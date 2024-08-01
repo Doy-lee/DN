@@ -143,17 +143,16 @@ DQN_API void Dqn_JSONBuilder_KeyValue(Dqn_JSONBuilder *builder, Dqn_Str8 key, Dq
     int spaces            = builder->indent_level * spaces_per_indent;
 
     if (key.size) {
-        Dqn_Str8Builder_AppendF(&builder->string_builder,
-                                "%.*s%*c\"%.*s\": %.*s",
-                                prefix_size,
-                                prefix,
-                                spaces,
-                                ' ',
-                                DQN_STR_FMT(key),
-                                DQN_STR_FMT(value));
+        Dqn_Str8Builder_AddF(&builder->string_builder,
+                             "%.*s%*c\"%.*s\": %.*s",
+                             prefix_size,
+                             prefix,
+                             spaces,
+                             ' ',
+                             DQN_STR_FMT(key),
+                             DQN_STR_FMT(value));
     } else {
-        Dqn_Str8Builder_AppendF(
-            &builder->string_builder, "%.*s%*c%.*s", prefix_size, prefix, spaces, ' ', DQN_STR_FMT(value));
+        Dqn_Str8Builder_AddF(&builder->string_builder, "%.*s%*c%.*s", prefix_size, prefix, spaces, ' ', DQN_STR_FMT(value));
     }
 
     if (item == Dqn_JSONBuilderItem_OpenContainer)
@@ -164,8 +163,8 @@ DQN_API void Dqn_JSONBuilder_KeyValue(Dqn_JSONBuilder *builder, Dqn_Str8 key, Dq
 
 DQN_API void Dqn_JSONBuilder_KeyValueFV(Dqn_JSONBuilder *builder, Dqn_Str8 key, char const *value_fmt, va_list args)
 {
-    Dqn_Scratch scratch = Dqn_Scratch_Get(builder->string_builder.arena);
-    Dqn_Str8    value   = Dqn_Str8_InitFV(scratch.arena, value_fmt, args);
+    Dqn_TLSTMem tmem = Dqn_TLS_TMem(builder->string_builder.arena);
+    Dqn_Str8    value   = Dqn_Str8_InitFV(tmem.arena, value_fmt, args);
     Dqn_JSONBuilder_KeyValue(builder, key, value);
 }
 
@@ -765,55 +764,55 @@ DQN_API Dqn_Str8 Dqn_U64ByteSizeTypeString(Dqn_U64ByteSizeType type)
     return result;
 }
 
-DQN_API Dqn_Str8 Dqn_U64ToAge(Dqn_Arena *arena, uint64_t age_s, Dqn_usize type)
+DQN_API Dqn_Str8 Dqn_U64ToAge(Dqn_Arena *arena, uint64_t age_s, Dqn_U64AgeUnit unit)
 {
     Dqn_Str8 result = {};
     if (!arena)
         return result;
 
-    Dqn_Scratch     scratch = Dqn_Scratch_Get(arena);
+    Dqn_TLSTMem     tmem = Dqn_TLS_TMem(arena);
     Dqn_Str8Builder builder = {};
     builder.arena           = arena;
     uint64_t remainder      = age_s;
 
-    if (type & Dqn_U64AgeUnit_Year) {
-        Dqn_usize unit  = remainder / DQN_YEARS_TO_S(1);
-        remainder      -= DQN_YEARS_TO_S(unit);
-        if (unit)
-            Dqn_Str8Builder_AppendF(&builder, "%s%I64uyr", builder.string_size ? " " : "", unit);
+    if (unit & Dqn_U64AgeUnit_Year) {
+        Dqn_usize value = remainder / DQN_YEARS_TO_S(1);
+        remainder -= DQN_YEARS_TO_S(value);
+        if (value)
+            Dqn_Str8Builder_AddF(&builder, "%s%I64uyr", builder.string_size ? " " : "", value);
     }
 
-    if (type & Dqn_U64AgeUnit_Week) {
-        Dqn_usize unit  = remainder / DQN_WEEKS_TO_S(1);
-        remainder      -= DQN_WEEKS_TO_S(unit);
-        if (unit)
-            Dqn_Str8Builder_AppendF(&builder, "%s%I64uw", builder.string_size ? " " : "", unit);
+    if (unit & Dqn_U64AgeUnit_Week) {
+        Dqn_usize value = remainder / DQN_WEEKS_TO_S(1);
+        remainder -= DQN_WEEKS_TO_S(value);
+        if (value)
+            Dqn_Str8Builder_AddF(&builder, "%s%I64uw", builder.string_size ? " " : "", value);
     }
 
-    if (type & Dqn_U64AgeUnit_Day) {
-        Dqn_usize unit  = remainder / DQN_DAYS_TO_S(1);
-        remainder      -= DQN_DAYS_TO_S(unit);
-        if (unit)
-            Dqn_Str8Builder_AppendF(&builder, "%s%I64ud", builder.string_size ? " " : "", unit);
+    if (unit & Dqn_U64AgeUnit_Day) {
+        Dqn_usize value = remainder / DQN_DAYS_TO_S(1);
+        remainder -= DQN_DAYS_TO_S(value);
+        if (value)
+            Dqn_Str8Builder_AddF(&builder, "%s%I64ud", builder.string_size ? " " : "", value);
     }
 
-    if (type & Dqn_U64AgeUnit_Hr) {
-        Dqn_usize unit  = remainder / DQN_HOURS_TO_S(1);
-        remainder      -= DQN_HOURS_TO_S(unit);
-        if (unit)
-            Dqn_Str8Builder_AppendF(&builder, "%s%I64uh", builder.string_size ? " " : "", unit);
+    if (unit & Dqn_U64AgeUnit_Hr) {
+        Dqn_usize value = remainder / DQN_HOURS_TO_S(1);
+        remainder -= DQN_HOURS_TO_S(value);
+        if (value)
+            Dqn_Str8Builder_AddF(&builder, "%s%I64uh", builder.string_size ? " " : "", value);
     }
 
-    if (type & Dqn_U64AgeUnit_Min) {
-        Dqn_usize unit  = remainder / DQN_MINS_TO_S(1);
-        remainder      -= DQN_MINS_TO_S(unit);
-        if (unit)
-            Dqn_Str8Builder_AppendF(&builder, "%s%I64um", builder.string_size ? " " : "", unit);
+    if (unit & Dqn_U64AgeUnit_Min) {
+        Dqn_usize value = remainder / DQN_MINS_TO_S(1);
+        remainder -= DQN_MINS_TO_S(value);
+        if (value)
+            Dqn_Str8Builder_AddF(&builder, "%s%I64um", builder.string_size ? " " : "", value);
     }
 
-    if (type & Dqn_U64AgeUnit_Sec) {
-        Dqn_usize unit = remainder;
-        Dqn_Str8Builder_AppendF(&builder, "%s%I64us", builder.string_size ? " " : "", unit);
+    if (unit & Dqn_U64AgeUnit_Sec) {
+        Dqn_usize value = remainder;
+        Dqn_Str8Builder_AddF(&builder, "%s%I64us", builder.string_size ? " " : "", value);
     }
 
     result = Dqn_Str8Builder_Build(&builder, arena);
@@ -841,10 +840,10 @@ DQN_API uint64_t Dqn_HexToU64(Dqn_Str8 hex)
 DQN_API Dqn_Str8 Dqn_U64ToHex(Dqn_Arena *arena, uint64_t number, uint32_t flags)
 {
     Dqn_Str8 prefix = {};
-    if (!(flags & Dqn_BinHexU64Str8Flags_No0xPrefix))
+    if ((flags & Dqn_HexU64Str8Flags_0xPrefix))
         prefix = DQN_STR8("0x");
 
-    char const *fmt           = (flags & Dqn_BinHexU64Str8Flags_UppercaseHex) ? "%I64X" : "%I64x";
+    char const *fmt           = (flags & Dqn_HexU64Str8Flags_UppercaseHex) ? "%I64X" : "%I64x";
     Dqn_usize   required_size = Dqn_CStr8_FSize(fmt, number) + prefix.size;
     Dqn_Str8    result        = Dqn_Str8_Alloc(arena, required_size, Dqn_ZeroMem_No);
 
@@ -859,14 +858,14 @@ DQN_API Dqn_Str8 Dqn_U64ToHex(Dqn_Arena *arena, uint64_t number, uint32_t flags)
 DQN_API Dqn_U64HexStr8 Dqn_U64ToHexStr8(uint64_t number, uint32_t flags)
 {
     Dqn_Str8 prefix = {};
-    if (!(flags & Dqn_BinHexU64Str8Flags_No0xPrefix))
+    if (flags & Dqn_HexU64Str8Flags_0xPrefix)
         prefix = DQN_STR8("0x");
 
     Dqn_U64HexStr8 result = {};
     DQN_MEMCPY(result.data, prefix.data, prefix.size);
     result.size += DQN_CAST(int8_t) prefix.size;
 
-    char const *fmt = (flags & Dqn_BinHexU64Str8Flags_UppercaseHex) ? "%I64X" : "%I64x";
+    char const *fmt = (flags & Dqn_HexU64Str8Flags_UppercaseHex) ? "%I64X" : "%I64x";
     int size        = DQN_SNPRINTF(result.data + result.size, DQN_ARRAY_UCOUNT(result.data) - result.size, fmt, number);
     result.size += DQN_CAST(uint8_t) size;
     DQN_ASSERT(result.size < DQN_ARRAY_UCOUNT(result.data));
@@ -905,9 +904,9 @@ DQN_API Dqn_Str8 Dqn_BytesToHex(Dqn_Arena *arena, void const *src, Dqn_usize siz
     if (!src || size <= 0)
         return result;
 
-    result                       = Dqn_Str8_Alloc(arena, size * 2, Dqn_ZeroMem_No);
-    result.data[result.size - 1] = 0;
-    bool converted               = Dqn_BytesToHexPtr(src, size, result.data, result.size);
+    result                   = Dqn_Str8_Alloc(arena, size * 2, Dqn_ZeroMem_No);
+    result.data[result.size] = 0;
+    bool converted           = Dqn_BytesToHexPtr(src, size, result.data, result.size);
     DQN_ASSERT(converted);
     return result;
 }
@@ -1029,10 +1028,10 @@ DQN_API Dqn_Library *Dqn_Library_Init(Dqn_LibraryOnInit on_init)
     // NOTE: Setup the allocation table with allocation tracking turned off on
     // the arena we're using to initialise the table.
     result->alloc_table_arena.flags |= Dqn_ArenaFlag_NoAllocTrack;
-    result->alloc_table              = Dqn_DSMap_Init<Dqn_DebugAlloc>(&result->alloc_table_arena, 4096);
+    result->alloc_table              = Dqn_DSMap_Init<Dqn_DebugAlloc>(&result->alloc_table_arena, 4096, Dqn_DSMapFlags_Nil);
     #endif
 
-    result->arena = Dqn_Arena_InitSize(0, 0, Dqn_ArenaFlag_AllocCanLeak);
+    result->arena = Dqn_Arena_InitSize(DQN_MEGABYTES(2), DQN_KILOBYTES(64), Dqn_ArenaFlag_AllocCanLeak);
     result->pool  = Dqn_ChunkPool_Init(&result->arena, /*align*/ 0);
     Dqn_ArenaCatalog_Init(&result->arena_catalog, &result->pool);
     Dqn_ArenaCatalog_AddF(&result->arena_catalog, &result->arena, "Dqn Library");
@@ -1041,47 +1040,49 @@ DQN_API Dqn_Library *Dqn_Library_Init(Dqn_LibraryOnInit on_init)
     Dqn_ArenaCatalog_AddF(&result->arena_catalog, &result->alloc_table_arena, "Dqn Allocation Table");
     #endif
 
-    // NOTE: Initialise scratch arenas which allocate memory and will be
+    // NOTE: Initialise tmem arenas which allocate memory and will be
     // recorded to the now initialised allocation table. The initialisation
-    // of scratch memory may request scratch memory itself in leak tracing mode.
-    // This is supported as the scratch arenas defer allocation tracking until
+    // of tmem memory may request tmem memory itself in leak tracing mode.
+    // This is supported as the tmem arenas defer allocation tracking until
     // initialisation is done.
-    Dqn_Scratch scratch = Dqn_Scratch_Get(nullptr);
+    Dqn_TLS_Init(&result->tls);
+    Dqn_OS_ThreadSetTLS(&result->tls);
+    Dqn_TLSTMem tmem = Dqn_TLS_TMem(nullptr);
     // NOTE: END IMPORTANT ORDER OF STATEMENTS /////////////////////////////////////////////////////
 
     result->exe_dir = Dqn_OS_EXEDir(&result->arena);
 
     // NOTE: Print out init features ///////////////////////////////////////////////////////////////
     Dqn_Str8Builder builder = {};
-    builder.arena           = scratch.arena;
+    builder.arena           = tmem.arena;
     if (on_init & Dqn_LibraryOnInit_LogLibFeatures) {
-        Dqn_Str8Builder_AppendRef(&builder, DQN_STR8("Dqn Library initialised:\n"));
+        Dqn_Str8Builder_AddRef(&builder, DQN_STR8("Dqn Library initialised:\n"));
 
         Dqn_f64 page_size_kib         = result->os_page_size / 1024.0;
         Dqn_f64 alloc_granularity_kib = result->os_alloc_granularity / 1024.0;
-        Dqn_Str8Builder_AppendF(
+        Dqn_Str8Builder_AddF(
             &builder, "  OS Page Size/Alloc Granularity: %.1f/%.1fKiB\n", page_size_kib, alloc_granularity_kib);
 
         #if DQN_HAS_FEATURE(address_sanitizer) || defined(__SANITIZE_ADDRESS__)
         if (DQN_ASAN_POISON) {
-            Dqn_Str8Builder_AppendF(
+            Dqn_Str8Builder_AddF(
                 &builder, "  ASAN manual poisoning%s\n", DQN_ASAN_VET_POISON ? " (+vet sanity checks)" : "");
-            Dqn_Str8Builder_AppendF(&builder, "  ASAN poison guard size: %u\n", DQN_ASAN_POISON_GUARD_SIZE);
+            Dqn_Str8Builder_AddF(&builder, "  ASAN poison guard size: %u\n", DQN_ASAN_POISON_GUARD_SIZE);
         }
         #endif
 
         #if defined(DQN_LEAK_TRACKING)
-        Dqn_Str8Builder_AppendRef(&builder, DQN_STR8("  Allocation leak tracing\n"));
+        Dqn_Str8Builder_AddRef(&builder, DQN_STR8("  Allocation leak tracing\n"));
         #endif
 
         #if !defined(DQN_NO_PROFILER)
-        Dqn_Str8Builder_AppendRef(&builder, DQN_STR8("  TSC profiler available\n"));
+        Dqn_Str8Builder_AddRef(&builder, DQN_STR8("  TSC profiler available\n"));
         #endif
 
         #if defined(DQN_USE_STD_PRINTF)
-        Dqn_Str8Builder_AppendRef(&builder, DQN_STR8("  Using stdio's printf functions\n"));
+        Dqn_Str8Builder_AddRef(&builder, DQN_STR8("  Using stdio's printf functions\n"));
         #else
-        Dqn_Str8Builder_AppendRef(&builder, DQN_STR8("  Using stb_sprintf functions\n"));
+        Dqn_Str8Builder_AddRef(&builder, DQN_STR8("  Using stb_sprintf functions\n"));
         #endif
 
         // TODO(doyle): Add stacktrace feature log
@@ -1090,10 +1091,10 @@ DQN_API Dqn_Library *Dqn_Library_Init(Dqn_LibraryOnInit on_init)
     if (on_init & Dqn_LibraryOnInit_LogCPUFeatures) {
         Dqn_CPUReport const *report = &result->cpu_report;
         Dqn_Str8 brand              = Dqn_Str8_TrimWhitespaceAround(Dqn_Str8_Init(report->brand, sizeof(report->brand) - 1));
-        Dqn_Str8Builder_AppendF(&builder,
-                                "  CPU '%.*s' from '%s' detected:\n",
-                                DQN_STR_FMT(brand),
-                                report->vendor);
+        Dqn_Str8Builder_AddF(&builder,
+                             "  CPU '%.*s' from '%s' detected:\n",
+                             DQN_STR_FMT(brand),
+                             report->vendor);
 
         Dqn_usize longest_feature_name = 0;
         DQN_FOR_UINDEX(feature_index, Dqn_CPUFeature_Count) {
@@ -1104,16 +1105,16 @@ DQN_API Dqn_Library *Dqn_Library_Init(Dqn_LibraryOnInit on_init)
         DQN_FOR_UINDEX(feature_index, Dqn_CPUFeature_Count) {
             Dqn_CPUFeatureDecl feature_decl = g_dqn_cpu_feature_decl[feature_index];
             bool               has_feature  = Dqn_CPU_HasFeature(report, feature_decl.value);
-            Dqn_Str8Builder_AppendF(&builder,
-                                    "    %.*s:%*s%s\n",
-                                    DQN_STR_FMT(feature_decl.label),
-                                    DQN_CAST(int)(longest_feature_name - feature_decl.label.size),
-                                    "",
-                                    has_feature ? "available" : "not available");
+            Dqn_Str8Builder_AddF(&builder,
+                                 "    %.*s:%*s%s\n",
+                                 DQN_STR_FMT(feature_decl.label),
+                                 DQN_CAST(int)(longest_feature_name - feature_decl.label.size),
+                                 "",
+                                 has_feature ? "available" : "not available");
         }
     }
 
-    Dqn_Str8 info_log = Dqn_Str8Builder_Build(&builder, scratch.arena);
+    Dqn_Str8 info_log = Dqn_Str8Builder_Build(&builder, tmem.arena);
     if (Dqn_Str8_HasData(info_log))
         Dqn_Log_DebugF("%.*s", DQN_STR_FMT(info_log));
     return result;
@@ -1121,8 +1122,10 @@ DQN_API Dqn_Library *Dqn_Library_Init(Dqn_LibraryOnInit on_init)
 
 DQN_API void Dqn_Library_SetPointer(Dqn_Library *library)
 {
-    if (library)
+    if (library) {
         g_dqn_library = library;
+        Dqn_OS_ThreadSetTLS(&library->tls);
+    }
 }
 
 #if !defined(DQN_NO_PROFILER)
@@ -1216,21 +1219,42 @@ DQN_API Dqn_Arena *Dqn_Library_AllocArenaF(Dqn_usize reserve, Dqn_usize commit, 
     return result;
 }
 
-#if !defined(DQN_NO_PROFILER)
-// NOTE: [$PROF] Dqn_Profiler //////////////////////////////////////////////////////////////////////
-Dqn_ProfilerZoneScope::Dqn_ProfilerZoneScope(Dqn_Str8 name, uint16_t anchor_index)
+DQN_API bool Dqn_Library_EraseArena(Dqn_Arena *arena, Dqn_ArenaCatalogFreeArena free_arena)
 {
-    zone = Dqn_Profiler_BeginZoneWithIndex(name, anchor_index);
+    Dqn_ArenaCatalog *catalog = &g_dqn_library->arena_catalog;
+    bool result = Dqn_ArenaCatalog_Erase(catalog, arena, free_arena);
+    return result;
 }
 
-Dqn_ProfilerZoneScope::~Dqn_ProfilerZoneScope()
+#if !defined(DQN_NO_PROFILER)
+// NOTE: [$PROF] Dqn_Profiler //////////////////////////////////////////////////////////////////////
+DQN_API Dqn_ProfilerZoneScope::Dqn_ProfilerZoneScope(Dqn_Str8 name, uint16_t anchor_index)
+{
+    zone = Dqn_Profiler_BeginZoneAtIndex(name, anchor_index);
+}
+
+DQN_API Dqn_ProfilerZoneScope::~Dqn_ProfilerZoneScope()
 {
     Dqn_Profiler_EndZone(zone);
 }
 
-Dqn_ProfilerZone Dqn_Profiler_BeginZoneWithIndex(Dqn_Str8 name, uint16_t anchor_index)
+DQN_API Dqn_ProfilerAnchor *Dqn_Profiler_ReadBuffer()
 {
-    Dqn_ProfilerAnchor *anchor           = Dqn_Profiler_AnchorBuffer(Dqn_ProfilerAnchorBuffer_Back) + anchor_index;
+    Dqn_ProfilerAnchor *result = Dqn_Profiler_AnchorBuffer(Dqn_ProfilerAnchorBuffer_Front);
+    return result;
+}
+
+DQN_API Dqn_ProfilerAnchor *Dqn_Profiler_WriteBuffer()
+{
+    Dqn_ProfilerAnchor *result = Dqn_Profiler_AnchorBuffer(Dqn_ProfilerAnchorBuffer_Back);
+    return result;
+}
+
+DQN_API Dqn_ProfilerZone Dqn_Profiler_BeginZoneAtIndex(Dqn_Str8 name, uint16_t anchor_index)
+{
+    Dqn_ProfilerAnchor *anchor           = Dqn_Profiler_WriteBuffer() + anchor_index;
+    if (Dqn_Str8_HasData(anchor->name))
+        DQN_ASSERTF(name == anchor->name, "Potentially overwriting a zone by accident?");
     anchor->name                         = name;
     Dqn_ProfilerZone result              = {};
     result.begin_tsc                     = Dqn_CPU_TSC();
@@ -1241,10 +1265,10 @@ Dqn_ProfilerZone Dqn_Profiler_BeginZoneWithIndex(Dqn_Str8 name, uint16_t anchor_
     return result;
 }
 
-void Dqn_Profiler_EndZone(Dqn_ProfilerZone zone)
+DQN_API void Dqn_Profiler_EndZone(Dqn_ProfilerZone zone)
 {
     uint64_t            elapsed_tsc   = Dqn_CPU_TSC() - zone.begin_tsc;
-    Dqn_ProfilerAnchor *anchor_buffer = Dqn_Profiler_AnchorBuffer(Dqn_ProfilerAnchorBuffer_Back);
+    Dqn_ProfilerAnchor *anchor_buffer = Dqn_Profiler_WriteBuffer();
     Dqn_ProfilerAnchor *anchor        = anchor_buffer + zone.anchor_index;
 
     anchor->hit_count++;
@@ -1256,7 +1280,7 @@ void Dqn_Profiler_EndZone(Dqn_ProfilerZone zone)
     g_dqn_library->profiler->parent_zone = zone.parent_zone;
 }
 
-Dqn_ProfilerAnchor *Dqn_Profiler_AnchorBuffer(Dqn_ProfilerAnchorBuffer buffer)
+DQN_API Dqn_ProfilerAnchor *Dqn_Profiler_AnchorBuffer(Dqn_ProfilerAnchorBuffer buffer)
 {
     uint8_t offset = buffer == Dqn_ProfilerAnchorBuffer_Back ? 0 : 1;
     uint8_t anchor_buffer =
@@ -1265,7 +1289,7 @@ Dqn_ProfilerAnchor *Dqn_Profiler_AnchorBuffer(Dqn_ProfilerAnchorBuffer buffer)
     return result;
 }
 
-void Dqn_Profiler_SwapAnchorBuffer()
+DQN_API void Dqn_Profiler_SwapAnchorBuffer()
 {
     g_dqn_library->profiler->active_anchor_buffer++;
     Dqn_ProfilerAnchor *anchors = Dqn_Profiler_AnchorBuffer(Dqn_ProfilerAnchorBuffer_Back);
@@ -1274,9 +1298,9 @@ void Dqn_Profiler_SwapAnchorBuffer()
                DQN_ARRAY_UCOUNT(g_dqn_library->profiler->anchors[0]) * sizeof(g_dqn_library->profiler->anchors[0][0]));
 }
 
-void Dqn_Profiler_Dump(uint64_t tsc_per_second)
+DQN_API void Dqn_Profiler_Dump(uint64_t tsc_per_second)
 {
-    Dqn_ProfilerAnchor *anchors = Dqn_Profiler_AnchorBuffer(Dqn_ProfilerAnchorBuffer_Back);
+    Dqn_ProfilerAnchor *anchors = Dqn_Profiler_ReadBuffer();
     for (size_t anchor_index = 1; anchor_index < DQN_PROFILER_ANCHOR_BUFFER_SIZE; anchor_index++) {
         Dqn_ProfilerAnchor const *anchor = anchors + anchor_index;
         if (!anchor->hit_count)
@@ -1343,8 +1367,8 @@ DQN_API bool Dqn_OS_JobQueueSPMCAdd(Dqn_JobQueueSPMC *queue, Dqn_Job job)
 
 DQN_API int32_t Dqn_OS_JobQueueSPMCThread(Dqn_OSThread *thread)
 {
-    Dqn_JobQueueSPMC *queue = DQN_CAST(Dqn_JobQueueSPMC *) thread->user_context;
-    uint32_t const    pot_mask  = DQN_ARRAY_UCOUNT(queue->jobs) - 1;
+    Dqn_JobQueueSPMC *queue    = DQN_CAST(Dqn_JobQueueSPMC *) thread->user_context;
+    uint32_t const    pot_mask = DQN_ARRAY_UCOUNT(queue->jobs) - 1;
     static_assert(DQN_ARRAY_UCOUNT(queue->jobs) == DQN_ARRAY_UCOUNT(queue->complete_queue), "PoT mask is used to mask access to both arrays");
 
     for (;;) {
@@ -1360,8 +1384,9 @@ DQN_API int32_t Dqn_OS_JobQueueSPMCThread(Dqn_OSThread *thread)
         queue->read_index += 1;
         Dqn_OS_MutexUnlock(&queue->mutex);
 
-        job.func(job.user_context);
-        Dqn_Arena_Deinit(job.arena);
+        job.elapsed_tsc -= Dqn_CPU_TSC();
+        job.func(thread, job.user_context);
+        job.elapsed_tsc += Dqn_CPU_TSC();
 
         if (job.add_to_completion_queue) {
             Dqn_OS_SemaphoreWait(&queue->complete_queue_write_semaphore, DQN_OS_SEMAPHORE_INFINITE_TIMEOUT);
@@ -1371,9 +1396,15 @@ DQN_API int32_t Dqn_OS_JobQueueSPMCThread(Dqn_OSThread *thread)
             Dqn_OS_SemaphoreIncrement(&queue->complete_queue_write_semaphore, 1);
         }
 
+        // NOTE: Update finish counter
         Dqn_OS_MutexLock(&queue->mutex);
         queue->finish_index += 1;
-        if (queue->finish_index == queue->write_index && queue->threads_waiting_for_completion) {
+
+        // NOTE: If all jobs are finished and we have another thread who is
+        // blocked via `WaitForCompletion` for this job queue, we will go
+        // release the semaphore to wake them all up.
+        bool all_jobs_finished = queue->finish_index == queue->write_index;
+        if (all_jobs_finished && queue->threads_waiting_for_completion) {
             Dqn_OS_SemaphoreIncrement(&queue->wait_for_completion_semaphore,
                                       queue->threads_waiting_for_completion);
             queue->threads_waiting_for_completion = 0;

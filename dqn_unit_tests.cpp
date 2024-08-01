@@ -3,7 +3,7 @@
 
 #include <inttypes.h>
 
-#if !defined(__clang__)
+
 // NOTE: Taken from MSDN __cpuid example implementation
 // https://learn.microsoft.com/en-us/cpp/intrinsics/cpuid-cpuidex?view=msvc-170
 #include <bitset>
@@ -110,7 +110,7 @@ private:
             for (int i = 0; i <= nIds_; ++i)
             {
                 __cpuidex(cpui.data(), i, 0);
-                data_.push_back(cpui);
+                data_[dataSize_++] = cpui;
             }
 
             // Capture vendor string
@@ -154,7 +154,7 @@ private:
             for (int i = 0x80000000; i <= nExIds_; ++i)
             {
                 __cpuidex(cpui.data(), i, 0);
-                extdata_.push_back(cpui);
+                extdata_[extdataSize_++] = cpui;
             }
 
             // load bitset with flags for function 0x80000001
@@ -186,14 +186,15 @@ private:
         std::bitset<32> f_7_ECX_;
         std::bitset<32> f_81_ECX_;
         std::bitset<32> f_81_EDX_;
-        std::vector<std::array<int, 4>> data_;
-        std::vector<std::array<int, 4>> extdata_;
+        std::array<std::array<int, 4>, 512> data_{};
+        size_t dataSize_ = 0;
+        std::array<std::array<int, 4>, 512> extdata_{};
+        size_t extdataSize_ = 0;
     };
 };
 
 // Initialize static member data
 const Dqn_RefImplCPUReport::Dqn_RefImplCPUReport_Internal Dqn_RefImplCPUReport::CPU_Rep;
-#endif // !defined(__clang__)
 
 #if 0
 static void Dqn_RefImpl_CPUReportDump() // Print out supported instruction set features
@@ -263,8 +264,6 @@ static Dqn_UTest Dqn_Test_Base()
 {
     Dqn_UTest test = {};
     DQN_UTEST_GROUP(test, "Dqn_Base") {
-        // TODO(doyle): cpuid refimpl doesn't work on clang
-        #if !defined(__clang__)
         DQN_UTEST_TEST("Query CPUID") {
             Dqn_CPUReport cpu_report = Dqn_CPU_Report();
 
@@ -324,8 +323,8 @@ static Dqn_UTest Dqn_Test_Base()
             DQN_UTEST_ASSERT(&test, Dqn_CPU_HasFeature(&cpu_report, Dqn_CPUFeature_XOP)         == Dqn_RefImplCPUReport::XOP());
             DQN_UTEST_ASSERT(&test, Dqn_CPU_HasFeature(&cpu_report, Dqn_CPUFeature_XSAVE)       == Dqn_RefImplCPUReport::XSAVE());
             #endif
+
         }
-        #endif // !defined(__clang__)
     }
     return test;
 }
@@ -427,7 +426,7 @@ static Dqn_UTest Dqn_Test_Arena()
 
 static Dqn_UTest Dqn_Test_Bin()
 {
-    Dqn_Scratch scratch = Dqn_Scratch_Get(nullptr);
+    Dqn_TLSTMem tmem = Dqn_TLS_TMem(nullptr);
     Dqn_UTest test           = {};
     DQN_UTEST_GROUP(test, "Dqn_Bin") {
         DQN_UTEST_TEST("Convert 0x123") {
@@ -487,23 +486,23 @@ static Dqn_UTest Dqn_Test_Bin()
 
         uint32_t number = 0xd095f6;
         DQN_UTEST_TEST("Convert %x to string", number) {
-            Dqn_Str8 number_hex = Dqn_BytesToHex(scratch.arena, &number, sizeof(number));
+            Dqn_Str8 number_hex = Dqn_BytesToHex(tmem.arena, &number, sizeof(number));
             DQN_UTEST_ASSERTF(&test, Dqn_Str8_Eq(number_hex, DQN_STR8("f695d000")), "number_hex=%.*s", DQN_STR_FMT(number_hex));
         }
 
         number = 0xf6ed00;
         DQN_UTEST_TEST("Convert %x to string", number) {
-            Dqn_Str8 number_hex = Dqn_BytesToHex(scratch.arena, &number, sizeof(number));
+            Dqn_Str8 number_hex = Dqn_BytesToHex(tmem.arena, &number, sizeof(number));
             DQN_UTEST_ASSERTF(&test, Dqn_Str8_Eq(number_hex, DQN_STR8("00edf600")), "number_hex=%.*s", DQN_STR_FMT(number_hex));
         }
 
         Dqn_Str8 hex = DQN_STR8("0xf6ed00");
         DQN_UTEST_TEST("Convert %.*s to bytes", DQN_STR_FMT(hex)) {
-            Dqn_Str8 bytes = Dqn_HexToBytes(scratch.arena, hex);
+            Dqn_Str8 bytes = Dqn_HexToBytes(tmem.arena, hex);
             DQN_UTEST_ASSERTF(&test,
                                Dqn_Str8_Eq(bytes, DQN_STR8("\xf6\xed\x00")),
                                "number_hex=%.*s",
-                               DQN_STR_FMT(Dqn_BytesToHex(scratch.arena, bytes.data, bytes.size)));
+                               DQN_STR_FMT(Dqn_BytesToHex(tmem.arena, bytes.data, bytes.size)));
         }
 
     }
@@ -822,11 +821,11 @@ static Dqn_UTest Dqn_Test_DSMap()
 {
     Dqn_UTest test = {};
     DQN_UTEST_GROUP(test, "Dqn_DSMap") {
-        Dqn_Scratch scratch = Dqn_Scratch_Get(nullptr);
+        Dqn_TLSTMem tmem = Dqn_TLS_TMem(nullptr);
         {
             Dqn_Arena           arena    = {};
             uint32_t const      MAP_SIZE = 64;
-            Dqn_DSMap<uint64_t> map      = Dqn_DSMap_Init<uint64_t>(&arena, MAP_SIZE);
+            Dqn_DSMap<uint64_t> map      = Dqn_DSMap_Init<uint64_t>(&arena, MAP_SIZE, Dqn_DSMapFlags_Nil);
             DQN_DEFER { Dqn_DSMap_Deinit(&map, Dqn_ZeroMem_Yes); };
 
             DQN_UTEST_TEST("Find non-existent value") {
@@ -867,10 +866,10 @@ static Dqn_UTest Dqn_Test_DSMap()
                 case DSMapTestType_MakeSlot: prefix = DQN_STR8("Make slot"); break;
             }
 
-            Dqn_ArenaTempMemScope temp_mem_scope = Dqn_ArenaTempMemScope(scratch.arena);
+            Dqn_ArenaTempMemScope temp_mem_scope = Dqn_ArenaTempMemScope(tmem.arena);
             Dqn_Arena             arena          = {};
             uint32_t const        MAP_SIZE       = 64;
-            Dqn_DSMap<uint64_t>   map            = Dqn_DSMap_Init<uint64_t>(&arena, MAP_SIZE);
+            Dqn_DSMap<uint64_t>   map            = Dqn_DSMap_Init<uint64_t>(&arena, MAP_SIZE, Dqn_DSMapFlags_Nil);
             DQN_DEFER { Dqn_DSMap_Deinit(&map, Dqn_ZeroMem_Yes); };
 
             DQN_UTEST_TEST("%.*s: Test growing", DQN_STR_FMT(prefix)) {
@@ -878,8 +877,7 @@ static Dqn_UTest Dqn_Test_DSMap()
                 uint64_t value          = 0;
                 uint64_t grow_threshold = map_start_size * 3 / 4;
                 for (; map.occupied != grow_threshold; value++) {
-                    uint64_t *val_copy = Dqn_Arena_NewCopy(scratch.arena, uint64_t, &value);
-                    Dqn_DSMapKey key   = Dqn_DSMap_KeyBuffer(&map, (char *)val_copy, sizeof(*val_copy));
+                    Dqn_DSMapKey key = Dqn_DSMap_KeyU64(&map, value);
                     DQN_UTEST_ASSERT(&test, !Dqn_DSMap_Find<uint64_t>(&map, key).value);
                     Dqn_DSMapResult<uint64_t> make_result = {};
                     if (test_type == DSMapTestType_Set) {
@@ -895,8 +893,7 @@ static Dqn_UTest Dqn_Test_DSMap()
                 DQN_UTEST_ASSERT(&test, map.occupied     == 1 /*Sentinel*/ + value);
 
                 { // NOTE: One more item should cause the table to grow by 2x
-                    uint64_t *val_copy = Dqn_Arena_NewCopy(scratch.arena, uint64_t, &value);
-                    Dqn_DSMapKey key   = Dqn_DSMap_KeyBuffer(&map, (char *)val_copy, sizeof(*val_copy));
+                    Dqn_DSMapKey              key         = Dqn_DSMap_KeyU64(&map, value);
                     Dqn_DSMapResult<uint64_t> make_result = {};
                     if (test_type == DSMapTestType_Set) {
                         make_result = Dqn_DSMap_Set(&map, key, value);
@@ -924,7 +921,7 @@ static Dqn_UTest Dqn_Test_DSMap()
 
                     // NOTE: Validate each slot value
                     uint64_t value_test = index - 1;
-                    Dqn_DSMapKey key    = Dqn_DSMap_KeyBuffer(&map, &value_test, sizeof(value_test));
+                    Dqn_DSMapKey key    = Dqn_DSMap_KeyU64(&map, value_test);
                     DQN_UTEST_ASSERT(&test, Dqn_DSMap_KeyEquals(slot->key, key));
                     if (test_type == DSMapTestType_Set) {
                         DQN_UTEST_ASSERT(&test, slot->value == value_test);
@@ -945,9 +942,7 @@ static Dqn_UTest Dqn_Test_DSMap()
                 uint64_t value              = 0;
                 uint64_t shrink_threshold   = map.size * 1 / 4;
                 for (; map.occupied != shrink_threshold; value++) {
-                    uint64_t *val_copy = Dqn_Arena_NewCopy(scratch.arena, uint64_t, &value);
-                    Dqn_DSMapKey key   = Dqn_DSMap_KeyBuffer(&map, (char *)val_copy, sizeof(*val_copy));
-
+                    Dqn_DSMapKey key = Dqn_DSMap_KeyU64(&map, value);
                     DQN_UTEST_ASSERT(&test, Dqn_DSMap_Find<uint64_t>(&map, key).value);
                     Dqn_DSMap_Erase(&map, key);
                     DQN_UTEST_ASSERT(&test, !Dqn_DSMap_Find<uint64_t>(&map, key).value);
@@ -955,9 +950,8 @@ static Dqn_UTest Dqn_Test_DSMap()
                 DQN_UTEST_ASSERT(&test, map.size == start_map_size);
                 DQN_UTEST_ASSERT(&test, map.occupied == start_map_occupied - value);
 
-                { // NOTE: One more item should cause the table to grow by 2x
-                    uint64_t *val_copy = Dqn_Arena_NewCopy(scratch.arena, uint64_t, &value);
-                    Dqn_DSMapKey key   = Dqn_DSMap_KeyBuffer(&map, (char *)val_copy, sizeof(*val_copy));
+                { // NOTE: One more item should cause the table to shrink by 2x
+                    Dqn_DSMapKey key = Dqn_DSMap_KeyU64(&map, value);
                     Dqn_DSMap_Erase(&map, key);
                     value++;
 
@@ -971,12 +965,12 @@ static Dqn_UTest Dqn_Test_DSMap()
                     DQN_UTEST_ASSERT(&test, DQN_MEMCMP(&sentinel, &NIL_SLOT, sizeof(NIL_SLOT)) == 0);
                 }
 
-                // NOTE: Recheck all the hash table values after growing
+                // NOTE: Recheck all the hash table values after shrinking
                 for (uint64_t index = 1 /*Sentinel*/; index < map.occupied; index++) {
 
                     // NOTE: Generate the key
                     uint64_t value_test = value + (index - 1);
-                    Dqn_DSMapKey key    = Dqn_DSMap_KeyBuffer(&map, (char *)&value_test, sizeof(value_test));
+                    Dqn_DSMapKey key    = Dqn_DSMap_KeyU64(&map, value_test);
 
                     // NOTE: Validate each slot value
                     Dqn_DSMapResult<uint64_t> find_result = Dqn_DSMap_Find(&map, key);
@@ -995,8 +989,7 @@ static Dqn_UTest Dqn_Test_DSMap()
                 }
 
                 for (; map.occupied != 1; value++) { // NOTE: Remove all items from the table
-                    uint64_t *val_copy = Dqn_Arena_NewCopy(scratch.arena, uint64_t, &value);
-                    Dqn_DSMapKey key   = Dqn_DSMap_KeyBuffer(&map, (char *)val_copy, sizeof(*val_copy));
+                    Dqn_DSMapKey key   = Dqn_DSMap_KeyU64(&map, value);
                     DQN_UTEST_ASSERT(&test, Dqn_DSMap_Find<uint64_t>(&map, key).value);
                     Dqn_DSMap_Erase(&map, key);
                     DQN_UTEST_ASSERT(&test, !Dqn_DSMap_Find<uint64_t>(&map, key).value);
@@ -1016,12 +1009,12 @@ static Dqn_UTest Dqn_Test_FStr8()
     DQN_UTEST_GROUP(test, "Dqn_FStr8") {
         DQN_UTEST_TEST("Append too much fails") {
             Dqn_FStr8<4> str = {};
-            DQN_UTEST_ASSERT(&test, !Dqn_FStr8_Append(&str, DQN_STR8("abcde")));
+            DQN_UTEST_ASSERT(&test, !Dqn_FStr8_Add(&str, DQN_STR8("abcde")));
         }
 
         DQN_UTEST_TEST("Append format string too much fails") {
             Dqn_FStr8<4> str = {};
-            DQN_UTEST_ASSERT(&test, !Dqn_FStr8_AppendF(&str, "abcde"));
+            DQN_UTEST_ASSERT(&test, !Dqn_FStr8_AddF(&str, "abcde"));
         }
     }
     return test;
@@ -1049,8 +1042,8 @@ static Dqn_UTest Dqn_Test_Fs()
             DQN_UTEST_ASSERT(&test, Dqn_OS_FileExists(SRC_FILE));
 
             // NOTE: Read step
-            Dqn_Scratch scratch   = Dqn_Scratch_Get(nullptr);
-            Dqn_Str8    read_file = Dqn_OS_ReadAll(SRC_FILE, scratch.arena, nullptr);
+            Dqn_TLSTMem tmem   = Dqn_TLS_TMem(nullptr);
+            Dqn_Str8    read_file = Dqn_OS_ReadAll(tmem.arena, SRC_FILE, nullptr);
             DQN_UTEST_ASSERTF(&test, Dqn_Str8_HasData(read_file), "Failed to load file");
             DQN_UTEST_ASSERTF(&test, read_file.size == 4, "File read wrong amount of bytes");
             DQN_UTEST_ASSERTF(&test, Dqn_Str8_Eq(read_file, DQN_STR8("test")), "read(%zu): %.*s", read_file.size, DQN_STR_FMT(read_file));
@@ -1301,8 +1294,8 @@ Dqn_Str8 const DQN_UTEST_HASH_STRING_[] =
 
 void Dqn_Test_KeccakDispatch_(Dqn_UTest *test, int hash_type, Dqn_Str8 input)
 {
-    Dqn_Scratch scratch   = Dqn_Scratch_Get(nullptr);
-    Dqn_Str8    input_hex = Dqn_BytesToHex(scratch.arena, input.data, input.size);
+    Dqn_TLSTMem tmem   = Dqn_TLS_TMem(nullptr);
+    Dqn_Str8    input_hex = Dqn_BytesToHex(tmem.arena, input.data, input.size);
 
     switch(hash_type)
     {
@@ -1536,8 +1529,8 @@ static Dqn_UTest Dqn_Test_OS()
         }
 
         DQN_UTEST_TEST("Query executable directory") {
-            Dqn_Scratch scratch = Dqn_Scratch_Get(nullptr);
-            Dqn_Str8 result = Dqn_OS_EXEDir(scratch.arena);
+            Dqn_TLSTMem tmem = Dqn_TLS_TMem(nullptr);
+            Dqn_Str8 result = Dqn_OS_EXEDir(tmem.arena);
             DQN_UTEST_ASSERT(&test, Dqn_Str8_HasData(result));
             DQN_UTEST_ASSERTF(&test, Dqn_OS_DirExists(result), "result(%zu): %.*s", result.size, DQN_STR_FMT(result));
         }
@@ -1709,8 +1702,8 @@ static Dqn_UTest Dqn_Test_Str8()
         }
 
         DQN_UTEST_TEST("Initialise with format string") {
-            Dqn_Scratch scratch = Dqn_Scratch_Get(nullptr);
-            Dqn_Str8    string  = Dqn_Str8_InitF(scratch.arena, "%s", "AB");
+            Dqn_TLSTMem tmem = Dqn_TLS_TMem(nullptr);
+            Dqn_Str8    string  = Dqn_Str8_InitF(tmem.arena, "%s", "AB");
             DQN_UTEST_ASSERTF(&test, string.size == 2,      "size: %zu",   string.size);
             DQN_UTEST_ASSERTF(&test, string.data[0] == 'A', "string[0]: %c", string.data[0]);
             DQN_UTEST_ASSERTF(&test, string.data[1] == 'B', "string[1]: %c", string.data[1]);
@@ -1718,9 +1711,9 @@ static Dqn_UTest Dqn_Test_Str8()
         }
 
         DQN_UTEST_TEST("Copy string") {
-            Dqn_Scratch scratch = Dqn_Scratch_Get(nullptr);
+            Dqn_TLSTMem tmem = Dqn_TLS_TMem(nullptr);
             Dqn_Str8 string        = DQN_STR8("AB");
-            Dqn_Str8 copy          = Dqn_Str8_Copy(scratch.arena, string);
+            Dqn_Str8 copy          = Dqn_Str8_Copy(tmem.arena, string);
             DQN_UTEST_ASSERTF(&test, copy.size == 2,      "size: %zu", copy.size);
             DQN_UTEST_ASSERTF(&test, copy.data[0] == 'A', "copy[0]: %c", copy.data[0]);
             DQN_UTEST_ASSERTF(&test, copy.data[1] == 'B', "copy[1]: %c", copy.data[1]);
@@ -1733,8 +1726,8 @@ static Dqn_UTest Dqn_Test_Str8()
         }
 
         DQN_UTEST_TEST("Allocate string from arena") {
-            Dqn_Scratch scratch = Dqn_Scratch_Get(nullptr);
-            Dqn_Str8 string = Dqn_Str8_Alloc(scratch.arena, 2, Dqn_ZeroMem_No);
+            Dqn_TLSTMem tmem = Dqn_TLS_TMem(nullptr);
+            Dqn_Str8 string = Dqn_Str8_Alloc(tmem.arena, 2, Dqn_ZeroMem_No);
             DQN_UTEST_ASSERTF(&test, string.size == 2, "size: %zu", string.size);
         }
 
@@ -1950,7 +1943,7 @@ static Dqn_UTest Dqn_Test_Str8()
         DQN_UTEST_TEST("Find: String (char) is not in buffer") {
             Dqn_Str8 buf              = DQN_STR8("836a35becd4e74b66a0d6844d51f1a63018c7ebc44cf7e109e8e4bba57eefb55");
             Dqn_Str8 find             = DQN_STR8("2");
-            Dqn_Str8FindResult result = Dqn_Str8_FindStr8(buf, find);
+            Dqn_Str8FindResult result = Dqn_Str8_FindStr8(buf, find, Dqn_Str8EqCase_Sensitive);
             DQN_UTEST_ASSERT(&test, !result.found);
             DQN_UTEST_ASSERT(&test, result.index == 0);
             DQN_UTEST_ASSERT(&test, result.match.data == nullptr);
@@ -1960,7 +1953,7 @@ static Dqn_UTest Dqn_Test_Str8()
         DQN_UTEST_TEST("Find: String (char) is in buffer") {
             Dqn_Str8 buf              = DQN_STR8("836a35becd4e74b66a0d6844d51f1a63018c7ebc44cf7e109e8e4bba57eefb55");
             Dqn_Str8 find             = DQN_STR8("6");
-            Dqn_Str8FindResult result = Dqn_Str8_FindStr8(buf, find);
+            Dqn_Str8FindResult result = Dqn_Str8_FindStr8(buf, find, Dqn_Str8EqCase_Sensitive);
             DQN_UTEST_ASSERT(&test, result.found);
             DQN_UTEST_ASSERT(&test, result.index == 2);
             DQN_UTEST_ASSERT(&test, result.match.data[0] == '6');
@@ -2175,23 +2168,23 @@ static Dqn_UTest Dqn_Test_Win()
 {
     Dqn_UTest test = {};
     DQN_UTEST_GROUP(test, "OS Win32") {
-        Dqn_Scratch scratch = Dqn_Scratch_Get(nullptr);
+        Dqn_TLSTMem tmem = Dqn_TLS_TMem(nullptr);
         Dqn_Str8    input8  = DQN_STR8("String");
         Dqn_Str16   input16 = Dqn_Str16{(wchar_t *)(L"String"), sizeof(L"String") / sizeof(L"String"[0]) - 1};
 
         DQN_UTEST_TEST("Str8 to Str16") {
-            Dqn_Str16 result = Dqn_Win_Str8ToStr16(scratch.arena, input8);
+            Dqn_Str16 result = Dqn_Win_Str8ToStr16(tmem.arena, input8);
             DQN_UTEST_ASSERT(&test, result == input16);
         }
 
         DQN_UTEST_TEST("Str16 to Str8") {
-            Dqn_Str8 result = Dqn_Win_Str16ToStr8(scratch.arena, input16);
+            Dqn_Str8 result = Dqn_Win_Str16ToStr8(tmem.arena, input16);
             DQN_UTEST_ASSERT(&test, result == input8);
         }
 
         DQN_UTEST_TEST("Str16 to Str8: Null terminates string") {
             int   size_required = Dqn_Win_Str16ToStr8Buffer(input16, nullptr, 0);
-            char *string        = Dqn_Arena_NewArray(scratch.arena, char, size_required + 1, Dqn_ZeroMem_No);
+            char *string        = Dqn_Arena_NewArray(tmem.arena, char, size_required + 1, Dqn_ZeroMem_No);
 
             // Fill the string with error sentinels
             DQN_MEMSET(string, 'Z', size_required + 1);
@@ -2205,7 +2198,7 @@ static Dqn_UTest Dqn_Test_Win()
         }
 
         DQN_UTEST_TEST("Str16 to Str8: Arena null terminates string") {
-            Dqn_Str8   string8       = Dqn_Win_Str16ToStr8(scratch.arena, input16);
+            Dqn_Str8   string8       = Dqn_Win_Str16ToStr8(tmem.arena, input16);
             int        size_returned = Dqn_Win_Str16ToStr8Buffer(input16, nullptr, 0);
             char const EXPECTED[]    = {'S', 't', 'r', 'i', 'n', 'g', 0};
 
@@ -2259,7 +2252,7 @@ void Dqn_Test_RunSuite()
 int main(int argc, char *argv[])
 {
     (void)argv; (void)argc;
-    Dqn_Library_Init(Dqn_LibraryOnInit_LogAllFeatures);
+    Dqn_Library_Init(Dqn_LibraryOnInit_LogFeatures);
     Dqn_Test_RunSuite();
     return 0;
 }

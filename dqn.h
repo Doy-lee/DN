@@ -126,7 +126,7 @@
 //
 //   Allocations are stored in a global hash-table and their respective stack
 //   traces for the allocation location. Memory leaks can be dumped at the end
-//   of the program or some epoch by calling Dqn_Library_DumpLeaks()
+//   of the program or some epoch by calling Dqn_Debug_DumpLeaks()
 //
 //     #define DQN_LEAK_TRACKING
 //
@@ -300,15 +300,12 @@
             #define _CRT_SECURE_NO_WARNINGS
             #define DQN_UNDO_CRT_SECURE_NO_WARNINGS
         #endif
+        #define MD_DEFAULT_SPRINTF 0
+        #define MD_IMPL_Vsnprintf DQN_VSNPRINTF
         #include "External/metadesk/md.h"
         #if defined(DQN_UNDO_CRT_SECURE_NO_WARNINGS)
             #undef _CRT_SECURE_NO_WARNINGS
         #endif
-    #endif
-
-    // Metadesk includes 'stb_sprintf.h' already
-    #if !defined(DQN_STB_SPRINTF_HEADER_ONLY)
-        #define DQN_STB_SPRINTF_HEADER_ONLY
     #endif
 
     // Metadesk includes Windows.h
@@ -321,7 +318,7 @@
 #include "dqn_win32.h"
 #endif
 #include "dqn_allocator.h"
-#include "dqn_thread_context.h"
+#include "dqn_tls.h"
 #include "dqn_debug.h"
 #include "dqn_string.h"
 #include "dqn_containers.h"

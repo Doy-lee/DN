@@ -1,6 +1,8 @@
 #pragma once
 #include "dqn.h"
 
+#include <dirent.h> // readdir, opendir, closedir
+
 /*
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //
@@ -271,6 +273,12 @@ DQN_API Dqn_OSPathInfo Dqn_OS_PathInfo(Dqn_Str8 path)
         // shoddily deal with this.
         result.create_time_in_s =
             DQN_MIN(result.last_access_time_in_s, result.last_write_time_in_s);
+
+        if (S_ISDIR(file_stat.st_mode)) {
+            result.type = Dqn_OSPathInfoType_Directory;
+        } else if (S_ISREG(file_stat.st_mode)) {
+            result.type = Dqn_OSPathInfoType_File;
+        }
     }
     return result;
 }
@@ -350,11 +358,11 @@ DQN_API bool Dqn_OS_CopyFile(Dqn_Str8 src, Dqn_Str8 dest, bool overwrite, Dqn_Er
     result                = (bytes_written == stat_existing.st_size);
     if (!result) {
         int         error_code = errno;
-        Dqn_Scratch scratch    = Dqn_Scratch_Get(nullptr);
+        Dqn_TLSTMem tmem       = Dqn_TLS_TMem(nullptr);
         Dqn_Str8    file_size_str8 =
-            Dqn_U64ToByteSizeStr8(scratch.arena, stat_existing.st_size, Dqn_U64ByteSizeType_Auto);
+            Dqn_U64ToByteSizeStr8(tmem.arena, stat_existing.st_size, Dqn_U64ByteSizeType_Auto);
         Dqn_Str8 bytes_written_str8 =
-            Dqn_U64ToByteSizeStr8(scratch.arena, bytes_written, Dqn_U64ByteSizeType_Auto);
+            Dqn_U64ToByteSizeStr8(tmem.arena, bytes_written, Dqn_U64ByteSizeType_Auto);
         Dqn_ErrorSink_MakeF(error,
                             error_code,
                             "Failed to copy file '%.*s' to '%.*s', we copied %.*s but the file "
@@ -399,29 +407,17 @@ DQN_API bool Dqn_OS_MoveFile(Dqn_Str8 src, Dqn_Str8 dest, bool overwrite, Dqn_Er
     return result;
 }
 
-DQN_API bool Dqn_OS_DirExists(Dqn_Str8 path)
-{
-    bool result = false;
-    if (!Dqn_Str8_HasData(path))
-        return result;
-
-    struct stat stat_result;
-    if (lstat(path.data, &stat_result) != -1)
-        result = S_ISDIR(stat_result.st_mode);
-    return result;
-}
-
 DQN_API bool Dqn_OS_MakeDir(Dqn_Str8 path)
 {
-    Dqn_Scratch scratch = Dqn_Scratch_Get(nullptr);
-    bool        result  = true;
+    Dqn_TLSTMem tmem   = Dqn_TLS_TMem(nullptr);
+    bool        result = true;
 
     // TODO(doyle): Implement this without using the path indexes, it's not
     // necessary. See Windows implementation.
     Dqn_usize path_indexes_size = 0;
     uint16_t  path_indexes[64]  = {};
 
-    Dqn_Str8 copy = Dqn_Str8_Copy(scratch.arena, path);
+    Dqn_Str8 copy = Dqn_Str8_Copy(tmem.arena, path);
     for (Dqn_usize index = copy.size - 1; index < copy.size; index--) {
         bool first_char = index == (copy.size - 1);
         char ch         = copy.data[index];
@@ -465,6 +461,51 @@ DQN_API bool Dqn_OS_MakeDir(Dqn_Str8 path)
             copy.data[path_index] = temp;
     }
     return result;
+}
+
+DQN_API bool Dqn_OS_DirExists(Dqn_Str8 path)
+{
+    bool result = false;
+    if (!Dqn_Str8_HasData(path))
+        return result;
+
+    struct stat stat_result;
+    if (lstat(path.data, &stat_result) != -1)
+        result = S_ISDIR(stat_result.st_mode);
+    return result;
+}
+
+DQN_API bool Dqn_OS_DirIterate(Dqn_Str8 path, Dqn_OS_DirIterator *it)
+{
+    if (!it->handle) {
+        it->handle = opendir(path.data);
+        if (!it->handle)
+            return false;
+    }
+
+    struct dirent *entry;
+    for (;;) {
+        entry = readdir(DQN_CAST(DIR*)it->handle);
+        if (entry == NULL)
+            break;
+
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+            continue;
+
+        Dqn_usize name_size    = Dqn_CStr8_Size(entry->d_name);
+        Dqn_usize clamped_size = DQN_MIN(sizeof(it->buffer) - 1, name_size);
+        DQN_ASSERTF(name_size == clamped_size, "name: %s, name_size: %zu, clamped_size: %zu", entry->d_name, name_size, clamped_size);
+        DQN_MEMCPY(it->buffer, entry->d_name, clamped_size);
+        it->buffer[clamped_size] = 0;
+        it->file_name = Dqn_Str8_Init(it->buffer, clamped_size);
+        return true;
+    }
+
+    closedir(DQN_CAST(DIR*)it->handle);
+    it->handle    = NULL;
+    it->file_name = {};
+    it->buffer[0] = 0;
+    return false;
 }
 
 // NOTE: R/W Stream API ////////////////////////////////////////////////////////////////////////////
@@ -548,9 +589,9 @@ DQN_API bool Dqn_OS_FileRead(Dqn_OSFile *file, void *buffer, Dqn_usize size, Dqn
         return false;
 
     if (fread(buffer, size, 1, DQN_CAST(FILE *) file->handle) != 1) {
-        Dqn_Scratch scratch = Dqn_Scratch_Get(nullptr);
+        Dqn_TLSTMem tmem = Dqn_TLS_TMem(nullptr);
         Dqn_Str8    buffer_size_str8 =
-            Dqn_U64ToByteSizeStr8(scratch.arena, size, Dqn_U64ByteSizeType_Auto);
+            Dqn_U64ToByteSizeStr8(tmem.arena, size, Dqn_U64ByteSizeType_Auto);
         Dqn_ErrorSink_MakeF(
             error, 1, "Failed to read %.*s from file", DQN_STR_FMT(buffer_size_str8));
         return false;
@@ -568,9 +609,9 @@ Dqn_OS_FileWritePtr(Dqn_OSFile *file, void const *buffer, Dqn_usize size, Dqn_Er
         fwrite(buffer, DQN_CAST(Dqn_usize) size, 1 /*count*/, DQN_CAST(FILE *) file->handle) ==
         1 /*count*/;
     if (!result) {
-        Dqn_Scratch scratch = Dqn_Scratch_Get(nullptr);
+        Dqn_TLSTMem tmem = Dqn_TLS_TMem(nullptr);
         Dqn_Str8    buffer_size_str8 =
-            Dqn_U64ToByteSizeStr8(scratch.arena, size, Dqn_U64ByteSizeType_Auto);
+            Dqn_U64ToByteSizeStr8(tmem.arena, size, Dqn_U64ByteSizeType_Auto);
         Dqn_ErrorSink_MakeF(
             error, 1, "Failed to write buffer (%s) to file handle", DQN_STR_FMT(buffer_size_str8));
     }
@@ -663,17 +704,16 @@ DQN_API Dqn_OSExecResult Dqn_OS_ExecWait(Dqn_OSExecAsyncHandle handle,
 
     // NOTE: Read the data from the read end of the pipe
     if (result.os_error_code == 0) {
-        Dqn_Scratch scratch = Dqn_Scratch_Get(arena);
+        Dqn_TLSTMem tmem = Dqn_TLS_TMem(arena);
         if (arena && handle.stdout_read) {
             char            buffer[4096];
-            Dqn_Str8Builder builder = {};
-            builder.arena           = scratch.arena;
+            Dqn_Str8Builder builder = Dqn_Str8Builder_Init(tmem.arena);
             for (;;) {
                 ssize_t bytes_read =
                     read(stdout_pipe[Dqn_OSPipeType__Read], buffer, sizeof(buffer));
                 if (bytes_read <= 0)
                     break;
-                Dqn_Str8Builder_AppendF(&builder, "%.*s", bytes_read, buffer);
+                Dqn_Str8Builder_AddF(&builder, "%.*s", bytes_read, buffer);
             }
 
             result.stdout_text = Dqn_Str8Builder_Build(&builder, arena);
@@ -681,14 +721,13 @@ DQN_API Dqn_OSExecResult Dqn_OS_ExecWait(Dqn_OSExecAsyncHandle handle,
 
         if (arena && handle.stderr_read) {
             char            buffer[4096];
-            Dqn_Str8Builder builder = {};
-            builder.arena           = scratch.arena;
+            Dqn_Str8Builder builder = Dqn_Str8Builder_Init(tmem.arena);
             for (;;) {
                 ssize_t bytes_read =
                     read(stderr_pipe[Dqn_OSPipeType__Read], buffer, sizeof(buffer));
                 if (bytes_read <= 0)
                     break;
-                Dqn_Str8Builder_AppendF(&builder, "%.*s", bytes_read, buffer);
+                Dqn_Str8Builder_AddF(&builder, "%.*s", bytes_read, buffer);
             }
 
             result.stderr_text = Dqn_Str8Builder_Build(&builder, arena);
@@ -713,8 +752,8 @@ DQN_API Dqn_OSExecAsyncHandle Dqn_OS_ExecAsync(Dqn_Slice<Dqn_Str8> cmd_line,
     if (cmd_line.size == 0)
         return result;
 
-    Dqn_Scratch scratch      = Dqn_Scratch_Get(nullptr);
-    Dqn_Str8    cmd_rendered = Dqn_Slice_Str8Render(scratch.arena, cmd_line, DQN_STR8(" "));
+    Dqn_TLSTMem tmem         = Dqn_TLS_TMem(nullptr);
+    Dqn_Str8    cmd_rendered = Dqn_Slice_Str8Render(tmem.arena, cmd_line, DQN_STR8(" "));
     int         stdout_pipe[Dqn_OSPipeType__Count] = {};
     int         stderr_pipe[Dqn_OSPipeType__Count] = {};
 
@@ -807,7 +846,7 @@ DQN_API Dqn_OSExecAsyncHandle Dqn_OS_ExecAsync(Dqn_Slice<Dqn_Str8> cmd_line,
 
         // NOTE: Convert the command into something suitable for execvp
         char **argv =
-            Dqn_Arena_NewArray(scratch.arena, char *, cmd_line.size + 1 /*null*/, Dqn_ZeroMem_Yes);
+            Dqn_Arena_NewArray(tmem.arena, char *, cmd_line.size + 1 /*null*/, Dqn_ZeroMem_Yes);
         if (!argv) {
             result.exit_code = -1;
             Dqn_ErrorSink_MakeF(
@@ -820,7 +859,7 @@ DQN_API Dqn_OSExecAsyncHandle Dqn_OS_ExecAsync(Dqn_Slice<Dqn_Str8> cmd_line,
 
         for (Dqn_usize arg_index = 0; arg_index < cmd_line.size; arg_index++) {
             Dqn_Str8 arg    = cmd_line.data[arg_index];
-            argv[arg_index] = Dqn_Str8_Copy(scratch.arena, arg).data; // NOTE: Copy string to guarantee it is null-terminated
+            argv[arg_index] = Dqn_Str8_Copy(tmem.arena, arg).data; // NOTE: Copy string to guarantee it is null-terminated
         }
 
         // NOTE: Change the working directory if there is one
@@ -1008,9 +1047,7 @@ DQN_API void Dqn_OS_MutexUnlock(Dqn_OSMutex *mutex)
 // NOTE: [$THRD] Dqn_OSThread /////////////////////////////////////////////////////////////////////
 static void *Dqn_OS_ThreadFunc_(void *user_context)
 {
-    Dqn_OSThread *thread = DQN_CAST(Dqn_OSThread *) user_context;
-    Dqn_OS_SemaphoreWait(&thread->init_semaphore, DQN_OS_SEMAPHORE_INFINITE_TIMEOUT);
-    thread->func(thread);
+    Dqn_OS_ThreadExecute_(user_context);
     return nullptr;
 }
 
@@ -1167,12 +1204,12 @@ DQN_API void Dqn_OS_HttpRequestAsync(Dqn_OSHttpResponse     *response,
 
     response->arena = arena;
     response->builder.arena =
-        response->scratch_arena ? response->scratch_arena : &response->tmp_arena;
+        response->tmem_arena ? response->tmem_arena : &response->tmp_arena;
 
-    Dqn_Arena  *scratch_arena = response->scratch_arena;
-    Dqn_Scratch scratch_      = Dqn_Scratch_Get(arena);
-    if (!scratch_arena)
-        scratch_arena = scratch_.arena;
+    Dqn_Arena  *tmem  = response->tmem_arena;
+    Dqn_TLSTMem tmem_ = Dqn_TLS_TMem(arena);
+    if (!tmem)
+        tmem = tmem_.arena;
 
 #if defined(DQN_PLATFORM_EMSCRIPTEN)
     emscripten_fetch_attr_t fetch_attribs = {};

@@ -48,6 +48,14 @@ void Dqn_Docs_Demo()
         }
     }
 
+    // NOTE: Dqn_BytesToHex ////////////////////////////////////////////////////////////////////////
+    {
+        Dqn_TLSTMem   tmem     = Dqn_TLS_TMem(nullptr);
+        unsigned char bytes[2] = {0xFA, 0xCE};
+        Dqn_Str8      hex      = Dqn_BytesToHex(tmem.arena, bytes, sizeof(bytes));
+        DQN_ASSERT(hex == DQN_STR8("face")); // NOTE: Guaranteed to be null-terminated
+    }
+
     // NOTE: DQN_CHECK /////////////////////////////////////////////////////////////////////////////
     //
     // Check the expression trapping in debug, whilst in release- trapping is
@@ -140,8 +148,8 @@ void Dqn_Docs_Demo()
         // A 'Deinit' of the map will similarly deallocate the passed in arena (as
         // the map takes ownership of the arena).
         Dqn_Arena arena = {};
-        Dqn_DSMap<int> map = Dqn_DSMap_Init<int>(&arena, /*size*/ 1024); // Size must be PoT!
-        DQN_ASSERT(Dqn_DSMap_IsValid(&map));                             // Valid if no initialisation failure (e.g. mem alloc failure)
+        Dqn_DSMap<int> map = Dqn_DSMap_Init<int>(&arena, /*size*/ 1024, Dqn_DSMapFlags_Nil); // Size must be PoT!
+        DQN_ASSERT(Dqn_DSMap_IsValid(&map));                                                 // Valid if no initialisation failure (e.g. mem alloc failure)
 
         // NOTE: Dqn_DSMap_KeyCStringLit ///////////////////////////////////////////////////////////
         // NOTE: Dqn_DSMap_KeyU64        ///////////////////////////////////////////////////////////
@@ -204,7 +212,7 @@ void Dqn_Docs_Demo()
             int                *it_value = &it->value;
             DQN_ASSERT(*it_value == 0xCAFE);
 
-            DQN_ASSERT(Dqn_Str8_Init(it_key.payload.buffer.data, it_key.payload.buffer.size) == DQN_STR8("Sample Key"));
+            DQN_ASSERT(Dqn_Str8_Init(it_key.buffer_data, it_key.buffer_size) == DQN_STR8("Sample Key"));
         }
 
         // NOTE: Dqn_DSMap_Erase ///////////////////////////////////////////////////////////////////
@@ -327,6 +335,15 @@ void Dqn_Docs_Demo()
     // The lifetime of the slice is bound to the lifetime of the FStr8 and is
     //  invalidated when the FStr8 is.
 
+    // NOTE: Dqn_HexToBytes ////////////////////////////////////////////////////////////////////////
+    {
+        unsigned char bytes[2];
+        Dqn_usize bytes_written = Dqn_HexToBytesPtr(DQN_STR8("0xFACE"), bytes, sizeof(bytes));
+        DQN_ASSERT(bytes_written == 2);
+        DQN_ASSERT(bytes[0] == 0xFA);
+        DQN_ASSERT(bytes[1] == 0xCE);
+    }
+
     // NOTE: Dqn_JSONBuilder_Build /////////////////////////////////////////////////////////////////
     //
     // Convert the internal JSON buffer in the builder into a string.
@@ -371,8 +388,8 @@ void Dqn_Docs_Demo()
 
     // NOTE: Dqn_List_Iterate //////////////////////////////////////////////////////////////////////
     {
-        Dqn_Scratch   scratch = Dqn_Scratch_Get(nullptr);
-        Dqn_List<int> list    = Dqn_List_Init<int>(scratch.arena, /*chunk_size*/ 128);
+        Dqn_TLSTMem   tmem = Dqn_TLS_TMem(nullptr);
+        Dqn_List<int> list = Dqn_List_Init<int>(/*chunk_size*/ 128);
         for (Dqn_ListIterator<int> it = {}; Dqn_List_Iterate(&list, &it, 0);) {
             int *item = it.data;
             (void)item;
@@ -450,7 +467,7 @@ void Dqn_Docs_Demo()
     // If 'tmp_path' is written to successfuly, the file will be copied over into
     // 'path'.
     if (0) {
-        Dqn_Scratch    scratch = Dqn_Scratch_Get(nullptr);
+        Dqn_TLSTMem    tmem = Dqn_TLS_TMem(nullptr);
         Dqn_ErrorSink *error   = Dqn_ErrorSink_Begin(Dqn_ErrorSinkMode_Nil);
         Dqn_OS_WriteAllSafe(/*path*/ DQN_STR8("C:/Home/my.txt"), /*buffer*/ DQN_STR8("Hello world"), error);
         Dqn_ErrorSink_EndAndLogErrorF(error, "");
@@ -550,12 +567,11 @@ void Dqn_Docs_Demo()
     // that can be converted into a duration.
     //
     // This profiler uses a double buffer scheme for storing profiling markers.
-    // After an application's typical update/frame cycle you can swap the profiler's
-    // buffer whereby the front buffer contains the previous frames profiling
-    // metrics and the back buffer will be populated with the new frame's profiling
-    // metrics.
+    // After an application's typical update/frame cycle you can swap the
+    // profiler's buffer whereby the front buffer contains the previous frames
+    // profiling metrics and the back buffer will be populated with the new
+    // frame's profiling metrics.
     {
-        uint64_t tsc_per_seconds = Dqn_OS_EstimateTSCPerSecond(/*duration_ms_to_gauge_tsc_frequency*/ 100);
         enum Zone { Zone_MainLoop, Zone_Count };
         Dqn_ProfilerZone profiler_zone_main_update = Dqn_Profiler_BeginZone(Zone_MainLoop);
 
@@ -573,22 +589,34 @@ void Dqn_Docs_Demo()
         // the front buffer which contain the metrics that you can visualise
         // regarding the most profiling metrics recorded.
 
-        Dqn_ProfilerAnchor *anchors = Dqn_Profiler_AnchorBuffer(Dqn_ProfilerAnchorBuffer_Front);
-        for (size_t index = 0; index < Zone_Count; index++) {
-            Dqn_ProfilerAnchor *anchor = anchors + index;
-
-            // Print the result like so
-            if (0) {
-                printf("%.*s[%u] %" PRIu64 " cycles (%.1fms)\n",
-                       DQN_STR_FMT(anchor->name),
-                       anchor->hit_count,
-                       anchor->tsc_inclusive,
-                       anchor->tsc_inclusive * tsc_per_seconds * 1000.f);
+        // NOTE: Dqn_Profiler_ReadBuffer ///////////////////////////////////////////////////////////
+        //
+        // Retrieve the buffer of anchors of which there are
+        // `DQN_PROFILER_ANCHOR_BUFFER_SIZE` anchors from the most recent run
+        // of the profiler after you have called `SwapAnchorBuffer` to trigger
+        // the double buffer
+        Dqn_ProfilerAnchor *read_anchors = Dqn_Profiler_ReadBuffer();
+        for (Dqn_usize index = 0; index < DQN_PROFILER_ANCHOR_BUFFER_SIZE; index++) {
+            Dqn_ProfilerAnchor *anchor = read_anchors + index;
+            if (Dqn_Str8_HasData(anchor->name)) {
+                // ...
             }
         }
+
+        // NOTE: Dqn_Profiler_WriteBuffer //////////////////////////////////////////////////////////
+        //
+        // Same as `ReadBuffer` however we return the buffer that the profiler
+        // is currently writing anchors into.
+        Dqn_ProfilerAnchor *write_anchors = Dqn_Profiler_WriteBuffer();
+        for (Dqn_usize index = 0; index < DQN_PROFILER_ANCHOR_BUFFER_SIZE; index++) {
+            Dqn_ProfilerAnchor *anchor = write_anchors + index;
+            if (Dqn_Str8_HasData(anchor->name)) {
+                // ...
+            }
+        }
+
         Dqn_Profiler_EndZone(profiler_zone_main_update);
         Dqn_Profiler_SwapAnchorBuffer(); // Should occur after all profiling zones are ended!
-
         *g_dqn_library->profiler = {};
     }
     #endif // !defined(DQN_NO_PROFILER)
@@ -672,7 +700,7 @@ void Dqn_Docs_Demo()
     // the debug APIs are aware of how to resolve the new addresses imported
     // into the address space.
     {
-        Dqn_Scratch scratch = Dqn_Scratch_Get(nullptr);
+        Dqn_TLSTMem tmem = Dqn_TLS_TMem(nullptr);
 
         // NOTE: Dqn_StackTrace_Walk ///////////////////////////////////////////////////////////////
         //
@@ -680,7 +708,7 @@ void Dqn_Docs_Demo()
         // functions on the call-stack at the current instruction pointer. The
         // addresses are stored in order from the current executing function
         // first to the most ancestor function last in the walk.
-        Dqn_StackTraceWalkResult walk = Dqn_StackTrace_Walk(scratch.arena, /*depth limit*/ 128);
+        Dqn_StackTraceWalkResult walk = Dqn_StackTrace_Walk(tmem.arena, /*depth limit*/ 128);
 
         // Loop over the addresses produced in the stack trace
         for (Dqn_StackTraceWalkResultIterator it = {}; Dqn_StackTrace_WalkResultIterate(&it, &walk); ) {
@@ -689,7 +717,7 @@ void Dqn_Docs_Demo()
             //
             // Converts the base address into a human readable stack trace
             // entry (e.g. address, line number, file and function name).
-            Dqn_StackTraceFrame frame = Dqn_StackTrace_RawFrameToFrame(scratch.arena, it.raw_frame);
+            Dqn_StackTraceFrame frame = Dqn_StackTrace_RawFrameToFrame(tmem.arena, it.raw_frame);
 
             // You may then print out the frame like so
             if (0)
@@ -706,7 +734,7 @@ void Dqn_Docs_Demo()
         // Helper function to create a stack trace and automatically convert the
         // raw frames into human readable frames. This function effectively
         // calls 'Walk' followed by 'RawFrameToFrame'.
-        Dqn_Slice<Dqn_StackTraceFrame> frames = Dqn_StackTrace_GetFrames(scratch.arena, /*depth limit*/ 128);
+        Dqn_Slice<Dqn_StackTraceFrame> frames = Dqn_StackTrace_GetFrames(tmem.arena, /*depth limit*/ 128);
         (void)frames;
     }
 
@@ -719,8 +747,8 @@ void Dqn_Docs_Demo()
     // The returned string's 'size' member variable does *not* include this
     // additional null-terminating byte.
     {
-        Dqn_Scratch scratch = Dqn_Scratch_Get(nullptr);
-        Dqn_Str8    string  = Dqn_Str8_Alloc(scratch.arena, /*size*/ 1, Dqn_ZeroMem_Yes);
+        Dqn_TLSTMem tmem = Dqn_TLS_TMem(nullptr);
+        Dqn_Str8    string  = Dqn_Str8_Alloc(tmem.arena, /*size*/ 1, Dqn_ZeroMem_Yes);
         DQN_ASSERT(string.size == 1);
         DQN_ASSERT(string.data[string.size] == 0); // It is null-terminated!
     }
@@ -799,12 +827,12 @@ void Dqn_Docs_Demo()
     // always be a newly allocated copy, irrespective of if any replacements
     // were done or not.
     {
-        Dqn_Scratch scratch = Dqn_Scratch_Get(nullptr);
+        Dqn_TLSTMem tmem = Dqn_TLS_TMem(nullptr);
         Dqn_Str8 string     = Dqn_Str8_Replace(/*string*/      DQN_STR8("Foo Foo Bar"),
                                                /*find*/        DQN_STR8("Foo"),
                                                /*replace*/     DQN_STR8("Moo"),
                                                /*start_index*/ 1,
-                                               /*arena*/       scratch.arena,
+                                               /*arena*/       tmem.arena,
                                                /*eq_case*/     Dqn_Str8EqCase_Sensitive);
         DQN_ASSERT(string == DQN_STR8("Foo Moo Bar"));
     }
@@ -817,8 +845,8 @@ void Dqn_Docs_Demo()
     // Reverse segment delimits the string counting 'segment_size' from the back
     // of the string.
     {
-        Dqn_Scratch scratch = Dqn_Scratch_Get(nullptr);
-        Dqn_Str8    string  = Dqn_Str8_Segment(scratch.arena, /*string*/ DQN_STR8("123456789"), /*segment_size*/ 3, /*segment_char*/ ',');
+        Dqn_TLSTMem tmem = Dqn_TLS_TMem(nullptr);
+        Dqn_Str8    string  = Dqn_Str8_Segment(tmem.arena, /*string*/ DQN_STR8("123456789"), /*segment_size*/ 3, /*segment_char*/ ',');
         DQN_ASSERT(string == DQN_STR8("123,456,789"));
     }
 
@@ -826,9 +854,9 @@ void Dqn_Docs_Demo()
     {
         // Splits the string at each delimiter into substrings occuring prior and
         // after until the next delimiter.
-        Dqn_Scratch scratch = Dqn_Scratch_Get(nullptr);
+        Dqn_TLSTMem tmem = Dqn_TLS_TMem(nullptr);
         {
-            Dqn_Slice<Dqn_Str8> splits = Dqn_Str8_SplitAlloc(/*arena*/     scratch.arena,
+            Dqn_Slice<Dqn_Str8> splits = Dqn_Str8_SplitAlloc(/*arena*/     tmem.arena,
                                                              /*string*/    DQN_STR8("192.168.8.1"),
                                                              /*delimiter*/ DQN_STR8("."),
                                                              /*mode*/      Dqn_Str8SplitIncludeEmptyStrings_No);
@@ -839,7 +867,7 @@ void Dqn_Docs_Demo()
         // You can include empty strings that occur when splitting by setting
         // the split mode to include empty strings.
         {
-            Dqn_Slice<Dqn_Str8> splits = Dqn_Str8_SplitAlloc(/*arena*/     scratch.arena,
+            Dqn_Slice<Dqn_Str8> splits = Dqn_Str8_SplitAlloc(/*arena*/     tmem.arena,
                                                              /*string*/    DQN_STR8("a--b"),
                                                              /*delimiter*/ DQN_STR8("-"),
                                                              /*mode*/      Dqn_Str8SplitIncludeEmptyStrings_Yes);
@@ -953,7 +981,7 @@ void Dqn_Docs_Demo()
 
     // NOTE: Dqn_ThreadContext /////////////////////////////////////////////////////////////////////
     //
-    // Each thread is assigned in their thread-local storage (TLS) scratch and
+    // Each thread is assigned in their thread-local storage (TLS) tmem and
     // permanent arena allocators. These can be used for allocations with a
     // lifetime scoped to the lexical scope or for storing data permanently
     // using the arena paradigm.
@@ -961,40 +989,40 @@ void Dqn_Docs_Demo()
     // TLS in this implementation is implemented using the `thread_local` C/C++
     // keyword.
     //
-    // 99% of the time you will want Dqn_Scratch_Get(...) which returns you a
+    // 99% of the time you will want Dqn_TLS_TMem(...) which returns you a
     // temporary arena for function lifetime allocations. On scope exit, the
     // arena is cleared out.
     //
-    // This library's paradigm revolves heavily around arenas including scratch
+    // This library's paradigm revolves heavily around arenas including tmem
     // arenas into child functions for temporary calculations. If an arena is
     // passed into a function, this poses a problem sometimes known as
     // 'arena aliasing'.
     //
     // If an arena aliases another arena (e.g. the arena passed in) is the same
-    // as the scratch arena requested in the function, we risk the scratch arena
+    // as the tmem arena requested in the function, we risk the tmem arena
     // on scope exit deallocating memory belonging to the caller.
     //
-    // To avoid this we the 'Dqn_Scratch_Get(...)' API takes in a list of arenas
-    // to ensure that we provide a scratch arena that *won't* alias with the
+    // To avoid this we the 'Dqn_TLS_TMem(...)' API takes in a list of arenas
+    // to ensure that we provide a tmem arena that *won't* alias with the
     // caller's arena. If arena aliasing occurs, with ASAN on, generally
     // the library will trap and report use-after-poison once violated.
     {
-        Dqn_Scratch scratch_a = Dqn_Scratch_Get(nullptr);
+        Dqn_TLSTMem tmem_a = Dqn_TLS_TMem(nullptr);
 
-        // Now imagine we call a function where we pass scratch_a.arena down
-        // into it .. If we call scratch again, we need to pass in the arena
+        // Now imagine we call a function where we pass tmem_a.arena down
+        // into it .. If we call tmem again, we need to pass in the arena
         // to prevent aliasing.
-        Dqn_Scratch scratch_b = Dqn_Scratch_Get(scratch_a.arena);
-        DQN_ASSERT(scratch_a.arena != scratch_b.arena);
+        Dqn_TLSTMem tmem_b = Dqn_TLS_TMem(tmem_a.arena);
+        DQN_ASSERT(tmem_a.arena != tmem_b.arena);
     }
 
-    // @proc Dqn_Thread_GetScratch
+    // @proc Dqn_Thread_GetTMem
     //   @desc Retrieve the per-thread temporary arena allocator that is reset on scope
     //   exit.
 
-    //   The scratch arena must be deconflicted with any existing arenas in the
+    //   The tmem arena must be deconflicted with any existing arenas in the
     //   function to avoid trampling over each other's memory. Consider the situation
-    //   where the scratch arena is passed into the function. Inside the function, if
+    //   where the tmem arena is passed into the function. Inside the function, if
     //   the same arena is reused then, if both arenas allocate, when the inner arena
     //   is reset, this will undo the passed in arena's allocations in the function.
 
@@ -1010,8 +1038,8 @@ void Dqn_Docs_Demo()
 
     // NOTE: Dqn_U64ToAge //////////////////////////////////////////////////////////////////////////
     {
-        Dqn_Scratch scratch = Dqn_Scratch_Get(nullptr);
-        Dqn_Str8    string  = Dqn_U64ToAge(scratch.arena, DQN_HOURS_TO_S(2) + DQN_MINS_TO_S(30), Dqn_U64AgeUnit_All);
+        Dqn_TLSTMem tmem = Dqn_TLS_TMem(nullptr);
+        Dqn_Str8    string  = Dqn_U64ToAge(tmem.arena, DQN_HOURS_TO_S(2) + DQN_MINS_TO_S(30), Dqn_U64AgeUnit_All);
         if (0) // Prints "2hr 30m"
             printf("%.*s", DQN_STR_FMT(string));
     }
@@ -1131,12 +1159,12 @@ void Dqn_Docs_Demo()
     if (0) {
         // Generate the error string for the last Win32 API called that return
         // an error value.
-        Dqn_Scratch  scratch        = Dqn_Scratch_Get(nullptr);
-        Dqn_WinError get_last_error = Dqn_Win_LastError(scratch.arena);
+        Dqn_TLSTMem     tmem        = Dqn_TLS_TMem(nullptr);
+        Dqn_WinError get_last_error = Dqn_Win_LastError(tmem.arena);
         printf("Error (%lu): %.*s", get_last_error.code, DQN_STR_FMT(get_last_error.msg));
 
         // Alternatively, pass in the error code directly
-        Dqn_WinError error_msg_for_code = Dqn_Win_ErrorCodeToMsg(scratch.arena, /*error_code*/ 0);
+        Dqn_WinError error_msg_for_code = Dqn_Win_ErrorCodeToMsg(tmem.arena, /*error_code*/ 0);
         printf("Error (%lu): %.*s", error_msg_for_code.code, DQN_STR_FMT(error_msg_for_code.msg));
     }
 

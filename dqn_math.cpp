@@ -1212,10 +1212,10 @@ DQN_API Dqn_FStr8<256> Dqn_M4_ColumnMajorString(Dqn_M4 mat)
     Dqn_FStr8<256> result = {};
     for (int row = 0; row < 4; row++) {
         for (int it = 0; it < 4; it++) {
-            if (it == 0) Dqn_FStr8_Append(&result, DQN_STR8("|"));
-            Dqn_FStr8_AppendF(&result, "%.5f", mat.columns[it][row]);
-            if (it != 3) Dqn_FStr8_Append(&result, DQN_STR8(", "));
-            else         Dqn_FStr8_Append(&result, DQN_STR8("|\n"));
+            if (it == 0) Dqn_FStr8_Add(&result, DQN_STR8("|"));
+            Dqn_FStr8_AddF(&result, "%.5f", mat.columns[it][row]);
+            if (it != 3) Dqn_FStr8_Add(&result, DQN_STR8(", "));
+            else         Dqn_FStr8_Add(&result, DQN_STR8("|\n"));
         }
     }
 

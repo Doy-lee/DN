@@ -56,11 +56,28 @@ DQN_API Dqn_ArenaBlock *Dqn_Arena_BlockInitFlags(uint64_t reserve, uint64_t comm
     return result;
 }
 
+static void Dqn_Arena_UpdateStatsOnNewBlock_(Dqn_Arena *arena, Dqn_ArenaBlock const *block)
+{
+    DQN_ASSERT(arena);
+    if (block) {
+        arena->stats.info.used     += block->used;
+        arena->stats.info.commit   += block->commit;
+        arena->stats.info.reserve  += block->reserve;
+        arena->stats.info.blocks   += 1;
+
+        arena->stats.hwm.used       = DQN_MAX(arena->stats.hwm.used,    arena->stats.info.used);
+        arena->stats.hwm.commit     = DQN_MAX(arena->stats.hwm.commit,  arena->stats.info.commit);
+        arena->stats.hwm.reserve    = DQN_MAX(arena->stats.hwm.reserve, arena->stats.info.reserve);
+        arena->stats.hwm.blocks     = DQN_MAX(arena->stats.hwm.blocks,  arena->stats.info.blocks);
+    }
+}
+
 DQN_API Dqn_Arena Dqn_Arena_InitSize(uint64_t reserve, uint64_t commit, uint8_t flags)
 {
     Dqn_Arena result = {};
     result.flags     = flags;
     result.curr      = Dqn_Arena_BlockInitFlags(reserve, commit, flags);
+    Dqn_Arena_UpdateStatsOnNewBlock_(&result, result.curr);
     return result;
 }
 
@@ -123,8 +140,10 @@ DQN_API void *Dqn_Arena_Alloc(Dqn_Arena *arena, uint64_t size, uint8_t align, Dq
     if (!arena)
         return nullptr;
 
-    if (!arena->curr)
+    if (!arena->curr) {
         arena->curr = Dqn_Arena_BlockInitFlags(DQN_ARENA_RESERVE_SIZE, DQN_ARENA_COMMIT_SIZE, arena->flags);
+        Dqn_Arena_UpdateStatsOnNewBlock_(arena, arena->curr);
+    }
 
     if (!arena->curr)
         return nullptr;
@@ -147,6 +166,7 @@ DQN_API void *Dqn_Arena_Alloc(Dqn_Arena *arena, uint64_t size, uint8_t align, Dq
         new_block->prev        = arena->curr;
         arena->curr            = new_block;
         new_block->reserve_sum = new_block->prev->reserve_sum + new_block->prev->reserve;
+        Dqn_Arena_UpdateStatsOnNewBlock_(arena, arena->curr);
         goto try_alloc_again;
     }
 
@@ -159,11 +179,16 @@ DQN_API void *Dqn_Arena_Alloc(Dqn_Arena *arena, uint64_t size, uint8_t align, Dq
             return nullptr;
         if (poison)
             Dqn_ASAN_PoisonMemoryRegion(commit_ptr, commit_size);
-        curr->commit = end_commit;
+        curr->commit              = end_commit;
+        arena->stats.info.commit += commit_size;
+        arena->stats.hwm.commit   = DQN_MAX(arena->stats.hwm.commit, arena->stats.info.commit);
     }
 
-    void *result = DQN_CAST(char *) curr + offset_pos;
-    curr->used   = end_pos;
+    void *result            = DQN_CAST(char *) curr + offset_pos;
+    Dqn_usize alloc_size    = end_pos - curr->used;
+    curr->used             += alloc_size;
+    arena->stats.info.used += alloc_size;
+    arena->stats.hwm.used   = DQN_MAX(arena->stats.hwm.used, arena->stats.info.used);
     Dqn_ASAN_UnpoisonMemoryRegion(result, size);
 
     if (zero_mem == Dqn_ZeroMem_Yes) {
@@ -171,6 +196,10 @@ DQN_API void *Dqn_Arena_Alloc(Dqn_Arena *arena, uint64_t size, uint8_t align, Dq
         DQN_MEMSET(result, 0, reused_bytes);
     }
 
+    DQN_ASSERT(arena->stats.hwm.used    >= arena->stats.info.used);
+    DQN_ASSERT(arena->stats.hwm.commit  >= arena->stats.info.commit);
+    DQN_ASSERT(arena->stats.hwm.reserve >= arena->stats.info.reserve);
+    DQN_ASSERT(arena->stats.hwm.blocks  >= arena->stats.info.blocks);
     return result;
 }
 
@@ -195,21 +224,27 @@ DQN_API void *Dqn_Arena_Copy(Dqn_Arena *arena, void const *data, uint64_t size, 
 
 DQN_API void Dqn_Arena_PopTo(Dqn_Arena *arena, uint64_t init_used)
 {
-    if (!arena)
+    if (!arena || !arena->curr)
         return;
     uint64_t        used = DQN_MAX(DQN_ARENA_HEADER_SIZE, init_used);
     Dqn_ArenaBlock *curr = arena->curr;
     while (curr->reserve_sum >= used) {
         Dqn_ArenaBlock *block_to_free = curr;
+        arena->stats.info.used       -= block_to_free->used;
+        arena->stats.info.commit     -= block_to_free->commit;
+        arena->stats.info.reserve    -= block_to_free->reserve;
+        arena->stats.info.blocks     -= 1;
         curr                          = curr->prev;
         Dqn_Arena_BlockDeinit_(arena, block_to_free);
     }
 
-    arena->curr           = curr;
-    curr->used            = used - curr->reserve_sum;
-    char     *poison_ptr  = (char *)curr + Dqn_AlignUpPowerOfTwo(curr->used, DQN_ASAN_POISON_ALIGNMENT);
-    Dqn_usize poison_size = ((char *)curr + curr->commit) - poison_ptr;
+    arena->stats.info.used -= curr->used;
+    arena->curr             = curr;
+    curr->used              = used - curr->reserve_sum;
+    char     *poison_ptr    = (char *)curr + Dqn_AlignUpPowerOfTwo(curr->used, DQN_ASAN_POISON_ALIGNMENT);
+    Dqn_usize poison_size   = ((char *)curr + curr->commit) - poison_ptr;
     Dqn_ASAN_PoisonMemoryRegion(poison_ptr, poison_size);
+    arena->stats.info.used += curr->used;
 }
 
 DQN_API void Dqn_Arena_Pop(Dqn_Arena *arena, uint64_t amount)
@@ -237,10 +272,46 @@ DQN_API bool Dqn_Arena_OwnsPtr(Dqn_Arena const *arena, void *ptr)
 {
     bool result = false;
     uintptr_t uint_ptr = DQN_CAST(uintptr_t)ptr;
-    for (Dqn_ArenaBlock const *block = arena ? arena->curr : nullptr; !result && block; ) {
+    for (Dqn_ArenaBlock const *block = arena ? arena->curr : nullptr; !result && block; block = block->prev) {
         uintptr_t begin = DQN_CAST(uintptr_t) block + DQN_ARENA_HEADER_SIZE;
         uintptr_t end   = begin + block->reserve;
         result          = uint_ptr >= begin && uint_ptr <= end;
+    }
+    return result;
+}
+
+
+DQN_API Dqn_ArenaStats Dqn_Arena_SumStatsArray(Dqn_ArenaStats const *array, Dqn_usize size)
+{
+    Dqn_ArenaStats result = {};
+    DQN_FOR_UINDEX(index, size) {
+        Dqn_ArenaStats stats  = array[index];
+        result.info.used     += stats.info.used;
+        result.info.commit   += stats.info.commit;
+        result.info.reserve  += stats.info.reserve;
+        result.info.blocks   += stats.info.blocks;
+
+        result.hwm.used       = DQN_MAX(result.hwm.used,    result.info.used);
+        result.hwm.commit     = DQN_MAX(result.hwm.commit,  result.info.commit);
+        result.hwm.reserve    = DQN_MAX(result.hwm.reserve, result.info.reserve);
+        result.hwm.blocks     = DQN_MAX(result.hwm.blocks,  result.info.blocks);
+    }
+    return result;
+}
+
+DQN_API Dqn_ArenaStats Dqn_Arena_SumStats(Dqn_ArenaStats lhs, Dqn_ArenaStats rhs)
+{
+    Dqn_ArenaStats array[] = {lhs, rhs};
+    Dqn_ArenaStats result  = Dqn_Arena_SumStatsArray(array, DQN_ARRAY_UCOUNT(array));
+    return result;
+}
+
+DQN_API Dqn_ArenaStats Dqn_Arena_SumArenaArrayToStats(Dqn_Arena const *array, Dqn_usize size)
+{
+    Dqn_ArenaStats result = {};
+    for (Dqn_usize index = 0; index < size; index++) {
+        Dqn_Arena const *arena = array + index;
+        result                 = Dqn_Arena_SumStats(result, arena->stats);
     }
     return result;
 }
@@ -299,13 +370,8 @@ DQN_API void *Dqn_ChunkPool_Alloc(Dqn_ChunkPool *pool, Dqn_usize size)
     Dqn_usize const size_to_slot_offset = 5; // __lzcnt64(32) e.g. Dqn_ChunkPoolSlotSize_32B
     Dqn_usize       slot_index          = 0;
     if (required_size > 32) {
-        #if defined(DQN_OS_WIN32)
-        Dqn_usize dist_to_next_msb = __lzcnt64(required_size) + 1;
-        #else
-        Dqn_usize dist_to_next_msb = __builtin_clzll(required_size) + 1;
-        #endif
-
         // NOTE: Round up if not PoT as the low bits are set.
+        Dqn_usize dist_to_next_msb = Dqn_CountLeadingZerosU64(required_size) + 1;
         dist_to_next_msb -= DQN_CAST(Dqn_usize)(!Dqn_IsPowerOfTwo(required_size));
 
         Dqn_usize const register_size = sizeof(Dqn_usize) * 8;
@@ -401,14 +467,17 @@ DQN_API Dqn_Str8 Dqn_ChunkPool_AllocStr8Copy(Dqn_ChunkPool *pool, Dqn_Str8 strin
 
 DQN_API void Dqn_ChunkPool_Dealloc(Dqn_ChunkPool *pool, void *ptr)
 {
-    if (!Dqn_ChunkPool_IsValid(pool))
+    if (!Dqn_ChunkPool_IsValid(pool) || !ptr)
         return;
 
-    Dqn_usize offset_to_original_ptr = 0;
-    DQN_MEMCPY(&offset_to_original_ptr, &(DQN_CAST(char *)ptr)[-1], 1);
+    DQN_ASSERT(Dqn_Arena_OwnsPtr(pool->arena, ptr));
+
+    char const *one_byte_behind_ptr    = DQN_CAST(char *) ptr - 1;
+    Dqn_usize   offset_to_original_ptr = 0;
+    DQN_MEMCPY(&offset_to_original_ptr, one_byte_behind_ptr, 1);
     DQN_ASSERT(offset_to_original_ptr <= sizeof(Dqn_ChunkPoolSlot) + pool->align);
 
-    char *original_ptr                = DQN_CAST(char *)ptr - offset_to_original_ptr;
+    char *original_ptr               = DQN_CAST(char *)ptr - offset_to_original_ptr;
     Dqn_ChunkPoolSlot *slot          = DQN_CAST(Dqn_ChunkPoolSlot *)original_ptr;
     Dqn_ChunkPoolSlotSize slot_index = DQN_CAST(Dqn_ChunkPoolSlotSize)(DQN_CAST(uintptr_t)slot->next);
     DQN_ASSERT(slot_index < Dqn_ChunkPoolSlotSize_Count);
@@ -417,6 +486,20 @@ DQN_API void Dqn_ChunkPool_Dealloc(Dqn_ChunkPool *pool, void *ptr)
     pool->slots[slot_index] = slot;
 }
 
+DQN_API void *Dqn_ChunkPool_Copy(Dqn_ChunkPool *pool, void const *data, uint64_t size, uint8_t align)
+{
+    if (!pool || !data || size == 0)
+        return nullptr;
+
+    // TODO: Hmm should align be part of the alloc interface in general? I'm not going to worry
+    // about this until we crash because of misalignment.
+    DQN_ASSERT(pool->align >= align);
+
+    void *result = Dqn_ChunkPool_Alloc(pool, size);
+    if (result)
+        DQN_MEMCPY(result, data, size);
+    return result;
+}
 
 // NOTE: [$ACAT] Dqn_ArenaCatalog //////////////////////////////////////////////////////////////////
 DQN_API void Dqn_ArenaCatalog_Init(Dqn_ArenaCatalog *catalog, Dqn_ChunkPool *pool)
@@ -440,7 +523,7 @@ DQN_API Dqn_ArenaCatalogItem *Dqn_ArenaCatalog_Find(Dqn_ArenaCatalog *catalog, D
     return result;
 }
 
-DQN_API void Dqn_ArenaCatalog_AddLabelRef(Dqn_ArenaCatalog *catalog, Dqn_Arena *arena, Dqn_Str8 label)
+static void Dqn_ArenaCatalog_AddInternal_(Dqn_ArenaCatalog *catalog, Dqn_Arena *arena, Dqn_Str8 label, bool arena_pool_allocated)
 {
     // NOTE: We could use an atomic for appending to the sentinel but it is such
     // a rare operation to append to the catalog that we don't bother.
@@ -451,6 +534,7 @@ DQN_API void Dqn_ArenaCatalog_AddLabelRef(Dqn_ArenaCatalog *catalog, Dqn_Arena *
     if (result) {
         result->arena                = arena;
         result->label                = label;
+        result->arena_pool_allocated = arena_pool_allocated;
 
         // NOTE: Add to the catalog (linked list)
         Dqn_ArenaCatalogItem *sentinel = &catalog->sentinel;
@@ -463,14 +547,6 @@ DQN_API void Dqn_ArenaCatalog_AddLabelRef(Dqn_ArenaCatalog *catalog, Dqn_Arena *
     Dqn_TicketMutex_End(&catalog->ticket_mutex);
 }
 
-DQN_API void Dqn_ArenaCatalog_AddLabelCopy(Dqn_ArenaCatalog *catalog, Dqn_Arena *arena, Dqn_Str8 label)
-{
-    Dqn_TicketMutex_Begin(&catalog->ticket_mutex);
-    Dqn_Str8 label_copy = Dqn_ChunkPool_AllocStr8Copy(catalog->pool, label);
-    Dqn_TicketMutex_End(&catalog->ticket_mutex);
-    Dqn_ArenaCatalog_AddLabelRef(catalog, arena, label_copy);
-}
-
 DQN_API void Dqn_ArenaCatalog_AddF(Dqn_ArenaCatalog *catalog, Dqn_Arena *arena, DQN_FMT_ATTRIB char const *fmt, ...)
 {
     va_list args;
@@ -479,7 +555,7 @@ DQN_API void Dqn_ArenaCatalog_AddF(Dqn_ArenaCatalog *catalog, Dqn_Arena *arena, 
     Dqn_Str8 label = Dqn_ChunkPool_AllocStr8FV(catalog->pool, fmt, args);
     Dqn_TicketMutex_End(&catalog->ticket_mutex);
     va_end(args);
-    Dqn_ArenaCatalog_AddLabelRef(catalog, arena, label);
+    Dqn_ArenaCatalog_AddInternal_(catalog, arena, label, false /*arena_pool_allocated*/);
 }
 
 DQN_API void Dqn_ArenaCatalog_AddFV(Dqn_ArenaCatalog *catalog, Dqn_Arena *arena, DQN_FMT_ATTRIB char const *fmt, va_list args)
@@ -487,35 +563,18 @@ DQN_API void Dqn_ArenaCatalog_AddFV(Dqn_ArenaCatalog *catalog, Dqn_Arena *arena,
     Dqn_TicketMutex_Begin(&catalog->ticket_mutex);
     Dqn_Str8 label = Dqn_ChunkPool_AllocStr8FV(catalog->pool, fmt, args);
     Dqn_TicketMutex_End(&catalog->ticket_mutex);
-    Dqn_ArenaCatalog_AddLabelRef(catalog, arena, label);
-}
-
-DQN_API Dqn_Arena *Dqn_ArenaCatalog_AllocLabelRef(Dqn_ArenaCatalog *catalog, Dqn_usize reserve, Dqn_usize commit, uint8_t arena_flags, Dqn_Str8 label)
-{
-    Dqn_TicketMutex_Begin(&catalog->ticket_mutex);
-    Dqn_Arena *result = Dqn_ChunkPool_New(catalog->pool, Dqn_Arena);
-    Dqn_TicketMutex_End(&catalog->ticket_mutex);
-
-    *result = Dqn_Arena_InitSize(reserve, commit, arena_flags);
-    Dqn_ArenaCatalog_AddLabelRef(catalog, result, label);
-    return result;
-}
-
-DQN_API Dqn_Arena *Dqn_ArenaCatalog_AllocLabelCopy(Dqn_ArenaCatalog *catalog, Dqn_usize reserve, Dqn_usize commit, uint8_t arena_flags, Dqn_Str8 label)
-{
-    Dqn_TicketMutex_Begin(&catalog->ticket_mutex);
-    Dqn_Str8   label_copy = Dqn_ChunkPool_AllocStr8Copy(catalog->pool, label);
-    Dqn_TicketMutex_End(&catalog->ticket_mutex);
-    Dqn_Arena *result     = Dqn_ArenaCatalog_AllocLabelRef(catalog, reserve, commit, arena_flags, label_copy);
-    return result;
+    Dqn_ArenaCatalog_AddInternal_(catalog, arena, label, false /*arena_pool_allocated*/);
 }
 
 DQN_API Dqn_Arena *Dqn_ArenaCatalog_AllocFV(Dqn_ArenaCatalog *catalog, Dqn_usize reserve, Dqn_usize commit, uint8_t arena_flags, DQN_FMT_ATTRIB char const *fmt, va_list args)
 {
     Dqn_TicketMutex_Begin(&catalog->ticket_mutex);
     Dqn_Str8   label  = Dqn_ChunkPool_AllocStr8FV(catalog->pool, fmt, args);
+    Dqn_Arena *result = Dqn_ChunkPool_New(catalog->pool, Dqn_Arena);
     Dqn_TicketMutex_End(&catalog->ticket_mutex);
-    Dqn_Arena *result = Dqn_ArenaCatalog_AllocLabelRef(catalog, reserve, commit, arena_flags, label);
+
+    *result = Dqn_Arena_InitSize(reserve, commit, arena_flags);
+    Dqn_ArenaCatalog_AddInternal_(catalog, result, label, true /*arena_pool_allocated*/);
     return result;
 }
 
@@ -525,8 +584,34 @@ DQN_API Dqn_Arena *Dqn_ArenaCatalog_AllocF(Dqn_ArenaCatalog *catalog, Dqn_usize 
     va_start(args, fmt);
     Dqn_TicketMutex_Begin(&catalog->ticket_mutex);
     Dqn_Str8   label  = Dqn_ChunkPool_AllocStr8FV(catalog->pool, fmt, args);
+    Dqn_Arena *result = Dqn_ChunkPool_New(catalog->pool, Dqn_Arena);
     Dqn_TicketMutex_End(&catalog->ticket_mutex);
-    Dqn_Arena *result = Dqn_ArenaCatalog_AllocLabelRef(catalog, reserve, commit, arena_flags, label);
     va_end(args);
+
+    *result = Dqn_Arena_InitSize(reserve, commit, arena_flags);
+    Dqn_ArenaCatalog_AddInternal_(catalog, result, label, true /*arena_pool_allocated*/);
+    return result;
+}
+
+DQN_API bool Dqn_ArenaCatalog_Erase(Dqn_ArenaCatalog *catalog, Dqn_Arena *arena, Dqn_ArenaCatalogFreeArena free_arena)
+{
+    bool result = false;
+    Dqn_TicketMutex_Begin(&catalog->ticket_mutex);
+    for (Dqn_ArenaCatalogItem *item = catalog->sentinel.next; item != &catalog->sentinel; item = item->next) {
+        if (item->arena == arena) {
+            item->next->prev = item->prev;
+            item->prev->next = item->next;
+            if (item->arena_pool_allocated) {
+                if (free_arena == Dqn_ArenaCatalogFreeArena_Yes)
+                    Dqn_Arena_Deinit(item->arena);
+                Dqn_ChunkPool_Dealloc(catalog->pool, item->arena);
+            }
+            Dqn_ChunkPool_Dealloc(catalog->pool, item->label.data);
+            Dqn_ChunkPool_Dealloc(catalog->pool, item);
+            result = true;
+            break;
+        }
+    }
+    Dqn_TicketMutex_End(&catalog->ticket_mutex);
     return result;
 }

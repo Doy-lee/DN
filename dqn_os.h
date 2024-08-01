@@ -122,6 +122,13 @@ struct Dqn_OSPathInfo
     uint64_t           size;
 };
 
+struct Dqn_OS_DirIterator
+{
+    void    *handle;
+    Dqn_Str8 file_name;
+    char     buffer[512];
+};
+
 // NOTE: R/W Stream API ////////////////////////////////////////////////////////////////////////////
 struct Dqn_OSFile
 {
@@ -231,6 +238,7 @@ typedef int32_t (Dqn_OSThreadFunc)(struct Dqn_OSThread*);
 
 struct Dqn_OSThread
 {
+    Dqn_TLS           tls;
     void             *handle;
     uint64_t          thread_id;
     void             *user_context;
@@ -262,7 +270,7 @@ struct Dqn_OSHttpResponse
     // Synchronous HTTP response uses the TLS scratch arena whereas async
     // calls use their own dedicated arena.
     Dqn_Arena         tmp_arena;
-    Dqn_Arena        *scratch_arena;
+    Dqn_Arena        *tmem_arena;
     Dqn_Str8Builder   builder;
     Dqn_OSSemaphore   on_complete_semaphore;
 
@@ -295,6 +303,7 @@ DQN_API bool                      Dqn_OS_DateIsValid         (Dqn_OSDateTime dat
 DQN_API bool                      Dqn_OS_SecureRNGBytes      (void *buffer, uint32_t size);
 DQN_API Dqn_Str8                  Dqn_OS_EXEPath             (Dqn_Arena *arena);
 DQN_API Dqn_Str8                  Dqn_OS_EXEDir              (Dqn_Arena *arena);
+#define                           Dqn_OS_EXEDir_TLS()        Dqn_OS_EXEDir(Dqn_TLS_TopArena())
 DQN_API void                      Dqn_OS_SleepMs             (Dqn_uint milliseconds);
 // NOTE: Counters //////////////////////////////////////////////////////////////////////////////////
 DQN_API uint64_t                  Dqn_OS_PerfCounterNow      ();
@@ -313,13 +322,15 @@ DQN_API uint64_t                  Dqn_OS_EstimateTSCPerSecond(uint64_t duration_
 
 #if !defined(DQN_NO_OS_FILE_API)
 // NOTE: File system paths /////////////////////////////////////////////////////////////////////////
-DQN_API Dqn_OSPathInfo            Dqn_OS_PathInfo  (Dqn_Str8 path);
-DQN_API bool                      Dqn_OS_PathDelete(Dqn_Str8 path);
-DQN_API bool                      Dqn_OS_FileExists(Dqn_Str8 path);
-DQN_API bool                      Dqn_OS_CopyFile  (Dqn_Str8 src, Dqn_Str8 dest, bool overwrite, Dqn_ErrorSink *error);
-DQN_API bool                      Dqn_OS_MoveFile  (Dqn_Str8 src, Dqn_Str8 dest, bool overwrite, Dqn_ErrorSink *error);
-DQN_API bool                      Dqn_OS_MakeDir   (Dqn_Str8 path, Dqn_ErrorSink *error);
-DQN_API bool                      Dqn_OS_DirExists (Dqn_Str8 path, Dqn_ErrorSink *error);
+DQN_API Dqn_OSPathInfo            Dqn_OS_PathInfo       (Dqn_Str8 path);
+DQN_API bool                      Dqn_OS_FileIsOlderThan(Dqn_Str8 file, Dqn_Str8 check_against);
+DQN_API bool                      Dqn_OS_PathDelete     (Dqn_Str8 path);
+DQN_API bool                      Dqn_OS_FileExists     (Dqn_Str8 path);
+DQN_API bool                      Dqn_OS_CopyFile       (Dqn_Str8 src, Dqn_Str8 dest, bool overwrite, Dqn_ErrorSink *error);
+DQN_API bool                      Dqn_OS_MoveFile       (Dqn_Str8 src, Dqn_Str8 dest, bool overwrite, Dqn_ErrorSink *error);
+DQN_API bool                      Dqn_OS_MakeDir        (Dqn_Str8 path);
+DQN_API bool                      Dqn_OS_DirExists      (Dqn_Str8 path);
+DQN_API bool                      Dqn_OS_DirIterate     (Dqn_Str8 path, Dqn_OS_DirIterator *it);
 
 // NOTE: R/W Stream API ////////////////////////////////////////////////////////////////////////////
 DQN_API Dqn_OSFile                Dqn_OS_FileOpen    (Dqn_Str8 path, Dqn_OSFileOpen open_mode, uint32_t access, Dqn_ErrorSink *error);
@@ -331,35 +342,45 @@ DQN_API bool                      Dqn_OS_FileWriteF  (Dqn_OSFile *file, Dqn_Erro
 DQN_API void                      Dqn_OS_FileClose   (Dqn_OSFile *file);
 
 // NOTE: R/W Entire File ///////////////////////////////////////////////////////////////////////////
-DQN_API Dqn_Str8                  Dqn_OS_ReadAll       (Dqn_Str8 path, Dqn_Arena *arena, Dqn_ErrorSink *error);
-DQN_API bool                      Dqn_OS_WriteAll      (Dqn_Str8 path, Dqn_Str8 buffer, Dqn_ErrorSink *error);
-DQN_API bool                      Dqn_OS_WriteAllFV    (Dqn_Str8 path, Dqn_ErrorSink *error, DQN_FMT_ATTRIB char const *fmt, va_list args);
-DQN_API bool                      Dqn_OS_WriteAllF     (Dqn_Str8 path, Dqn_ErrorSink *error, DQN_FMT_ATTRIB char const *fmt, ...);
-DQN_API bool                      Dqn_OS_WriteAllSafe  (Dqn_Str8 path, Dqn_Str8 buffer, Dqn_ErrorSink *error);
-DQN_API bool                      Dqn_OS_WriteAllSafeFV(Dqn_Str8 path, Dqn_ErrorSink *error, DQN_FMT_ATTRIB char const *fmt, va_list args);
-DQN_API bool                      Dqn_OS_WriteAllSafeF (Dqn_Str8 path, Dqn_ErrorSink *error, DQN_FMT_ATTRIB char const *fmt, ...);
+DQN_API Dqn_Str8                  Dqn_OS_ReadAll          (Dqn_Arena *arena, Dqn_Str8 path, Dqn_ErrorSink *error);
+#define                           Dqn_OS_ReadAll_TLS(...) Dqn_OS_ReadAll(Dqn_TLS_TopArena(), ##__VA_ARGS__)
+DQN_API bool                      Dqn_OS_WriteAll         (Dqn_Str8 path, Dqn_Str8 buffer, Dqn_ErrorSink *error);
+DQN_API bool                      Dqn_OS_WriteAllFV       (Dqn_Str8 path, Dqn_ErrorSink *error, DQN_FMT_ATTRIB char const *fmt, va_list args);
+DQN_API bool                      Dqn_OS_WriteAllF        (Dqn_Str8 path, Dqn_ErrorSink *error, DQN_FMT_ATTRIB char const *fmt, ...);
+DQN_API bool                      Dqn_OS_WriteAllSafe     (Dqn_Str8 path, Dqn_Str8 buffer, Dqn_ErrorSink *error);
+DQN_API bool                      Dqn_OS_WriteAllSafeFV   (Dqn_Str8 path, Dqn_ErrorSink *error, DQN_FMT_ATTRIB char const *fmt, va_list args);
+DQN_API bool                      Dqn_OS_WriteAllSafeF    (Dqn_Str8 path, Dqn_ErrorSink *error, DQN_FMT_ATTRIB char const *fmt, ...);
 #endif // !defined(DQN_NO_OS_FILE_API)
 
 // NOTE: File system paths /////////////////////////////////////////////////////////////////////////
-DQN_API bool                      Dqn_OS_PathAddRef            (Dqn_Arena *arena, Dqn_OSPath *fs_path, Dqn_Str8 path);
-DQN_API bool                      Dqn_OS_PathAdd               (Dqn_Arena *arena, Dqn_OSPath *fs_path, Dqn_Str8 path);
-DQN_API bool                      Dqn_OS_PathAddF              (Dqn_Arena *arena, Dqn_OSPath *fs_path, DQN_FMT_ATTRIB char const *fmt, ...);
-DQN_API bool                      Dqn_OS_PathPop               (Dqn_OSPath *fs_path);
-DQN_API Dqn_Str8                  Dqn_OS_PathBuildWithSeparator(Dqn_Arena *arena, Dqn_OSPath const *fs_path, Dqn_Str8 path_separator);
-DQN_API Dqn_Str8                  Dqn_OS_PathConvertTo         (Dqn_Arena *arena, Dqn_Str8 path, Dqn_Str8 path_separtor);
-DQN_API Dqn_Str8                  Dqn_OS_PathConvertToF        (Dqn_Arena *arena, Dqn_Str8 path_separator, DQN_FMT_ATTRIB char const *fmt, ...);
-DQN_API Dqn_Str8                  Dqn_OS_PathConvert           (Dqn_Arena *arena, Dqn_Str8 path);
-DQN_API Dqn_Str8                  Dqn_OS_PathConvertF          (Dqn_Arena *arena, DQN_FMT_ATTRIB char const *fmt, ...);
+DQN_API bool                      Dqn_OS_PathAddRef                             (Dqn_Arena *arena, Dqn_OSPath *fs_path, Dqn_Str8 path);
+#define                           Dqn_OS_PathAddRef_TLS(...)                    Dqn_OS_PathAddRef(Dqn_TLS_TopArena(), ##__VA_ARGS__)
+DQN_API bool                      Dqn_OS_PathAdd                                (Dqn_Arena *arena, Dqn_OSPath *fs_path, Dqn_Str8 path);
+#define                           Dqn_OS_PathAdd_TLS(...)                       Dqn_OS_PathAdd(Dqn_TLS_TopArena(), ##__VA_ARGS__)
+DQN_API bool                      Dqn_OS_PathAddF                               (Dqn_Arena *arena, Dqn_OSPath *fs_path, DQN_FMT_ATTRIB char const *fmt, ...);
+#define                           Dqn_OS_PathAddF_TLS(...)                      Dqn_OS_PathAddF(Dqn_TLS_TopArena(), ##__VA_ARGS__)
+DQN_API bool                      Dqn_OS_PathPop                                (Dqn_OSPath *fs_path);
+DQN_API Dqn_Str8                  Dqn_OS_PathBuildWithSeparator                 (Dqn_Arena *arena, Dqn_OSPath const *fs_path, Dqn_Str8 path_separator);
+#define                           Dqn_OS_PathBuildWithSeperator_TLS(...)        Dqn_OS_PathBuildWithSeperator(Dqn_TLS_TopArena(), ##__VA_ARGS__)
+DQN_API Dqn_Str8                  Dqn_OS_PathTo                                 (Dqn_Arena *arena, Dqn_Str8 path, Dqn_Str8 path_separtor);
+#define                           Dqn_OS_PathTo_TLS(...)                        Dqn_OS_PathTo(Dqn_TLS_TopArena(), ##__VA_ARGS__)
+DQN_API Dqn_Str8                  Dqn_OS_PathToF                                (Dqn_Arena *arena, Dqn_Str8 path_separator, DQN_FMT_ATTRIB char const *fmt, ...);
+#define                           Dqn_OS_PathToF_TLS(...)                       Dqn_OS_PathToF(Dqn_TLS_TopArena(), ##__VA_ARGS__)
+DQN_API Dqn_Str8                  Dqn_OS_Path                                   (Dqn_Arena *arena, Dqn_Str8 path);
+#define                           Dqn_OS_Path_TLS(...)                          Dqn_OS_Path(Dqn_TLS_TopArena(), ##__VA_ARGS__)
+DQN_API Dqn_Str8                  Dqn_OS_PathF                                  (Dqn_Arena *arena, DQN_FMT_ATTRIB char const *fmt, ...);
+#define                           Dqn_OS_PathF_TLS(...)                         Dqn_OS_PathF(Dqn_TLS_TopArena(), ##__VA_ARGS__)
 #define                           Dqn_OS_PathBuildFwdSlash(allocator, fs_path)  Dqn_OS_PathBuildWithSeparator(allocator, fs_path, DQN_STR8("/"))
 #define                           Dqn_OS_PathBuildBackSlash(allocator, fs_path) Dqn_OS_PathBuildWithSeparator(allocator, fs_path, DQN_STR8("\\"))
 #define                           Dqn_OS_PathBuild(allocator, fs_path)          Dqn_OS_PathBuildWithSeparator(allocator, fs_path, Dqn_OSPathSeparatorString)
 
 // NOTE: [$EXEC] Dqn_OSExec ////////////////////////////////////////////////////////////////////////
-DQN_API void                      Dqn_OS_Exit       (int32_t exit_code);
-DQN_API Dqn_OSExecResult          Dqn_OS_ExecWait   (Dqn_OSExecAsyncHandle handle, Dqn_Arena *arena, Dqn_ErrorSink *error);
-DQN_API Dqn_OSExecAsyncHandle     Dqn_OS_ExecAsync  (Dqn_Slice<Dqn_Str8> cmd_line, Dqn_Str8 working_dir, uint8_t exec_flags, Dqn_ErrorSink *error);
-DQN_API Dqn_OSExecResult          Dqn_OS_Exec       (Dqn_Slice<Dqn_Str8> cmd_line, Dqn_Str8 working_dir, uint8_t exec_flags, Dqn_Arena *arena, Dqn_ErrorSink *error);
-DQN_API Dqn_OSExecResult          Dqn_OS_ExecOrAbort(Dqn_Slice<Dqn_Str8> cmd_line, Dqn_Str8 working_dir, uint8_t exec_flags, Dqn_Arena *arena);
+DQN_API void                      Dqn_OS_Exit                 (int32_t exit_code);
+DQN_API Dqn_OSExecResult          Dqn_OS_ExecWait             (Dqn_OSExecAsyncHandle handle, Dqn_Arena *arena, Dqn_ErrorSink *error);
+DQN_API Dqn_OSExecAsyncHandle     Dqn_OS_ExecAsync            (Dqn_Slice<Dqn_Str8> cmd_line, Dqn_Str8 working_dir, uint8_t exec_flags, Dqn_ErrorSink *error);
+DQN_API Dqn_OSExecResult          Dqn_OS_Exec                 (Dqn_Slice<Dqn_Str8> cmd_line, Dqn_Str8 working_dir, uint8_t exec_flags, Dqn_Arena *arena, Dqn_ErrorSink *error);
+DQN_API Dqn_OSExecResult          Dqn_OS_ExecOrAbort          (Dqn_Slice<Dqn_Str8> cmd_line, Dqn_Str8 working_dir, uint8_t exec_flags, Dqn_Arena *arena);
+#define                           Dqn_OS_ExecOrAbort_TLS(...) Dqn_OS_ExecOrAbort(__VA_ARGS__, Dqn_TLS_TopArena())
 
 // NOTE: [$SEMA] Dqn_OSSemaphore ///////////////////////////////////////////////////////////////////
 #if !defined(DQN_NO_SEMAPHORE)
@@ -381,6 +402,7 @@ DQN_API void                      Dqn_OS_MutexUnlock(Dqn_OSMutex *mutex);
 DQN_API bool                      Dqn_OS_ThreadInit  (Dqn_OSThread *thread, Dqn_OSThreadFunc *func, void *user_context);
 DQN_API void                      Dqn_OS_ThreadDeinit(Dqn_OSThread thread);
 DQN_API uint32_t                  Dqn_OS_ThreadID    ();
+DQN_API void                      Dqn_OS_ThreadSetTLS(Dqn_TLS *tls);
 #endif // !defined(DQN_NO_THREAD)
 
 // NOTE: [$HTTP] Dqn_OSHttp ////////////////////////////////////////////////////////////////////////

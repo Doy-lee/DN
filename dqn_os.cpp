@@ -75,8 +75,8 @@ DQN_API Dqn_Str8 Dqn_OS_EXEDir(Dqn_Arena *arena)
     Dqn_Str8 result = {};
     if (!arena)
         return result;
-    Dqn_Scratch               scratch      = Dqn_Scratch_Get(arena);
-    Dqn_Str8                  exe_path     = Dqn_OS_EXEPath(scratch.arena);
+    Dqn_TLSTMem               tmem      = Dqn_TLS_TMem(arena);
+    Dqn_Str8                  exe_path     = Dqn_OS_EXEPath(tmem.arena);
     Dqn_Str8                  separators[] = {DQN_STR8("/"), DQN_STR8("\\")};
     Dqn_Str8BinarySplitResult split        = Dqn_Str8_BinarySplitLastArray(exe_path, separators, DQN_ARRAY_UCOUNT(separators));
     result                                 = Dqn_Str8_Copy(arena, split.lhs);
@@ -172,6 +172,14 @@ DQN_API uint64_t Dqn_OS_EstimateTSCPerSecond(uint64_t duration_ms_to_gauge_tsc_f
 
 #if !defined(DQN_NO_OS_FILE_API)
 // NOTE: [$FILE] Dqn_OSPathInfo/File ///////////////////////////////////////////////////////////////
+DQN_API bool Dqn_OS_FileIsOlderThan(Dqn_Str8 file, Dqn_Str8 check_against)
+{
+    Dqn_OSPathInfo file_info          = Dqn_OS_PathInfo(file);
+    Dqn_OSPathInfo check_against_info = Dqn_OS_PathInfo(check_against);
+    bool           result             = !file_info.exists || file_info.last_write_time_in_s < check_against_info.last_write_time_in_s;
+    return result;
+}
+
 DQN_API bool Dqn_OS_FileWrite(Dqn_OSFile *file, Dqn_Str8 buffer, Dqn_ErrorSink *error)
 {
     bool result = Dqn_OS_FileWritePtr(file, buffer.data, buffer.size, error);
@@ -183,8 +191,8 @@ DQN_API bool Dqn_OS_FileWriteFV(Dqn_OSFile *file, Dqn_ErrorSink *error, DQN_FMT_
     bool result = false;
     if (!file || !fmt)
         return result;
-    Dqn_Scratch scratch = Dqn_Scratch_Get(nullptr);
-    Dqn_Str8    buffer  = Dqn_Str8_InitFV(scratch.arena, fmt, args);
+    Dqn_TLSTMem tmem = Dqn_TLS_TMem(nullptr);
+    Dqn_Str8    buffer  = Dqn_Str8_InitFV(tmem.arena, fmt, args);
     result              = Dqn_OS_FileWritePtr(file, buffer.data, buffer.size, error);
     return result;
 }
@@ -199,7 +207,7 @@ DQN_API bool Dqn_OS_FileWriteF(Dqn_OSFile *file, Dqn_ErrorSink *error, DQN_FMT_A
 }
 
 // NOTE: R/W Entire File ///////////////////////////////////////////////////////////////////////////
-DQN_API Dqn_Str8 Dqn_OS_ReadAll(Dqn_Str8 path, Dqn_Arena *arena, Dqn_ErrorSink *error)
+DQN_API Dqn_Str8 Dqn_OS_ReadAll(Dqn_Arena *arena, Dqn_Str8 path, Dqn_ErrorSink *error)
 {
     Dqn_Str8 result = {};
     if (!arena)
@@ -215,8 +223,8 @@ DQN_API Dqn_Str8 Dqn_OS_ReadAll(Dqn_Str8 path, Dqn_Arena *arena, Dqn_ErrorSink *
     Dqn_ArenaTempMem temp_mem = Dqn_Arena_TempMemBegin(arena);
     result                    = Dqn_Str8_Alloc(arena, path_info.size, Dqn_ZeroMem_No);
     if (!Dqn_Str8_HasData(result)) {
-        Dqn_Scratch scratch          = Dqn_Scratch_Get(nullptr);
-        Dqn_Str8    buffer_size_str8 = Dqn_U64ToByteSizeStr8(scratch.arena, path_info.size, Dqn_U64ByteSizeType_Auto);
+        Dqn_TLSTMem tmem          = Dqn_TLS_TMem(nullptr);
+        Dqn_Str8    buffer_size_str8 = Dqn_U64ToByteSizeStr8(tmem.arena, path_info.size, Dqn_U64ByteSizeType_Auto);
         Dqn_ErrorSink_MakeF(error, 1 /*error_code*/, "Failed to allocate %.*s for reading file '%.*s'", DQN_STR_FMT(buffer_size_str8), DQN_STR_FMT(path));
         Dqn_Arena_TempMemEnd(temp_mem);
         result = {};
@@ -244,8 +252,8 @@ DQN_API bool Dqn_OS_WriteAll(Dqn_Str8 path, Dqn_Str8 buffer, Dqn_ErrorSink *erro
 
 DQN_API bool Dqn_OS_WriteAllFV(Dqn_Str8 file_path, Dqn_ErrorSink *error, DQN_FMT_ATTRIB char const *fmt, va_list args)
 {
-    Dqn_Scratch scratch = Dqn_Scratch_Get(nullptr);
-    Dqn_Str8    buffer  = Dqn_Str8_InitFV(scratch.arena, fmt, args);
+    Dqn_TLSTMem tmem = Dqn_TLS_TMem(nullptr);
+    Dqn_Str8    buffer  = Dqn_Str8_InitFV(tmem.arena, fmt, args);
     bool        result  = Dqn_OS_WriteAll(file_path, buffer, error);
     return result;
 }
@@ -261,8 +269,8 @@ DQN_API bool Dqn_OS_WriteAllF(Dqn_Str8 file_path, Dqn_ErrorSink *error, DQN_FMT_
 
 DQN_API bool Dqn_OS_WriteAllSafe(Dqn_Str8 path, Dqn_Str8 buffer, Dqn_ErrorSink *error)
 {
-    Dqn_Scratch scratch  = Dqn_Scratch_Get(nullptr);
-    Dqn_Str8    tmp_path = Dqn_Str8_InitF(scratch.arena, "%.*s.tmp", DQN_STR_FMT(path));
+    Dqn_TLSTMem tmem  = Dqn_TLS_TMem(nullptr);
+    Dqn_Str8    tmp_path = Dqn_Str8_InitF(tmem.arena, "%.*s.tmp", DQN_STR_FMT(path));
     if (!Dqn_OS_WriteAll(tmp_path, buffer, error))
         return false;
     if (!Dqn_OS_CopyFile(tmp_path, path, true /*overwrite*/, error))
@@ -274,8 +282,8 @@ DQN_API bool Dqn_OS_WriteAllSafe(Dqn_Str8 path, Dqn_Str8 buffer, Dqn_ErrorSink *
 
 DQN_API bool Dqn_OS_WriteAllSafeFV(Dqn_Str8 path, Dqn_ErrorSink *error, DQN_FMT_ATTRIB char const *fmt, va_list args)
 {
-    Dqn_Scratch scratch = Dqn_Scratch_Get(nullptr);
-    Dqn_Str8    buffer  = Dqn_Str8_InitFV(scratch.arena, fmt, args);
+    Dqn_TLSTMem tmem = Dqn_TLS_TMem(nullptr);
+    Dqn_Str8    buffer  = Dqn_Str8_InitFV(tmem.arena, fmt, args);
     bool        result  = Dqn_OS_WriteAllSafe(path, buffer, error);
     return result;
 }
@@ -375,7 +383,7 @@ DQN_API bool Dqn_OS_PathPop(Dqn_OSPath *fs_path)
     return true;
 }
 
-DQN_API Dqn_Str8 Dqn_OS_PathConvertTo(Dqn_Arena *arena, Dqn_Str8 path, Dqn_Str8 path_separator)
+DQN_API Dqn_Str8 Dqn_OS_PathTo(Dqn_Arena *arena, Dqn_Str8 path, Dqn_Str8 path_separator)
 {
     Dqn_OSPath fs_path = {};
     Dqn_OS_PathAddRef(arena, &fs_path, path);
@@ -383,31 +391,31 @@ DQN_API Dqn_Str8 Dqn_OS_PathConvertTo(Dqn_Arena *arena, Dqn_Str8 path, Dqn_Str8 
     return result;
 }
 
-DQN_API Dqn_Str8 Dqn_OS_PathConvertToF(Dqn_Arena *arena, Dqn_Str8 path_separator, DQN_FMT_ATTRIB char const *fmt, ...)
+DQN_API Dqn_Str8 Dqn_OS_PathToF(Dqn_Arena *arena, Dqn_Str8 path_separator, DQN_FMT_ATTRIB char const *fmt, ...)
 {
-    Dqn_Scratch scratch = Dqn_Scratch_Get(arena);
+    Dqn_TLSTMem tmem = Dqn_TLS_TMem(arena);
     va_list args;
     va_start(args, fmt);
-    Dqn_Str8 path = Dqn_Str8_InitFV(scratch.arena, fmt, args);
+    Dqn_Str8 path = Dqn_Str8_InitFV(tmem.arena, fmt, args);
     va_end(args);
-    Dqn_Str8 result = Dqn_OS_PathConvertTo(arena, path, path_separator);
+    Dqn_Str8 result = Dqn_OS_PathTo(arena, path, path_separator);
     return result;
 }
 
-DQN_API Dqn_Str8 Dqn_OS_PathConvert(Dqn_Arena *arena, Dqn_Str8 path)
+DQN_API Dqn_Str8 Dqn_OS_Path(Dqn_Arena *arena, Dqn_Str8 path)
 {
-    Dqn_Str8 result = Dqn_OS_PathConvertTo(arena, path, Dqn_OSPathSeperatorString);
+    Dqn_Str8 result = Dqn_OS_PathTo(arena, path, Dqn_OSPathSeperatorString);
     return result;
 }
 
-DQN_API Dqn_Str8 Dqn_OS_PathConvertF(Dqn_Arena *arena, DQN_FMT_ATTRIB char const *fmt, ...)
+DQN_API Dqn_Str8 Dqn_OS_PathF(Dqn_Arena *arena, DQN_FMT_ATTRIB char const *fmt, ...)
 {
-    Dqn_Scratch scratch = Dqn_Scratch_Get(arena);
+    Dqn_TLSTMem tmem = Dqn_TLS_TMem(arena);
     va_list args;
     va_start(args, fmt);
-    Dqn_Str8 path = Dqn_Str8_InitFV(scratch.arena, fmt, args);
+    Dqn_Str8 path = Dqn_Str8_InitFV(tmem.arena, fmt, args);
     va_end(args);
-    Dqn_Str8 result = Dqn_OS_PathConvert(arena, path);
+    Dqn_Str8 result = Dqn_OS_Path(arena, path);
     return result;
 }
 
@@ -480,6 +488,23 @@ DQN_API Dqn_OSExecResult Dqn_OS_ExecOrAbort(Dqn_Slice<Dqn_Str8> cmd_line, Dqn_St
     return result;
 }
 
+// NOTE: [$THRD] Dqn_OSThread //////////////////////////////////////////////////////////////////////
+DQN_THREAD_LOCAL Dqn_TLS *g_dqn_os_thread_tls;
+
+static void Dqn_OS_ThreadExecute_(void *user_context)
+{
+    Dqn_OSThread *thread = DQN_CAST(Dqn_OSThread *)user_context;
+    Dqn_TLS_Init(&thread->tls);
+    Dqn_OS_ThreadSetTLS(&thread->tls);
+    Dqn_OS_SemaphoreWait(&thread->init_semaphore, DQN_OS_SEMAPHORE_INFINITE_TIMEOUT);
+    thread->func(thread);
+}
+
+DQN_API void Dqn_OS_ThreadSetTLS(Dqn_TLS *tls)
+{
+    g_dqn_os_thread_tls = tls;
+}
+
 // NOTE: [$HTTP] Dqn_OSHttp ////////////////////////////////////////////////////////////////////////
 DQN_API void Dqn_OS_HttpRequestWait(Dqn_OSHttpResponse *response)
 {
@@ -490,9 +515,9 @@ DQN_API void Dqn_OS_HttpRequestWait(Dqn_OSHttpResponse *response)
 DQN_API Dqn_OSHttpResponse Dqn_OS_HttpRequest(Dqn_Arena *arena, Dqn_Str8 host, Dqn_Str8 path, Dqn_OSHttpRequestSecure secure, Dqn_Str8 method, Dqn_Str8 body, Dqn_Str8 headers)
 {
     // TODO(doyle): Revise the memory allocation and its lifetime
-    Dqn_OSHttpResponse result  = {};
-    Dqn_Scratch        scratch = Dqn_Scratch_Get(arena);
-    result.scratch_arena       = scratch.arena;
+    Dqn_OSHttpResponse result = {};
+    Dqn_TLSTMem        tmem   = Dqn_TLS_TMem(arena);
+    result.tmem_arena         = tmem.arena;
 
     Dqn_OS_HttpRequestAsync(&result, arena, host, path, secure, method, body, headers);
     Dqn_OS_HttpRequestWait(&result);

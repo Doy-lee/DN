@@ -145,16 +145,16 @@
 #if !defined(DQN_MEMCPY) || !defined(DQN_MEMSET) || !defined(DQN_MEMCMP) || !defined(DQN_MEMMOVE)
     #include <string.h>
     #if !defined(DQN_MEMCPY)
-        #define DQN_MEMCPY(dest, src, count) memcpy(dest, src, count)
+        #define DQN_MEMCPY(dest, src, count) memcpy((dest), (src), (count))
     #endif
     #if !defined(DQN_MEMSET)
-        #define DQN_MEMSET(dest, value, count) memset(dest, value, count)
+        #define DQN_MEMSET(dest, value, count) memset((dest), (value), (count))
     #endif
     #if !defined(DQN_MEMCMP)
-        #define DQN_MEMCMP(lhs, rhs, count) memcmp(lhs, rhs, count)
+        #define DQN_MEMCMP(lhs, rhs, count) memcmp((lhs), (rhs), (count))
     #endif
     #if !defined(DQN_MEMMOVE)
-        #define DQN_MEMMOVE(dest, src, count) memmove(dest, src, count)
+        #define DQN_MEMMOVE(dest, src, count) memmove((dest), (src), (count))
     #endif
 #endif
 
@@ -424,6 +424,9 @@ struct Dqn_ErrorSink
     #define Dqn_Atomic_AddU64(target, value)                          _InterlockedExchangeAdd64((__int64 volatile *)target, value)
     #define Dqn_Atomic_SubU32(target, value)                          Dqn_Atomic_AddU32(DQN_CAST(long volatile *)target, (long)-value)
     #define Dqn_Atomic_SubU64(target, value)                          Dqn_Atomic_AddU64(target, (uint64_t)-value)
+
+    #define Dqn_CountLeadingZerosU64(value)                           __lzcnt64(value)
+
     #define Dqn_CPU_TSC()                                             __rdtsc()
     #define Dqn_CompilerReadBarrierAndCPUReadFence                    _ReadBarrier(); _mm_lfence()
     #define Dqn_CompilerWriteBarrierAndCPUWriteFence                  _WriteBarrier(); _mm_sfence()
@@ -439,6 +442,8 @@ struct Dqn_ErrorSink
     #define Dqn_Atomic_AddU64(target, value) __atomic_fetch_add(target, value, __ATOMIC_ACQ_REL)
     #define Dqn_Atomic_SubU32(target, value) __atomic_fetch_sub(target, value, __ATOMIC_ACQ_REL)
     #define Dqn_Atomic_SubU64(target, value) __atomic_fetch_sub(target, value, __ATOMIC_ACQ_REL)
+
+    #define Dqn_CountLeadingZerosU64(value)                           __builtin_clzll(value)
     #if defined(DQN_COMPILER_GCC)
         #define Dqn_CPU_TSC() __rdtsc()
     #else
@@ -752,8 +757,8 @@ DQN_API          bool               Dqn_ErrorSink_EndAndLogErrorF               
 DQN_API          void               Dqn_ErrorSink_EndAndExitIfErrorF            (Dqn_ErrorSink *error, uint32_t exit_code, DQN_FMT_ATTRIB char const *fmt, ...);
 DQN_API          void               Dqn_ErrorSink_EndAndExitIfErrorFV           (Dqn_ErrorSink *error, uint32_t exit_code, DQN_FMT_ATTRIB char const *fmt, va_list args);
 
-#define                             Dqn_ErrorSink_MakeFV(error, error_code, fmt, args) do { Dqn_ThreadContext_SaveCallSite; Dqn_ErrorSink_MakeFV_(error, error_code, fmt, args); } while (0)
-#define                             Dqn_ErrorSink_MakeF(error, error_code, fmt, ...)   do { Dqn_ThreadContext_SaveCallSite; Dqn_ErrorSink_MakeF_(error, error_code, fmt, ## __VA_ARGS__); } while (0)
+#define                             Dqn_ErrorSink_MakeFV(error, error_code, fmt, args) do { Dqn_TLS_SaveCallSite; Dqn_ErrorSink_MakeFV_(error, error_code, fmt, args); } while (0)
+#define                             Dqn_ErrorSink_MakeF(error, error_code, fmt, ...)   do { Dqn_TLS_SaveCallSite; Dqn_ErrorSink_MakeF_(error, error_code, fmt, ## __VA_ARGS__); } while (0)
 DQN_API          void               Dqn_ErrorSink_MakeFV_                       (Dqn_ErrorSink *error, uint32_t error_code, DQN_FMT_ATTRIB char const *fmt, va_list args);
 DQN_API          void               Dqn_ErrorSink_MakeF_                        (Dqn_ErrorSink *error, uint32_t error_code, DQN_FMT_ATTRIB char const *fmt, ...);
 

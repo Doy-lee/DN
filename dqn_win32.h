@@ -1,6 +1,7 @@
 #pragma once
 #include "dqn.h"
 
+/*
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //
 //   $$\      $$\ $$$$$$\ $$\   $$\  $$$$$$\   $$$$$$\
@@ -15,11 +16,15 @@
 //   dqn_win32.h -- Windows replacement header
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
+*/
 
 #if defined(DQN_COMPILER_MSVC) || defined(DQN_COMPILER_CLANG_CL)
     #pragma comment(lib, "bcrypt")
     #pragma comment(lib, "winhttp")
     #pragma comment(lib, "dbghelp")
+    #pragma comment(lib, "comdlg32")
+    #pragma comment(lib, "pathcch")
+    #pragma comment(lib, "shlwapi")
 #endif
 
 #if defined(DQN_NO_WIN32_MIN_HEADER) || defined(_INC_WINDOWS)
@@ -27,6 +32,8 @@
     #include <Windows.h>  // LONG
     #include <bcrypt.h>   // Dqn_OS_SecureRNGBytes -> BCryptOpenAlgorithmProvider ... etc
     #include <shellapi.h> // Dqn_Win_MakeProcessDPIAware -> SetProcessDpiAwareProc
+    #include <shlwapi.h>  // PathRelativePathTO
+    #include <pathcch.h>  // PathCchCanonicalizeEx
     #include <winhttp.h>  // WinHttp*
     #include <DbgHelp.h>
 #else
@@ -35,6 +42,7 @@
 
     // NOTE: basetsd.h /////////////////////////////////////////////////////////////////////////////
     typedef unsigned __int64 ULONG_PTR, *PULONG_PTR;
+    typedef unsigned __int64 UINT_PTR,  *PUINT_PTR;
     typedef ULONG_PTR        SIZE_T,    *PSIZE_T;
     typedef __int64          LONG_PTR,  *PLONG_PTR;
     typedef ULONG_PTR        DWORD_PTR, *PDWORD_PTR;
@@ -47,17 +55,21 @@
     };
     typedef struct HINSTANCE__ *HINSTANCE;
 
-    typedef unsigned long  DWORD;
-    typedef int            BOOL;
-    typedef int            INT;
-    typedef unsigned long  ULONG;
-    typedef unsigned int   UINT;
-    typedef unsigned short WORD;
-    typedef unsigned char  BYTE;
-    typedef unsigned char  UCHAR;
-    typedef HINSTANCE      HMODULE; /* HMODULEs can be used in place of HINSTANCEs */
-    typedef void *         HANDLE;
-    typedef HANDLE         HLOCAL;
+    typedef unsigned long    DWORD;
+    typedef int              BOOL;
+    typedef int              INT;
+    typedef unsigned long    ULONG;
+    typedef unsigned int     UINT;
+    typedef unsigned short   WORD;
+    typedef unsigned char    BYTE;
+    typedef unsigned char    UCHAR;
+    typedef HINSTANCE        HMODULE; /* HMODULEs can be used in place of HINSTANCEs */
+    typedef void *           HANDLE;
+    typedef HANDLE           HLOCAL;
+
+    typedef unsigned __int64 WPARAM;
+    typedef LONG_PTR         LPARAM;
+    typedef LONG_PTR         LRESULT;
 
     #define MAX_PATH 260
 
@@ -85,6 +97,7 @@
     typedef wchar_t          WCHAR; // wc, 16-bit UNICODE character
     typedef CHAR *           NPSTR, *LPSTR, *PSTR;
     typedef WCHAR *          NWPSTR, *LPWSTR, *PWSTR;
+    typedef long             HRESULT;
 
     // NOTE: VirtualAlloc: Allocation Type
     #define MEM_RESERVE  0x00002000
@@ -129,6 +142,9 @@
     #define WAIT_TIMEOUT            258L    // dderror
     #define STATUS_WAIT_0           ((DWORD   )0x00000000L)
     #define STATUS_ABANDONED_WAIT_0 ((DWORD   )0x00000080L)
+
+    #define S_OK                    ((HRESULT)0L)
+    #define S_FALSE                 ((HRESULT)1L)
 
     typedef union _ULARGE_INTEGER {
         struct {
@@ -1047,12 +1063,11 @@
 
     extern "C"
     {
-    __declspec(dllimport) BOOL   __stdcall CreateProcessW(WCHAR const *lpApplicationName, WCHAR *lpCommandLine, SECURITY_ATTRIBUTES *lpProcessAttributes, SECURITY_ATTRIBUTES *lpThreadAttributes, BOOL bInheritHandles, DWORD dwCreationFlags, VOID *lpEnvironment, WCHAR const *lpCurrentDirectory, STARTUPINFOW *lpStartupInfo, PROCESS_INFORMATION *lpProcessInformation);
-    __declspec(dllimport) HANDLE __stdcall CreateThread(SECURITY_ATTRIBUTES *lpThreadAttributes, SIZE_T dwStackSize, PTHREAD_START_ROUTINE lpStartAddress, VOID *lpParameter, DWORD dwCreationFlags, DWORD *lpThreadId);
+    __declspec(dllimport) BOOL   __stdcall CreateProcessW    (WCHAR const *lpApplicationName, WCHAR *lpCommandLine, SECURITY_ATTRIBUTES *lpProcessAttributes, SECURITY_ATTRIBUTES *lpThreadAttributes, BOOL bInheritHandles, DWORD dwCreationFlags, VOID *lpEnvironment, WCHAR const *lpCurrentDirectory, STARTUPINFOW *lpStartupInfo, PROCESS_INFORMATION *lpProcessInformation);
+    __declspec(dllimport) HANDLE __stdcall CreateThread      (SECURITY_ATTRIBUTES *lpThreadAttributes, SIZE_T dwStackSize, PTHREAD_START_ROUTINE lpStartAddress, VOID *lpParameter, DWORD dwCreationFlags, DWORD *lpThreadId);
     __declspec(dllimport) DWORD  __stdcall GetCurrentThreadId(VOID);
     __declspec(dllimport) BOOL   __stdcall GetExitCodeProcess(HANDLE hProcess, DWORD *lpExitCode);
-    __declspec(dllimport) void   __stdcall ExitProcess(UINT uExitCode);
-
+    __declspec(dllimport) void   __stdcall ExitProcess       (UINT uExitCode);
     }
 
     // NOTE: um/memoryapi.h ////////////////////////////////////////////////////////////////////////
@@ -1077,6 +1092,7 @@
     extern "C"
     {
     __declspec(dllimport) HINSTANCE __stdcall ShellExecuteA(HWND hwnd, CHAR const *lpOperation, CHAR const *lpFile, CHAR const *lpParameters, CHAR const *lpDirectory, INT nShowCmd);
+    __declspec(dllimport) HINSTANCE __stdcall ShellExecuteW(HWND hwnd, WCHAR const *lpOperation, WCHAR const *lpFile, WCHAR const *lpParameters, WCHAR const *lpDirectory, INT nShowCmd);
     }
 
     // NOTE: um/debugapi.h /////////////////////////////////////////////////////////////////////////
@@ -1088,14 +1104,150 @@
     // NOTE: um/namedpipeapi.h /////////////////////////////////////////////////////////////////////
     extern "C"
     {
-        __declspec(dllimport) BOOL __stdcall CreatePipe          (HANDLE *hReadPipe, HANDLE *hWritePipe, LPSECURITY_ATTRIBUTES lpPipeAttributes, DWORD nSize);
+    __declspec(dllimport) BOOL __stdcall CreatePipe   (HANDLE *hReadPipe, HANDLE *hWritePipe, LPSECURITY_ATTRIBUTES lpPipeAttributes, DWORD nSize);
+    __declspec(dllimport) BOOL __stdcall PeekNamedPipe(HANDLE hNamedPipe, VOID *lpBuffer, DWORD nBufferSize, DWORD *lpBytesRead, DWORD *lpTotalBytesAvail, DWORD *lpBytesLeftThisMessage);
     }
 
-    // NOTE: um/handleapi.h /////////////////////////////////////////////////////////////////////
+    // NOTE: um/handleapi.h ////////////////////////////////////////////////////////////////////////
     extern "C"
     {
-        __declspec(dllimport) BOOL __stdcall SetHandleInformation(HANDLE hObject, DWORD dwMask, DWORD dwFlags);
+    __declspec(dllimport) BOOL __stdcall SetHandleInformation(HANDLE hObject, DWORD dwMask, DWORD dwFlags);
     }
+
+    // NOTE: um/commdlg.h //////////////////////////////////////////////////////////////////////////
+    typedef UINT_PTR (__stdcall *LPOFNHOOKPROC)(HWND, UINT, WPARAM, LPARAM);
+    typedef struct tagOFNW {
+       DWORD         lStructSize;
+       HWND          hwndOwner;
+       HINSTANCE     hInstance;
+       WCHAR const * lpstrFilter;
+       LPWSTR        lpstrCustomFilter;
+       DWORD         nMaxCustFilter;
+       DWORD         nFilterIndex;
+       LPWSTR        lpstrFile;
+       DWORD         nMaxFile;
+       LPWSTR        lpstrFileTitle;
+       DWORD         nMaxFileTitle;
+       WCHAR const * lpstrInitialDir;
+       WCHAR const * lpstrTitle;
+       DWORD         Flags;
+       WORD          nFileOffset;
+       WORD          nFileExtension;
+       WCHAR const * lpstrDefExt;
+       LPARAM        lCustData;
+       LPOFNHOOKPROC lpfnHook;
+       WCHAR const * lpTemplateName;
+       #ifdef _MAC
+       LPEDITMENU    lpEditInfo;
+       LPCSTR        lpstrPrompt;
+       #endif
+       #if (_WIN32_WINNT >= 0x0500)
+       void *        pvReserved;
+       DWORD         dwReserved;
+       DWORD         FlagsEx;
+       #endif // (_WIN32_WINNT >= 0x0500)
+    } OPENFILENAMEW, *LPOPENFILENAMEW;
+
+
+    #define OFN_READONLY                 0x00000001
+    #define OFN_OVERWRITEPROMPT          0x00000002
+    #define OFN_HIDEREADONLY             0x00000004
+    #define OFN_NOCHANGEDIR              0x00000008
+    #define OFN_SHOWHELP                 0x00000010
+    #define OFN_ENABLEHOOK               0x00000020
+    #define OFN_ENABLETEMPLATE           0x00000040
+    #define OFN_ENABLETEMPLATEHANDLE     0x00000080
+    #define OFN_NOVALIDATE               0x00000100
+    #define OFN_ALLOWMULTISELECT         0x00000200
+    #define OFN_EXTENSIONDIFFERENT       0x00000400
+    #define OFN_PATHMUSTEXIST            0x00000800
+    #define OFN_FILEMUSTEXIST            0x00001000
+    #define OFN_CREATEPROMPT             0x00002000
+    #define OFN_SHAREAWARE               0x00004000
+    #define OFN_NOREADONLYRETURN         0x00008000
+    #define OFN_NOTESTFILECREATE         0x00010000
+    #define OFN_NONETWORKBUTTON          0x00020000
+    #define OFN_NOLONGNAMES              0x00040000     // force no long names for 4.x modules
+    #if(WINVER >= 0x0400)
+    #define OFN_EXPLORER                 0x00080000     // new look commdlg
+    #define OFN_NODEREFERENCELINKS       0x00100000
+    #define OFN_LONGNAMES                0x00200000     // force long names for 3.x modules
+    // OFN_ENABLEINCLUDENOTIFY and OFN_ENABLESIZING require
+    // Windows 2000 or higher to have any effect.
+    #define OFN_ENABLEINCLUDENOTIFY      0x00400000     // send include message to callback
+    #define OFN_ENABLESIZING             0x00800000
+    #endif /* WINVER >= 0x0400 */
+    #if (_WIN32_WINNT >= 0x0500)
+    #define OFN_DONTADDTORECENT          0x02000000
+    #define OFN_FORCESHOWHIDDEN          0x10000000    // Show All files including System and hidden files
+    #endif // (_WIN32_WINNT >= 0x0500)
+    
+    //FlagsEx Values
+    #if (_WIN32_WINNT >= 0x0500)
+    #define  OFN_EX_NOPLACESBAR         0x00000001
+    #endif // (_WIN32_WINNT >= 0x0500)
+
+    extern "C"
+    {
+    __declspec(dllimport) BOOL __stdcall GetSaveFileNameW(LPOPENFILENAMEW);
+    __declspec(dllimport) BOOL __stdcall GetOpenFileNameW(LPOPENFILENAMEW);
+    }
+
+    // NOTE: um/shlwapi.h //////////////////////////////////////////////////////////////////////////
+    extern "C"
+    {
+    __declspec(dllimport) BOOL __stdcall PathRelativePathToW(WCHAR *pszPath, WCHAR const *pszFrom, DWORD dwAttrFrom, WCHAR const *pszTo, DWORD dwAttrTo);
+    __declspec(dllimport) BOOL __stdcall PathIsRelativeW(WCHAR *pszPath);
+    }
+
+    // NOTE: um/pathcch.h //////////////////////////////////////////////////////////////////////////
+    typedef enum PATHCCH_OPTIONS
+    {
+        PATHCCH_NONE = 0x0,
+
+        // This option allows applications to gain access to long paths. It has two
+        // different behaviors. For process configured to enable long paths it will allow
+        // the returned path to be longer than the max path limit that is normally imposed.
+        // For process that are not this option will convert long paths into the extended
+        // length DOS device form (with \\?\ prefix) when the path is longer than the limit.
+        // This form is not length limited by the Win32 file system API on all versions of Windows.
+        // This second behavior is the same behavior for OSes that don't have the long path feature.
+        // This can not be specified with PATHCCH_ENSURE_IS_EXTENDED_LENGTH_PATH.
+        PATHCCH_ALLOW_LONG_PATHS = 0x01,
+
+        // Can only be used when PATHCCH_ALLOW_LONG_PATHS is specified. This
+        // Forces the API to treat the caller as long path enabled, independent of the
+        // process's long name enabled state. Cannot be used with PATHCCH_FORCE_DISABLE_LONG_NAME_PROCESS.
+        PATHCCH_FORCE_ENABLE_LONG_NAME_PROCESS = 0x02,
+
+        // Can only be used when PATHCCH_ALLOW_LONG_PATHS is specified. This
+        // Forces the API to treat the caller as long path disabled, independent of the
+        // process's long name enabled state. Cannot be used with PATHCCH_FORCE_ENABLE_LONG_NAME_PROCESS.
+        PATHCCH_FORCE_DISABLE_LONG_NAME_PROCESS = 0x04,
+
+        // Disable the normalization of path segments that includes removing trailing dots and spaces.
+        // This enables access to paths that win32 path normalization will block.
+        PATHCCH_DO_NOT_NORMALIZE_SEGMENTS = 0x08,
+
+        // Convert the input path into the extended length DOS device path form (with the \\?\ prefix)
+        // if not already in that form. This enables access to paths that are otherwise not addressable
+        // due to Win32 normalization rules (that can strip trailing dots and spaces) and path
+        // length limitations. This option implies the same behavior of PATHCCH_DO_NOT_NORMALIZE_SEGMENTS.
+        // This can not be specified with PATHCCH_ALLOW_LONG_PATHS.
+        PATHCCH_ENSURE_IS_EXTENDED_LENGTH_PATH = 0x10,
+
+        // When combining or normalizing a path ensure there is a trailing backslash.
+        PATHCCH_ENSURE_TRAILING_SLASH = 0x020,
+
+        // Convert forward slashes to back slashes and collapse multiple slashes.
+        // This is needed to to support sub-path or identity comparisons.
+        PATHCCH_CANONICALIZE_SLASHES = 0x040,
+    } PATHCCH_OPTIONS;
+
+    extern "C"
+    {
+        __declspec(dllimport) HRESULT __stdcall PathCchCanonicalizeEx(PWSTR pszPathOut, size_t cchPathOut, WCHAR const *pszPathIn, ULONG dwFlags);
+    };
 
     DQN_MSVC_WARNING_POP
 #endif // !defined(_INC_WINDOWS)

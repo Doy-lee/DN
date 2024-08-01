@@ -64,8 +64,7 @@ enum Dqn_BinarySearchType
 {
     // Index of the match. If no match is found, found is set to false and the
     // index is set to the index where the match should be inserted/exist, if
-    // it were in the array (in practice this turns out to be the first or
-    // [last index + 1] of the array).
+    // it were in the array
     Dqn_BinarySearchType_Match,
 
     // Index of the first element in the array that is `element >= find`. If no such
@@ -97,6 +96,9 @@ struct Dqn_BinarySearchResult
     Dqn_usize index;
 };
 
+template <typename T>
+using Dqn_QSortLessThanProc = bool(T const &a, T const &b, void *user_context);
+
 // NOTE: [$MISC] Misc //////////////////////////////////////////////////////////////////////////////
 struct Dqn_U64Str8
 {
@@ -122,7 +124,8 @@ struct Dqn_U64ByteSize
     Dqn_f64             bytes;
 };
 
-enum Dqn_U64AgeUnit
+typedef uint32_t Dqn_U64AgeUnit;
+enum Dqn_U64AgeUnit_
 {
     Dqn_U64AgeUnit_Sec  = 1 << 0,
     Dqn_U64AgeUnit_Min  = 1 << 1,
@@ -142,8 +145,9 @@ struct Dqn_U64HexStr8
 
 enum Dqn_U64HexStr8Flags
 {
-    Dqn_BinHexU64Str8Flags_No0xPrefix   = 1 << 0, /// Remove the 0x prefix from the string
-    Dqn_BinHexU64Str8Flags_UppercaseHex = 1 << 1, /// Use uppercase ascii characters for hex
+    Dqn_HexU64Str8Flags_Nil         = 0,
+    Dqn_HexU64Str8Flags_0xPrefix     = 1 << 0, /// Add the '0x' prefix from the string
+    Dqn_HexU64Str8Flags_UppercaseHex = 1 << 1, /// Use uppercase ascii characters for hex
 };
 
 #if !defined(DQN_NO_PROFILER)
@@ -182,12 +186,12 @@ struct Dqn_ProfilerZoneScope
     ~Dqn_ProfilerZoneScope();
     Dqn_ProfilerZone zone;
 };
-#define Dqn_Profiler_ZoneScopeWithIndex(name, anchor_index) auto DQN_UNIQUE_NAME(profile_zone_) = Dqn_ProfilerZoneScope(DQN_STR8(name), anchor_index)
-#define Dqn_Profiler_ZoneScope(name) Dqn_Profiler_ZoneScopeWithIndex(name, __COUNTER__ + 1)
+#define Dqn_Profiler_ZoneScopeAtIndex(name, anchor_index) auto DQN_UNIQUE_NAME(profile_zone_) = Dqn_ProfilerZoneScope(DQN_STR8(name), anchor_index)
+#define Dqn_Profiler_ZoneScope(name) Dqn_Profiler_ZoneScopeAtIndex(name, __COUNTER__ + 1)
 #endif
 
 #define Dqn_Profiler_ZoneBlockIndex(name, index) \
-    for (Dqn_ProfilerZone DQN_UNIQUE_NAME(profile_zone__) = Dqn_Profiler_BeginZoneWithIndex(name, index), DQN_UNIQUE_NAME(dummy__) = {}; \
+    for (Dqn_ProfilerZone DQN_UNIQUE_NAME(profile_zone__) = Dqn_Profiler_BeginZoneAtIndex(name, index), DQN_UNIQUE_NAME(dummy__) = {}; \
          DQN_UNIQUE_NAME(dummy__).begin_tsc == 0; \
          Dqn_Profiler_EndZone(DQN_UNIQUE_NAME(profile_zone__)), DQN_UNIQUE_NAME(dummy__).begin_tsc = 1)
 
@@ -208,13 +212,14 @@ struct Dqn_Profiler
 #endif // !defined(DQN_NO_PROFILER)
 
 // NOTE: [$JOBQ] Dqn_JobQueue ///////////////////////////////////////////////////////////////////////
-typedef void (Dqn_JobQueueFunc)(void *user_context);
+typedef void (Dqn_JobQueueFunc)(Dqn_OSThread *thread, void *user_context);
 struct Dqn_Job
 {
-    bool              add_to_completion_queue;
-    Dqn_Arena        *arena;
-    Dqn_JobQueueFunc *func;
-    void             *user_context;
+    Dqn_JobQueueFunc *func;                    // The function to invoke for the job
+    void             *user_context;            // Pointer user can set to use in their `job_func`
+    uint64_t          elapsed_tsc;
+    uint16_t          user_tag;                // Arbitrary value the user can set to identiy the type of `user_context` this job has
+    bool              add_to_completion_queue; // When true, on job completion, job must be dequeued from the completion queue via `GetFinishedJobs`
 };
 
 #if !defined(DQN_JOB_QUEUE_SPMC_SIZE)
@@ -248,13 +253,14 @@ struct Dqn_Library
 {
     bool                       lib_init;                 // True if the library has been initialised via `Dqn_Library_Init`
     Dqn_TicketMutex            lib_mutex;
-    Dqn_TicketMutex            thread_context_init_mutex;
     Dqn_Str8                   exe_dir;                  // The directory of the current executable
     Dqn_Arena                  arena;
     Dqn_ChunkPool              pool;                     // Uses 'arena' for malloc-like allocations
     Dqn_ArenaCatalog           arena_catalog;
     bool                       slow_verification_checks; // Enable expensive library verification checks
     Dqn_CPUReport              cpu_report;
+    Dqn_TLS                    tls;                      // Thread local storage state for the main thread.
+
     // NOTE: Logging ///////////////////////////////////////////////////////////////////////////////
     Dqn_LogProc *              log_callback;             // Set this pointer to override the logging routine
     void *                     log_user_data;
@@ -262,22 +268,27 @@ struct Dqn_Library
     Dqn_OSFile                 log_file;                 // TODO(dqn): Hmmm, how should we do this... ?
     Dqn_TicketMutex            log_file_mutex;           // Is locked when instantiating the log_file for the first time
     bool                       log_no_colour;            // Disable colours in the logging output
+
     // NOTE: Leak Tracing //////////////////////////////////////////////////////////////////////////
     #if defined(DQN_LEAK_TRACKING)
     Dqn_DSMap<Dqn_DebugAlloc>  alloc_table;
     Dqn_TicketMutex            alloc_table_mutex;
     Dqn_Arena                  alloc_table_arena;
     #endif
+
     // NOTE: Win32 /////////////////////////////////////////////////////////////////////////////////
     #if defined(DQN_OS_WIN32)
     LARGE_INTEGER              win32_qpc_frequency;
     Dqn_TicketMutex            win32_bcrypt_rng_mutex;
     void *                     win32_bcrypt_rng_handle;
     #endif
+
     bool                       win32_sym_initialised;
+
     // NOTE: OS ////////////////////////////////////////////////////////////////////////////////////
     uint32_t                   os_page_size;
     uint32_t                   os_alloc_granularity;
+
     // NOTE: Profiler //////////////////////////////////////////////////////////////////////////////
     #if !defined(DQN_NO_PROFILER)
     Dqn_Profiler *profiler;
@@ -354,6 +365,13 @@ template <typename T> Dqn_BinarySearchResult Dqn_BinarySearch                (T 
                                                                               Dqn_BinarySearchType type = Dqn_BinarySearchType_Match,
                                                                               Dqn_BinarySearchLessThanProc<T> less_than = Dqn_BinarySearch_DefaultLessThan);
 
+// NOTE: [$QSOR] Dqn_QSort /////////////////////////////////////////////////////////////////////////
+template <typename T> bool Dqn_QSort_DefaultLessThan(T const &lhs, T const &rhs);
+template <typename T> void Dqn_QSort                (T *array,
+                                                     Dqn_usize array_size,
+                                                     void *user_context,
+                                                     Dqn_QSortLessThanProc<T> less_than = Dqn_QSort_DefaultLessThan);
+
 // NOTE: [$BITS] Dqn_Bit ///////////////////////////////////////////////////////////////////////////
 DQN_API void                Dqn_Bit_UnsetInplace                     (Dqn_usize *flags, Dqn_usize bitfield);
 DQN_API void                Dqn_Bit_SetInplace                       (Dqn_usize *flags, Dqn_usize bitfield);
@@ -426,23 +444,28 @@ DQN_API Dqn_U64Str8         Dqn_U64ToStr8                            (uint64_t v
 DQN_API Dqn_U64ByteSize     Dqn_U64ToByteSize                        (uint64_t bytes, Dqn_U64ByteSizeType type);
 DQN_API Dqn_Str8            Dqn_U64ToByteSizeStr8                    (Dqn_Arena *arena, uint64_t bytes, Dqn_U64ByteSizeType desired_type);
 DQN_API Dqn_Str8            Dqn_U64ByteSizeTypeString                (Dqn_U64ByteSizeType type);
-DQN_API Dqn_Str8            Dqn_U64ToAge                             (Dqn_Arena *arena, uint64_t age_s, Dqn_usize type);
+DQN_API Dqn_Str8            Dqn_U64ToAge                             (Dqn_Arena *arena, uint64_t age_s, Dqn_U64AgeUnit unit);
 
 DQN_API uint64_t            Dqn_HexToU64                             (Dqn_Str8 hex);
 DQN_API Dqn_Str8            Dqn_U64ToHex                             (Dqn_Arena *arena, uint64_t number, uint32_t flags);
 DQN_API Dqn_U64HexStr8      Dqn_U64ToHexStr8                         (uint64_t number, uint32_t flags);
 
-DQN_API bool                Dqn_BytesToHexPtr                        (Dqn_Arena *arena, void const *src, Dqn_usize src_size, char *dest);
+DQN_API bool                Dqn_BytesToHexPtr                        (void const *src, Dqn_usize src_size, char *dest);
 DQN_API Dqn_Str8            Dqn_BytesToHex                           (Dqn_Arena *arena, void const *src, Dqn_usize size);
+#define                     Dqn_BytesToHex_TLS(...)                  Dqn_BytesToHex(Dqn_TLS_TopArena(), __VA_ARGS__)
 
-DQN_API Dqn_usize           Dqn_HexToBytesPtrUnchecked               (Dqn_Str8 hex, void *dest, Dqn_usize dest_sizek);
-DQN_API Dqn_usize           Dqn_HexToBytesPtr                        (Dqn_Str8 hex, void *dest, Dqn_usize dest_sizek);
+DQN_API Dqn_usize           Dqn_HexToBytesPtrUnchecked               (Dqn_Str8 hex, void *dest, Dqn_usize dest_size);
+DQN_API Dqn_usize           Dqn_HexToBytesPtr                        (Dqn_Str8 hex, void *dest, Dqn_usize dest_size);
 DQN_API Dqn_Str8            Dqn_HexToBytesUnchecked                  (Dqn_Arena *arena, Dqn_Str8 hex);
+#define                     Dqn_HexToBytesUnchecked_TLS(...)         Dqn_HexToBytesUnchecked(Dqn_TLS_TopArena(), __VA_ARGS__)
 DQN_API Dqn_Str8            Dqn_HexToBytes                           (Dqn_Arena *arena, Dqn_Str8 hex);
+#define                     Dqn_HexToBytes_TLS(...)                  Dqn_HexToBytes(Dqn_TLS_TopArena(), __VA_ARGS__)
 
 // NOTE: [$PROF] Dqn_Profiler //////////////////////////////////////////////////////////////////////
-#define                     Dqn_Profiler_BeginZone(name)             Dqn_Profiler_BeginZoneWithIndex(DQN_STR8(name), __COUNTER__ + 1)
-DQN_API Dqn_ProfilerZone    Dqn_Profiler_BeginZoneWithIndex          (Dqn_Str8 name, uint16_t anchor_index);
+DQN_API Dqn_ProfilerAnchor *Dqn_Profiler_ReadBuffer                  ();
+DQN_API Dqn_ProfilerAnchor *Dqn_Profiler_WriteBuffer                 ();
+#define                     Dqn_Profiler_BeginZone(name)             Dqn_Profiler_BeginZoneAtIndex(DQN_STR8(name), __COUNTER__ + 1)
+DQN_API Dqn_ProfilerZone    Dqn_Profiler_BeginZoneAtIndex            (Dqn_Str8 name, uint16_t anchor_index);
 DQN_API void                Dqn_Profiler_EndZone                     (Dqn_ProfilerZone zone);
 DQN_API Dqn_ProfilerAnchor *Dqn_Profiler_AnchorBuffer                (Dqn_ProfilerAnchorBuffer buffer);
 DQN_API void                Dqn_Profiler_SwapAnchorBuffer            ();
@@ -465,6 +488,7 @@ DQN_API void                Dqn_Library_SetProfiler                  (Dqn_Profil
 DQN_API void                Dqn_Library_SetLogCallback               (Dqn_LogProc *proc, void *user_data);
 DQN_API void                Dqn_Library_DumpThreadContextArenaStat   (Dqn_Str8 file_path);
 DQN_API Dqn_Arena *         Dqn_Library_AllocArenaF                  (Dqn_usize reserve, Dqn_usize commit, uint8_t arena_flags, char const *fmt, ...);
+DQN_API bool                Dqn_Library_EraseArena                   (Dqn_Arena *arena, Dqn_ArenaCatalogFreeArena free_arena);
 
 // NOTE: [$BSEA] Dqn_BinarySearch //////////////////////////////////////////////////////////////////
 template <typename T>
@@ -482,7 +506,7 @@ Dqn_BinarySearchResult Dqn_BinarySearch(T const                         *array,
                                         Dqn_BinarySearchLessThanProc<T>  less_than)
 {
     Dqn_BinarySearchResult result = {};
-    if (!array || array_size <= 0)
+    if (!array || array_size <= 0 || !less_than)
         return result;
 
     T const *end   = array + array_size;
@@ -519,3 +543,73 @@ Dqn_BinarySearchResult Dqn_BinarySearch(T const                         *array,
     return result;
 }
 
+// NOTE: [$QSOR] Dqn_QSort /////////////////////////////////////////////////////////////////////////
+template <typename T>
+bool Dqn_QSort_DefaultLessThan(T const &lhs, T const &rhs, void *user_context)
+{
+    (void)user_context;
+    bool result = lhs < rhs;
+    return result;
+}
+
+template <typename T>
+void Dqn_QSort(T *array, Dqn_usize array_size, void *user_context, Dqn_QSortLessThanProc<T> less_than)
+{
+    if (!array || array_size <= 1 || !less_than)
+        return;
+
+    // NOTE: Insertion Sort, under 24->32 is an optimal amount /////////////////////////////////////
+    const Dqn_usize QSORT_THRESHOLD = 24;
+    if (array_size < QSORT_THRESHOLD) {
+        for (Dqn_usize item_to_insert_index = 1; item_to_insert_index < array_size; item_to_insert_index++) {
+            for (Dqn_usize index = 0; index < item_to_insert_index; index++) {
+                if (!less_than(array[index], array[item_to_insert_index], user_context)) {
+                    T item_to_insert = array[item_to_insert_index];
+                    for (Dqn_usize i = item_to_insert_index; i > index; i--)
+                        array[i] = array[i - 1];
+
+                    array[index] = item_to_insert;
+                    break;
+                }
+            }
+        }
+        return;
+    }
+
+    // NOTE: Quick sort, under 24->32 is an optimal amount /////////////////////////////////////////
+    Dqn_usize last_index      = array_size - 1;
+    Dqn_usize pivot_index     = array_size / 2;
+    Dqn_usize partition_index = 0;
+    Dqn_usize start_index     = 0;
+
+    // Swap pivot with last index, so pivot is always at the end of the array.
+    // This makes logic much simpler.
+    DQN_SWAP(array[last_index], array[pivot_index]);
+    pivot_index = last_index;
+
+    // 4^, 8, 7, 5, 2, 3, 6
+    if (less_than(array[start_index], array[pivot_index], user_context))
+        partition_index++;
+    start_index++;
+
+    // 4, |8, 7, 5^, 2, 3, 6*
+    // 4, 5, |7, 8, 2^, 3, 6*
+    // 4, 5, 2, |8, 7, ^3, 6*
+    // 4, 5, 2, 3, |7, 8, ^6*
+    for (Dqn_usize index = start_index; index < last_index; index++) {
+        if (less_than(array[index], array[pivot_index], user_context)) {
+            DQN_SWAP(array[partition_index], array[index]);
+            partition_index++;
+        }
+    }
+
+    // Move pivot to right of partition
+    // 4, 5, 2, 3, |6, 8, ^7*
+    DQN_SWAP(array[partition_index], array[pivot_index]);
+    Dqn_QSort(array, partition_index, user_context, less_than);
+
+    // Skip the value at partion index since that is guaranteed to be sorted.
+    // 4, 5, 2, 3, (x), 8, 7
+    Dqn_usize one_after_partition_index = partition_index + 1;
+    Dqn_QSort(array + one_after_partition_index, (array_size - one_after_partition_index), user_context, less_than);
+}

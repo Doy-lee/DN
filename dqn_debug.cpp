@@ -67,8 +67,8 @@ DQN_API Dqn_StackTraceWalkResult Dqn_StackTrace_Walk(Dqn_Arena *arena, uint16_t 
         g_dqn_library->win32_sym_initialised = true;
         SymSetOptions(SYMOPT_LOAD_LINES);
         if (!SymInitialize(result.process, nullptr /*UserSearchPath*/, true /*fInvadeProcess*/)) {
-            Dqn_Scratch  scratch = Dqn_Scratch_Get(arena);
-            Dqn_WinError error   = Dqn_Win_LastError(scratch.arena);
+            Dqn_TLSTMem  tmem  = Dqn_TLS_TMem(arena);
+            Dqn_WinError error = Dqn_Win_LastError(tmem.arena);
             Dqn_Log_ErrorF("SymInitialize failed, stack trace can not be generated (%lu): %.*s\n", error.code, DQN_STR_FMT(error.msg));
         }
     }
@@ -115,8 +115,8 @@ DQN_API Dqn_StackTraceWalkResult Dqn_StackTrace_Walk(Dqn_Arena *arena, uint16_t 
 
 DQN_API Dqn_Str8 Dqn_StackTrace_WalkStr8CRT(uint16_t limit, uint16_t skip)
 {
-    Dqn_Scratch              scratch     = Dqn_Scratch_Get(nullptr);
-    Dqn_StackTraceWalkResult walk_result = Dqn_StackTrace_Walk(scratch.arena, limit);
+    Dqn_TLSTMem              tmem        = Dqn_TLS_TMem(nullptr);
+    Dqn_StackTraceWalkResult walk_result = Dqn_StackTrace_Walk(tmem.arena, limit);
     Dqn_Str8                 result      = Dqn_StackTrace_WalkResultStr8CRT(&walk_result, skip);
     return result;
 }
@@ -128,7 +128,7 @@ static void Dqn_StackTrace_AddWalkToStr8Builder_(Dqn_StackTraceWalkResult const 
     for (Dqn_usize index = skip; index < walk->size; index++) {
         raw_frame.base_addr       = walk->base_addr[index];
         Dqn_StackTraceFrame frame = Dqn_StackTrace_RawFrameToFrame(builder->arena, raw_frame);
-        Dqn_Str8Builder_AppendF(builder, "%.*s(%zu): %.*s%s", DQN_STR_FMT(frame.file_name), frame.line_number, DQN_STR_FMT(frame.function_name), (DQN_CAST(int)index == walk->size - 1) ? "" : "\n");
+        Dqn_Str8Builder_AddF(builder, "%.*s(%zu): %.*s%s", DQN_STR_FMT(frame.file_name), frame.line_number, DQN_STR_FMT(frame.function_name), (DQN_CAST(int)index == walk->size - 1) ? "" : "\n");
     }
 }
 
@@ -167,9 +167,8 @@ DQN_API Dqn_Str8 Dqn_StackTrace_WalkResultStr8(Dqn_Arena *arena, Dqn_StackTraceW
     if (!walk || !arena)
         return result;
 
-    Dqn_Scratch     scratch = Dqn_Scratch_Get(arena);
-    Dqn_Str8Builder builder = {};
-    builder.arena           = scratch.arena;
+    Dqn_TLSTMem     tmem    = Dqn_TLS_TMem(arena);
+    Dqn_Str8Builder builder = Dqn_Str8Builder_Init(tmem.arena);
     Dqn_StackTrace_AddWalkToStr8Builder_(walk, &builder, skip);
     result = Dqn_Str8Builder_Build(&builder, arena);
     return result;
@@ -181,9 +180,8 @@ DQN_API Dqn_Str8 Dqn_StackTrace_WalkResultStr8CRT(Dqn_StackTraceWalkResult const
     if (!walk)
         return result;
 
-    Dqn_Scratch     scratch = Dqn_Scratch_Get(nullptr);
-    Dqn_Str8Builder builder = {};
-    builder.arena           = scratch.arena;
+    Dqn_TLSTMem     tmem    = Dqn_TLS_TMem(nullptr);
+    Dqn_Str8Builder builder = Dqn_Str8Builder_Init(tmem.arena);
     Dqn_StackTrace_AddWalkToStr8Builder_(walk, &builder, skip);
     result = Dqn_Str8Builder_BuildCRT(&builder);
     return result;
@@ -196,8 +194,8 @@ DQN_API Dqn_Slice<Dqn_StackTraceFrame> Dqn_StackTrace_GetFrames(Dqn_Arena *arena
     if (!arena)
         return result;
 
-    Dqn_Scratch              scratch = Dqn_Scratch_Get(arena);
-    Dqn_StackTraceWalkResult walk    = Dqn_StackTrace_Walk(scratch.arena, limit);
+    Dqn_TLSTMem              tmem = Dqn_TLS_TMem(arena);
+    Dqn_StackTraceWalkResult walk = Dqn_StackTrace_Walk(tmem.arena, limit);
     if (!walk.size)
         return result;
 
@@ -259,8 +257,8 @@ DQN_API Dqn_StackTraceFrame Dqn_StackTrace_RawFrameToFrame(Dqn_Arena *arena, Dqn
 
 DQN_API void Dqn_StackTrace_Print(uint16_t limit)
 {
-    Dqn_Scratch                    scratch     = Dqn_Scratch_Get(nullptr);
-    Dqn_Slice<Dqn_StackTraceFrame> stack_trace = Dqn_StackTrace_GetFrames(scratch.arena, limit);
+    Dqn_TLSTMem                    tmem        = Dqn_TLS_TMem(nullptr);
+    Dqn_Slice<Dqn_StackTraceFrame> stack_trace = Dqn_StackTrace_GetFrames(tmem.arena, limit);
     for (Dqn_StackTraceFrame &frame : stack_trace)
         Dqn_Print_ErrLnF("%.*s(%I64u): %.*s", DQN_STR_FMT(frame.file_name), frame.line_number, DQN_STR_FMT(frame.function_name));
 }

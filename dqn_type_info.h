@@ -30,6 +30,7 @@ struct Dqn_TypeField
 {
     uint16_t                   index;
     Dqn_Str8                   name;
+    Dqn_Str8                   label;
     Dqn_isize                  value;
     Dqn_usize                  offset_of;
     Dqn_usize                  size_of;

@@ -2,7 +2,7 @@
 #include "dqn.h"
 
 #if !defined(SHEREDOM_JSON_H_INCLUDED)
-    #error Sheredom's json.h (github.com/sheredom/json.h) must be included before this file
+    #error Sheredom json.h (github.com/sheredom/json.h) must be included before this file
 #endif
 
 // NOTE: Dqn_JSON //////////////////////////////////////////////////////////////////////////////////

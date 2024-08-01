@@ -1,6 +1,7 @@
 #pragma once
 #include "dqn.h"
 
+/*
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //
 //    $$$$$$\   $$$$$$\        $$\      $$\ $$$$$$\ $$\   $$\  $$$$$$\   $$$$$$\
@@ -15,8 +16,9 @@
 //   dqn_os_win32.cpp
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
+*/
 
-// NOTE: [$VMEM] Dqn_OSMem //////////////////////////////////////////////////////////////////////////
+// NOTE: [$VMEM] Dqn_OSMem /////////////////////////////////////////////////////////////////////////
 static uint32_t Dqn_OS_MemConvertPageToOSFlags_(uint32_t protect)
 {
     DQN_ASSERT((protect & ~Dqn_OSMemPage_All) == 0);
@@ -217,8 +219,8 @@ DQN_API Dqn_Str8 Dqn_OS_EXEPath(Dqn_Arena *arena)
     Dqn_Str8 result = {};
     if (!arena)
         return result;
-    Dqn_Scratch scratch   = Dqn_Scratch_Get(arena);
-    Dqn_Str16   exe_dir16 = Dqn_Win_EXEPathW(scratch.arena);
+    Dqn_TLSTMem t_mem      = Dqn_TLS_TMem(arena);
+    Dqn_Str16   exe_dir16 = Dqn_Win_EXEPathW(t_mem.arena);
     result                = Dqn_Win_Str16ToStr8(arena, exe_dir16);
     return result;
 }
@@ -259,8 +261,8 @@ DQN_API Dqn_OSPathInfo Dqn_OS_PathInfo(Dqn_Str8 path)
     if (!Dqn_Str8_HasData(path))
         return result;
 
-    Dqn_Scratch scratch = Dqn_Scratch_Get(nullptr);
-    Dqn_Str16   path16  = Dqn_Win_Str8ToStr16(scratch.arena, path);
+    Dqn_TLSTMem t_mem   = Dqn_TLS_TMem(nullptr);
+    Dqn_Str16   path16 = Dqn_Win_Str8ToStr16(t_mem.arena, path);
 
     WIN32_FILE_ATTRIBUTE_DATA attrib_data = {};
     if (!GetFileAttributesExW(path16.data, GetFileExInfoStandard, &attrib_data))
@@ -292,8 +294,8 @@ DQN_API bool Dqn_OS_PathDelete(Dqn_Str8 path)
     if (!Dqn_Str8_HasData(path))
         return result;
 
-    Dqn_Scratch scratch = Dqn_Scratch_Get(nullptr);
-    Dqn_Str16   path16  = Dqn_Win_Str8ToStr16(scratch.arena, path);
+    Dqn_TLSTMem t_mem = Dqn_TLS_TMem(nullptr);
+    Dqn_Str16   path16  = Dqn_Win_Str8ToStr16(t_mem.arena, path);
     if (path16.size) {
         result = DeleteFileW(path16.data);
         if (!result)
@@ -308,8 +310,8 @@ DQN_API bool Dqn_OS_FileExists(Dqn_Str8 path)
     if (!Dqn_Str8_HasData(path))
         return result;
 
-    Dqn_Scratch scratch = Dqn_Scratch_Get(nullptr);
-    Dqn_Str16   path16  = Dqn_Win_Str8ToStr16(scratch.arena, path);
+    Dqn_TLSTMem t_mem = Dqn_TLS_TMem(nullptr);
+    Dqn_Str16   path16  = Dqn_Win_Str8ToStr16(t_mem.arena, path);
     if (path16.size) {
         WIN32_FILE_ATTRIBUTE_DATA attrib_data = {};
         if (GetFileAttributesExW(path16.data, GetFileExInfoStandard, &attrib_data)) {
@@ -323,15 +325,15 @@ DQN_API bool Dqn_OS_FileExists(Dqn_Str8 path)
 DQN_API bool Dqn_OS_CopyFile(Dqn_Str8 src, Dqn_Str8 dest, bool overwrite, Dqn_ErrorSink *error)
 {
     bool         result  = false;
-    Dqn_Scratch  scratch = Dqn_Scratch_Get(nullptr);
-    Dqn_Str16    src16   = Dqn_Win_Str8ToStr16(scratch.arena, src);
-    Dqn_Str16    dest16  = Dqn_Win_Str8ToStr16(scratch.arena, dest);
+    Dqn_TLSTMem  t_mem = Dqn_TLS_TMem(nullptr);
+    Dqn_Str16    src16   = Dqn_Win_Str8ToStr16(t_mem.arena, src);
+    Dqn_Str16    dest16  = Dqn_Win_Str8ToStr16(t_mem.arena, dest);
 
     int fail_if_exists = overwrite == false;
     result             = CopyFileW(src16.data, dest16.data, fail_if_exists) != 0;
 
     if (!result) {
-        Dqn_WinError win_error = Dqn_Win_LastError(scratch.arena);
+        Dqn_WinError win_error = Dqn_Win_LastError(t_mem.arena);
         Dqn_ErrorSink_MakeF(error,
                             win_error.code,
                             "Failed to copy file '%.*s' to '%.*s': (%u) %.*s",
@@ -346,9 +348,9 @@ DQN_API bool Dqn_OS_CopyFile(Dqn_Str8 src, Dqn_Str8 dest, bool overwrite, Dqn_Er
 DQN_API bool Dqn_OS_MoveFile(Dqn_Str8 src, Dqn_Str8 dest, bool overwrite, Dqn_ErrorSink *error)
 {
     bool        result  = false;
-    Dqn_Scratch scratch = Dqn_Scratch_Get(nullptr);
-    Dqn_Str16   src16   = Dqn_Win_Str8ToStr16(scratch.arena, src);
-    Dqn_Str16   dest16  = Dqn_Win_Str8ToStr16(scratch.arena, dest);
+    Dqn_TLSTMem t_mem = Dqn_TLS_TMem(nullptr);
+    Dqn_Str16   src16   = Dqn_Win_Str8ToStr16(t_mem.arena, src);
+    Dqn_Str16   dest16  = Dqn_Win_Str8ToStr16(t_mem.arena, dest);
 
     unsigned long flags = MOVEFILE_COPY_ALLOWED;
     if (overwrite) {
@@ -357,7 +359,7 @@ DQN_API bool Dqn_OS_MoveFile(Dqn_Str8 src, Dqn_Str8 dest, bool overwrite, Dqn_Er
 
     result = MoveFileExW(src16.data, dest16.data, flags) != 0;
     if (!result) {
-        Dqn_WinError win_error = Dqn_Win_LastError(scratch.arena);
+        Dqn_WinError win_error = Dqn_Win_LastError(t_mem.arena);
         Dqn_ErrorSink_MakeF(error,
                             win_error.code,
                             "Failed to move file '%.*s' to '%.*s': (%u) %.*s",
@@ -371,9 +373,9 @@ DQN_API bool Dqn_OS_MoveFile(Dqn_Str8 src, Dqn_Str8 dest, bool overwrite, Dqn_Er
 
 DQN_API bool Dqn_OS_MakeDir(Dqn_Str8 path)
 {
-    bool        result  = true;
-    Dqn_Scratch scratch = Dqn_Scratch_Get(nullptr);
-    Dqn_Str16   path16  = Dqn_Win_Str8ToStr16(scratch.arena, path);
+    bool        result = true;
+    Dqn_TLSTMem t_mem  = Dqn_TLS_TMem(nullptr);
+    Dqn_Str16   path16 = Dqn_Win_Str8ToStr16(t_mem.arena, path);
 
     // NOTE: Go back from the end of the string to all the directories in the
     // string, and try to create them. Since Win32 API cannot create
@@ -427,8 +429,8 @@ DQN_API bool Dqn_OS_DirExists(Dqn_Str8 path)
     if (!Dqn_Str8_HasData(path))
         return result;
 
-    Dqn_Scratch scratch = Dqn_Scratch_Get(nullptr);
-    Dqn_Str16   path16  = Dqn_Win_Str8ToStr16(scratch.arena, path);
+    Dqn_TLSTMem t_mem = Dqn_TLS_TMem(nullptr);
+    Dqn_Str16   path16  = Dqn_Win_Str8ToStr16(t_mem.arena, path);
     if (path16.size) {
         WIN32_FILE_ATTRIBUTE_DATA attrib_data = {};
         if (GetFileAttributesExW(path16.data, GetFileExInfoStandard, &attrib_data)) {
@@ -474,8 +476,8 @@ DQN_API Dqn_OSFile Dqn_OS_FileOpen(Dqn_Str8 path, Dqn_OSFileOpen open_mode, uint
             access_mode |= GENERIC_EXECUTE;
     }
 
-    Dqn_Scratch scratch = Dqn_Scratch_Get(nullptr);
-    Dqn_Str16   path16  = Dqn_Win_Str8ToStr16(scratch.arena, path);
+    Dqn_TLSTMem t_mem = Dqn_TLS_TMem(nullptr);
+    Dqn_Str16   path16  = Dqn_Win_Str8ToStr16(t_mem.arena, path);
     void       *handle  = CreateFileW(/*LPCWSTR               lpFileName*/ path16.data,
                                       /*DWORD                 dwDesiredAccess*/ access_mode,
                                       /*DWORD                 dwShareMode*/ 0,
@@ -485,7 +487,7 @@ DQN_API Dqn_OSFile Dqn_OS_FileOpen(Dqn_Str8 path, Dqn_OSFileOpen open_mode, uint
                                       /*HANDLE                hTemplateFile*/ nullptr);
 
     if (handle == INVALID_HANDLE_VALUE) {
-        Dqn_WinError win_error = Dqn_Win_LastError(scratch.arena);
+        Dqn_WinError win_error = Dqn_Win_LastError(t_mem.arena);
         result.error           = true;
         Dqn_ErrorSink_MakeF(error, win_error.code, "Failed to open file at '%.*s': '%.*s'", DQN_STR_FMT(path), DQN_STR_FMT(win_error.msg));
         return result;
@@ -500,9 +502,9 @@ DQN_API bool Dqn_OS_FileRead(Dqn_OSFile *file, void *buffer, Dqn_usize size, Dqn
     if (!file || !file->handle || file->error || !buffer || size <= 0)
         return false;
 
-    Dqn_Scratch scratch = Dqn_Scratch_Get(nullptr);
+    Dqn_TLSTMem t_mem = Dqn_TLS_TMem(nullptr);
     if (!DQN_CHECK(size <= (unsigned long)-1)) {
-        Dqn_Str8    buffer_size_str8 = Dqn_U64ToByteSizeStr8(scratch.arena, size, Dqn_U64ByteSizeType_Auto);
+        Dqn_Str8    buffer_size_str8 = Dqn_U64ToByteSizeStr8(t_mem.arena, size, Dqn_U64ByteSizeType_Auto);
         Dqn_ErrorSink_MakeF(
             error,
             1 /*error_code*/,
@@ -518,13 +520,13 @@ DQN_API bool Dqn_OS_FileRead(Dqn_OSFile *file, void *buffer, Dqn_usize size, Dqn
                                          /*LPDWORD      lpNumberOfByesRead*/   &bytes_read,
                                          /*LPOVERLAPPED lpOverlapped*/          nullptr);
     if (read_result == 0) {
-        Dqn_WinError win_error = Dqn_Win_LastError(scratch.arena);
+        Dqn_WinError win_error = Dqn_Win_LastError(t_mem.arena);
         Dqn_ErrorSink_MakeF(error, win_error.code, "Failed to read data from file: (%u) %.*s", win_error.code, DQN_STR_FMT(win_error.msg));
         return false;
     }
 
     if (bytes_read != size) {
-        Dqn_WinError win_error = Dqn_Win_LastError(scratch.arena);
+        Dqn_WinError win_error = Dqn_Win_LastError(t_mem.arena);
         Dqn_ErrorSink_MakeF(
             error,
             win_error.code,
@@ -554,9 +556,9 @@ DQN_API bool Dqn_OS_FileWritePtr(Dqn_OSFile *file, void const *buffer, Dqn_usize
     }
 
     if (!result) {
-        Dqn_Scratch  scratch          = Dqn_Scratch_Get(nullptr);
-        Dqn_WinError win_error        = Dqn_Win_LastError(scratch.arena);
-        Dqn_Str8     buffer_size_str8 = Dqn_U64ToByteSizeStr8(scratch.arena, size, Dqn_U64ByteSizeType_Auto);
+        Dqn_TLSTMem  t_mem          = Dqn_TLS_TMem(nullptr);
+        Dqn_WinError win_error        = Dqn_Win_LastError(t_mem.arena);
+        Dqn_Str8     buffer_size_str8 = Dqn_U64ToByteSizeStr8(t_mem.arena, size, Dqn_U64ByteSizeType_Auto);
         Dqn_ErrorSink_MakeF(error, win_error.code, "Failed to write buffer (%.*s) to file handle: %.*s", DQN_STR_FMT(buffer_size_str8), DQN_STR_FMT(win_error.msg));
     }
     return result;
@@ -594,69 +596,106 @@ DQN_API Dqn_OSExecResult Dqn_OS_ExecWait(Dqn_OSExecAsyncHandle handle, Dqn_Arena
         return result;
     }
 
-    Dqn_Scratch scratch     = Dqn_Scratch_Get(arena);
-    DWORD       exec_result = WaitForSingleObject(handle.process, INFINITE);
-    CloseHandle(handle.stdout_write);
-    CloseHandle(handle.stderr_write);
+    Dqn_TLSTMem     t_mem          = Dqn_TLS_TMem(arena);
+    Dqn_Str8Builder stdout_builder = {};
+    Dqn_Str8Builder stderr_builder = {};
+    if (arena) {
+        stdout_builder.arena = t_mem.arena;
+        stderr_builder.arena = t_mem.arena;
+    }
 
-    if (exec_result == WAIT_FAILED) {
-        Dqn_WinError win_error = Dqn_Win_LastError(scratch.arena);
-        result.os_error_code   = win_error.code;
-        Dqn_ErrorSink_MakeF(error, result.os_error_code, "Executed command failed to terminate: %.*s", DQN_STR_FMT(win_error.msg));
-        CloseHandle(handle.process);
-    } else {
-        // NOTE: Get exit code /////////////////////////////////////////////////////////////////////
+    DWORD const SLOW_WAIT_TIME_MS = 100;
+    DWORD const FAST_WAIT_TIME_MS = 20;
+    DWORD       wait_ms           = FAST_WAIT_TIME_MS;
+    DWORD       exec_result       = WAIT_TIMEOUT;
+    while (exec_result == WAIT_TIMEOUT) {
+        exec_result = WaitForSingleObject(handle.process, wait_ms);
+        if (exec_result == WAIT_FAILED) {
+            Dqn_WinError win_error = Dqn_Win_LastError(t_mem.arena);
+            result.os_error_code   = win_error.code;
+            Dqn_ErrorSink_MakeF(error, result.os_error_code, "Executed command failed to terminate: %.*s", DQN_STR_FMT(win_error.msg));
+        } else if (DQN_CHECK(exec_result == WAIT_TIMEOUT || exec_result == WAIT_OBJECT_0)) {
+            // NOTE: If the pipes are full, the process will block. We
+            // periodically flush the pipes to make sure this doesn't happen
+
+            // NOTE: Read stdout from process //////////////////////////////////////////////////////
+            // TODO: Allow the user to pump the execution of the command w/ a user passed in buffer.
+            char  output_buffer[DQN_KILOBYTES(8)];
+            DWORD stdout_bytes_available = 0;
+            if (PeekNamedPipe(handle.stdout_read, nullptr, 0, nullptr, &stdout_bytes_available, nullptr)) {
+                if (stdout_bytes_available) {
+                    for (;;) {
+                        DWORD bytes_read = 0;
+                        BOOL  success    = ReadFile(handle.stdout_read, output_buffer, sizeof(output_buffer), &bytes_read, NULL);
+                        if (!success || bytes_read == 0)
+                            break;
+
+                        if (handle.stdout_write && arena)
+                            Dqn_Str8Builder_AddF(&stdout_builder, "%.*s", bytes_read, output_buffer);
+
+                        if (bytes_read < sizeof(output_buffer))
+                            break;
+                    }
+                }
+            }
+
+            // NOTE: Read stderr from process //////////////////////////////////////////////////////
+            DWORD stderr_bytes_available = 0;
+            if (PeekNamedPipe(handle.stderr_read, nullptr, 0, nullptr, &stderr_bytes_available, nullptr)) {
+                if (stderr_bytes_available) {
+                    for (;;) {
+                        DWORD bytes_read = 0;
+                        BOOL  success    = ReadFile(handle.stderr_read, output_buffer, sizeof(output_buffer), &bytes_read, NULL);
+                        if (!success || bytes_read == 0)
+                            break;
+
+                        if (handle.stderr_read && arena)
+                            Dqn_Str8Builder_AddF(&stderr_builder, "%.*s", bytes_read, output_buffer);
+
+                        if (bytes_read < sizeof(output_buffer))
+                            break;
+                    }
+                }
+            }
+
+            // NOTE: If we produced some data, we'll sleep for a short amount of
+            // time because if we have the presence of data it's typical we deal
+            // with N amount of. Otherwise if we timed-out and we didn't produce
+            // any data, its more likely this is a long running operation so we
+            // sleep longer to avoid slamming the CPU.
+            if (stdout_bytes_available || stderr_bytes_available) {
+                wait_ms = FAST_WAIT_TIME_MS;
+            } else {
+                wait_ms = SLOW_WAIT_TIME_MS;
+            }
+        }
+    }
+
+    // NOTE: Get stdout/stderr. If no arena is passed this is a no-op //////////////////////////////
+    result.stdout_text = Dqn_Str8Builder_Build(&stdout_builder, arena);
+    result.stderr_text = Dqn_Str8Builder_Build(&stderr_builder, arena);
+
+    // NOTE: Get exit code /////////////////////////////////////////////////////////////////////////
+    if (exec_result != WAIT_FAILED) {
         DWORD exit_status;
         if (GetExitCodeProcess(handle.process, &exit_status)) {
             result.exit_code = exit_status;
         } else {
-            Dqn_WinError win_error = Dqn_Win_LastError(scratch.arena);
+            Dqn_WinError win_error = Dqn_Win_LastError(t_mem.arena);
             result.os_error_code   = win_error.code;
             Dqn_ErrorSink_MakeF(error,
                                 result.os_error_code,
                                 "Failed to retrieve command exit code: %.*s",
                                 DQN_STR_FMT(win_error.msg));
         }
-
-        CloseHandle(handle.process);
-
-        // NOTE: Read stdout from process //////////////////////////////////////////////////////////
-        if (arena && handle.stdout_write) {
-            char            stdout_buffer[4096];
-            Dqn_Str8Builder builder = {};
-            builder.arena           = scratch.arena;
-            for (;;) {
-                DWORD bytes_read = 0;
-                BOOL  success    = ReadFile(handle.stdout_read, stdout_buffer, sizeof(stdout_buffer), &bytes_read, NULL);
-                if (!success || bytes_read == 0)
-                    break;
-
-                Dqn_Str8Builder_AppendF(&builder, "%.*s", bytes_read, stdout_buffer);
-            }
-
-            result.stdout_text = Dqn_Str8Builder_Build(&builder, arena);
-        }
-
-        // NOTE: Read stderr from process //////////////////////////////////////////////////////////
-        if (arena && handle.stderr_read) {
-            char            stderr_buffer[4096];
-            Dqn_Str8Builder builder = {};
-            builder.arena           = scratch.arena;
-            for (;;) {
-                DWORD bytes_read = 0;
-                BOOL  success    = ReadFile(handle.stderr_read, stderr_buffer, sizeof(stderr_buffer), &bytes_read, NULL);
-                if (!success || bytes_read == 0)
-                    break;
-
-                Dqn_Str8Builder_AppendF(&builder, "%.*s", bytes_read, stderr_buffer);
-            }
-
-            result.stderr_text = Dqn_Str8Builder_Build(&builder, arena);
-        }
     }
 
+    // NOTE: Cleanup ///////////////////////////////////////////////////////////////////////////////
+    CloseHandle(handle.stdout_write);
+    CloseHandle(handle.stderr_write);
     CloseHandle(handle.stdout_read);
     CloseHandle(handle.stderr_read);
+    CloseHandle(handle.process);
     return result;
 }
 
@@ -667,10 +706,10 @@ DQN_API Dqn_OSExecAsyncHandle Dqn_OS_ExecAsync(Dqn_Slice<Dqn_Str8> cmd_line, Dqn
     if (cmd_line.size == 0)
         return result;
 
-    Dqn_Scratch scratch       = Dqn_Scratch_Get(nullptr);
-    Dqn_Str8    cmd_rendered  = Dqn_Slice_Str8Render(scratch.arena, cmd_line, DQN_STR8(" "));
-    Dqn_Str16   cmd16         = Dqn_Win_Str8ToStr16(scratch.arena, cmd_rendered);
-    Dqn_Str16   working_dir16 = Dqn_Win_Str8ToStr16(scratch.arena, working_dir);
+    Dqn_TLSTMem t_mem       = Dqn_TLS_TMem(nullptr);
+    Dqn_Str8    cmd_rendered  = Dqn_Slice_Str8Render(t_mem.arena, cmd_line, DQN_STR8(" "));
+    Dqn_Str16   cmd16         = Dqn_Win_Str8ToStr16(t_mem.arena, cmd_rendered);
+    Dqn_Str16   working_dir16 = Dqn_Win_Str8ToStr16(t_mem.arena, working_dir);
 
     // NOTE: Stdout/err security attributes ////////////////////////////////////////////////////////
     SECURITY_ATTRIBUTES save_std_security_attribs = {};
@@ -689,7 +728,7 @@ DQN_API Dqn_OSExecAsyncHandle Dqn_OS_ExecAsync(Dqn_Slice<Dqn_Str8> cmd_line, Dqn
 
     if (Dqn_Bit_IsSet(exec_flags, Dqn_OSExecFlag_SaveStdout)) {
         if (!CreatePipe(&stdout_read, &stdout_write, &save_std_security_attribs, /*nSize*/ 0)) {
-            Dqn_WinError win_error = Dqn_Win_LastError(scratch.arena);
+            Dqn_WinError win_error = Dqn_Win_LastError(t_mem.arena);
             result.os_error_code   = win_error.code;
             Dqn_ErrorSink_MakeF(
                 error,
@@ -701,7 +740,7 @@ DQN_API Dqn_OSExecAsyncHandle Dqn_OS_ExecAsync(Dqn_Slice<Dqn_Str8> cmd_line, Dqn
         }
 
         if (!SetHandleInformation(stdout_read, HANDLE_FLAG_INHERIT, 0)) {
-            Dqn_WinError win_error = Dqn_Win_LastError(scratch.arena);
+            Dqn_WinError win_error = Dqn_Win_LastError(t_mem.arena);
             result.os_error_code   = win_error.code;
             Dqn_ErrorSink_MakeF(error,
                                 result.os_error_code,
@@ -729,7 +768,7 @@ DQN_API Dqn_OSExecAsyncHandle Dqn_OS_ExecAsync(Dqn_Slice<Dqn_Str8> cmd_line, Dqn
             stderr_write = stdout_write;
         } else {
             if (!CreatePipe(&stderr_read, &stderr_write, &save_std_security_attribs, /*nSize*/ 0)) {
-                Dqn_WinError win_error = Dqn_Win_LastError(scratch.arena);
+                Dqn_WinError win_error = Dqn_Win_LastError(t_mem.arena);
                 result.os_error_code   = win_error.code;
                 Dqn_ErrorSink_MakeF(
                     error,
@@ -741,7 +780,7 @@ DQN_API Dqn_OSExecAsyncHandle Dqn_OS_ExecAsync(Dqn_Slice<Dqn_Str8> cmd_line, Dqn
             }
 
             if (!SetHandleInformation(stderr_read, HANDLE_FLAG_INHERIT, 0)) {
-                Dqn_WinError win_error = Dqn_Win_LastError(scratch.arena);
+                Dqn_WinError win_error = Dqn_Win_LastError(t_mem.arena);
                 result.os_error_code   = win_error.code;
                 Dqn_ErrorSink_MakeF(error,
                                     result.os_error_code,
@@ -764,7 +803,7 @@ DQN_API Dqn_OSExecAsyncHandle Dqn_OS_ExecAsync(Dqn_Slice<Dqn_Str8> cmd_line, Dqn
     startup_info.dwFlags         |= STARTF_USESTDHANDLES;
     BOOL create_result            = CreateProcessW(nullptr, cmd16.data, nullptr, nullptr, true, 0, nullptr, working_dir16.data, &startup_info, &proc_info);
     if (!create_result) {
-        Dqn_WinError win_error = Dqn_Win_LastError(scratch.arena);
+        Dqn_WinError win_error = Dqn_Win_LastError(t_mem.arena);
         result.os_error_code   = win_error.code;
         Dqn_ErrorSink_MakeF(error,
                             result.os_error_code,
@@ -882,9 +921,7 @@ DQN_API void Dqn_OS_MutexUnlock(Dqn_OSMutex *mutex)
 // NOTE: [$THRD] Dqn_OSThread /////////////////////////////////////////////////////////////////////
 static DWORD __stdcall Dqn_OS_ThreadFunc_(void *user_context)
 {
-    Dqn_OSThread *thread = DQN_CAST(Dqn_OSThread *)user_context;
-    Dqn_OS_SemaphoreWait(&thread->init_semaphore, DQN_OS_SEMAPHORE_INFINITE_TIMEOUT);
-    thread->func(thread);
+    Dqn_OS_ThreadExecute_(user_context);
     return 0;
 }
 
@@ -1001,7 +1038,7 @@ void Dqn_OS_HttpRequestWin32Callback(HINTERNET session, DWORD *dwContext, DWORD 
         DWORD bytes_read = dwStatusInformationLength;
         if (bytes_read) {
             Dqn_Str8 prev_buffer = Dqn_Str8_Init(DQN_CAST(char *) lpvStatusInformation, bytes_read);
-            Dqn_Str8Builder_AppendRef(&response->builder, prev_buffer);
+            Dqn_Str8Builder_AddRef(&response->builder, prev_buffer);
 
             void *buffer = Dqn_Arena_Alloc(response->builder.arena, READ_BUFFER_SIZE, 1 /*align*/, Dqn_ZeroMem_No);
             if (!WinHttpReadData(request, buffer, READ_BUFFER_SIZE, nullptr))
@@ -1050,12 +1087,12 @@ DQN_API void Dqn_OS_HttpRequestAsync(Dqn_OSHttpResponse     *response,
         return;
 
     response->arena         = arena;
-    response->builder.arena = response->scratch_arena ? response->scratch_arena : &response->tmp_arena;
+    response->builder.arena = response->tmem_arena ? response->tmem_arena : &response->tmp_arena;
 
-    Dqn_Arena  *scratch_arena = response->scratch_arena;
-    Dqn_Scratch scratch_      = Dqn_Scratch_Get(arena);
-    if (!scratch_arena) {
-        scratch_arena = scratch_.arena;
+    Dqn_Arena  *t_mem_arena = response->tmem_arena;
+    Dqn_TLSTMem t_mem_      = Dqn_TLS_TMem(arena);
+    if (!t_mem_arena) {
+        t_mem_arena = t_mem_.arena;
     }
 
     Dqn_WinError error = {};
@@ -1088,15 +1125,15 @@ DQN_API void Dqn_OS_HttpRequestAsync(Dqn_OSHttpResponse     *response,
         return;
     }
 
-    Dqn_Str16 host16                   = Dqn_Win_Str8ToStr16(scratch_arena, host);
+    Dqn_Str16 host16                   = Dqn_Win_Str8ToStr16(t_mem_arena, host);
     response->win32_request_connection = WinHttpConnect(response->win32_request_session, host16.data, secure ? INTERNET_DEFAULT_HTTPS_PORT : INTERNET_DEFAULT_HTTP_PORT, 0 /*reserved*/);
     if (!response->win32_request_connection) {
         error = Dqn_Win_LastError(&response->tmp_arena);
         return;
     }
 
-    Dqn_Str16 method16 = Dqn_Win_Str8ToStr16(scratch_arena, method);
-    Dqn_Str16 path16   = Dqn_Win_Str8ToStr16(scratch_arena, path);
+    Dqn_Str16 method16 = Dqn_Win_Str8ToStr16(t_mem_arena, method);
+    Dqn_Str16 path16   = Dqn_Win_Str8ToStr16(t_mem_arena, path);
     response->win32_request_handle = WinHttpOpenRequest(response->win32_request_connection,
                                                         method16.data,
                                                         path16.data,
@@ -1109,7 +1146,7 @@ DQN_API void Dqn_OS_HttpRequestAsync(Dqn_OSHttpResponse     *response,
         return;
     }
 
-    Dqn_Str16 headers16             = Dqn_Win_Str8ToStr16(scratch_arena, headers);
+    Dqn_Str16 headers16             = Dqn_Win_Str8ToStr16(t_mem_arena, headers);
     response->on_complete_semaphore = Dqn_OS_SemaphoreInit(0);
     if (!WinHttpSendRequest(response->win32_request_handle,
                             headers16.data,
@@ -1295,13 +1332,13 @@ DQN_API Dqn_Str8 Dqn_Win_Str16ToStr8(Dqn_Arena *arena, Dqn_Str16 src)
 // NOTE: Windows Executable Directory //////////////////////////////////////////
 DQN_API Dqn_Str16 Dqn_Win_EXEPathW(Dqn_Arena *arena)
 {
-    Dqn_Scratch scratch     = Dqn_Scratch_Get(arena);
+    Dqn_TLSTMem t_mem     = Dqn_TLS_TMem(arena);
     Dqn_Str16   result      = {};
     Dqn_usize   module_size = 0;
     wchar_t    *module_path = nullptr;
     do {
         module_size += 256;
-        module_path = Dqn_Arena_NewArray(scratch.arena, wchar_t, module_size, Dqn_ZeroMem_No);
+        module_path = Dqn_Arena_NewArray(t_mem.arena, wchar_t, module_size, Dqn_ZeroMem_No);
         if (!module_path)
             return result;
         module_size = DQN_CAST(Dqn_usize)GetModuleFileNameW(nullptr /*module*/, module_path, DQN_CAST(int)module_size);
@@ -1321,13 +1358,13 @@ DQN_API Dqn_Str16 Dqn_Win_EXEPathW(Dqn_Arena *arena)
 DQN_API Dqn_Str16 Dqn_Win_EXEDirW(Dqn_Arena *arena)
 {
     // TODO(doyle): Implement a Dqn_Str16_BinarySearchReverse
-    Dqn_Scratch scratch     = Dqn_Scratch_Get(arena);
+    Dqn_TLSTMem t_mem     = Dqn_TLS_TMem(arena);
     Dqn_Str16   result      = {};
     Dqn_usize   module_size = 0;
     wchar_t    *module_path = nullptr;
     do {
         module_size += 256;
-        module_path = Dqn_Arena_NewArray(scratch.arena, wchar_t, module_size, Dqn_ZeroMem_No);
+        module_path = Dqn_Arena_NewArray(t_mem.arena, wchar_t, module_size, Dqn_ZeroMem_No);
         if (!module_path)
             return result;
         module_size = DQN_CAST(Dqn_usize)GetModuleFileNameW(nullptr /*module*/, module_path, DQN_CAST(int)module_size);
@@ -1346,9 +1383,9 @@ DQN_API Dqn_Str16 Dqn_Win_EXEDirW(Dqn_Arena *arena)
 
 DQN_API Dqn_Str8 Dqn_Win_WorkingDir(Dqn_Arena *arena, Dqn_Str8 suffix)
 {
-    Dqn_Scratch scratch  = Dqn_Scratch_Get(arena);
-    Dqn_Str16   suffix16 = Dqn_Win_Str8ToStr16(scratch.arena, suffix);
-    Dqn_Str16   dir16    = Dqn_Win_WorkingDirW(scratch.arena, suffix16);
+    Dqn_TLSTMem t_mem  = Dqn_TLS_TMem(arena);
+    Dqn_Str16   suffix16 = Dqn_Win_Str8ToStr16(t_mem.arena, suffix);
+    Dqn_Str16   dir16    = Dqn_Win_WorkingDirW(t_mem.arena, suffix16);
     Dqn_Str8    result   = Dqn_Win_Str16ToStr8(arena, dir16);
     return result;
 }
@@ -1359,15 +1396,15 @@ DQN_API Dqn_Str16 Dqn_Win_WorkingDirW(Dqn_Arena *arena, Dqn_Str16 suffix)
     Dqn_Str16 result = {};
 
     // NOTE: required_size is the size required *including* the null-terminator
-    Dqn_Scratch   scratch       = Dqn_Scratch_Get(arena);
+    Dqn_TLSTMem   t_mem       = Dqn_TLS_TMem(arena);
     unsigned long required_size = GetCurrentDirectoryW(0, nullptr);
     unsigned long desired_size  = required_size + DQN_CAST(unsigned long) suffix.size;
 
-    wchar_t *scratch_w_path = Dqn_Arena_NewArray(scratch.arena, wchar_t, desired_size, Dqn_ZeroMem_No);
-    if (!scratch_w_path)
+    wchar_t *t_mem_w_path = Dqn_Arena_NewArray(t_mem.arena, wchar_t, desired_size, Dqn_ZeroMem_No);
+    if (!t_mem_w_path)
         return result;
 
-    unsigned long bytes_written_wo_null_terminator = GetCurrentDirectoryW(desired_size, scratch_w_path);
+    unsigned long bytes_written_wo_null_terminator = GetCurrentDirectoryW(desired_size, t_mem_w_path);
     if ((bytes_written_wo_null_terminator + 1) != required_size) {
         // TODO(dqn): Error
         return result;
@@ -1378,7 +1415,7 @@ DQN_API Dqn_Str16 Dqn_Win_WorkingDirW(Dqn_Arena *arena, Dqn_Str16 suffix)
         return result;
 
     if (suffix.size) {
-        DQN_MEMCPY(w_path, scratch_w_path, sizeof(*scratch_w_path) * bytes_written_wo_null_terminator);
+        DQN_MEMCPY(w_path, t_mem_w_path, sizeof(*t_mem_w_path) * bytes_written_wo_null_terminator);
         DQN_MEMCPY(w_path + bytes_written_wo_null_terminator, suffix.data, sizeof(suffix.data[0]) * suffix.size);
         w_path[desired_size] = 0;
     }
@@ -1427,7 +1464,7 @@ DQN_API bool Dqn_Win_FolderIterate(Dqn_Str8 path, Dqn_Win_FolderIterator *it)
     if (!Dqn_Str8_HasData(path) || !it || path.size <= 0)
         return false;
 
-    Dqn_Scratch             scratch = Dqn_Scratch_Get(nullptr);
+    Dqn_TLSTMem                t_mem    = Dqn_TLS_TMem(nullptr);
     Dqn_Win_FolderIteratorW wide_it = {};
     Dqn_Str16               path16  = {};
     if (it->handle) {
@@ -1444,12 +1481,12 @@ DQN_API bool Dqn_Win_FolderIterate(Dqn_Str8 path, Dqn_Win_FolderIterator *it)
             // add those characters in this branch, so overwrite the null
             // character, add the glob and re-null terminate the buffer.
             if (needs_asterisks)
-                adjusted_path = Dqn_OS_PathConvertF(scratch.arena, "%.*s*", DQN_STR_FMT(path));
+                adjusted_path = Dqn_OS_PathF(t_mem.arena, "%.*s*", DQN_STR_FMT(path));
             else
-                adjusted_path = Dqn_OS_PathConvertF(scratch.arena, "%.*s/*", DQN_STR_FMT(path));
+                adjusted_path = Dqn_OS_PathF(t_mem.arena, "%.*s/*", DQN_STR_FMT(path));
         }
 
-        path16 = Dqn_Win_Str8ToStr16(scratch.arena, adjusted_path);
+        path16 = Dqn_Win_Str8ToStr16(t_mem.arena, adjusted_path);
         if (path16.size <= 0) // Conversion error
             return false;
     }

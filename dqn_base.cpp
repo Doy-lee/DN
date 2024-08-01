@@ -77,8 +77,8 @@ DQN_API void Dqn_CPU_SetFeature(Dqn_CPUReport *report, Dqn_CPUFeature feature)
 DQN_API Dqn_CPUReport Dqn_CPU_Report()
 {
     Dqn_CPUReport   result                 = {};
-    Dqn_CPUIDResult fn_0000_[16]           = {};
-    Dqn_CPUIDResult fn_8000_[64]           = {};
+    Dqn_CPUIDResult fn_0000_[512]          = {};
+    Dqn_CPUIDResult fn_8000_[512]          = {};
     int const       EXTENDED_FUNC_BASE_EAX = 0x8000'0000;
     int const       REGISTER_SIZE          = sizeof(fn_0000_[0].reg.eax);
 
@@ -102,8 +102,10 @@ DQN_API Dqn_CPUReport Dqn_CPU_Report()
 
     // NOTE: Enumerate all CPUID results for the known function counts /////////////////////////////
     {
-        DQN_ASSERT((STANDARD_FUNC_MAX_EAX                                             + 1) <= DQN_ARRAY_ICOUNT(fn_0000_));
-        DQN_ASSERT((DQN_CAST(Dqn_isize)EXTENDED_FUNC_MAX_EAX - EXTENDED_FUNC_BASE_EAX + 1) <= DQN_ARRAY_ICOUNT(fn_8000_));
+        DQN_ASSERTF((STANDARD_FUNC_MAX_EAX                                             + 1) <= DQN_ARRAY_ICOUNT(fn_0000_),
+                    "Max standard count is %zu", STANDARD_FUNC_MAX_EAX + 1);
+        DQN_ASSERTF((DQN_CAST(Dqn_isize)EXTENDED_FUNC_MAX_EAX - EXTENDED_FUNC_BASE_EAX + 1) <= DQN_ARRAY_ICOUNT(fn_8000_),
+                    "Max extended count is %zu", DQN_CAST(Dqn_isize)EXTENDED_FUNC_MAX_EAX - EXTENDED_FUNC_BASE_EAX + 1);
 
         for (int eax = 1; eax <= STANDARD_FUNC_MAX_EAX; eax++) {
             Dqn_CPUIDArgs args = {};
@@ -535,15 +537,15 @@ DQN_FILE_SCOPE void Dqn_Log_FVDefault_(Dqn_Str8 type, int log_type, void *user_d
     // NOTE: Open log file for appending if requested //////////////////////////
     Dqn_TicketMutex_Begin(&lib->log_file_mutex);
     if (lib->log_to_file && !lib->log_file.handle && !lib->log_file.error) {
-        Dqn_Scratch scratch  = Dqn_Scratch_Get(nullptr);
-        Dqn_Str8    log_path = Dqn_OS_PathConvertF(scratch.arena, "%.*s/dqn.log", DQN_STR_FMT(lib->exe_dir));
-        lib->log_file        = Dqn_OS_FileOpen(log_path, Dqn_OSFileOpen_CreateAlways, Dqn_OSFileAccess_AppendOnly, nullptr);
+        Dqn_TLSTMem t_mem = Dqn_TLS_TMem(nullptr);
+        Dqn_Str8 log_path = Dqn_OS_PathF(t_mem.arena, "%.*s/dqn.log", DQN_STR_FMT(lib->exe_dir));
+        lib->log_file     = Dqn_OS_FileOpen(log_path, Dqn_OSFileOpen_CreateAlways, Dqn_OSFileAccess_AppendOnly, nullptr);
     }
     Dqn_TicketMutex_End(&lib->log_file_mutex);
 
     // NOTE: Generate the log header ///////////////////////////////////////////
-    Dqn_Scratch scratch  = Dqn_Scratch_Get(nullptr);
-    Dqn_Str8    log_line = Dqn_Log_MakeStr8(scratch.arena, !lib->log_no_colour, type, log_type, call_site, fmt, args);
+    Dqn_TLSTMem t_mem  = Dqn_TLS_TMem(nullptr);
+    Dqn_Str8    log_line = Dqn_Log_MakeStr8(t_mem.arena, !lib->log_no_colour, type, log_type, call_site, fmt, args);
 
     // NOTE: Print log /////////////////////////////////////////////////////////
     Dqn_Print_StdLn(Dqn_PrintStd_Out, log_line);
@@ -597,13 +599,14 @@ DQN_API void Dqn_Log_TypeFCallSite(Dqn_LogType type, Dqn_CallSite call_site, DQN
 // NOTE: [$ERRS] Dqn_ErrorSink /////////////////////////////////////////////////////////////////////
 DQN_API Dqn_ErrorSink *Dqn_ErrorSink_Begin(Dqn_ErrorSinkMode mode)
 {
-    Dqn_ThreadContext *thread_context = Dqn_ThreadContext_Get();
-    Dqn_ErrorSink     *result         = &thread_context->error_sink;
-    Dqn_ErrorSinkNode *node           = Dqn_Arena_New(result->arena, Dqn_ErrorSinkNode, Dqn_ZeroMem_Yes);
-    node->next                        = result->stack;
-    node->arena_pos                   = Dqn_Arena_Pos(result->arena);
-    node->mode                        = mode;
-    result->stack                     = node;
+    Dqn_TLS           *tls       = Dqn_TLS_Get();
+    Dqn_ErrorSink     *result    = &tls->error_sink;
+    Dqn_usize          arena_pos = Dqn_Arena_Pos(result->arena);
+    Dqn_ErrorSinkNode *node      = Dqn_Arena_New(result->arena, Dqn_ErrorSinkNode, Dqn_ZeroMem_Yes);
+    node->next                   = result->stack;
+    node->arena_pos              = arena_pos;
+    node->mode                   = mode;
+    result->stack                = node;
     return result;
 }
 
@@ -640,8 +643,8 @@ DQN_API void Dqn_ErrorSink_EndAndIgnore(Dqn_ErrorSink *error)
 
 DQN_API bool Dqn_ErrorSink_EndAndLogError(Dqn_ErrorSink *error, Dqn_Str8 error_msg)
 {
-    Dqn_Scratch       scratch = Dqn_Scratch_Get(nullptr);
-    Dqn_ErrorSinkNode node    = Dqn_ErrorSink_End(scratch.arena, error);
+    Dqn_TLSTMem       t_mem = Dqn_TLS_TMem(nullptr);
+    Dqn_ErrorSinkNode node    = Dqn_ErrorSink_End(t_mem.arena, error);
     if (node.error) {
         if (Dqn_Str8_HasData(error_msg)) {
             Dqn_Log_TypeFCallSite(Dqn_LogType_Error, node.call_site, "%.*s: %.*s", DQN_STR_FMT(error_msg), DQN_STR_FMT(node.msg));
@@ -655,8 +658,8 @@ DQN_API bool Dqn_ErrorSink_EndAndLogError(Dqn_ErrorSink *error, Dqn_Str8 error_m
 
 DQN_API bool Dqn_ErrorSink_EndAndLogErrorFV(Dqn_ErrorSink *error, DQN_FMT_ATTRIB char const *fmt, va_list args)
 {
-    Dqn_Scratch scratch = Dqn_Scratch_Get(nullptr);
-    Dqn_Str8    log     = Dqn_Str8_InitFV(scratch.arena, fmt, args);
+    Dqn_TLSTMem t_mem = Dqn_TLS_TMem(nullptr);
+    Dqn_Str8    log     = Dqn_Str8_InitFV(t_mem.arena, fmt, args);
     bool        result  = Dqn_ErrorSink_EndAndLogError(error, log);
     return result;
 }
@@ -665,8 +668,8 @@ DQN_API bool Dqn_ErrorSink_EndAndLogErrorF(Dqn_ErrorSink *error, DQN_FMT_ATTRIB 
 {
     va_list args;
     va_start(args, fmt);
-    Dqn_Scratch scratch = Dqn_Scratch_Get(nullptr);
-    Dqn_Str8    log     = Dqn_Str8_InitFV(scratch.arena, fmt, args);
+    Dqn_TLSTMem t_mem = Dqn_TLS_TMem(nullptr);
+    Dqn_Str8    log     = Dqn_Str8_InitFV(t_mem.arena, fmt, args);
     bool        result  = Dqn_ErrorSink_EndAndLogError(error, log);
     va_end(args);
     return result;
@@ -699,7 +702,7 @@ DQN_API void Dqn_ErrorSink_MakeFV_(Dqn_ErrorSink *error, uint32_t error_code, DQ
         node->msg        = Dqn_Str8_InitFV(error->arena, fmt, args);
         node->error_code = error_code;
         node->error      = true;
-        node->call_site  = Dqn_ThreadContext_Get()->call_site;
+        node->call_site  = Dqn_TLS_Get()->call_site;
         if (node->mode == Dqn_ErrorSinkMode_ExitOnError)
             Dqn_ErrorSink_EndAndExitIfErrorF(error, error_code, "Fatal error %u", error_code);
     }

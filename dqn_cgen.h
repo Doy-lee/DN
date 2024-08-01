@@ -1,6 +1,7 @@
 #if !defined(DQN_CGEN_H)
 #define DQN_CGEN_H
 
+/*
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //
 //    $$$$$$\   $$$$$$\  $$$$$$$$\ $$\   $$\
@@ -15,6 +16,7 @@
 //   dqn_cgen.h -- C/C++ code generation from table data in Metadesk files
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
+*/
 
 // NOTE: [$CGEN] Dqn_CGen //////////////////////////////////////////////////////////////////////////
 #if !defined(MD_H)
@@ -70,6 +72,7 @@ enum Dqn_CGenTableHeaderType
     Dqn_CGenTableHeaderType_CppOpEquals,
     Dqn_CGenTableHeaderType_CppArraySize,
     Dqn_CGenTableHeaderType_CppArraySizeField,
+    Dqn_CGenTableHeaderType_CppLabel,
     Dqn_CGenTableHeaderType_GenTypeInfo,
     Dqn_CGenTableHeaderType_GenEnumCount,
     Dqn_CGenTableHeaderType_Count,
@@ -162,6 +165,7 @@ enum Dqn_CGenEmit
 DQN_API Dqn_CGen                     Dqn_CGen_InitFilesArgV                (int argc, char const **argv, Dqn_ErrorSink *error);
 DQN_API Dqn_Str8                     Dqn_CGen_TableHeaderTypeToDeclStr8    (Dqn_CGenTableHeaderType type);
 DQN_API Dqn_CGenMapNodeToEnum        Dqn_CGen_MapNodeToEnumOrExit          (MD_Node const *node, Dqn_CGenMapNodeToEnum const *valid_keys, Dqn_usize valid_keys_size, char const *fmt, ...);
+DQN_API Dqn_usize                    Dqn_CGen_NodeChildrenCount            (MD_Node const *node);
 DQN_API void                         Dqn_CGen_LogF                         (MD_MessageKind kind, MD_Node *node, Dqn_ErrorSink *error, char const *fmt, ...);
 DQN_API bool                         Dqn_CGen_TableHasHeaders              (Dqn_CGenTable const *table, Dqn_Str8 const *headers, Dqn_usize header_count, Dqn_ErrorSink *error);
 DQN_API Dqn_CGenLookupColumnAtHeader Dqn_CGen_LookupColumnAtHeader         (Dqn_CGenTable *table, Dqn_Str8 header, Dqn_CGenTableRow const *row);

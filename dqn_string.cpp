@@ -95,7 +95,7 @@ DQN_API bool Dqn_Str8_IsAll(Dqn_Str8 string, Dqn_Str8IsAll is_all)
 
         case Dqn_Str8IsAll_Hex: {
             Dqn_Str8 trimmed = Dqn_Str8_TrimPrefix(string, DQN_STR8("0x"), Dqn_Str8EqCase_Insensitive);
-            for (Dqn_usize index = 0; result && index < string.size; index++) {
+            for (Dqn_usize index = 0; result && index < trimmed.size; index++) {
                 char ch = trimmed.data[index];
                 result  = (ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F');
             }
@@ -221,7 +221,7 @@ DQN_API Dqn_Slice<Dqn_Str8> Dqn_Str8_SplitAlloc(Dqn_Arena *arena, Dqn_Str8 strin
     return result;
 }
 
-DQN_API Dqn_Str8FindResult Dqn_Str8_FindStr8Array(Dqn_Str8 string, Dqn_Str8 const *find, Dqn_usize find_size)
+DQN_API Dqn_Str8FindResult Dqn_Str8_FindStr8Array(Dqn_Str8 string, Dqn_Str8 const *find, Dqn_usize find_size, Dqn_Str8EqCase eq_case)
 {
     Dqn_Str8FindResult result = {};
     if (!Dqn_Str8_HasData(string) || !find || find_size == 0)
@@ -231,7 +231,7 @@ DQN_API Dqn_Str8FindResult Dqn_Str8_FindStr8Array(Dqn_Str8 string, Dqn_Str8 cons
         for (Dqn_usize find_index = 0; find_index < find_size; find_index++) {
             Dqn_Str8 find_item    = find[find_index];
             Dqn_Str8 string_slice = Dqn_Str8_Slice(string, index, find_item.size);
-            if (Dqn_Str8_Eq(string_slice, find_item)) {
+            if (Dqn_Str8_Eq(string_slice, find_item, eq_case)) {
                 result.found                  = true;
                 result.index                  = index;
                 result.start_to_before_match  = Dqn_Str8_Init(string.data, index);
@@ -244,9 +244,9 @@ DQN_API Dqn_Str8FindResult Dqn_Str8_FindStr8Array(Dqn_Str8 string, Dqn_Str8 cons
     return result;
 }
 
-DQN_API Dqn_Str8FindResult Dqn_Str8_FindStr8(Dqn_Str8 string, Dqn_Str8 find)
+DQN_API Dqn_Str8FindResult Dqn_Str8_FindStr8(Dqn_Str8 string, Dqn_Str8 find, Dqn_Str8EqCase eq_case)
 {
-    Dqn_Str8FindResult result = Dqn_Str8_FindStr8Array(string, &find, 1);
+    Dqn_Str8FindResult result = Dqn_Str8_FindStr8Array(string, &find, 1, eq_case);
     return result;
 }
 
@@ -400,6 +400,12 @@ DQN_API Dqn_Str8 Dqn_Str8_TrimPrefix(Dqn_Str8 string, Dqn_Str8 prefix, Dqn_Str8E
         result.data += prefix.size;
         result.size -= prefix.size;
     }
+    return result;
+}
+
+DQN_API Dqn_Str8 Dqn_Str8_TrimHexPrefix(Dqn_Str8 string)
+{
+    Dqn_Str8 result = Dqn_Str8_TrimPrefix(string, DQN_STR8("0x"), Dqn_Str8EqCase_Insensitive);
     return result;
 }
 
@@ -591,11 +597,10 @@ DQN_API Dqn_Str8 Dqn_Str8_Replace(Dqn_Str8       string,
         return result;
     }
 
-    Dqn_Scratch     scratch        = Dqn_Scratch_Get(arena);
-    Dqn_Str8Builder string_builder = {};
-    string_builder.arena           = scratch.arena;
-    Dqn_usize max                  = string.size - find.size;
-    Dqn_usize head                 = start_index;
+    Dqn_TLSTMem     tmem           = Dqn_TLS_TMem(arena);
+    Dqn_Str8Builder string_builder = Dqn_Str8Builder_Init(tmem.arena);
+    Dqn_usize       max            = string.size - find.size;
+    Dqn_usize       head           = start_index;
 
     for (Dqn_usize tail = head; tail <= max; tail++) {
         Dqn_Str8 check = Dqn_Str8_Slice(string, tail, find.size);
@@ -608,12 +613,12 @@ DQN_API Dqn_Str8 Dqn_Str8_Replace(Dqn_Str8       string,
             // a replacement action, otherwise we have a special case for no
             // replacements, where the entire string gets copied.
             Dqn_Str8 slice = Dqn_Str8_Init(string.data, head);
-            Dqn_Str8Builder_AppendRef(&string_builder, slice);
+            Dqn_Str8Builder_AddRef(&string_builder, slice);
         }
 
         Dqn_Str8 range = Dqn_Str8_Slice(string, head, (tail - head));
-        Dqn_Str8Builder_AppendRef(&string_builder, range);
-        Dqn_Str8Builder_AppendRef(&string_builder, replace);
+        Dqn_Str8Builder_AddRef(&string_builder, range);
+        Dqn_Str8Builder_AddRef(&string_builder, replace);
         head = tail + find.size;
         tail += find.size - 1; // NOTE: -1 since the for loop will post increment us past the end of the find string
     }
@@ -623,7 +628,7 @@ DQN_API Dqn_Str8 Dqn_Str8_Replace(Dqn_Str8       string,
         result = Dqn_Str8_Copy(arena, string);
     } else {
         Dqn_Str8 remainder = Dqn_Str8_Init(string.data + head, string.size - head);
-        Dqn_Str8Builder_AppendRef(&string_builder, remainder);
+        Dqn_Str8Builder_AddRef(&string_builder, remainder);
         result = Dqn_Str8Builder_Build(&string_builder, arena);
     }
 
@@ -693,6 +698,8 @@ DQN_API Dqn_Str8 Dqn_Str8_Alloc(Dqn_Arena *arena, Dqn_usize size, Dqn_ZeroMem ze
     result.data     = Dqn_Arena_NewArray(arena, char, size + 1, zero_mem);
     if (result.data)
         result.size = size;
+    if (zero_mem == Dqn_ZeroMem_No)
+        result.data[result.size] = 0;
     return result;
 }
 
@@ -717,18 +724,46 @@ DQN_API Dqn_Str8 Dqn_Str8_Copy(Dqn_Arena *arena, Dqn_Str8 string)
 }
 
 // NOTE: [$STRB] Dqn_Str8Builder ////////////////////////////////////////////////////////////////
-DQN_API bool Dqn_Str8Builder_AppendRefArray(Dqn_Str8Builder *builder, Dqn_Slice<Dqn_Str8> array)
+DQN_API Dqn_Str8Builder Dqn_Str8Builder_Init(Dqn_Arena *arena)
+{
+    Dqn_Str8Builder result = {};
+    result.arena           = arena;
+    return result;
+}
+
+DQN_API Dqn_Str8Builder Dqn_Str8Builder_InitArrayRef(Dqn_Arena      *arena,
+                                                     Dqn_Str8 const *strings,
+                                                     Dqn_usize       size)
+{
+    Dqn_Str8Builder result = Dqn_Str8Builder_Init(arena);
+    Dqn_Str8Builder_AddArrayRef(&result, strings, size);
+    return result;
+}
+
+DQN_API Dqn_Str8Builder Dqn_Str8Builder_InitArrayCopy(Dqn_Arena      *arena,
+                                                      Dqn_Str8 const *strings,
+                                                      Dqn_usize       size)
+{
+    Dqn_Str8Builder result = Dqn_Str8Builder_Init(arena);
+    Dqn_Str8Builder_AddArrayCopy(&result, strings, size);
+    return result;
+}
+
+DQN_API bool Dqn_Str8Builder_AddArrayRef(Dqn_Str8Builder *builder, Dqn_Str8 const *strings, Dqn_usize size)
 {
     if (!builder)
         return false;
 
-    for (Dqn_Str8 string : array) {
-        if (!builder || !string.data || string.size <= 0)
-            return false;
+    if (!strings || size <= 0)
+        return true;
 
-        Dqn_Str8Link *link = Dqn_Arena_New(builder->arena, Dqn_Str8Link, Dqn_ZeroMem_No);
-        if (!link)
-            return false;
+    Dqn_Str8Link *links = Dqn_Arena_NewArray(builder->arena, Dqn_Str8Link, size, Dqn_ZeroMem_No);
+    if (!links)
+        return false;
+
+    DQN_FOR_UINDEX(index, size) {
+        Dqn_Str8      string = strings[index];
+        Dqn_Str8Link *link   = links + index;
 
         link->string = string;
         link->next   = NULL;
@@ -746,69 +781,203 @@ DQN_API bool Dqn_Str8Builder_AppendRefArray(Dqn_Str8Builder *builder, Dqn_Slice<
     return true;
 }
 
-DQN_API bool Dqn_Str8Builder_AppendCopyArray(Dqn_Str8Builder *builder, Dqn_Slice<Dqn_Str8> array)
+DQN_API bool Dqn_Str8Builder_AddArrayCopy(Dqn_Str8Builder *builder, Dqn_Str8 const *strings, Dqn_usize size)
 {
-    for (Dqn_Str8 string : array) {
-        Dqn_Str8 copy = Dqn_Str8_Copy(builder->arena, string);
-        if (!Dqn_Str8Builder_AppendRef(builder, copy))
-            return false;
-    }
-    return true;
-}
+    if (!builder)
+        return false;
 
-DQN_API bool Dqn_Str8Builder_AppendFV(Dqn_Str8Builder *builder, DQN_FMT_ATTRIB char const *fmt, va_list args)
-{
-    Dqn_Str8 string = Dqn_Str8_InitFV(builder->arena, fmt, args);
-    if (string.size == 0)
+    if (!strings || size <= 0)
         return true;
 
+    Dqn_ArenaTempMem tmp_mem = Dqn_Arena_TempMemBegin(builder->arena);
+    bool             result  = true;
+    Dqn_Str8 *strings_copy   = Dqn_Arena_NewArray(builder->arena, Dqn_Str8, size, Dqn_ZeroMem_No);
+    DQN_FOR_UINDEX (index, size) {
+        strings_copy[index] = Dqn_Str8_Copy(builder->arena, strings[index]);
+        if (strings_copy[index].size != strings[index].size) {
+            result = false;
+            break;
+        }
+    }
+
+    if (result)
+        result = Dqn_Str8Builder_AddArrayRef(builder, strings_copy, size);
+
+    if (!result)
+        Dqn_Arena_TempMemEnd(tmp_mem);
+
+    return result;
+}
+
+DQN_API bool Dqn_Str8Builder_AddSliceRef(Dqn_Str8Builder *builder, Dqn_Slice<Dqn_Str8> array)
+{
+    bool result = Dqn_Str8Builder_AddArrayRef(builder, array.data, array.size);
+    return result;
+}
+
+DQN_API bool Dqn_Str8Builder_AddSliceCopy(Dqn_Str8Builder *builder, Dqn_Slice<Dqn_Str8> array)
+{
+    bool result = Dqn_Str8Builder_AddArrayCopy(builder, array.data, array.size);
+    return result;
+}
+
+DQN_API bool Dqn_Str8Builder_AddRef(Dqn_Str8Builder *builder, Dqn_Str8 string)
+{
+    bool result = Dqn_Str8Builder_AddArrayRef(builder, &string, 1);
+    return result;
+}
+
+DQN_API bool Dqn_Str8Builder_AddCopy(Dqn_Str8Builder *builder, Dqn_Str8 string)
+{
+    bool result = Dqn_Str8Builder_AddArrayCopy(builder, &string, 1);
+    return result;
+}
+
+DQN_API bool Dqn_Str8Builder_AddFV(Dqn_Str8Builder *builder, DQN_FMT_ATTRIB char const *fmt, va_list args)
+{
+    Dqn_Str8         string   = Dqn_Str8_InitFV(builder->arena, fmt, args);
     Dqn_ArenaTempMem temp_mem = Dqn_Arena_TempMemBegin(builder->arena);
-    bool result = Dqn_Str8Builder_AppendRef(builder, string);
+    bool result = Dqn_Str8Builder_AddRef(builder, string);
     if (!result)
         Dqn_Arena_TempMemEnd(temp_mem);
     return result;
 }
 
-DQN_API bool Dqn_Str8Builder_AppendF(Dqn_Str8Builder *builder, DQN_FMT_ATTRIB char const *fmt, ...)
+DQN_API bool Dqn_Str8Builder_AddF(Dqn_Str8Builder *builder, DQN_FMT_ATTRIB char const *fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
-    bool result = Dqn_Str8Builder_AppendFV(builder, fmt, args);
+    bool result = Dqn_Str8Builder_AddFV(builder, fmt, args);
     va_end(args);
     return result;
 }
 
-DQN_API bool Dqn_Str8Builder_AppendRef(Dqn_Str8Builder *builder, Dqn_Str8 string)
+DQN_API bool Dqn_Str8Builder_AddBytesRef(Dqn_Str8Builder *builder, void const *ptr, Dqn_usize size)
 {
-    Dqn_Slice<Dqn_Str8> array = Dqn_Slice_Init(&string, 1);
-    bool result               = Dqn_Str8Builder_AppendRefArray(builder, array);
+    Dqn_Str8 input  = Dqn_Str8_Init(ptr, size);
+    bool     result = Dqn_Str8Builder_AddRef(builder, input);
     return result;
 }
 
-DQN_API bool Dqn_Str8Builder_AppendCopy(Dqn_Str8Builder *builder, Dqn_Str8 string)
+DQN_API bool Dqn_Str8Builder_AddBytesCopy(Dqn_Str8Builder *builder, void const *ptr, Dqn_usize size)
 {
-    Dqn_Slice<Dqn_Str8> array = Dqn_Slice_Init(&string, 1);
-    bool result               = Dqn_Str8Builder_AppendCopyArray(builder, array);
+    Dqn_Str8 input  = Dqn_Str8_Init(ptr, size);
+    bool     result = Dqn_Str8Builder_AddCopy(builder, input);
+    return result;
+}
+
+static bool Dqn_Str8Builder_AddBuilder_(Dqn_Str8Builder *dest, Dqn_Str8Builder const *src, bool copy)
+{
+    if (!dest)
+        return false;
+    if (!src)
+        return true;
+
+    Dqn_Arena_TempMemBegin(dest->arena);
+    Dqn_Str8Link *links = Dqn_Arena_NewArray(dest->arena, Dqn_Str8Link, src->count, Dqn_ZeroMem_No);
+    if (!links)
+        return false;
+
+    Dqn_Str8Link *first      = nullptr;
+    Dqn_Str8Link *last       = nullptr;
+    Dqn_usize     link_index = 0;
+    bool          result     = true;
+    for (Dqn_Str8Link const *it = src->head; it; it = it->next) {
+        Dqn_Str8Link *link = links + link_index++;
+        link->next         = nullptr;
+        link->string       = it->string;
+
+        if (copy) {
+            link->string = Dqn_Str8_Copy(dest->arena, it->string);
+            if (link->string.size != it->string.size) {
+                result = false;
+                break;
+            }
+        }
+
+        if (last) {
+            last->next = link;
+        } else {
+            first = link;
+        }
+        last = link;
+    }
+
+    if (result) {
+        if (dest->head)
+            dest->tail->next = first;
+        else
+            dest->head = first;
+        dest->tail        = last;
+        dest->count       += src->count;
+        dest->string_size += src->string_size;
+    }
+    return true;
+}
+
+DQN_API bool Dqn_Str8Builder_AddBuilderRef(Dqn_Str8Builder *dest, Dqn_Str8Builder const *src)
+{
+    bool result = Dqn_Str8Builder_AddBuilder_(dest, src, false);
+    return result;
+}
+
+DQN_API bool Dqn_Str8Builder_AddBuilderCopy(Dqn_Str8Builder *dest, Dqn_Str8Builder const *src)
+{
+    bool result = Dqn_Str8Builder_AddBuilder_(dest, src, true);
+    return result;
+}
+
+DQN_API bool Dqn_Str8Builder_Erase(Dqn_Str8Builder *builder, Dqn_Str8 string)
+{
+    for (Dqn_Str8Link **it = &builder->head; *it; it = &((*it)->next)) {
+        if ((*it)->string == string) {
+            *it = (*it)->next;
+            builder->string_size -= string.size;
+            builder->count       -= 1;
+            return true;
+        }
+    }
+    return false;
+}
+
+DQN_API Dqn_Str8Builder Dqn_Str8Builder_Copy(Dqn_Arena *arena, Dqn_Str8Builder const *builder)
+{
+    Dqn_Str8Builder result = Dqn_Str8Builder_Init(arena);
+    Dqn_Str8Builder_AddBuilderCopy(&result, builder);
     return result;
 }
 
 DQN_API Dqn_Str8 Dqn_Str8Builder_Build(Dqn_Str8Builder const *builder, Dqn_Arena *arena)
 {
+    Dqn_Str8 result = Dqn_Str8Builder_BuildDelimited(builder, DQN_STR8(""), arena);
+    return result;
+}
+
+DQN_API Dqn_Str8 Dqn_Str8Builder_BuildDelimited(Dqn_Str8Builder const *builder, Dqn_Str8 delimiter, Dqn_Arena *arena)
+{
     Dqn_Str8 result = DQN_ZERO_INIT;
     if (!builder || builder->string_size <= 0 || builder->count <= 0)
         return result;
 
-    result.data = Dqn_Arena_NewArray(arena, char, builder->string_size + 1, Dqn_ZeroMem_No);
+    Dqn_usize size_for_delimiter = Dqn_Str8_HasData(delimiter) ? ((builder->count - 1) * delimiter.size) : 0;
+    result.data = Dqn_Arena_NewArray(arena,
+                                     char,
+                                     builder->string_size + size_for_delimiter + 1 /*null terminator*/,
+                                     Dqn_ZeroMem_No);
     if (!result.data)
         return result;
 
     for (Dqn_Str8Link *link = builder->head; link; link = link->next) {
         DQN_MEMCPY(result.data + result.size, link->string.data, link->string.size);
         result.size += link->string.size;
+        if (link->next && Dqn_Str8_HasData(delimiter)) {
+            DQN_MEMCPY(result.data + result.size, delimiter.data, delimiter.size);
+            result.size += delimiter.size;
+        }
     }
 
     result.data[result.size] = 0;
-    DQN_ASSERT(result.size == builder->string_size);
+    DQN_ASSERT(result.size == builder->string_size + size_for_delimiter);
     return result;
 }
 
@@ -850,13 +1019,13 @@ DQN_API Dqn_Slice<Dqn_Str8> Dqn_Str8Builder_BuildSlice(Dqn_Str8Builder const *bu
     return result;
 }
 
-DQN_API void Dqn_Str8Builder_PrintF(Dqn_Str8Builder const *builder)
+DQN_API void Dqn_Str8Builder_Print(Dqn_Str8Builder const *builder)
 {
     for (Dqn_Str8Link *link = builder ? builder->head : nullptr; link; link = link->next)
         Dqn_Print(link->string);
 }
 
-DQN_API void Dqn_Str8Builder_PrintLnF(Dqn_Str8Builder const *builder)
+DQN_API void Dqn_Str8Builder_PrintLn(Dqn_Str8Builder const *builder)
 {
     for (Dqn_Str8Link *link = builder ? builder->head : nullptr; link; link = link->next) {
         if (link->next) {

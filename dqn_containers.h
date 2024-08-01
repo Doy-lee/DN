@@ -110,23 +110,22 @@ template <typename T> using Dqn_FArray64 = Dqn_FArray<T, 64>;
 // NOTE: [$DMAP] Dqn_DSMap /////////////////////////////////////////////////////////////////////////
 enum Dqn_DSMapKeyType
 {
+                                        // Key    | Key Hash         | Map Index
     Dqn_DSMapKeyType_Invalid,
-    Dqn_DSMapKeyType_U64,       // Use a U64 key that is `hash(u64) % size` to map into the table
-    Dqn_DSMapKeyType_U64NoHash, // Use a U64 key that is `u64 % size` to map into the table
-    Dqn_DSMapKeyType_Buffer,    // Use a buffer key that is `hash(buffer) % size` to map into the table
+    Dqn_DSMapKeyType_U64,               // U64    | Hash(U64)        | Hash(U64)        % map_size
+    Dqn_DSMapKeyType_U64NoHash,         // U64    | U64              | U64              % map_size
+    Dqn_DSMapKeyType_Buffer,            // Buffer | Hash(buffer)     | Hash(buffer)     % map_size
+    Dqn_DSMapKeyType_BufferAsU64NoHash, // Buffer | U64(buffer[0:4]) | U64(buffer[0:4]) % map_size
 };
 
 struct Dqn_DSMapKey
 {
     Dqn_DSMapKeyType type;
-    uint32_t hash;
-    union Payload {
-        struct Buffer {
-            void const *data;
-            uint32_t    size;
-        } buffer;
-        uint64_t u64;
-    } payload;
+    uint32_t         hash;           // Hash to lookup in the map. If it equals, we check that the original key payload matches
+    void const      *buffer_data;
+    uint32_t         buffer_size;
+    uint64_t         u64;
+    bool             no_copy_buffer;
 };
 
 template <typename T>
@@ -134,6 +133,13 @@ struct Dqn_DSMapSlot
 {
     Dqn_DSMapKey key;   ///< Hash table lookup key
     T            value; ///< Hash table value
+};
+
+typedef uint32_t Dqn_DSMapFlags;
+enum Dqn_DSMapFlags_
+{
+    Dqn_DSMapFlags_Nil                   = 0,
+    Dqn_DSMapFlags_DontFreeArenaOnResize = 1 << 0,
 };
 
 using Dqn_DSMapHashFunction = uint32_t(Dqn_DSMapKey key, uint32_t seed);
@@ -147,6 +153,7 @@ template <typename T> struct Dqn_DSMap
     uint32_t               initial_size;  // Initial map size, map cannot shrink on erase below this size
     Dqn_DSMapHashFunction *hash_function; // Custom hashing function to use if field is set
     uint32_t               hash_seed;     // Seed for the hashing function, when 0, DQN_DS_MAP_DEFAULT_HASH_SEED is used
+    Dqn_DSMapFlags         flags;
 };
 
 template <typename T> struct Dqn_DSMapResult
@@ -179,7 +186,6 @@ template <typename T> struct Dqn_ListIterator
 
 template <typename T> struct Dqn_List
 {
-    Dqn_Arena        *arena;
     Dqn_usize         count;      // Cumulative count of all items made across all list chunks
     Dqn_usize         chunk_size; // When new ListChunk's are required, the minimum 'data' entries to allocate for that node.
     Dqn_ListChunk<T> *head;
@@ -254,6 +260,7 @@ template <typename T>                           void                   Dqn_SArra
 #endif // !defined(DQN_NO_SARRAY)
 #if !defined(DQN_NO_FARRAY)
 template <typename T, Dqn_usize N>              Dqn_FArray<T, N>       Dqn_FArray_Init                    (T const *array, Dqn_usize count);
+#define                                                                Dqn_FArray_HasData(array)          ((array).data && (array).size)
 template <typename T, Dqn_usize N>              Dqn_FArray<T, N>       Dqn_FArray_InitSlice               (Dqn_Slice<T> slice);
 template <typename T, Dqn_usize N, Dqn_usize K> Dqn_FArray<T, N>       Dqn_FArray_InitCArray              (T const (&items)[K]);
 template <typename T, Dqn_usize N>              bool                   Dqn_FArray_IsValid                 (Dqn_FArray<T, N> const *array);
@@ -289,9 +296,11 @@ template <typename T>                           Dqn_Slice<T>           Dqn_Slice
 template <typename T>                           Dqn_Slice<T>           Dqn_Slice_Alloc                    (Dqn_Arena *arena, Dqn_usize size, Dqn_ZeroMem zero_mem);
                                                 Dqn_Str8               Dqn_Slice_Str8Render               (Dqn_Arena *arena, Dqn_Slice<Dqn_Str8> array, Dqn_Str8 separator);
                                                 Dqn_Str8               Dqn_Slice_Str8RenderSpaceSeparated (Dqn_Arena *arena, Dqn_Slice<Dqn_Str8> array);
+                                                Dqn_Str16              Dqn_Slice_Str16Render              (Dqn_Arena *arena, Dqn_Slice<Dqn_Str16> array, Dqn_Str16 separator);
+                                                Dqn_Str16              Dqn_Slice_Str16RenderSpaceSeparated(Dqn_Arena *arena, Dqn_Slice<Dqn_Str16> array);
 #endif // !defined(DQN_NO_SLICE)
 #if !defined(DQN_NO_DSMAP)
-template <typename T>                           Dqn_DSMap<T>           Dqn_DSMap_Init                     (Dqn_Arena *arena, uint32_t size);
+template <typename T>                           Dqn_DSMap<T>           Dqn_DSMap_Init                     (Dqn_Arena *arena, uint32_t size, Dqn_DSMapFlags flags);
 template <typename T>                           void                   Dqn_DSMap_Deinit                   (Dqn_DSMap<T> *map, Dqn_ZeroMem zero_mem);
 template <typename T>                           bool                   Dqn_DSMap_IsValid                  (Dqn_DSMap<T> const *map);
 template <typename T>                           uint32_t               Dqn_DSMap_Hash                     (Dqn_DSMap<T> const *map, Dqn_DSMapKey key);
@@ -305,27 +314,28 @@ template <typename T>                           Dqn_DSMapResult<T>     Dqn_DSMap
 template <typename T>                           Dqn_DSMapResult<T>     Dqn_DSMap_FindKeyStr8              (Dqn_DSMap<T> const *map, Dqn_Str8 key);
 template <typename T>                           Dqn_DSMapResult<T>     Dqn_DSMap_MakeKeyStr8              (Dqn_DSMap<T> *map,       Dqn_Str8 key);
 template <typename T>                           Dqn_DSMapResult<T>     Dqn_DSMap_SetKeyStr8               (Dqn_DSMap<T> *map,       Dqn_Str8 key, T const &value);
-template <typename T>                           Dqn_DSMapResult<T>     Dqn_DSMap_MakeKeyStr8Copy          (Dqn_DSMap<T> *map,       Dqn_Arena *arena, Dqn_Str8 key);
-template <typename T>                           Dqn_DSMapResult<T>     Dqn_DSMap_SetKeyStr8Copy           (Dqn_DSMap<T> *map,       Dqn_Arena *arena, Dqn_Str8 key, T const &value);
 template <typename T>                           bool                   Dqn_DSMap_Resize                   (Dqn_DSMap<T> *map, uint32_t size);
 template <typename T>                           bool                   Dqn_DSMap_Erase                    (Dqn_DSMap<T> *map, Dqn_DSMapKey key);
 template <typename T>                           Dqn_DSMapKey           Dqn_DSMap_KeyBuffer                (Dqn_DSMap<T> const *map, void const *data, uint32_t size);
+template <typename T>                           Dqn_DSMapKey           Dqn_DSMap_KeyBufferAsU64NoHash     (Dqn_DSMap<T> const *map, void const *data, uint32_t size);
 template <typename T>                           Dqn_DSMapKey           Dqn_DSMap_KeyU64                   (Dqn_DSMap<T> const *map, uint64_t u64);
 template <typename T>                           Dqn_DSMapKey           Dqn_DSMap_KeyStr8                  (Dqn_DSMap<T> const *map, Dqn_Str8 string);
-template <typename T>                           Dqn_DSMapKey           Dqn_DSMap_KeyStr8Copy              (Dqn_DSMap<T> const *map, Dqn_Arena *arena, Dqn_Str8 string);
 #define                                                                Dqn_DSMap_KeyCStr8(map, string)    Dqn_DSMap_KeyBuffer(map, string, sizeof((string))/sizeof((string)[0]) - 1)
 DQN_API                                         Dqn_DSMapKey           Dqn_DSMap_KeyU64NoHash             (uint64_t u64);
 DQN_API                                         bool                   Dqn_DSMap_KeyEquals                (Dqn_DSMapKey lhs, Dqn_DSMapKey rhs);
 DQN_API                                         bool                   operator==                         (Dqn_DSMapKey lhs, Dqn_DSMapKey rhs);
 #endif // !defined(DQN_NO_DSMAP)
 #if !defined(DQN_NO_LIST)
-template <typename T>                           Dqn_List<T>            Dqn_List_Init                      (Dqn_Arena *arena, Dqn_usize chunk_size);
+template <typename T>                           Dqn_List<T>            Dqn_List_Init                      (Dqn_usize chunk_size);
 template <typename T, size_t N>                 Dqn_List<T>            Dqn_List_InitCArray                (Dqn_Arena *arena, Dqn_usize chunk_size, T const (&array)[N]);
 template <typename T>                           T *                    Dqn_List_At                        (Dqn_List<T> *list, Dqn_usize index, Dqn_ListChunk<T> *at_chunk);
 template <typename T>                           bool                   Dqn_List_Iterate                   (Dqn_List<T> *list, Dqn_ListIterator<T> *it, Dqn_usize start_index);
-template <typename T>                           T *                    Dqn_List_Make                      (Dqn_List<T> *list, Dqn_usize count);
-template <typename T>                           T *                    Dqn_List_Add                       (Dqn_List<T> *list, T const &value);
-template <typename T>                           void                   Dqn_List_AddList                   (Dqn_List<T> *list, Dqn_List<T> other);
+template <typename T>                           T *                    Dqn_List_MakeArena                 (Dqn_List<T> *list, Dqn_Arena *arena, Dqn_usize count);
+template <typename T>                           T *                    Dqn_List_MakePool                  (Dqn_List<T> *list, Dqn_ChunkPool *pool, Dqn_usize count);
+template <typename T>                           T *                    Dqn_List_AddArena                  (Dqn_List<T> *list, Dqn_Arena *arena, T const &value);
+template <typename T>                           T *                    Dqn_List_AddPool                   (Dqn_List<T> *list, Dqn_ChunkPool *pool, T const &value);
+template <typename T>                           void                   Dqn_List_AddListArena              (Dqn_List<T> *list, Dqn_Arena *arena, Dqn_List<T> other);
+template <typename T>                           void                   Dqn_List_AddListArena              (Dqn_List<T> *list, Dqn_ChunkPool *pool, Dqn_List<T> other);
 template <typename T>                           Dqn_Slice<T>           Dqn_List_ToSliceCopy               (Dqn_List<T> const *list, Dqn_Arena* arena);
 #endif // !defined(DQN_NO_LIST)
 
@@ -932,19 +942,22 @@ template <typename T> Dqn_Slice<T> Dqn_Slice_Alloc(Dqn_Arena *arena, Dqn_usize s
 uint32_t const DQN_DS_MAP_DEFAULT_HASH_SEED = 0x8a1ced49;
 uint32_t const DQN_DS_MAP_SENTINEL_SLOT     = 0;
 
-template <typename T> Dqn_DSMap<T> Dqn_DSMap_Init(Dqn_Arena *arena, uint32_t size)
+template <typename T> Dqn_DSMap<T> Dqn_DSMap_Init(Dqn_Arena *arena, uint32_t size, Dqn_DSMapFlags flags)
 {
     Dqn_DSMap<T> result = {};
     if (!DQN_CHECKF(Dqn_IsPowerOfTwo(size), "Power-of-two size required, given size was '%u'", size))
         return result;
-    if (!arena)
+    if (!DQN_CHECKF(size > 0, "Non-zero size must be given"))
+        return result;
+    if (!DQN_CHECK(arena))
         return result;
     result.arena        = arena;
-    result.hash_to_slot = Dqn_Arena_NewArray(result.arena, uint32_t,         size, Dqn_ZeroMem_No);
-    result.slots        = Dqn_Arena_NewArray(result.arena, Dqn_DSMapSlot<T>, size, Dqn_ZeroMem_No);
+    result.hash_to_slot = Dqn_Arena_NewArray(result.arena, uint32_t,         size, Dqn_ZeroMem_Yes);
+    result.slots        = Dqn_Arena_NewArray(result.arena, Dqn_DSMapSlot<T>, size, Dqn_ZeroMem_Yes);
     result.occupied     = 1; // For sentinel
     result.size         = size;
     result.initial_size = size;
+    result.flags        = flags;
     DQN_ASSERTF(result.hash_to_slot && result.slots, "We pre-allocated a block of memory sufficient in size for the 2 arrays. Maybe the pointers needed extra space because of natural alignment?");
     return result;
 }
@@ -980,7 +993,12 @@ uint32_t Dqn_DSMap_Hash(Dqn_DSMap<T> const *map, Dqn_DSMapKey key)
         return result;
 
     if (key.type == Dqn_DSMapKeyType_U64NoHash) {
-        result = DQN_CAST(uint32_t)key.payload.u64;
+        result = DQN_CAST(uint32_t)key.u64;
+        return result;
+    }
+
+    if (key.type == Dqn_DSMapKeyType_BufferAsU64NoHash) {
+        result = key.hash;
         return result;
     }
 
@@ -998,17 +1016,18 @@ uint32_t Dqn_DSMap_Hash(Dqn_DSMap<T> const *map, Dqn_DSMapKey key)
         uint32_t len        = 0;
         uint32_t h          = seed;
         switch (key.type) {
+            case Dqn_DSMapKeyType_BufferAsU64NoHash: /*FALLTHRU*/
             case Dqn_DSMapKeyType_U64NoHash: DQN_INVALID_CODE_PATH; /*FALLTHRU*/
             case Dqn_DSMapKeyType_Invalid: break;
 
             case Dqn_DSMapKeyType_Buffer:
-                key_ptr = DQN_CAST(char const *)key.payload.buffer.data;
-                len     = key.payload.buffer.size;
+                key_ptr = DQN_CAST(char const *)key.buffer_data;
+                len     = key.buffer_size;
                 break;
 
             case Dqn_DSMapKeyType_U64:
-                key_ptr = DQN_CAST(char const *)&key.payload.u64;
-                len     = sizeof(key.payload.u64);
+                key_ptr = DQN_CAST(char const *)&key.u64;
+                len     = sizeof(key.u64);
                 break;
         }
 
@@ -1048,6 +1067,7 @@ uint32_t Dqn_DSMap_Hash(Dqn_DSMap<T> const *map, Dqn_DSMapKey key)
 template <typename T>
 uint32_t Dqn_DSMap_HashToSlotIndex(Dqn_DSMap<T> const *map, Dqn_DSMapKey key)
 {
+    DQN_ASSERT(key.type != Dqn_DSMapKeyType_Invalid);
     uint32_t result = DQN_DS_MAP_SENTINEL_SLOT;
     if (!Dqn_DSMap_IsValid(map))
         return result;
@@ -1101,6 +1121,11 @@ Dqn_DSMapResult<T> Dqn_DSMap_Make(Dqn_DSMap<T> *map, Dqn_DSMapKey key)
         } else {
             result.slot      = map->slots + map->hash_to_slot[index];
             result.slot->key = key; // NOTE: Assign key to new slot
+            if ((result.slot->key.type == Dqn_DSMapKeyType_Buffer ||
+                 result->slot.key.type == Dqn_DSMapKeyType_BufferAsU64NoHash) &&
+                !key.no_copy_buffer) {
+                result.slot->key.buffer_data = Dqn_Arena_Copy(map->arena, key.buffer_data, key.buffer_size, 1);
+            }
         }
     } else {
         result.slot  = map->slots + map->hash_to_slot[index];
@@ -1108,6 +1133,7 @@ Dqn_DSMapResult<T> Dqn_DSMap_Make(Dqn_DSMap<T> *map, Dqn_DSMapKey key)
     }
 
     result.value = &result.slot->value;
+    DQN_ASSERT(result.slot->key.type != Dqn_DSMapKeyType_Invalid);
     return result;
 }
 
@@ -1172,30 +1198,6 @@ Dqn_DSMapResult<T> Dqn_DSMap_SetKeyStr8(Dqn_DSMap<T> *map, Dqn_Str8 key, T const
 }
 
 template <typename T>
-Dqn_DSMapResult<T> Dqn_DSMap_MakeKeyStr8Copy(Dqn_DSMap<T> *map, Dqn_Arena *arena, Dqn_Str8 key)
-{
-    Dqn_ArenaTempMem   temp_mem = Dqn_Arena_TempMemBegin(arena);
-    Dqn_DSMapKey       map_key  = Dqn_DSMap_KeyStr8Copy(map, arena, key);
-    Dqn_DSMapResult<T> result   = Dqn_DSMap_Make(map, map_key);
-    // NOTE: If it already exists then we already have the key, we can deallocate
-    if (result.found)
-        Dqn_Arena_TempMemEnd(temp_mem);
-    return result;
-}
-
-template <typename T>
-Dqn_DSMapResult<T> Dqn_DSMap_SetKeyStr8Copy(Dqn_DSMap<T> *map, Dqn_Arena *arena, Dqn_Str8 key, T const &value)
-{
-    Dqn_ArenaTempMem   temp_mem = Dqn_Arena_TempMemBegin(arena);
-    Dqn_DSMapKey       map_key  = Dqn_DSMap_KeyStr8Copy(map, arena, key);
-    Dqn_DSMapResult<T> result   = Dqn_DSMap_Set(map, map_key);
-    // NOTE: If it already exists then we already have the key, we can deallocate
-    if (result.found)
-        Dqn_Arena_TempMemEnd(temp_mem);
-    return result;
-}
-
-template <typename T>
 bool Dqn_DSMap_Resize(Dqn_DSMap<T> *map, uint32_t size)
 {
     if (!Dqn_DSMap_IsValid(map) || size < map->occupied || size < map->initial_size)
@@ -1205,20 +1207,21 @@ bool Dqn_DSMap_Resize(Dqn_DSMap<T> *map, uint32_t size)
     Dqn_Arena  new_arena  = {};
     new_arena.flags       = prev_arena->flags;
 
-    Dqn_DSMap<T> new_map = Dqn_DSMap_Init<T>(&new_arena, size);
+    Dqn_DSMap<T> new_map = Dqn_DSMap_Init<T>(&new_arena, size, map->flags);
     if (!Dqn_DSMap_IsValid(&new_map))
         return false;
 
     new_map.initial_size = map->initial_size;
     for (uint32_t old_index = 1 /*Sentinel*/; old_index < map->occupied; old_index++) {
         Dqn_DSMapSlot<T> *old_slot = map->slots + old_index;
-        if (old_slot->key.type != Dqn_DSMapKeyType_Invalid) {
-            Dqn_DSMap_Set(&new_map, old_slot->key, old_slot->value);
-        }
+        Dqn_DSMapKey      old_key  = old_slot->key;
+        if (old_key.type == Dqn_DSMapKeyType_Invalid)
+            continue;
+        Dqn_DSMap_Set(&new_map, old_key, old_slot->value);
     }
 
-    DQN_MEMCPY(new_map.slots, map->slots, sizeof(*map->slots) * map->occupied);
-    Dqn_DSMap_Deinit(map, Dqn_ZeroMem_No);
+    if ((map->flags & Dqn_DSMapFlags_DontFreeArenaOnResize) == 0)
+        Dqn_DSMap_Deinit(map, Dqn_ZeroMem_No);
     *map        = new_map;    // Update the map inplace
     map->arena  = prev_arena; // Restore the previous arena pointer, it's been de-init-ed
     *map->arena = new_arena;  // Re-init the old arena with the new data
@@ -1269,14 +1272,17 @@ bool Dqn_DSMap_Erase(Dqn_DSMap<T> *map, Dqn_DSMapKey key)
         // We will now fill in the vacant spot that we erased using the last 
         // element in the slot list.
         if (map->occupied >= 3 /*Ignoring sentinel, at least 2 other elements to unstable erase*/) {
-            // NOTE: Copy in last slot to the erase slot
-            Dqn_DSMapSlot<T> *last_slot = map->slots + map->occupied - 1;
-            map->slots[slot_index]      = *last_slot;
+            uint32_t last_index = map->occupied - 1;
+            if (last_index != slot_index) {
+                // NOTE: Copy in last slot to the erase slot
+                Dqn_DSMapSlot<T> *last_slot = map->slots + last_index;
+                map->slots[slot_index]      = *last_slot;
 
-            // NOTE: Update the hash-to-slot mapping for the value that was copied in
-            uint32_t hash_to_slot_index           = Dqn_DSMap_HashToSlotIndex(map, last_slot->key);
-            map->hash_to_slot[hash_to_slot_index] = slot_index;
-            *last_slot = {}; // TODO: Optional?
+                // NOTE: Update the hash-to-slot mapping for the value that was copied in
+                uint32_t hash_to_slot_index           = Dqn_DSMap_HashToSlotIndex(map, last_slot->key);
+                map->hash_to_slot[hash_to_slot_index] = slot_index;
+                *last_slot = {}; // TODO: Optional?
+            }
         }
     }
 
@@ -1289,53 +1295,52 @@ bool Dqn_DSMap_Erase(Dqn_DSMap<T> *map, Dqn_DSMapKey key)
 }
 
 template <typename T>
-DQN_API Dqn_DSMapKey Dqn_DSMap_KeyBuffer(Dqn_DSMap<T> const *map, void const *data, uint32_t size)
+Dqn_DSMapKey Dqn_DSMap_KeyBuffer(Dqn_DSMap<T> const *map, void const *data, Dqn_usize size)
 {
-    Dqn_DSMapKey result        = {};
-    result.type                = Dqn_DSMapKeyType_Buffer;
-    result.payload.buffer.data = data;
-    result.payload.buffer.size = size;
-    result.hash                = Dqn_DSMap_Hash(map, result);
-    return result;
-}
-
-template <typename T>
-DQN_API Dqn_DSMapKey Dqn_DSMap_KeyU64(Dqn_DSMap<T> const *map, uint64_t u64)
-{
+    DQN_ASSERT(size > 0 && size <= UINT32_MAX);
     Dqn_DSMapKey result = {};
-    result.type         = Dqn_DSMapKeyType_U64;
-    result.payload.u64  = u64;
+    result.type         = Dqn_DSMapKeyType_Buffer;
+    result.buffer_data  = data;
+    result.buffer_size  = DQN_CAST(uint32_t) size;
     result.hash         = Dqn_DSMap_Hash(map, result);
     return result;
 }
 
 template <typename T>
-DQN_API Dqn_DSMapKey Dqn_DSMap_KeyStr8(Dqn_DSMap<T> const *map, Dqn_Str8 string)
+Dqn_DSMapKey Dqn_DSMap_KeyBufferAsU64NoHash(Dqn_DSMap<T> const *map, void const *data, uint32_t size)
 {
-    DQN_ASSERT(string.size > 0 && string.size <= UINT32_MAX);
-    Dqn_DSMapKey result        = {};
-    result.type                = Dqn_DSMapKeyType_Buffer;
-    result.payload.buffer.data = string.data;
-    result.payload.buffer.size = DQN_CAST(uint32_t)string.size;
-    result.hash                = Dqn_DSMap_Hash(map, result);
+    Dqn_DSMapKey result = {};
+    result.type         = Dqn_DSMapKeyType_BufferAsU64NoHash;
+    result.buffer_data  = data;
+    result.buffer_size  = DQN_CAST(uint32_t) size;
+    DQN_ASSERT(size >= sizeof(result.hash));
+    DQN_MEMCPY(&result.hash, data, sizeof(result.hash));
     return result;
 }
 
 template <typename T>
-DQN_API Dqn_DSMapKey Dqn_DSMap_KeyStr8Copy(Dqn_DSMap<T> const *map, Dqn_Arena *arena, Dqn_Str8 string)
+Dqn_DSMapKey Dqn_DSMap_KeyU64(Dqn_DSMap<T> const *map, uint64_t u64)
 {
-    Dqn_Str8     copy   = Dqn_Str8_Copy(arena, string);
-    Dqn_DSMapKey result = Dqn_DSMap_KeyStr8(map, copy);
+    Dqn_DSMapKey result = {};
+    result.type         = Dqn_DSMapKeyType_U64;
+    result.u64          = u64;
+    result.hash         = Dqn_DSMap_Hash(map, result);
+    return result;
+}
+
+template <typename T>
+Dqn_DSMapKey Dqn_DSMap_KeyStr8(Dqn_DSMap<T> const *map, Dqn_Str8 string)
+{
+    Dqn_DSMapKey result = Dqn_DSMap_KeyBuffer(map, string.data, string.size);
     return result;
 }
 #endif // !defined(DQN_NO_DSMAP)
 
 #if !defined(DQN_NO_LIST)
 // NOTE: [$LIST] Dqn_List //////////////////////////////////////////////////////////////////////////
-template <typename T> Dqn_List<T> Dqn_List_Init(Dqn_Arena *arena, Dqn_usize chunk_size)
+template <typename T> Dqn_List<T> Dqn_List_Init(Dqn_usize chunk_size)
 {
     Dqn_List<T> result = {};
-    result.arena       = arena;
     result.chunk_size  = chunk_size;
     return result;
 }
@@ -1356,31 +1361,68 @@ template <typename T> Dqn_List<T> Dqn_List_InitSliceCopy(Dqn_Arena *arena, Dqn_u
     return result;
 }
 
-template <typename T> DQN_API T *Dqn_List_Make(Dqn_List<T> *list, Dqn_usize count)
+template <typename T> DQN_API bool Dqn_List_AttachTail_(Dqn_List<T> *list, Dqn_ListChunk<T> *tail)
+{
+    if (!tail)
+        return false;
+
+    if (list->tail) {
+        list->tail->next = tail;
+        tail->prev       = list->tail;
+    }
+
+    list->tail = tail;
+
+    if (!list->head)
+        list->head = list->tail;
+    return true;
+}
+
+template <typename T> DQN_API Dqn_ListChunk<T> *Dqn_List_AllocArena_(Dqn_List<T> *list, Dqn_Arena *arena, Dqn_usize count)
+{
+    auto            *result = Dqn_Arena_New(arena, Dqn_ListChunk<T>, Dqn_ZeroMem_Yes);
+    Dqn_ArenaTempMem tmem   = Dqn_Arena_TempMemBegin(arena);
+    if (!result)
+        return nullptr;
+
+    Dqn_usize items = DQN_MAX(list->chunk_size, count);
+    result->data    = Dqn_Arena_NewArray(arena, T, items, Dqn_ZeroMem_Yes);
+    result->size    = items;
+    if (!result->data) {
+        Dqn_Arena_TempMemEnd(tmem);
+        result = nullptr;
+    }
+
+    Dqn_List_AttachTail_(list, result);
+    return result;
+}
+
+template <typename T> DQN_API Dqn_ListChunk<T> *Dqn_List_AllocPool_(Dqn_List<T> *list, Dqn_ChunkPool *pool, Dqn_usize count)
+{
+    auto *result = Dqn_ChunkPool_New(pool, Dqn_ListChunk<T>);
+    if (!result)
+        return nullptr;
+
+    Dqn_usize items = DQN_MAX(list->chunk_size, count);
+    result->data    = Dqn_ChunkPool_NewArray(pool, T, items);
+    result->size    = items;
+    if (!result->data) {
+        Dqn_ChunkPool_Dealloc(result);
+        result = nullptr;
+    }
+
+    Dqn_List_AttachTail_(list, result);
+    return result;
+}
+
+template <typename T> DQN_API T *Dqn_List_MakeArena(Dqn_List<T> *list, Dqn_Arena *arena, Dqn_usize count)
 {
     if (list->chunk_size == 0)
         list->chunk_size = 128;
+
     if (!list->tail || (list->tail->count + count) > list->tail->size) {
-        auto *tail = Dqn_Arena_New(list->arena, Dqn_ListChunk<T>, Dqn_ZeroMem_Yes);
-        if (!tail)
-          return nullptr;
-
-        Dqn_usize items = DQN_MAX(list->chunk_size, count);
-        tail->data      = Dqn_Arena_NewArray(list->arena, T, items, Dqn_ZeroMem_Yes);
-        tail->size      = items;
-
-        if (!tail->data)
+        if (!Dqn_List_AllocArena_(list, arena, count))
             return nullptr;
-
-        if (list->tail) {
-            list->tail->next = tail;
-            tail->prev       = list->tail;
-        }
-
-        list->tail = tail;
-
-        if (!list->head)
-            list->head = list->tail;
     }
 
     T *result = list->tail->data + list->tail->count;
@@ -1389,9 +1431,32 @@ template <typename T> DQN_API T *Dqn_List_Make(Dqn_List<T> *list, Dqn_usize coun
     return result;
 }
 
-template <typename T> DQN_API T *Dqn_List_Add(Dqn_List<T> *list, T const &value)
+template <typename T> DQN_API T *Dqn_List_MakePool(Dqn_List<T> *list, Dqn_ChunkPool *pool, Dqn_usize count)
 {
-    T *result = Dqn_List_Make(list, 1);
+    if (list->chunk_size == 0)
+        list->chunk_size = 128;
+
+    if (!list->tail || (list->tail->count + count) > list->tail->size) {
+        if (!Dqn_List_AllocPool_(list, pool, count))
+            return nullptr;
+    }
+
+    T *result = list->tail->data + list->tail->count;
+    list->tail->count += count;
+    list->count       += count;
+    return result;
+}
+
+template <typename T> DQN_API T *Dqn_List_AddArena(Dqn_List<T> *list, Dqn_Arena *arena, T const &value)
+{
+    T *result = Dqn_List_MakeArena(list, arena, 1);
+    *result   = value;
+    return result;
+}
+
+template <typename T> DQN_API T *Dqn_List_AddPool(Dqn_List<T> *list, Dqn_ChunkPool *pool, T const &value)
+{
+    T *result = Dqn_List_MakePool(list, pool, 1);
     *result   = value;
     return result;
 }
@@ -1407,14 +1472,22 @@ template <typename T, size_t N> DQN_API bool Dqn_List_AddCArray(Dqn_List<T> *lis
     return true;
 }
 
-template <typename T> DQN_API void Dqn_List_AddList(Dqn_List<T> *list, Dqn_List<T> other)
+template <typename T> DQN_API void Dqn_List_AddListArena(Dqn_List<T> *list, Dqn_Arena *arena, Dqn_List<T> other)
 {
     if (!list || list->chunk_size <= 0)
         return;
-
     // TODO(doyle): Copy chunk by chunk
-    for (Dqn_ListIterator<Dqn_Str8> it = {}; Dqn_List_Iterate(&other, &it, 0 /*start_index*/); )
-        Dqn_List_Add(list, *it.data);
+    for (Dqn_ListIterator<T> it = {}; Dqn_List_Iterate(&other, &it, 0 /*start_index*/); )
+        Dqn_List_AddArena(list, arena, *it.data);
+}
+
+template <typename T> DQN_API void Dqn_List_AddListPool(Dqn_List<T> *list, Dqn_ChunkPool *pool, Dqn_List<T> other)
+{
+    if (!list || list->chunk_size <= 0)
+        return;
+    // TODO(doyle): Copy chunk by chunk
+    for (Dqn_ListIterator<T> it = {}; Dqn_List_Iterate(&other, &it, 0 /*start_index*/); )
+        Dqn_List_AddPool(list, pool, *it.data);
 }
 
 template <typename T> DQN_API bool Dqn_List_Iterate(Dqn_List<T> *list, Dqn_ListIterator<T> *it, Dqn_usize start_index)
@@ -1497,8 +1570,11 @@ template <typename T> Dqn_Slice<T> Dqn_List_ToSliceCopy(Dqn_List<T> const *list,
     Dqn_Slice<T> result = Dqn_Slice_Alloc<T>(arena, list->count, Dqn_ZeroMem_No);
     if (result.size) {
         Dqn_usize slice_index = 0;
+        DQN_MSVC_WARNING_PUSH
+        DQN_MSVC_WARNING_DISABLE(6011) // Dereferencing NULL pointer 'x'
         for (Dqn_ListIterator<T> it = {}; Dqn_List_Iterate<T>(DQN_CAST(Dqn_List<T> *)list, &it, 0);)
             result.data[slice_index++] = *it.data;
+        DQN_MSVC_WARNING_POP
         DQN_ASSERT(slice_index == result.size);
     }
     return result;
