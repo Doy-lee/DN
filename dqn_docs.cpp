@@ -629,7 +629,7 @@ void DN_Docs_Demo()
 
         DN_Profiler_EndZone(profiler_zone_main_update);
         DN_Profiler_SwapAnchorBuffer(); // Should occur after all profiling zones are ended!
-        DN_MEMSET(&g_dn_core->profiler, 0, sizeof(g_dn_core->profiler));
+        DN_MEMSET(g_dn_core->profiler, 0, sizeof(g_dn_core->profiler));
     }
     #endif // !defined(DN_NO_PROFILER)
 
