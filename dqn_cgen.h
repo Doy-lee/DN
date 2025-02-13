@@ -1,5 +1,5 @@
-#if !defined(DQN_CGEN_H)
-#define DQN_CGEN_H
+#if !defined(DN_CGEN_H)
+#define DN_CGEN_H
 
 /*
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -18,157 +18,157 @@
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 */
 
-// NOTE: [$CGEN] Dqn_CGen //////////////////////////////////////////////////////////////////////////
+// NOTE: [$CGEN] DN_CGen //////////////////////////////////////////////////////////////////////////
 #if !defined(MD_H)
-#error Metadesk 'md.h' must be included before 'dqn_cgen.h'
+#error Metadesk 'md.h' must be included before 'dn_cgen.h'
 #endif
 
-#if !defined(DQN_H)
-#error 'dqn.h' must be included before 'dqn_cgen.h'
+#if !defined(DN_H)
+#error 'dqn.h' must be included before 'dn_cgen.h'
 #endif
 
-#if !defined(DQN_CPP_FILE_H)
-#error 'dqn_cpp_file.h' must be included before 'dqn_cgen.h'
+#if !defined(DN_CPP_FILE_H)
+#error 'dn_cpp_file.h' must be included before 'dn_cgen.h'
 #endif
 
-enum Dqn_CGenTableKeyType
+enum DN_CGenTableKeyType
 {
-    Dqn_CGenTableKeyType_Nil,
-    Dqn_CGenTableKeyType_Name,
-    Dqn_CGenTableKeyType_Type,
+    DN_CGenTableKeyType_Nil,
+    DN_CGenTableKeyType_Name,
+    DN_CGenTableKeyType_Type,
 };
 
-enum Dqn_CGenTableType
+enum DN_CGenTableType
 {
-    Dqn_CGenTableType_Nil,
-    Dqn_CGenTableType_Data,
-    Dqn_CGenTableType_CodeGenBuiltinTypes,
-    Dqn_CGenTableType_CodeGenStruct,
-    Dqn_CGenTableType_CodeGenEnum,
-    Dqn_CGenTableType_Count,
+    DN_CGenTableType_Nil,
+    DN_CGenTableType_Data,
+    DN_CGenTableType_CodeGenBuiltinTypes,
+    DN_CGenTableType_CodeGenStruct,
+    DN_CGenTableType_CodeGenEnum,
+    DN_CGenTableType_Count,
 };
 
-enum Dqn_CGenTableRowTagType
+enum DN_CGenTableRowTagType
 {
-    Dqn_CGenTableRowTagType_Nil,
-    Dqn_CGenTableRowTagType_CommentDivider,
-    Dqn_CGenTableRowTagType_EmptyLine,
+    DN_CGenTableRowTagType_Nil,
+    DN_CGenTableRowTagType_CommentDivider,
+    DN_CGenTableRowTagType_EmptyLine,
 };
 
-enum Dqn_CGenTableRowTagCommentDivider
+enum DN_CGenTableRowTagCommentDivider
 {
-    Dqn_CGenTableRowTagCommentDivider_Nil,
-    Dqn_CGenTableRowTagCommentDivider_Label,
+    DN_CGenTableRowTagCommentDivider_Nil,
+    DN_CGenTableRowTagCommentDivider_Label,
 };
 
-enum Dqn_CGenTableHeaderType
+enum DN_CGenTableHeaderType
 {
-    Dqn_CGenTableHeaderType_Name,
-    Dqn_CGenTableHeaderType_Table,
-    Dqn_CGenTableHeaderType_CppType,
-    Dqn_CGenTableHeaderType_CppName,
-    Dqn_CGenTableHeaderType_CppValue,
-    Dqn_CGenTableHeaderType_CppIsPtr,
-    Dqn_CGenTableHeaderType_CppOpEquals,
-    Dqn_CGenTableHeaderType_CppArraySize,
-    Dqn_CGenTableHeaderType_CppArraySizeField,
-    Dqn_CGenTableHeaderType_CppLabel,
-    Dqn_CGenTableHeaderType_GenTypeInfo,
-    Dqn_CGenTableHeaderType_GenEnumCount,
-    Dqn_CGenTableHeaderType_Count,
+    DN_CGenTableHeaderType_Name,
+    DN_CGenTableHeaderType_Table,
+    DN_CGenTableHeaderType_CppType,
+    DN_CGenTableHeaderType_CppName,
+    DN_CGenTableHeaderType_CppValue,
+    DN_CGenTableHeaderType_CppIsPtr,
+    DN_CGenTableHeaderType_CppOpEquals,
+    DN_CGenTableHeaderType_CppArraySize,
+    DN_CGenTableHeaderType_CppArraySizeField,
+    DN_CGenTableHeaderType_CppLabel,
+    DN_CGenTableHeaderType_GenTypeInfo,
+    DN_CGenTableHeaderType_GenEnumCount,
+    DN_CGenTableHeaderType_Count,
 };
 
-struct Dqn_CGenTableHeader
+struct DN_CGenTableHeader
 {
     MD_String8 name;
     int        longest_string;
 };
 
-struct Dqn_CGenTableRowTag
+struct DN_CGenTableRowTag
 {
-    Dqn_CGenTableRowTagType type;
+    DN_CGenTableRowTagType type;
     MD_String8              comment;
-    Dqn_CGenTableRowTag    *next;
+    DN_CGenTableRowTag    *next;
 };
 
 
-struct Dqn_CGenTableColumn
+struct DN_CGenTableColumn
 {
     MD_Node  *node;
-    Dqn_Str8  string;
+    DN_Str8  string;
 };
 
-struct Dqn_CGenTableRow
+struct DN_CGenTableRow
 {
-    Dqn_CGenTableRowTag *first_tag;
-    Dqn_CGenTableRowTag *last_tag;
-    Dqn_CGenTableColumn *columns;
+    DN_CGenTableRowTag *first_tag;
+    DN_CGenTableRowTag *last_tag;
+    DN_CGenTableColumn *columns;
 };
 
-struct Dqn_CGenTable
+struct DN_CGenTable
 {
-    Dqn_CGenTableType    type;
-    Dqn_Str8             name;
-    MD_Map               headers_map;
-    Dqn_CGenTableHeader *headers;
-    Dqn_CGenTableRow    *rows;
-    size_t               column_count;
-    size_t               row_count;
+    DN_CGenTableType    type;
+    DN_Str8             name;
+    MD_Map              headers_map;
+    DN_CGenTableHeader *headers;
+    DN_CGenTableRow    *rows;
+    size_t              column_count;
+    size_t              row_count;
 
-    MD_Node             *node;
-    MD_Node             *headers_node;
-    Dqn_usize            column_indexes[Dqn_CGenTableHeaderType_Count];
-    Dqn_CGenTable       *next;
+    MD_Node            *node;
+    MD_Node            *headers_node;
+    DN_USize            column_indexes[DN_CGenTableHeaderType_Count];
+    DN_CGenTable       *next;
 };
 
-struct Dqn_CGen
+struct DN_CGen
 {
-    MD_Arena      *arena;
-    MD_Node       *file_list;
-    MD_Map         table_map;
-    Dqn_CGenTable *first_table;
-    Dqn_CGenTable *last_table;
-    Dqn_usize      table_counts[Dqn_CGenTableType_Count];
+    MD_Arena     *arena;
+    MD_Node      *file_list;
+    MD_Map        table_map;
+    DN_CGenTable *first_table;
+    DN_CGenTable *last_table;
+    DN_USize      table_counts[DN_CGenTableType_Count];
 };
 
-struct Dqn_CGenMapNodeToEnum
+struct DN_CGenMapNodeToEnum
 {
     uint32_t enum_val;
-    Dqn_Str8 node_string;
+    DN_Str8 node_string;
 };
 
-struct Dqn_CGenLookupTableIterator
+struct DN_CGenLookupTableIterator
 {
-    Dqn_CGenTable      *cgen_table;
-    Dqn_CGenTableRow   *cgen_table_row;
-    Dqn_CGenTableColumn cgen_table_column[Dqn_CGenTableHeaderType_Count];
-    Dqn_CGenTable      *table;
-    Dqn_usize           row_index;
+    DN_CGenTable      *cgen_table;
+    DN_CGenTableRow   *cgen_table_row;
+    DN_CGenTableColumn cgen_table_column[DN_CGenTableHeaderType_Count];
+    DN_CGenTable      *table;
+    DN_USize           row_index;
 };
 
-struct Dqn_CGenLookupColumnAtHeader
+struct DN_CGenLookupColumnAtHeader
 {
-    Dqn_usize           index;
-    Dqn_CGenTableHeader header;
-    Dqn_CGenTableColumn column;
+    DN_USize           index;
+    DN_CGenTableHeader header;
+    DN_CGenTableColumn column;
 };
 
-enum Dqn_CGenEmit
+enum DN_CGenEmit
 {
-    Dqn_CGenEmit_Prototypes     = 1 << 0,
-    Dqn_CGenEmit_Implementation = 1 << 1,
+    DN_CGenEmit_Prototypes     = 1 << 0,
+    DN_CGenEmit_Implementation = 1 << 1,
 };
 
-// NOTE: [$CGEN] Dqn_CGen //////////////////////////////////////////////////////////////////////////
-#define                              Dqn_CGen_MDToDqnStr8(str8) Dqn_Str8_Init((str8).str, (str8).size)
-#define                              Dqn_CGen_DqnToMDStr8(str8) {DQN_CAST(MD_u8 *)(str8).data, (str8).size}
-DQN_API Dqn_CGen                     Dqn_CGen_InitFilesArgV                (int argc, char const **argv, Dqn_ErrorSink *error);
-DQN_API Dqn_Str8                     Dqn_CGen_TableHeaderTypeToDeclStr8    (Dqn_CGenTableHeaderType type);
-DQN_API Dqn_CGenMapNodeToEnum        Dqn_CGen_MapNodeToEnumOrExit          (MD_Node const *node, Dqn_CGenMapNodeToEnum const *valid_keys, Dqn_usize valid_keys_size, char const *fmt, ...);
-DQN_API Dqn_usize                    Dqn_CGen_NodeChildrenCount            (MD_Node const *node);
-DQN_API void                         Dqn_CGen_LogF                         (MD_MessageKind kind, MD_Node *node, Dqn_ErrorSink *error, char const *fmt, ...);
-DQN_API bool                         Dqn_CGen_TableHasHeaders              (Dqn_CGenTable const *table, Dqn_Str8 const *headers, Dqn_usize header_count, Dqn_ErrorSink *error);
-DQN_API Dqn_CGenLookupColumnAtHeader Dqn_CGen_LookupColumnAtHeader         (Dqn_CGenTable *table, Dqn_Str8 header, Dqn_CGenTableRow const *row);
-DQN_API bool                         Dqn_CGen_LookupNextTableInCodeGenTable(Dqn_CGen *cgen, Dqn_CGenTable *cgen_table, Dqn_CGenLookupTableIterator *it);
-DQN_API void                         Dqn_CGen_EmitCodeForTables            (Dqn_CGen *cgen, Dqn_CGenEmit emit, Dqn_CppFile *cpp, Dqn_Str8 emit_prefix);
-#endif // DQN_CGEN_H
+// NOTE: [$CGEN] DN_CGen //////////////////////////////////////////////////////////////////////////
+#define                            DN_CGen_MDToDNStr8(str8) DN_Str8_Init((str8).str, (str8).size)
+#define                            DN_CGen_DNToMDStr8(str8) {DN_CAST(MD_u8 *)(str8).data, (str8).size}
+DN_API DN_CGen                     DN_CGen_InitFilesArgV                (int argc, char const **argv, DN_ErrSink *err);
+DN_API DN_Str8                     DN_CGen_TableHeaderTypeToDeclStr8    (DN_CGenTableHeaderType type);
+DN_API DN_CGenMapNodeToEnum        DN_CGen_MapNodeToEnumOrExit          (MD_Node const *node, DN_CGenMapNodeToEnum const *valid_keys, DN_USize valid_keys_size, char const *fmt, ...);
+DN_API DN_USize                    DN_CGen_NodeChildrenCount            (MD_Node const *node);
+DN_API void                        DN_CGen_LogF                         (MD_MessageKind kind, MD_Node *node, DN_ErrSink *err, char const *fmt, ...);
+DN_API bool                        DN_CGen_TableHasHeaders              (DN_CGenTable const *table, DN_Str8 const *headers, DN_USize header_count, DN_ErrSink *err);
+DN_API DN_CGenLookupColumnAtHeader DN_CGen_LookupColumnAtHeader         (DN_CGenTable *table, DN_Str8 header, DN_CGenTableRow const *row);
+DN_API bool                        DN_CGen_LookupNextTableInCodeGenTable(DN_CGen *cgen, DN_CGenTable *cgen_table, DN_CGenLookupTableIterator *it);
+DN_API void                        DN_CGen_EmitCodeForTables            (DN_CGen *cgen, DN_CGenEmit emit, DN_CppFile *cpp, DN_Str8 emit_prefix);
+#endif // DN_CGEN_H

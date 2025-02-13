@@ -18,15 +18,15 @@
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 */
 
-Dqn_TypeGetField Dqn_Type_GetField(Dqn_TypeInfo const *type_info, Dqn_Str8 name)
+DN_TypeGetField DN_Type_GetField(DN_TypeInfo const *type_info, DN_Str8 name)
 {
-    Dqn_TypeGetField result = {};
-    for (Dqn_usize index = 0; index < type_info->fields_count; index++) {
-        Dqn_TypeField const *type_field = type_info->fields + index;
+    DN_TypeGetField result = {};
+    for (DN_USize index = 0; index < type_info->fields_count; index++) {
+        DN_TypeField const *type_field = type_info->fields + index;
         if (type_field->name == name) {
             result.success = true;
             result.index   = index;
-            result.field   = DQN_CAST(Dqn_TypeField *)type_field;
+            result.field   = DN_CAST(DN_TypeField *)type_field;
             break;
         }
     }

@@ -17,197 +17,204 @@
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //
-// [$AREN] Dqn_Arena        -- Growing bump allocator
-// [$CHUN] Dqn_ChunkPool    -- Allocates reusable, free-able memory in PoT chunks
-// [$ACAT] Dqn_ArenaCatalog -- Collate, create & manage arenas in a catalog
+// [$AREN] DN_Arena        -- Growing bump allocator
+// [$CHUN] DN_Pool         -- Allocates reusable, free-able memory in PoT chunks
+// [$POOL] DN_Pool         -- TODO
+// [$ACAT] DN_ArenaCatalog -- Collate, create & manage arenas in a catalog
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 */
 
-// NOTE: [$AREN] Dqn_Arena /////////////////////////////////////////////////////////////////////////
-#if !defined(DQN_ARENA_RESERVE_SIZE)
-    #define DQN_ARENA_RESERVE_SIZE DQN_MEGABYTES(64)
+// NOTE: [$AREN] DN_Arena /////////////////////////////////////////////////////////////////////////
+#if !defined(DN_ARENA_RESERVE_SIZE)
+    #define DN_ARENA_RESERVE_SIZE DN_MEGABYTES(64)
 #endif
-#if !defined(DQN_ARENA_COMMIT_SIZE)
-    #define DQN_ARENA_COMMIT_SIZE DQN_KILOBYTES(64)
-#endif
-
-struct Dqn_ArenaBlock
-{
-    Dqn_ArenaBlock *prev;
-    uint64_t        used;
-    uint64_t        commit;
-    uint64_t        reserve;
-    uint64_t        reserve_sum;
-};
-
-enum Dqn_ArenaFlag
-{
-    Dqn_ArenaFlag_Nil          = 0,
-    Dqn_ArenaFlag_NoGrow       = 1 << 0,
-    Dqn_ArenaFlag_NoPoison     = 1 << 1,
-    Dqn_ArenaFlag_NoAllocTrack = 1 << 2,
-    Dqn_ArenaFlag_AllocCanLeak = 1 << 3,
-};
-
-struct Dqn_ArenaInfo
-{
-    uint64_t used;
-    uint64_t commit;
-    uint64_t reserve;
-    uint64_t blocks;
-};
-
-struct Dqn_ArenaStats
-{
-    Dqn_ArenaInfo info;
-    Dqn_ArenaInfo hwm;
-};
-
-struct Dqn_Arena
-{
-    Dqn_ArenaBlock *curr;
-    Dqn_ArenaStats  stats;
-    Dqn_TicketMutex mutex; // For user code to lock the arena, the arena itself does not use.
-    uint8_t         flags;
-};
-
-struct Dqn_ArenaTempMem
-{
-    Dqn_Arena *arena;
-    uint64_t   used_sum;
-};
-
-struct Dqn_ArenaTempMemScope
-{
-    Dqn_ArenaTempMemScope(Dqn_Arena *arena);
-    ~Dqn_ArenaTempMemScope();
-    Dqn_ArenaTempMem mem;
-};
-
-Dqn_usize const DQN_ARENA_HEADER_SIZE = Dqn_AlignUpPowerOfTwo(sizeof(Dqn_Arena), 64);
-
-// NOTE: [$CHUN] Dqn_ChunkPool /////////////////////////////////////////////////////////////////////
-#if !defined(DQN_CHUNK_POOL_DEFAULT_ALIGN)
-    #define DQN_CHUNK_POOL_DEFAULT_ALIGN 16
+#if !defined(DN_ARENA_COMMIT_SIZE)
+    #define DN_ARENA_COMMIT_SIZE DN_KILOBYTES(64)
 #endif
 
-struct Dqn_ChunkPoolSlot
+struct DN_ArenaBlock
 {
-    void              *data;
-    Dqn_ChunkPoolSlot *next;
+    DN_ArenaBlock *prev;
+    DN_U64        used;
+    DN_U64        commit;
+    DN_U64        reserve;
+    DN_U64        reserve_sum;
 };
 
-enum Dqn_ChunkPoolSlotSize
+typedef uint32_t DN_ArenaFlags;
+enum DN_ArenaFlags_
 {
-    Dqn_ChunkPoolSlotSize_32B,
-    Dqn_ChunkPoolSlotSize_64B,
-    Dqn_ChunkPoolSlotSize_128B,
-    Dqn_ChunkPoolSlotSize_256B,
-    Dqn_ChunkPoolSlotSize_512B,
-    Dqn_ChunkPoolSlotSize_1KiB,
-    Dqn_ChunkPoolSlotSize_2KiB,
-    Dqn_ChunkPoolSlotSize_4KiB,
-    Dqn_ChunkPoolSlotSize_8KiB,
-    Dqn_ChunkPoolSlotSize_16KiB,
-    Dqn_ChunkPoolSlotSize_32KiB,
-    Dqn_ChunkPoolSlotSize_64KiB,
-    Dqn_ChunkPoolSlotSize_128KiB,
-    Dqn_ChunkPoolSlotSize_256KiB,
-    Dqn_ChunkPoolSlotSize_512KiB,
-    Dqn_ChunkPoolSlotSize_1MiB,
-    Dqn_ChunkPoolSlotSize_2MiB,
-    Dqn_ChunkPoolSlotSize_4MiB,
-    Dqn_ChunkPoolSlotSize_8MiB,
-    Dqn_ChunkPoolSlotSize_16MiB,
-    Dqn_ChunkPoolSlotSize_32MiB,
-    Dqn_ChunkPoolSlotSize_64MiB,
-    Dqn_ChunkPoolSlotSize_128MiB,
-    Dqn_ChunkPoolSlotSize_256MiB,
-    Dqn_ChunkPoolSlotSize_512MiB,
-    Dqn_ChunkPoolSlotSize_1GiB,
-    Dqn_ChunkPoolSlotSize_2GiB,
-    Dqn_ChunkPoolSlotSize_4GiB,
-    Dqn_ChunkPoolSlotSize_8GiB,
-    Dqn_ChunkPoolSlotSize_16GiB,
-    Dqn_ChunkPoolSlotSize_32GiB,
-    Dqn_ChunkPoolSlotSize_Count,
+    DN_ArenaFlags_Nil          = 0,
+    DN_ArenaFlags_NoGrow       = 1 << 0,
+    DN_ArenaFlags_NoPoison     = 1 << 1,
+    DN_ArenaFlags_NoAllocTrack = 1 << 2,
+    DN_ArenaFlags_AllocCanLeak = 1 << 3,
+    DN_ArenaFlags_UserBuffer   = 1 << 4,
 };
 
-struct Dqn_ChunkPool
+struct DN_ArenaInfo
 {
-    Dqn_Arena         *arena;
-    Dqn_ChunkPoolSlot *slots[Dqn_ChunkPoolSlotSize_Count];
-    uint8_t            align;
+    DN_U64 used;
+    DN_U64 commit;
+    DN_U64 reserve;
+    DN_U64 blocks;
 };
 
-// NOTE: [$ACAT] Dqn_ArenaCatalog //////////////////////////////////////////////////////////////////
-struct Dqn_ArenaCatalogItem
+struct DN_ArenaStats
 {
-    Dqn_Arena            *arena;
-    Dqn_Str8              label;
+    DN_ArenaInfo info;
+    DN_ArenaInfo hwm;
+};
+
+struct DN_Arena
+{
+    DN_ArenaBlock *curr;
+    DN_ArenaStats  stats;
+    DN_ArenaFlags  flags;
+    DN_Str8        label;
+    DN_Arena      *prev, *next;
+};
+
+struct DN_ArenaTempMem
+{
+    DN_Arena *arena;
+    DN_U64   used_sum;
+};
+
+struct DN_ArenaTempMemScope
+{
+    DN_ArenaTempMemScope(DN_Arena *arena);
+    ~DN_ArenaTempMemScope();
+    DN_ArenaTempMem mem;
+};
+
+DN_USize const DN_ARENA_HEADER_SIZE = DN_AlignUpPowerOfTwo(sizeof(DN_Arena), 64);
+
+// NOTE: [$CHUN] DN_Pool /////////////////////////////////////////////////////////////////////
+#if !defined(DN_POOL_DEFAULT_ALIGN)
+    #define DN_POOL_DEFAULT_ALIGN 16
+#endif
+
+struct DN_PoolSlot
+{
+    void         *data;
+    DN_PoolSlot *next;
+};
+
+enum DN_PoolSlotSize
+{
+    DN_PoolSlotSize_32B,
+    DN_PoolSlotSize_64B,
+    DN_PoolSlotSize_128B,
+    DN_PoolSlotSize_256B,
+    DN_PoolSlotSize_512B,
+    DN_PoolSlotSize_1KiB,
+    DN_PoolSlotSize_2KiB,
+    DN_PoolSlotSize_4KiB,
+    DN_PoolSlotSize_8KiB,
+    DN_PoolSlotSize_16KiB,
+    DN_PoolSlotSize_32KiB,
+    DN_PoolSlotSize_64KiB,
+    DN_PoolSlotSize_128KiB,
+    DN_PoolSlotSize_256KiB,
+    DN_PoolSlotSize_512KiB,
+    DN_PoolSlotSize_1MiB,
+    DN_PoolSlotSize_2MiB,
+    DN_PoolSlotSize_4MiB,
+    DN_PoolSlotSize_8MiB,
+    DN_PoolSlotSize_16MiB,
+    DN_PoolSlotSize_32MiB,
+    DN_PoolSlotSize_64MiB,
+    DN_PoolSlotSize_128MiB,
+    DN_PoolSlotSize_256MiB,
+    DN_PoolSlotSize_512MiB,
+    DN_PoolSlotSize_1GiB,
+    DN_PoolSlotSize_2GiB,
+    DN_PoolSlotSize_4GiB,
+    DN_PoolSlotSize_8GiB,
+    DN_PoolSlotSize_16GiB,
+    DN_PoolSlotSize_32GiB,
+    DN_PoolSlotSize_Count,
+};
+
+struct DN_Pool
+{
+    DN_Arena    *arena;
+    DN_PoolSlot *slots[DN_PoolSlotSize_Count];
+    uint8_t       align;
+};
+
+// NOTE: [$ACAT] DN_ArenaCatalog //////////////////////////////////////////////////////////////////
+struct DN_ArenaCatalogItem
+{
+    DN_Arena            *arena;
+    DN_Str8              label;
     bool                  arena_pool_allocated;
-    Dqn_ArenaCatalogItem *next;
-    Dqn_ArenaCatalogItem *prev;
+    DN_ArenaCatalogItem *next;
+    DN_ArenaCatalogItem *prev;
 };
 
-struct Dqn_ArenaCatalog
+struct DN_ArenaCatalog
 {
-    Dqn_TicketMutex       ticket_mutex; // Mutex for adding to the linked list of arenas
-    struct Dqn_ChunkPool *pool;
-    Dqn_ArenaCatalogItem  sentinel;
-    uint16_t              arena_count;
+    DN_TicketMutex      ticket_mutex; // Mutex for adding to the linked list of arenas
+    DN_Pool            *pool;
+    DN_ArenaCatalogItem sentinel;
+    uint16_t             arena_count;
 };
 
-enum Dqn_ArenaCatalogFreeArena
+enum DN_ArenaCatalogFreeArena
 {
-    Dqn_ArenaCatalogFreeArena_No,
-    Dqn_ArenaCatalogFreeArena_Yes,
+    DN_ArenaCatalogFreeArena_No,
+    DN_ArenaCatalogFreeArena_Yes,
 };
 
-// NOTE: [$AREN] Dqn_Arena /////////////////////////////////////////////////////////////////////////
-DQN_API Dqn_Arena             Dqn_Arena_InitSize             (uint64_t reserve, uint64_t commit, uint8_t flags);
-DQN_API void                  Dqn_Arena_Deinit               (Dqn_Arena *arena);
-DQN_API bool                  Dqn_Arena_Commit               (Dqn_Arena *arena, uint64_t size);
-DQN_API bool                  Dqn_Arena_CommitTo             (Dqn_Arena *arena, uint64_t pos);
-DQN_API void *                Dqn_Arena_Alloc                (Dqn_Arena *arena, uint64_t size, uint8_t align, Dqn_ZeroMem zero_mem);
-DQN_API void *                Dqn_Arena_AllocContiguous      (Dqn_Arena *arena, uint64_t size, uint8_t align, Dqn_ZeroMem zero_mem);
-DQN_API void *                Dqn_Arena_Copy                 (Dqn_Arena *arena, void const *data, uint64_t size, uint8_t align);
-DQN_API void                  Dqn_Arena_PopTo                (Dqn_Arena *arena, uint64_t init_used);
-DQN_API void                  Dqn_Arena_Pop                  (Dqn_Arena *arena, uint64_t amount);
-DQN_API uint64_t              Dqn_Arena_Pos                  (Dqn_Arena const *arena);
-DQN_API void                  Dqn_Arena_Clear                (Dqn_Arena *arena);
-DQN_API bool                  Dqn_Arena_OwnsPtr              (Dqn_Arena const *arena, void *ptr);
-DQN_API Dqn_ArenaStats        Dqn_Arena_SumStatsArray        (Dqn_ArenaStats const *array, Dqn_usize size);
-DQN_API Dqn_ArenaStats        Dqn_Arena_SumStats             (Dqn_ArenaStats lhs, Dqn_ArenaStats rhs);
-DQN_API Dqn_ArenaStats        Dqn_Arena_SumArenaArrayToStats (Dqn_Arena const *array, Dqn_usize size);
-DQN_API Dqn_ArenaTempMem      Dqn_Arena_TempMemBegin         (Dqn_Arena *arena);
-DQN_API void                  Dqn_Arena_TempMemEnd           (Dqn_ArenaTempMem mem);
-#define                       Dqn_Arena_New(arena, T, zero_mem)             (T *)Dqn_Arena_Alloc(arena,        sizeof(T),              alignof(T), zero_mem)
-#define                       Dqn_Arena_NewArray(arena, T, count, zero_mem) (T *)Dqn_Arena_Alloc(arena,        sizeof(T)  * (count), alignof(T), zero_mem)
-#define                       Dqn_Arena_NewCopy(arena, T, src)              (T *)Dqn_Arena_Copy (arena, (src), sizeof(T),           alignof(T))
-#define                       Dqn_Arena_NewArrayCopy(arena, T, src, count)  (T *)Dqn_Arena_Copy (arena, (src), sizeof(T)  * (count), alignof(T))
+// NOTE: [$AREN] DN_Arena /////////////////////////////////////////////////////////////////////////
+DN_API DN_Arena             DN_Arena_InitBuffer                          (void *buffer, DN_USize size, DN_ArenaFlags flags);
+DN_API DN_Arena             DN_Arena_InitSize                            (DN_U64 reserve, DN_U64 commit, DN_ArenaFlags flags);
+DN_API void                 DN_Arena_Deinit                              (DN_Arena *arena);
+DN_API bool                 DN_Arena_Commit                              (DN_Arena *arena, DN_U64 size);
+DN_API bool                 DN_Arena_CommitTo                            (DN_Arena *arena, DN_U64 pos);
+DN_API bool                 DN_Arena_Grow                                (DN_Arena *arena, DN_U64 reserve, DN_U64 commit);
+DN_API void *               DN_Arena_Alloc                               (DN_Arena *arena, DN_U64 size, uint8_t align, DN_ZeroMem zero_mem);
+DN_API void *               DN_Arena_AllocContiguous                     (DN_Arena *arena, DN_U64 size, uint8_t align, DN_ZeroMem zero_mem);
+DN_API void *               DN_Arena_Copy                                (DN_Arena *arena, void const *data, DN_U64 size, uint8_t align);
+DN_API void                 DN_Arena_PopTo                               (DN_Arena *arena, DN_U64 init_used);
+DN_API void                 DN_Arena_Pop                                 (DN_Arena *arena, DN_U64 amount);
+DN_API DN_U64               DN_Arena_Pos                                 (DN_Arena const *arena);
+DN_API void                 DN_Arena_Clear                               (DN_Arena *arena);
+DN_API bool                 DN_Arena_OwnsPtr                             (DN_Arena const *arena, void *ptr);
+DN_API DN_ArenaStats        DN_Arena_SumStatsArray                       (DN_ArenaStats const *array, DN_USize size);
+DN_API DN_ArenaStats        DN_Arena_SumStats                            (DN_ArenaStats lhs, DN_ArenaStats rhs);
+DN_API DN_ArenaStats        DN_Arena_SumArenaArrayToStats                (DN_Arena const *array, DN_USize size);
+DN_API DN_ArenaTempMem      DN_Arena_TempMemBegin                        (DN_Arena *arena);
+DN_API void                 DN_Arena_TempMemEnd                          (DN_ArenaTempMem mem);
+#define                     DN_Arena_New_Frame(T, zero_mem)              (T *)DN_Arena_Alloc(DN_TLS_Get()->frame_arena, sizeof(T), alignof(T), zero_mem)
+#define                     DN_Arena_New(arena, T, zero_mem)             (T *)DN_Arena_Alloc(arena,                      sizeof(T),            alignof(T), zero_mem)
+#define                     DN_Arena_NewArray(arena, T, count, zero_mem) (T *)DN_Arena_Alloc(arena,                      sizeof(T)  * (count), alignof(T), zero_mem)
+#define                     DN_Arena_NewCopy(arena, T, src)              (T *)DN_Arena_Copy (arena, (src),               sizeof(T),            alignof(T))
+#define                     DN_Arena_NewArrayCopy(arena, T, src, count)  (T *)DN_Arena_Copy (arena, (src),               sizeof(T)  * (count), alignof(T))
 
-// NOTE: [$CHUN] Dqn_ChunkPool /////////////////////////////////////////////////////////////////////
-DQN_API Dqn_ChunkPool         Dqn_ChunkPool_Init             (Dqn_Arena *arena, uint8_t align);
-DQN_API bool                  Dqn_ChunkPool_IsValid          (Dqn_ChunkPool const *pool);
-DQN_API void *                Dqn_ChunkPool_Alloc            (Dqn_ChunkPool *pool, Dqn_usize size);
-DQN_API Dqn_Str8              Dqn_ChunkPool_AllocStr8FV      (Dqn_ChunkPool *pool, DQN_FMT_ATTRIB char const *fmt, va_list args);
-DQN_API Dqn_Str8              Dqn_ChunkPool_AllocStr8F       (Dqn_ChunkPool *pool, DQN_FMT_ATTRIB char const *fmt, ...);
-DQN_API Dqn_Str8              Dqn_ChunkPool_AllocStr8Copy    (Dqn_ChunkPool *pool, Dqn_Str8 string);
-DQN_API void                  Dqn_ChunkPool_Dealloc          (Dqn_ChunkPool *pool, void *ptr);
-DQN_API void *                Dqn_ChunkPool_Copy             (Dqn_ChunkPool *pool, void const *data, uint64_t size, uint8_t align);
+// NOTE: [$CHUN] DN_Pool /////////////////////////////////////////////////////////////////////
+DN_API DN_Pool              DN_Pool_Init                                 (DN_Arena *arena, uint8_t align);
+DN_API bool                 DN_Pool_IsValid                              (DN_Pool const *pool);
+DN_API void *               DN_Pool_Alloc                                (DN_Pool *pool, DN_USize size);
+DN_API DN_Str8              DN_Pool_AllocStr8FV                          (DN_Pool *pool, DN_FMT_ATTRIB char const *fmt, va_list args);
+DN_API DN_Str8              DN_Pool_AllocStr8F                           (DN_Pool *pool, DN_FMT_ATTRIB char const *fmt, ...);
+DN_API DN_Str8              DN_Pool_AllocStr8Copy                        (DN_Pool *pool, DN_Str8 string);
+DN_API void                 DN_Pool_Dealloc                              (DN_Pool *pool, void *ptr);
+DN_API void *               DN_Pool_Copy                                 (DN_Pool *pool, void const *data, DN_U64 size, uint8_t align);
 
-#define                       Dqn_ChunkPool_New(pool, T)                       (T *)Dqn_ChunkPool_Alloc(pool, sizeof(T))
-#define                       Dqn_ChunkPool_NewArray(pool, T, count)           (T *)Dqn_ChunkPool_Alloc(pool, count * sizeof(T))
-#define                       Dqn_ChunkPool_NewCopy(arena, T, src)             (T *)Dqn_ChunkPool_Copy (arena, (src), sizeof(T),            alignof(T))
-#define                       Dqn_ChunkPool_NewArrayCopy(arena, T, src, count) (T *)Dqn_ChunkPool_Copy (arena, (src), sizeof(T)  * (count), alignof(T))
+#define                     DN_Pool_New(pool, T)                         (T *)DN_Pool_Alloc(pool, sizeof(T))
+#define                     DN_Pool_NewArray(pool, T, count)             (T *)DN_Pool_Alloc(pool, count * sizeof(T))
+#define                     DN_Pool_NewCopy(arena, T, src)               (T *)DN_Pool_Copy (arena, (src), sizeof(T),            alignof(T))
+#define                     DN_Pool_NewArrayCopy(arena, T, src, count)   (T *)DN_Pool_Copy (arena, (src), sizeof(T)  * (count), alignof(T))
 
-// NOTE: [$ACAT] Dqn_ArenaCatalog //////////////////////////////////////////////////////////////////
-DQN_API void                  Dqn_ArenaCatalog_Init      (Dqn_ArenaCatalog *catalog, Dqn_ChunkPool *pool);
-DQN_API Dqn_ArenaCatalogItem *Dqn_ArenaCatalog_Find      (Dqn_ArenaCatalog *catalog, Dqn_Str8 label);
-DQN_API void                  Dqn_ArenaCatalog_AddF      (Dqn_ArenaCatalog *catalog, Dqn_Arena *arena, DQN_FMT_ATTRIB char const *fmt, ...);
-DQN_API void                  Dqn_ArenaCatalog_AddFV     (Dqn_ArenaCatalog *catalog, Dqn_Arena *arena, DQN_FMT_ATTRIB char const *fmt, va_list args);
-DQN_API Dqn_Arena *           Dqn_ArenaCatalog_AllocFV   (Dqn_ArenaCatalog *catalog, Dqn_usize reserve, Dqn_usize commit, uint8_t arena_flags, DQN_FMT_ATTRIB char const *fmt, va_list args);
-DQN_API Dqn_Arena *           Dqn_ArenaCatalog_AllocF    (Dqn_ArenaCatalog *catalog, Dqn_usize reserve, Dqn_usize commit, uint8_t arena_flags, DQN_FMT_ATTRIB char const *fmt, ...);
-DQN_API bool                  Dqn_ArenaCatalog_Erase     (Dqn_ArenaCatalog *catalog, Dqn_Arena *arena, Dqn_ArenaCatalogFreeArena free_arena);
+// NOTE: [$ACAT] DN_ArenaCatalog //////////////////////////////////////////////////////////////////
+DN_API void                 DN_ArenaCatalog_Init                         (DN_ArenaCatalog *catalog, DN_Pool *pool);
+DN_API DN_ArenaCatalogItem *DN_ArenaCatalog_Find                         (DN_ArenaCatalog *catalog, DN_Str8 label);
+DN_API void                 DN_ArenaCatalog_AddF                         (DN_ArenaCatalog *catalog, DN_Arena *arena, DN_FMT_ATTRIB char const *fmt, ...);
+DN_API void                 DN_ArenaCatalog_AddFV                        (DN_ArenaCatalog *catalog, DN_Arena *arena, DN_FMT_ATTRIB char const *fmt, va_list args);
+DN_API DN_Arena *           DN_ArenaCatalog_AllocFV                      (DN_ArenaCatalog *catalog, DN_USize reserve, DN_USize commit, uint8_t arena_flags, DN_FMT_ATTRIB char const *fmt, va_list args);
+DN_API DN_Arena *           DN_ArenaCatalog_AllocF                       (DN_ArenaCatalog *catalog, DN_USize reserve, DN_USize commit, uint8_t arena_flags, DN_FMT_ATTRIB char const *fmt, ...);
+DN_API bool                 DN_ArenaCatalog_Erase                        (DN_ArenaCatalog *catalog, DN_Arena *arena, DN_ArenaCatalogFreeArena free_arena);

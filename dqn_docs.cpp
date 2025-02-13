@@ -27,36 +27,41 @@
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 */
 
-DQN_MSVC_WARNING_PUSH
-DQN_MSVC_WARNING_DISABLE(4702) // unreachable code
-void Dqn_Docs_Demo()
+DN_MSVC_WARNING_PUSH
+DN_MSVC_WARNING_DISABLE(4702) // unreachable code
+void DN_Docs_Demo()
 {
-    Dqn_Library_Init(Dqn_LibraryOnInit_Nil);
+    // NOTE: Before using anything in the library, DN_Core_Init() must be
+    // called, for example:
+    #if 0
+    DN_Core core = {};
+    DN_Core_Init(&core, DN_CoreOnInit_Nil);
+    #endif
 
-    // NOTE: Dqn_Atomic_SetValue64 /////////////////////////////////////////////////////////////////
-    // NOTE: Dqn_Atomic_SetValue32 /////////////////////////////////////////////////////////////////
+    // NOTE: DN_Atomic_SetValue64 /////////////////////////////////////////////////////////////////
+    // NOTE: DN_Atomic_SetValue32 /////////////////////////////////////////////////////////////////
     // Atomically set the value into the target using an atomic compare and swap
     // idiom. The return value of the function is the value that was last stored
     // in the target.
     {
         uint64_t target       = 8;
         uint64_t value_to_set = 0xCAFE;
-        if (Dqn_Atomic_SetValue64(&target, value_to_set) == 8) {
+        if (DN_Atomic_SetValue64(&target, value_to_set) == 8) {
             // Atomic swap was successful, e.g. the last value that this thread
             // observed was '8' which is the value we initialised with e.g. no
             // other thread has modified the value.
         }
     }
 
-    // NOTE: Dqn_BytesToHex ////////////////////////////////////////////////////////////////////////
+    // NOTE: DN_BytesToHex ////////////////////////////////////////////////////////////////////////
     {
-        Dqn_TLSTMem   tmem     = Dqn_TLS_TMem(nullptr);
+        DN_TLSTMem   tmem     = DN_TLS_TMem(nullptr);
         unsigned char bytes[2] = {0xFA, 0xCE};
-        Dqn_Str8      hex      = Dqn_BytesToHex(tmem.arena, bytes, sizeof(bytes));
-        DQN_ASSERT(hex == DQN_STR8("face")); // NOTE: Guaranteed to be null-terminated
+        DN_Str8      hex      = DN_BytesToHex(tmem.arena, bytes, sizeof(bytes));
+        DN_ASSERT(hex == DN_STR8("face")); // NOTE: Guaranteed to be null-terminated
     }
 
-    // NOTE: DQN_CHECK /////////////////////////////////////////////////////////////////////////////
+    // NOTE: DN_CHECK /////////////////////////////////////////////////////////////////////////////
     //
     // Check the expression trapping in debug, whilst in release- trapping is
     // removed and the expression is evaluated as if it were a normal 'if' branch.
@@ -65,29 +70,29 @@ void Dqn_Docs_Demo()
     // traps to notify the developer in builds when it's compiled in.
     {
         bool flag = true;
-        if (DQN_CHECKF(flag, "Flag was false!")) {
+        if (DN_CHECKF(flag, "Flag was false!")) {
             /// This branch will execute!
         }
     }
 
-    // NOTE: Dqn_CPUID /////////////////////////////////////////////////////////////////////////////
+    // NOTE: DN_CPUID /////////////////////////////////////////////////////////////////////////////
     // Execute the 'CPUID' instruction which lets you query the capabilities of
     // the current CPU.
 
-    // NOTE: DQN_DEFER
+    // NOTE: DN_DEFER
     //
     // A macro that expands to a C++ lambda that executes arbitrary code on
     // scope exit.
     {
         int x = 0;
-        DQN_DEFER {
+        DN_DEFER {
             x = 3;
         };
         x = 1;
-        // On scope exit, DQN_DEFER object executes and assigns x = 3
+        // On scope exit, DN_DEFER object executes and assigns x = 3
     }
 
-    // NOTE: Dqn_DSMap /////////////////////////////////////////////////////////////////////////////
+    // NOTE: DN_DSMap /////////////////////////////////////////////////////////////////////////////
     //
     // A hash table configured using the presets recommended by Demitri Spanos
     // from the Handmade Network (HMN),
@@ -112,7 +117,7 @@ void Dqn_Docs_Demo()
     // of the map. On element erase, the last element is swapped into the
     // deleted element causing the non-sorted property of this table.
     //
-    // The 0th slot (DQN_DS_MAP_SENTINEL_SLOT) in the slots array is reserved
+    // The 0th slot (DN_DS_MAP_SENTINEL_SLOT) in the slots array is reserved
     // for a sentinel value, e.g. all zeros value. After map initialisation the
     // 'occupied' value of the array will be set to 1 to exclude the sentinel
     // from the capacity of the table. Skip the first value if you are iterating
@@ -128,8 +133,8 @@ void Dqn_Docs_Demo()
     // buffer, this buffer must be valid throughout the lifetime of the hash
     // table!
     {
-        // NOTE: Dqn_DSMap_Init   //////////////////////////////////////////////////////////////////
-        // NOTE: Dqn_DSMap_Deinit //////////////////////////////////////////////////////////////////
+        // NOTE: DN_DSMap_Init   //////////////////////////////////////////////////////////////////
+        // NOTE: DN_DSMap_Deinit //////////////////////////////////////////////////////////////////
         //
         // Initialise a hash table where the table size *must* be a
         // power-of-two, otherwise an assert will be triggered. If
@@ -147,16 +152,16 @@ void Dqn_Docs_Demo()
         //
         // A 'Deinit' of the map will similarly deallocate the passed in arena (as
         // the map takes ownership of the arena).
-        Dqn_Arena arena = {};
-        Dqn_DSMap<int> map = Dqn_DSMap_Init<int>(&arena, /*size*/ 1024, Dqn_DSMapFlags_Nil); // Size must be PoT!
-        DQN_ASSERT(Dqn_DSMap_IsValid(&map));                                                 // Valid if no initialisation failure (e.g. mem alloc failure)
+        DN_Arena arena = {};
+        DN_DSMap<int> map = DN_DSMap_Init<int>(&arena, /*size*/ 1024, DN_DSMapFlags_Nil); // Size must be PoT!
+        DN_ASSERT(DN_DSMap_IsValid(&map));                                                 // Valid if no initialisation failure (e.g. mem alloc failure)
 
-        // NOTE: Dqn_DSMap_KeyCStringLit ///////////////////////////////////////////////////////////
-        // NOTE: Dqn_DSMap_KeyU64        ///////////////////////////////////////////////////////////
-        // NOTE: Dqn_DSMap_KeyU64NoHash  ///////////////////////////////////////////////////////////
-        // NOTE: Dqn_DSMap_KeyBuffer     ///////////////////////////////////////////////////////////
-        // NOTE: Dqn_DSMap_KeyStr8       ///////////////////////////////////////////////////////////
-        // NOTE: Dqn_DSMap_KeyStr8Copy   ///////////////////////////////////////////////////////////
+        // NOTE: DN_DSMap_KeyCStringLit ///////////////////////////////////////////////////////////
+        // NOTE: DN_DSMap_KeyU64        ///////////////////////////////////////////////////////////
+        // NOTE: DN_DSMap_KeyU64NoHash  ///////////////////////////////////////////////////////////
+        // NOTE: DN_DSMap_KeyBuffer     ///////////////////////////////////////////////////////////
+        // NOTE: DN_DSMap_KeyStr8       ///////////////////////////////////////////////////////////
+        // NOTE: DN_DSMap_KeyStr8Copy   ///////////////////////////////////////////////////////////
         // Create a hash-table key where:
         //
         //   KeyCStringLit: Uses a Hash(cstring literal)
@@ -177,11 +182,11 @@ void Dqn_Docs_Demo()
         // already sufficiently uniformly distributed already (e.g. using 8
         // bytes taken from a SHA256 hash as the key) and the first 4 bytes
         // will be used verbatim.
-        Dqn_DSMapKey key = Dqn_DSMap_KeyStr8(&map, DQN_STR8("Sample Key"));
+        DN_DSMapKey key = DN_DSMap_KeyStr8(&map, DN_STR8("Sample Key"));
 
-        // NOTE: Dqn_DSMap_Find ////////////////////////////////////////////////////////////////////
-        // NOTE: Dqn_DSMap_Make ////////////////////////////////////////////////////////////////////
-        // NOTE: Dqn_DSMap_Set  ////////////////////////////////////////////////////////////////////
+        // NOTE: DN_DSMap_Find ////////////////////////////////////////////////////////////////////
+        // NOTE: DN_DSMap_Make ////////////////////////////////////////////////////////////////////
+        // NOTE: DN_DSMap_Set  ////////////////////////////////////////////////////////////////////
         //
         // Query or commit key-value pair to the table, where:
         //
@@ -199,54 +204,54 @@ void Dqn_Docs_Demo()
         // the table will be grown to 2x the current the size before insertion
         // completes.
         {
-            Dqn_DSMapResult<int> set_result = Dqn_DSMap_Set(&map, key, 0xCAFE);
-            DQN_ASSERT(!set_result.found); // First time we are setting the key-value pair, it wasn't previously in the table
-            DQN_ASSERT(map.occupied == 2); // Sentinel + new element == 2
+            DN_DSMapResult<int> set_result = DN_DSMap_Set(&map, key, 0xCAFE);
+            DN_ASSERT(!set_result.found); // First time we are setting the key-value pair, it wasn't previously in the table
+            DN_ASSERT(map.occupied == 2); // Sentinel + new element == 2
         }
 
         // Iterating elements in the array, note that index '0' is the sentinel
         // slot! You typically don't care about it!
-        for (Dqn_usize index = 1; index < map.occupied; index++) {
-            Dqn_DSMapSlot<int> *it       = map.slots + index;
-            Dqn_DSMapKey        it_key   = it->key;
+        for (DN_USize index = 1; index < map.occupied; index++) {
+            DN_DSMapSlot<int> *it       = map.slots + index;
+            DN_DSMapKey        it_key   = it->key;
             int                *it_value = &it->value;
-            DQN_ASSERT(*it_value == 0xCAFE);
+            DN_ASSERT(*it_value == 0xCAFE);
 
-            DQN_ASSERT(Dqn_Str8_Init(it_key.buffer_data, it_key.buffer_size) == DQN_STR8("Sample Key"));
+            DN_ASSERT(DN_Str8_Init(it_key.buffer_data, it_key.buffer_size) == DN_STR8("Sample Key"));
         }
 
-        // NOTE: Dqn_DSMap_Erase ///////////////////////////////////////////////////////////////////
+        // NOTE: DN_DSMap_Erase ///////////////////////////////////////////////////////////////////
         //
         // Remove the key-value pair from the table. If by erasing the key-value
         // pair from the table puts the table under 25% load, the table will be
         // shrunk by 1/2 the current size after erasing. The table will not shrink
         // below the initial size that the table was initialised as.
         {
-            bool erased = Dqn_DSMap_Erase(&map, key);
-            DQN_ASSERT(erased);
-            DQN_ASSERT(map.occupied == 1); // Sentinel element
+            bool erased = DN_DSMap_Erase(&map, key);
+            DN_ASSERT(erased);
+            DN_ASSERT(map.occupied == 1); // Sentinel element
         }
 
-        Dqn_DSMap_Deinit(&map, Dqn_ZeroMem_Yes); // Deallocates the 'arena' for us!
+        DN_DSMap_Deinit(&map, DN_ZeroMem_Yes); // Deallocates the 'arena' for us!
     }
 
-    // NOTE: Dqn_DSMap_Hash ////////////////////////////////////////////////////////////////////////
+    // NOTE: DN_DSMap_Hash ////////////////////////////////////////////////////////////////////////
     //
     // Hash the input key using the custom hash function if it's set on the map,
     // otherwise uses the default hashing function (32bit Murmur3).
 
-    // NOTE: Dqn_DSMap_HashToSlotIndex /////////////////////////////////////////////////////////////
+    // NOTE: DN_DSMap_HashToSlotIndex /////////////////////////////////////////////////////////////
     //
     // Calculate the index into the map's 'slots' array from the given hash.
 
-    // NOTE: Dqn_DSMap_Resize //////////////////////////////////////////////////////////////////////
+    // NOTE: DN_DSMap_Resize //////////////////////////////////////////////////////////////////////
     //
     // Resize the table and move all elements to the new map, note that the new
     // size must be a power of two. This function wil fail on memory allocation
     // failure, or the requested size is smaller than the current number of
     // elements in the map to resize.
 
-    // NOTE: Dqn_ErrorSink /////////////////////////////////////////////////////////////////////////
+    // NOTE: DN_ErrSink /////////////////////////////////////////////////////////////////////////
     //
     // Error sinks are a way of accumulating errors from API calls related or
     // unrelated into 1 unified error handling pattern. The implemenation of a
@@ -268,9 +273,9 @@ void Dqn_Docs_Demo()
 
     // (A) Conventional error checking patterns using return/sentinel values
     #if 0
-        Dqn_OSFile *file = Dqn_OS_FileOpen("/path/to/file", ...);
+        DN_OSFile *file = DN_OS_FileOpen("/path/to/file", ...);
         if (file) {
-            if (!Dqn_OS_FileWrite(file, "abc")) {
+            if (!DN_OS_FileWrite(file, "abc")) {
                 // Error handling!
             }
             Dnq_OS_FileClose(file);
@@ -282,11 +287,11 @@ void Dqn_Docs_Demo()
     // (B) Error handling using pipelining and and error proof APIs. APIs that
     // produce errors take in the error sink as a parameter.
     if (0) {
-        Dqn_ErrorSink *error = Dqn_ErrorSink_Begin(Dqn_ErrorSinkMode_Nil);
-        Dqn_OSFile     file  = Dqn_OS_FileOpen(DQN_STR8("/path/to/file"), Dqn_OSFileOpen_OpenIfExist, Dqn_OSFileAccess_ReadWrite, error);
-        Dqn_OS_FileWrite(&file, DQN_STR8("abc"), error);
-        Dqn_OS_FileClose(&file);
-        if (Dqn_ErrorSink_EndAndLogErrorF(error, "Failed to write to file")) {
+        DN_ErrSink *error = DN_ErrSink_Begin(DN_ErrSinkMode_Nil);
+        DN_OSFile     file  = DN_OS_FileOpen(DN_STR8("/path/to/file"), DN_OSFileOpen_OpenIfExist, DN_OSFileAccess_ReadWrite, error);
+        DN_OS_FileWrite(&file, DN_STR8("abc"), error);
+        DN_OS_FileClose(&file);
+        if (DN_ErrSink_EndAndLogErrorF(error, "Failed to write to file")) {
             // Do error handling!
         }
     }
@@ -306,49 +311,49 @@ void Dqn_Docs_Demo()
     // be populated by the first error encountered in that scope.
 
     if (0) {
-        Dqn_ErrorSink *error = Dqn_ErrorSink_Begin(Dqn_ErrorSinkMode_Nil);
-        Dqn_OSFile     file  = Dqn_OS_FileOpen(DQN_STR8("/path/to/file"), Dqn_OSFileOpen_OpenIfExist, Dqn_OSFileAccess_ReadWrite, error);
-        Dqn_OS_FileWrite(&file, DQN_STR8("abc"), error);
-        Dqn_OS_FileClose(&file);
+        DN_ErrSink *error = DN_ErrSink_Begin(DN_ErrSinkMode_Nil);
+        DN_OSFile     file  = DN_OS_FileOpen(DN_STR8("/path/to/file"), DN_OSFileOpen_OpenIfExist, DN_OSFileAccess_ReadWrite, error);
+        DN_OS_FileWrite(&file, DN_STR8("abc"), error);
+        DN_OS_FileClose(&file);
 
         {
             // NOTE: My error sinks are thread-local, so the returned 'error' is
             // the same as the 'error' value above.
-            Dqn_ErrorSink_Begin(Dqn_ErrorSinkMode_Nil);
-            Dqn_OS_WriteAll(DQN_STR8("/path/to/another/file"), DQN_STR8("123"), error);
-            Dqn_ErrorSink_EndAndLogErrorF(error, "Failed to write to another file");
+            DN_ErrSink_Begin(DN_ErrSinkMode_Nil);
+            DN_OS_WriteAll(DN_STR8("/path/to/another/file"), DN_STR8("123"), error);
+            DN_ErrSink_EndAndLogErrorF(error, "Failed to write to another file");
         }
 
-        if (Dqn_ErrorSink_EndAndLogErrorF(error, "Failed to write to file")) {
+        if (DN_ErrSink_EndAndLogErrorF(error, "Failed to write to file")) {
             // Do error handling!
         }
     }
 
-    // NOTE: Dqn_FStr8_Max /////////////////////////////////////////////////////////////////////////
+    // NOTE: DN_FStr8_Max /////////////////////////////////////////////////////////////////////////
     //
     // Return the maximum capacity of the string, e.g. the 'N' template
     // parameter of FStr8<N>
 
-    // NOTE: Dqn_FStr8_ToStr8 //////////////////////////////////////////////////////////////////////
+    // NOTE: DN_FStr8_ToStr8 //////////////////////////////////////////////////////////////////////
     //
-    // Create a slice of the string into a pointer and length string (Dqn_Str8).
+    // Create a slice of the string into a pointer and length string (DN_Str8).
     // The lifetime of the slice is bound to the lifetime of the FStr8 and is
     //  invalidated when the FStr8 is.
 
-    // NOTE: Dqn_HexToBytes ////////////////////////////////////////////////////////////////////////
+    // NOTE: DN_HexToBytes ////////////////////////////////////////////////////////////////////////
     {
         unsigned char bytes[2];
-        Dqn_usize bytes_written = Dqn_HexToBytesPtr(DQN_STR8("0xFACE"), bytes, sizeof(bytes));
-        DQN_ASSERT(bytes_written == 2);
-        DQN_ASSERT(bytes[0] == 0xFA);
-        DQN_ASSERT(bytes[1] == 0xCE);
+        DN_USize bytes_written = DN_HexToBytesPtr(DN_STR8("0xFACE"), bytes, sizeof(bytes));
+        DN_ASSERT(bytes_written == 2);
+        DN_ASSERT(bytes[0] == 0xFA);
+        DN_ASSERT(bytes[1] == 0xCE);
     }
 
-    // NOTE: Dqn_JSONBuilder_Build /////////////////////////////////////////////////////////////////
+    // NOTE: DN_JSONBuilder_Build /////////////////////////////////////////////////////////////////
     //
     // Convert the internal JSON buffer in the builder into a string.
 
-    // NOTE: Dqn_JSONBuilder_KeyValue, Dqn_JSONBuilder_KeyValueF
+    // NOTE: DN_JSONBuilder_KeyValue, DN_JSONBuilder_KeyValueF
     //
     // Add a JSON key value pair untyped. The value is emitted directly without
     // checking the contents of value.
@@ -356,28 +361,28 @@ void Dqn_Docs_Demo()
     // All other functions internally call into this function which is the main
     // workhorse of the builder.
 
-    // NOTE: Dqn_JSON_Builder_ObjectEnd
+    // NOTE: DN_JSON_Builder_ObjectEnd
     //
     // End a JSON object in the builder, generates internally a '}' string
 
-    // NOTE: Dqn_JSON_Builder_ArrayEnd
+    // NOTE: DN_JSON_Builder_ArrayEnd
     //
     // End a JSON array in the builder, generates internally a ']' string
 
-    // NOTE: Dqn_JSONBuilder_LiteralNamed
+    // NOTE: DN_JSONBuilder_LiteralNamed
     //
     // Add a named JSON key-value object whose value is directly written to
     // the following '"<key>": <value>' (e.g. useful for emitting the 'null'
     // value)
 
-    // NOTE: Dqn_JSONBuilder_U64       /////////////////////////////////////////////////////////////
-    // NOTE: Dqn_JSONBuilder_U64Named  /////////////////////////////////////////////////////////////
-    // NOTE: Dqn_JSONBuilder_I64       /////////////////////////////////////////////////////////////
-    // NOTE: Dqn_JSONBuilder_I64Named  /////////////////////////////////////////////////////////////
-    // NOTE: Dqn_JSONBuilder_F64       /////////////////////////////////////////////////////////////
-    // NOTE: Dqn_JSONBuilder_F64Named  /////////////////////////////////////////////////////////////
-    // NOTE: Dqn_JSONBuilder_Bool      /////////////////////////////////////////////////////////////
-    // NOTE: Dqn_JSONBuilder_BoolNamed /////////////////////////////////////////////////////////////
+    // NOTE: DN_JSONBuilder_U64       /////////////////////////////////////////////////////////////
+    // NOTE: DN_JSONBuilder_U64Named  /////////////////////////////////////////////////////////////
+    // NOTE: DN_JSONBuilder_I64       /////////////////////////////////////////////////////////////
+    // NOTE: DN_JSONBuilder_I64Named  /////////////////////////////////////////////////////////////
+    // NOTE: DN_JSONBuilder_F64       /////////////////////////////////////////////////////////////
+    // NOTE: DN_JSONBuilder_F64Named  /////////////////////////////////////////////////////////////
+    // NOTE: DN_JSONBuilder_Bool      /////////////////////////////////////////////////////////////
+    // NOTE: DN_JSONBuilder_BoolNamed /////////////////////////////////////////////////////////////
     //
     // Add the named JSON data type as a key-value object. The named variants
     // generates internally the key-value pair, e.g.
@@ -386,31 +391,31 @@ void Dqn_Docs_Demo()
     //
     // And the non-named version emit just the 'value' portion
 
-    // NOTE: Dqn_List_Iterate //////////////////////////////////////////////////////////////////////
+    // NOTE: DN_List_Iterate //////////////////////////////////////////////////////////////////////
     {
-        Dqn_TLSTMem   tmem = Dqn_TLS_TMem(nullptr);
-        Dqn_List<int> list = Dqn_List_Init<int>(/*chunk_size*/ 128);
-        for (Dqn_ListIterator<int> it = {}; Dqn_List_Iterate(&list, &it, 0);) {
+        DN_TLSTMem   tmem = DN_TLS_TMem(nullptr);
+        DN_List<int> list = DN_List_Init<int>(/*chunk_size*/ 128);
+        for (DN_ListIterator<int> it = {}; DN_List_Iterate(&list, &it, 0);) {
             int *item = it.data;
             (void)item;
         }
     }
 
-    // NOTE: Dqn_LogProc ///////////////////////////////////////////////////////////////////////////
+    // NOTE: DN_LogProc ///////////////////////////////////////////////////////////////////////////
     //
     // Function prototype of the logging interface exposed by this library. Logs
-    // emitted using the Dqn_Log_* family of functions are routed through this
+    // emitted using the DN_Log_* family of functions are routed through this
     // routine.
 
-    // NOTE: Dqn_FNV1A /////////////////////////////////////////////////////////////////////////////
+    // NOTE: DN_FNV1A /////////////////////////////////////////////////////////////////////////////
     {
-        // Using the default hash as defined by DQN_FNV1A32_SEED and
-        // DQN_FNV1A64_SEED for 32/64bit hashes respectively
+        // Using the default hash as defined by DN_FNV1A32_SEED and
+        // DN_FNV1A64_SEED for 32/64bit hashes respectively
         uint32_t buffer1 = 0xCAFE0000;
         uint32_t buffer2 = 0xDEAD0000;
         {
-            uint64_t hash = Dqn_FNV1A64_Hash(&buffer1, sizeof(buffer1));
-            hash          = Dqn_FNV1A64_Iterate(&buffer2, sizeof(buffer2), hash); // Chained hashing
+            uint64_t hash = DN_FNV1A64_Hash(&buffer1, sizeof(buffer1));
+            hash          = DN_FNV1A64_Iterate(&buffer2, sizeof(buffer2), hash); // Chained hashing
             (void)hash;
         }
 
@@ -418,22 +423,22 @@ void Dqn_Docs_Demo()
         // calling 'Iterate' immediately.
         {
             uint64_t custom_seed = 0xABCDEF12;
-            uint64_t hash        = Dqn_FNV1A64_Iterate(&buffer1, sizeof(buffer1), custom_seed);
-            hash                 = Dqn_FNV1A64_Iterate(&buffer2, sizeof(buffer2), hash);
+            uint64_t hash        = DN_FNV1A64_Iterate(&buffer1, sizeof(buffer1), custom_seed);
+            hash                 = DN_FNV1A64_Iterate(&buffer2, sizeof(buffer2), hash);
             (void)hash;
         }
     }
 
-    // NOTE: Dqn_FmtBuffer3DotTruncate //////////////////////////////////////////////////////////////
+    // NOTE: DN_FmtBuffer3DotTruncate //////////////////////////////////////////////////////////////
     {
         char buffer[8]           = {};
-        int buffer_chars_written = Dqn_FmtBuffer3DotTruncate(buffer, sizeof(buffer), "This string is longer than %d characters", DQN_CAST(int)(sizeof(buffer) - 1));
+        int buffer_chars_written = DN_FmtBuffer3DotTruncate(buffer, sizeof(buffer), "This string is longer than %d characters", DN_CAST(int)(sizeof(buffer) - 1));
         if (0) { // Prints "This ..." which is exactly 8 characters long
             printf("%.*s", buffer_chars_written, buffer);
         }
     }
 
-    // NOTE: Dqn_MurmurHash3 ///////////////////////////////////////////////////////////////////////
+    // NOTE: DN_MurmurHash3 ///////////////////////////////////////////////////////////////////////
     // MurmurHash3 was written by Austin Appleby, and is placed in the public
     // domain. The author (Austin Appleby) hereby disclaims copyright to this source
     // code.
@@ -443,20 +448,27 @@ void Dqn_Docs_Demo()
     // compile and run any of them on any platform, but your performance with the
     // non-native version will be less than optimal.
 
-    // NOTE: Dqn_OS_DateUnixTime
+    // NOTE: DN_OS_DateUnixTime
     //
     // Produce the time elapsed since the unix epoch
     {
-        uint64_t now = Dqn_OS_DateUnixTime();
+        uint64_t now = DN_OS_DateUnixTimeS();
         (void)now;
     }
 
-    // NOTE: Dqn_OS_FileDelete
+    // NOTE: DN_OS_DirIterate /////////////////////////////////////////////////////////////////////
+    //
+    // Iterate the files within the passed in folder
+    for (DN_OSDirIterator it = {}; DN_OS_DirIterate(DN_STR8("."), &it); ) {
+        printf("%.*s\n", DN_STR_FMT(it.file_name));
+    }
+
+    // NOTE: DN_OS_FileDelete
     //
     // This function can only delete files and it can *only* delete directories
     // if it is empty otherwise this function fails.
 
-    // NOTE: Dqn_OS_WriteAllSafe
+    // NOTE: DN_OS_WriteAllSafe
     // Writes the file at the path first by appending '.tmp' to the 'path' to
     // write to. If the temporary file is written successfully then the file is
     // copied into 'path', for example:
@@ -467,13 +479,13 @@ void Dqn_Docs_Demo()
     // If 'tmp_path' is written to successfuly, the file will be copied over into
     // 'path'.
     if (0) {
-        Dqn_TLSTMem    tmem = Dqn_TLS_TMem(nullptr);
-        Dqn_ErrorSink *error   = Dqn_ErrorSink_Begin(Dqn_ErrorSinkMode_Nil);
-        Dqn_OS_WriteAllSafe(/*path*/ DQN_STR8("C:/Home/my.txt"), /*buffer*/ DQN_STR8("Hello world"), error);
-        Dqn_ErrorSink_EndAndLogErrorF(error, "");
+        DN_TLSTMem  tmem  = DN_TLS_TMem(nullptr);
+        DN_ErrSink *error = DN_ErrSink_Begin(DN_ErrSinkMode_Nil);
+        DN_OS_WriteAllSafe(/*path*/ DN_STR8("C:/Home/my.txt"), /*buffer*/ DN_STR8("Hello world"), error);
+        DN_ErrSink_EndAndLogErrorF(error, "");
     }
 
-    // NOTE: Dqn_OS_EstimateTSCPerSecond ///////////////////////////////////////////////////////////
+    // NOTE: DN_OS_EstimateTSCPerSecond ///////////////////////////////////////////////////////////
     //
     // Estimate how many timestamp count's (TSC) there are per second. TSC
     // is evaluated by calling __rdtsc() or the equivalent on the platform. This
@@ -487,18 +499,18 @@ void Dqn_Docs_Demo()
     // This may return 0 if querying the CPU timestamp counter is not supported
     // on the platform (e.g. __rdtsc() or __builtin_readcyclecounter() returns 0).
 
-    // NOTE: Dqn_OS_EXEDir /////////////////////////////////////////////////////////////////////////
+    // NOTE: DN_OS_EXEDir /////////////////////////////////////////////////////////////////////////
     //
     // Retrieve the executable directory without the trailing '/' or ('\' for
     // windows). If this fails an empty string is returned.
 
-    // NOTE: Dqn_OS_PerfCounterFrequency ///////////////////////////////////////////////////////////
+    // NOTE: DN_OS_PerfCounterFrequency ///////////////////////////////////////////////////////////
     //
     // Get the number of ticks in the performance counter per second for the
     // operating system you're running on. This value can be used to calculate
     // duration from OS performance counter ticks.
 
-    // NOTE: Dqn_OS_Path* //////////////////////////////////////////////////////////////////////////
+    // NOTE: DN_OS_Path* //////////////////////////////////////////////////////////////////////////
     // Construct paths ensuring the native OS path separators are used in the
     // string. In 99% of cases you can use 'PathConvertF' which converts the
     // given path in one shot ensuring native path separators in the string.
@@ -527,39 +539,39 @@ void Dqn_Docs_Demo()
     //   path:        path/to/your/desired/folder
     //   popped_path: path/to/your/desired
 
-    // NOTE: Dqn_OS_SecureRNGBytes /////////////////////////////////////////////////////////////////
+    // NOTE: DN_OS_SecureRNGBytes /////////////////////////////////////////////////////////////////
     //
     // Generate cryptographically secure bytes
 
-    // NOTE: Dqn_PCG32 /////////////////////////////////////////////////////////////////////////////
+    // NOTE: DN_PCG32 /////////////////////////////////////////////////////////////////////////////
     //
     // Random number generator of the PCG family. Implementation taken from
     // Martins Mmozeiko from Handmade Network.
     // https://gist.github.com/mmozeiko/1561361cd4105749f80bb0b9223e9db8
     {
-        Dqn_PCG32 rng = Dqn_PCG32_Init(0xb917'a66c'1d9b'3bd8);
+        DN_PCG32 rng = DN_PCG32_Init(0xb917'a66c'1d9b'3bd8);
 
-        // NOTE: Dqn_PCG32_Range ///////////////////////////////////////////////////////////////////
+        // NOTE: DN_PCG32_Range ///////////////////////////////////////////////////////////////////
         //
         // Generate a value in the [low, high) interval
-        uint32_t u32_value = Dqn_PCG32_Range(&rng, 32, 64);
-        DQN_ASSERT(u32_value >= 32 && u32_value < 64);
+        uint32_t u32_value = DN_PCG32_Range(&rng, 32, 64);
+        DN_ASSERT(u32_value >= 32 && u32_value < 64);
 
-        // NOTE: Dqn_PCG32_NextF32 /////////////////////////////////////////////////////////////////
-        // NOTE: Dqn_PCG32_NextF64 /////////////////////////////////////////////////////////////////
+        // NOTE: DN_PCG32_NextF32 /////////////////////////////////////////////////////////////////
+        // NOTE: DN_PCG32_NextF64 /////////////////////////////////////////////////////////////////
         //
         // Generate a float/double in the [0, 1) interval
-        Dqn_f64 f64_value = Dqn_PCG32_NextF64(&rng);
-        DQN_ASSERT(f64_value >= 0.f && f64_value < 1.f);
+        DN_F64 f64_value = DN_PCG32_NextF64(&rng);
+        DN_ASSERT(f64_value >= 0.f && f64_value < 1.f);
 
-        // NOTE: Dqn_PCG32_Advance /////////////////////////////////////////////////////////////////
+        // NOTE: DN_PCG32_Advance /////////////////////////////////////////////////////////////////
         //
         // Step the random number generator by 'delta' steps
-        Dqn_PCG32_Advance(&rng, /*delta*/ 5);
+        DN_PCG32_Advance(&rng, /*delta*/ 5);
     }
 
-    #if !defined(DQN_NO_PROFILER)
-    // NOTE: [$PROF] Dqn_Profiler //////////////////////////////////////////////////////////////////
+    #if !defined(DN_NO_PROFILER)
+    // NOTE: [$PROF] DN_Profiler //////////////////////////////////////////////////////////////////
     //
     // A profiler based off Casey Muratori's Computer Enhance course, Performance
     // Aware Programming. This profiler measures function elapsed time using the
@@ -573,9 +585,9 @@ void Dqn_Docs_Demo()
     // frame's profiling metrics.
     {
         enum Zone { Zone_MainLoop, Zone_Count };
-        Dqn_ProfilerZone profiler_zone_main_update = Dqn_Profiler_BeginZone(Zone_MainLoop);
+        DN_ProfilerZone profiler_zone_main_update = DN_Profiler_BeginZone(Zone_MainLoop);
 
-        // NOTE: Dqn_Profiler_AnchorBuffer /////////////////////////////////////////////////////
+        // NOTE: DN_Profiler_AnchorBuffer /////////////////////////////////////////////////////
         //
         // Retrieve the requested buffer from the profiler for
         // writing/reading profiling metrics. Pass in the enum to specify
@@ -589,39 +601,39 @@ void Dqn_Docs_Demo()
         // the front buffer which contain the metrics that you can visualise
         // regarding the most profiling metrics recorded.
 
-        // NOTE: Dqn_Profiler_ReadBuffer ///////////////////////////////////////////////////////////
+        // NOTE: DN_Profiler_ReadBuffer ///////////////////////////////////////////////////////////
         //
         // Retrieve the buffer of anchors of which there are
-        // `DQN_PROFILER_ANCHOR_BUFFER_SIZE` anchors from the most recent run
+        // `DN_PROFILER_ANCHOR_BUFFER_SIZE` anchors from the most recent run
         // of the profiler after you have called `SwapAnchorBuffer` to trigger
         // the double buffer
-        Dqn_ProfilerAnchor *read_anchors = Dqn_Profiler_ReadBuffer();
-        for (Dqn_usize index = 0; index < DQN_PROFILER_ANCHOR_BUFFER_SIZE; index++) {
-            Dqn_ProfilerAnchor *anchor = read_anchors + index;
-            if (Dqn_Str8_HasData(anchor->name)) {
+        DN_ProfilerAnchor *read_anchors = DN_Profiler_ReadBuffer();
+        for (DN_USize index = 0; index < DN_PROFILER_ANCHOR_BUFFER_SIZE; index++) {
+            DN_ProfilerAnchor *anchor = read_anchors + index;
+            if (DN_Str8_HasData(anchor->name)) {
                 // ...
             }
         }
 
-        // NOTE: Dqn_Profiler_WriteBuffer //////////////////////////////////////////////////////////
+        // NOTE: DN_Profiler_WriteBuffer //////////////////////////////////////////////////////////
         //
         // Same as `ReadBuffer` however we return the buffer that the profiler
         // is currently writing anchors into.
-        Dqn_ProfilerAnchor *write_anchors = Dqn_Profiler_WriteBuffer();
-        for (Dqn_usize index = 0; index < DQN_PROFILER_ANCHOR_BUFFER_SIZE; index++) {
-            Dqn_ProfilerAnchor *anchor = write_anchors + index;
-            if (Dqn_Str8_HasData(anchor->name)) {
+        DN_ProfilerAnchor *write_anchors = DN_Profiler_WriteBuffer();
+        for (DN_USize index = 0; index < DN_PROFILER_ANCHOR_BUFFER_SIZE; index++) {
+            DN_ProfilerAnchor *anchor = write_anchors + index;
+            if (DN_Str8_HasData(anchor->name)) {
                 // ...
             }
         }
 
-        Dqn_Profiler_EndZone(profiler_zone_main_update);
-        Dqn_Profiler_SwapAnchorBuffer(); // Should occur after all profiling zones are ended!
-        *g_dqn_library->profiler = {};
+        DN_Profiler_EndZone(profiler_zone_main_update);
+        DN_Profiler_SwapAnchorBuffer(); // Should occur after all profiling zones are ended!
+        DN_MEMSET(&g_dn_core->profiler, 0, sizeof(g_dn_core->profiler));
     }
-    #endif // !defined(DQN_NO_PROFILER)
+    #endif // !defined(DN_NO_PROFILER)
 
-    // NOTE: Dqn_Raycast_LineIntersectV2 ///////////////////////////////////////////////////////////
+    // NOTE: DN_Raycast_LineIntersectV2 ///////////////////////////////////////////////////////////
     // Calculate the intersection point of 2 rays returning a `t` value
     // which is how much along the direction of the 'ray' did the intersection
     // occur.
@@ -629,17 +641,17 @@ void Dqn_Docs_Demo()
     // The arguments passed in do not need to be normalised for the function to
     // work.
 
-    // NOTE: Dqn_Safe_* ////////////////////////////////////////////////////////////////////////////
+    // NOTE: DN_Safe_* ////////////////////////////////////////////////////////////////////////////
     //
-    // Performs the arithmetic operation and uses DQN_CHECK on the operation to
+    // Performs the arithmetic operation and uses DN_CHECK on the operation to
     // check if it overflows. If it overflows the MAX value of the integer is
     // returned in add and multiply operations, and, the minimum is returned in
     // subtraction and division.
 
-    // NOTE: Dqn_Safe_SaturateCast* ////////////////////////////////////////////////////////////////
+    // NOTE: DN_Safe_SaturateCast* ////////////////////////////////////////////////////////////////
     //
     // Truncate the passed in value to the return type clamping the resulting
-    // value to the max value of the desired data type. It DQN_CHECK's the
+    // value to the max value of the desired data type. It DN_CHECK's the
     // truncation.
     //
     // The following sentinel values are returned when saturated,
@@ -671,7 +683,7 @@ void Dqn_Docs_Demo()
     // ISize -> U32:  0 or UINT32_MAX
     // ISize -> U64:  0 or UINT64_MAX
     //
-    // I64 -> ISize:  DQN_ISIZE_MIN or DQN_ISIZE_MAX
+    // I64 -> ISize:  DN_ISIZE_MIN or DN_ISIZE_MAX
     // I64 -> I8:     INT8_MIN      or INT8_MAX
     // I64 -> I16:    INT16_MIN     or INT16_MAX
     // I64 -> I32:    INT32_MIN     or INT32_MAX
@@ -683,7 +695,7 @@ void Dqn_Docs_Demo()
     // Int -> U32:    0         or UINT32_MAX
     // Int -> U64:    0         or UINT64_MAX
 
-    // NOTE: Dqn_StackTrace ////////////////////////////////////////////////////////////////////////
+    // NOTE: DN_StackTrace ////////////////////////////////////////////////////////////////////////
     // Emit stack traces at the calling site that these functions are invoked
     // from.
     //
@@ -700,45 +712,45 @@ void Dqn_Docs_Demo()
     // the debug APIs are aware of how to resolve the new addresses imported
     // into the address space.
     {
-        Dqn_TLSTMem tmem = Dqn_TLS_TMem(nullptr);
+        DN_TLSTMem tmem = DN_TLS_TMem(nullptr);
 
-        // NOTE: Dqn_StackTrace_Walk ///////////////////////////////////////////////////////////////
+        // NOTE: DN_StackTrace_Walk ///////////////////////////////////////////////////////////////
         //
         // Generate a stack trace as a series of addresses to the base of the
         // functions on the call-stack at the current instruction pointer. The
         // addresses are stored in order from the current executing function
         // first to the most ancestor function last in the walk.
-        Dqn_StackTraceWalkResult walk = Dqn_StackTrace_Walk(tmem.arena, /*depth limit*/ 128);
+        DN_StackTraceWalkResult walk = DN_StackTrace_Walk(tmem.arena, /*depth limit*/ 128);
 
         // Loop over the addresses produced in the stack trace
-        for (Dqn_StackTraceWalkResultIterator it = {}; Dqn_StackTrace_WalkResultIterate(&it, &walk); ) {
+        for (DN_StackTraceWalkResultIterator it = {}; DN_StackTrace_WalkResultIterate(&it, &walk); ) {
 
-            // NOTE: Dqn_StackTrace_RawFrameToFrame ////////////////////////////////////////////////
+            // NOTE: DN_StackTrace_RawFrameToFrame ////////////////////////////////////////////////
             //
             // Converts the base address into a human readable stack trace
             // entry (e.g. address, line number, file and function name).
-            Dqn_StackTraceFrame frame = Dqn_StackTrace_RawFrameToFrame(tmem.arena, it.raw_frame);
+            DN_StackTraceFrame frame = DN_StackTrace_RawFrameToFrame(tmem.arena, it.raw_frame);
 
             // You may then print out the frame like so
             if (0)
-                printf("%.*s(%" PRIu64 "): %.*s\n", DQN_STR_FMT(frame.file_name), frame.line_number, DQN_STR_FMT(frame.function_name));
+                printf("%.*s(%" PRIu64 "): %.*s\n", DN_STR_FMT(frame.file_name), frame.line_number, DN_STR_FMT(frame.function_name));
         }
 
         // If you load new shared-libraries into the address space it maybe
         // necessary to call into 'ReloadSymbols' to ensure that the OS is able
         // to resolve the new addresses.
-        Dqn_StackTrace_ReloadSymbols();
+        DN_StackTrace_ReloadSymbols();
 
-        // NOTE: Dqn_StackTrace_GetFrames //////////////////////////////////////////////////////////
+        // NOTE: DN_StackTrace_GetFrames //////////////////////////////////////////////////////////
         //
         // Helper function to create a stack trace and automatically convert the
         // raw frames into human readable frames. This function effectively
         // calls 'Walk' followed by 'RawFrameToFrame'.
-        Dqn_Slice<Dqn_StackTraceFrame> frames = Dqn_StackTrace_GetFrames(tmem.arena, /*depth limit*/ 128);
+        DN_Slice<DN_StackTraceFrame> frames = DN_StackTrace_GetFrames(tmem.arena, /*depth limit*/ 128);
         (void)frames;
     }
 
-    // NOTE: Dqn_Str8_Alloc ////////////////////////////////////////////////////////////////////////
+    // NOTE: DN_Str8_Alloc ////////////////////////////////////////////////////////////////////////
     //
     // Allocates a string with the requested 'size'. An additional byte is
     // always requested from the allocator to null-terminate the buffer. This
@@ -747,34 +759,34 @@ void Dqn_Docs_Demo()
     // The returned string's 'size' member variable does *not* include this
     // additional null-terminating byte.
     {
-        Dqn_TLSTMem tmem = Dqn_TLS_TMem(nullptr);
-        Dqn_Str8    string  = Dqn_Str8_Alloc(tmem.arena, /*size*/ 1, Dqn_ZeroMem_Yes);
-        DQN_ASSERT(string.size == 1);
-        DQN_ASSERT(string.data[string.size] == 0); // It is null-terminated!
+        DN_TLSTMem tmem = DN_TLS_TMem(nullptr);
+        DN_Str8    string  = DN_Str8_Alloc(tmem.arena, /*size*/ 1, DN_ZeroMem_Yes);
+        DN_ASSERT(string.size == 1);
+        DN_ASSERT(string.data[string.size] == 0); // It is null-terminated!
     }
 
-    // NOTE: Dqn_Str8_BinarySplit //////////////////////////////////////////////////////////////////
+    // NOTE: DN_Str8_BinarySplit //////////////////////////////////////////////////////////////////
     //
     // Splits a string into 2 substrings occuring prior and after the first
     // occurence of the delimiter. Neither strings include the matched
     // delimiter. If no delimiter is found, the 'rhs' of the split will be
     // empty.
     {
-        Dqn_Str8BinarySplitResult dot_split   = Dqn_Str8_BinarySplit(/*string*/ DQN_STR8("abc.def.ghi"), /*delimiter*/ DQN_STR8("."));
-        Dqn_Str8BinarySplitResult slash_split = Dqn_Str8_BinarySplit(/*string*/ DQN_STR8("abc.def.ghi"), /*delimiter*/ DQN_STR8("/"));
-        DQN_ASSERT(dot_split.lhs   == DQN_STR8("abc")         && dot_split.rhs   == DQN_STR8("def.ghi"));
-        DQN_ASSERT(slash_split.lhs == DQN_STR8("abc.def.ghi") && slash_split.rhs == DQN_STR8(""));
+        DN_Str8BinarySplitResult dot_split   = DN_Str8_BinarySplit(/*string*/ DN_STR8("abc.def.ghi"), /*delimiter*/ DN_STR8("."));
+        DN_Str8BinarySplitResult slash_split = DN_Str8_BinarySplit(/*string*/ DN_STR8("abc.def.ghi"), /*delimiter*/ DN_STR8("/"));
+        DN_ASSERT(dot_split.lhs   == DN_STR8("abc")         && dot_split.rhs   == DN_STR8("def.ghi"));
+        DN_ASSERT(slash_split.lhs == DN_STR8("abc.def.ghi") && slash_split.rhs == DN_STR8(""));
 
         // Loop that walks the string and produces ("abc", "def", "ghi")
-        for (Dqn_Str8 it = DQN_STR8("abc.def.ghi"); it.size; ) {
-            Dqn_Str8BinarySplitResult split = Dqn_Str8_BinarySplit(it, DQN_STR8("."));
-            Dqn_Str8 chunk                  = split.lhs; // "abc", "def", ...
+        for (DN_Str8 it = DN_STR8("abc.def.ghi"); it.size; ) {
+            DN_Str8BinarySplitResult split = DN_Str8_BinarySplit(it, DN_STR8("."));
+            DN_Str8 chunk                  = split.lhs; // "abc", "def", ...
             it                              = split.rhs;
             (void)chunk;
         }
     }
 
-    // NOTE: Dqn_Str8_FileNameFromPath /////////////////////////////////////////////////////////////
+    // NOTE: DN_Str8_FileNameFromPath /////////////////////////////////////////////////////////////
     //
     // Takes a slice to the file name from a file path. The file name is
     // evaluated by searching from the end of the string backwards to the first
@@ -783,41 +795,41 @@ void Dqn_Docs_Demo()
     // if there were any.
     {
         {
-            Dqn_Str8 string = Dqn_Str8_FileNameFromPath(DQN_STR8("C:/Folder/item.txt"));
-            DQN_ASSERT(string == DQN_STR8("item.txt"));
+            DN_Str8 string = DN_Str8_FileNameFromPath(DN_STR8("C:/Folder/item.txt"));
+            DN_ASSERT(string == DN_STR8("item.txt"));
         }
         {
             // TODO(doyle): Intuitively this seems incorrect. Empty string instead?
-            Dqn_Str8 string = Dqn_Str8_FileNameFromPath(DQN_STR8("C:/Folder/"));
-            DQN_ASSERT(string == DQN_STR8("C:/Folder"));
+            DN_Str8 string = DN_Str8_FileNameFromPath(DN_STR8("C:/Folder/"));
+            DN_ASSERT(string == DN_STR8("C:/Folder"));
         }
         {
-            Dqn_Str8 string = Dqn_Str8_FileNameFromPath(DQN_STR8("C:/Folder"));
-            DQN_ASSERT(string == DQN_STR8("Folder"));
+            DN_Str8 string = DN_Str8_FileNameFromPath(DN_STR8("C:/Folder"));
+            DN_ASSERT(string == DN_STR8("Folder"));
         }
     }
 
-    // NOTE: Dqn_Str8_FilePathNoExtension //////////////////////////////////////////////////////////
+    // NOTE: DN_Str8_FilePathNoExtension //////////////////////////////////////////////////////////
     //
     // This function preserves the original string if no extension was found.
     // An extension is defined as the substring after the last '.' encountered
     // in the string.
     {
-        Dqn_Str8 string = Dqn_Str8_FilePathNoExtension(DQN_STR8("C:/Folder/item.txt.bak"));
-        DQN_ASSERT(string == DQN_STR8("C:/Folder/item.txt"));
+        DN_Str8 string = DN_Str8_FilePathNoExtension(DN_STR8("C:/Folder/item.txt.bak"));
+        DN_ASSERT(string == DN_STR8("C:/Folder/item.txt"));
     }
 
-    // NOTE: Dqn_Str8_FileNameNoExtension //////////////////////////////////////////////////////////
+    // NOTE: DN_Str8_FileNameNoExtension //////////////////////////////////////////////////////////
     //
     // This function is the same as calling 'FileNameFromPath' followed by
     // 'FilePathNoExtension'
     {
-        Dqn_Str8 string = Dqn_Str8_FileNameNoExtension(DQN_STR8("C:/Folder/item.txt.bak"));
-        DQN_ASSERT(string == DQN_STR8("item.txt"));
+        DN_Str8 string = DN_Str8_FileNameNoExtension(DN_STR8("C:/Folder/item.txt.bak"));
+        DN_ASSERT(string == DN_STR8("item.txt"));
     }
 
-    // NOTE: Dqn_Str8_Replace            ///////////////////////////////////////////////////////////
-    // NOTE: Dqn_Str8_ReplaceInsensitive ///////////////////////////////////////////////////////////
+    // NOTE: DN_Str8_Replace            ///////////////////////////////////////////////////////////
+    // NOTE: DN_Str8_ReplaceInsensitive ///////////////////////////////////////////////////////////
     //
     // Replace any matching substring 'find' with 'replace' in the passed in
     // 'string'. The 'start_index' may be specified to offset which index the
@@ -827,17 +839,17 @@ void Dqn_Docs_Demo()
     // always be a newly allocated copy, irrespective of if any replacements
     // were done or not.
     {
-        Dqn_TLSTMem tmem = Dqn_TLS_TMem(nullptr);
-        Dqn_Str8 string     = Dqn_Str8_Replace(/*string*/      DQN_STR8("Foo Foo Bar"),
-                                               /*find*/        DQN_STR8("Foo"),
-                                               /*replace*/     DQN_STR8("Moo"),
+        DN_TLSTMem tmem = DN_TLS_TMem(nullptr);
+        DN_Str8 string     = DN_Str8_Replace(/*string*/      DN_STR8("Foo Foo Bar"),
+                                               /*find*/        DN_STR8("Foo"),
+                                               /*replace*/     DN_STR8("Moo"),
                                                /*start_index*/ 1,
                                                /*arena*/       tmem.arena,
-                                               /*eq_case*/     Dqn_Str8EqCase_Sensitive);
-        DQN_ASSERT(string == DQN_STR8("Foo Moo Bar"));
+                                               /*eq_case*/     DN_Str8EqCase_Sensitive);
+        DN_ASSERT(string == DN_STR8("Foo Moo Bar"));
     }
 
-    // NOTE: Dqn_Str8_Segment //////////////////////////////////////////////////////////////////////
+    // NOTE: DN_Str8_Segment //////////////////////////////////////////////////////////////////////
     //
     // Add a delimiting 'segment_char' every 'segment_size' number of characters
     // in the string.
@@ -845,39 +857,39 @@ void Dqn_Docs_Demo()
     // Reverse segment delimits the string counting 'segment_size' from the back
     // of the string.
     {
-        Dqn_TLSTMem tmem = Dqn_TLS_TMem(nullptr);
-        Dqn_Str8    string  = Dqn_Str8_Segment(tmem.arena, /*string*/ DQN_STR8("123456789"), /*segment_size*/ 3, /*segment_char*/ ',');
-        DQN_ASSERT(string == DQN_STR8("123,456,789"));
+        DN_TLSTMem tmem = DN_TLS_TMem(nullptr);
+        DN_Str8    string  = DN_Str8_Segment(tmem.arena, /*string*/ DN_STR8("123456789"), /*segment_size*/ 3, /*segment_char*/ ',');
+        DN_ASSERT(string == DN_STR8("123,456,789"));
     }
 
-    // NOTE: Dqn_Str8_Split ////////////////////////////////////////////////////////////////////////
+    // NOTE: DN_Str8_Split ////////////////////////////////////////////////////////////////////////
     {
         // Splits the string at each delimiter into substrings occuring prior and
         // after until the next delimiter.
-        Dqn_TLSTMem tmem = Dqn_TLS_TMem(nullptr);
+        DN_TLSTMem tmem = DN_TLS_TMem(nullptr);
         {
-            Dqn_Slice<Dqn_Str8> splits = Dqn_Str8_SplitAlloc(/*arena*/     tmem.arena,
-                                                             /*string*/    DQN_STR8("192.168.8.1"),
-                                                             /*delimiter*/ DQN_STR8("."),
-                                                             /*mode*/      Dqn_Str8SplitIncludeEmptyStrings_No);
-            DQN_ASSERT(splits.size    == 4);
-            DQN_ASSERT(splits.data[0] == DQN_STR8("192") && splits.data[1] == DQN_STR8("168") && splits.data[2] == DQN_STR8("8") && splits.data[3] == DQN_STR8("1"));
+            DN_Slice<DN_Str8> splits = DN_Str8_SplitAlloc(/*arena*/     tmem.arena,
+                                                             /*string*/    DN_STR8("192.168.8.1"),
+                                                             /*delimiter*/ DN_STR8("."),
+                                                             /*mode*/      DN_Str8SplitIncludeEmptyStrings_No);
+            DN_ASSERT(splits.size    == 4);
+            DN_ASSERT(splits.data[0] == DN_STR8("192") && splits.data[1] == DN_STR8("168") && splits.data[2] == DN_STR8("8") && splits.data[3] == DN_STR8("1"));
         }
 
         // You can include empty strings that occur when splitting by setting
         // the split mode to include empty strings.
         {
-            Dqn_Slice<Dqn_Str8> splits = Dqn_Str8_SplitAlloc(/*arena*/     tmem.arena,
-                                                             /*string*/    DQN_STR8("a--b"),
-                                                             /*delimiter*/ DQN_STR8("-"),
-                                                             /*mode*/      Dqn_Str8SplitIncludeEmptyStrings_Yes);
-            DQN_ASSERT(splits.size    == 3);
-            DQN_ASSERT(splits.data[0] == DQN_STR8("a") && splits.data[1] == DQN_STR8("") && splits.data[2] == DQN_STR8("b"));
+            DN_Slice<DN_Str8> splits = DN_Str8_SplitAlloc(/*arena*/     tmem.arena,
+                                                             /*string*/    DN_STR8("a--b"),
+                                                             /*delimiter*/ DN_STR8("-"),
+                                                             /*mode*/      DN_Str8SplitIncludeEmptyStrings_Yes);
+            DN_ASSERT(splits.size    == 3);
+            DN_ASSERT(splits.data[0] == DN_STR8("a") && splits.data[1] == DN_STR8("") && splits.data[2] == DN_STR8("b"));
         }
     }
 
-    // NOTE: Dqn_Str8_ToI64 ////////////////////////////////////////////////////////////////////////
-    // NOTE: Dqn_Str8_ToU64 ////////////////////////////////////////////////////////////////////////
+    // NOTE: DN_Str8_ToI64 ////////////////////////////////////////////////////////////////////////
+    // NOTE: DN_Str8_ToU64 ////////////////////////////////////////////////////////////////////////
     //
     // Convert a number represented as a string to a signed 64 bit number.
     //
@@ -897,31 +909,31 @@ void Dqn_Docs_Demo()
     // 'ToI64' either '+' or '-' prefix is permitted
     {
         {
-            Dqn_Str8ToI64Result result = Dqn_Str8_ToI64(DQN_STR8("-1,234"), /*separator*/ ',');
-            DQN_ASSERT(result.success && result.value == -1234);
+            DN_Str8ToI64Result result = DN_Str8_ToI64(DN_STR8("-1,234"), /*separator*/ ',');
+            DN_ASSERT(result.success && result.value == -1234);
         }
         {
-            Dqn_Str8ToI64Result result = Dqn_Str8_ToI64(DQN_STR8("-1,234"), /*separator*/ 0);
-            DQN_ASSERT(!result.success && result.value == 1); // 1 because it's a greedy conversion
+            DN_Str8ToI64Result result = DN_Str8_ToI64(DN_STR8("-1,234"), /*separator*/ 0);
+            DN_ASSERT(!result.success && result.value == 1); // 1 because it's a greedy conversion
         }
     }
 
-    // NOTE: Dqn_Str8_TrimByteOrderMark ////////////////////////////////////////////////////////////
+    // NOTE: DN_Str8_TrimByteOrderMark ////////////////////////////////////////////////////////////
     //
     // Removes a leading UTF8, UTF16 BE/LE, UTF32 BE/LE byte order mark from the
     // string if it's present.
 
-    // NOTE: DQN_STR_FMT ///////////////////////////////////////////////////////////////////////////
+    // NOTE: DN_STR_FMT ///////////////////////////////////////////////////////////////////////////
     //
     // Unpacks a string struct that has the fields {.data, .size} for printing a
     // pointer and length style string using the printf format specifier "%.*s"
     //
-    //   printf("%.*s\n", DQN_STR_FMT(DQN_STR8("Hello world")));
+    //   printf("%.*s\n", DN_STR_FMT(DN_STR8("Hello world")));
 
-    // NOTE: Dqn_Str8Builder_AppendF    ////////////////////////////////////////////////////////////
-    // NOTE: Dqn_Str8Builder_AppendFV   ////////////////////////////////////////////////////////////
-    // NOTE: Dqn_Str8Builder_AppendRef  ////////////////////////////////////////////////////////////
-    // NOTE: Dqn_Str8Builder_AppendCopy ////////////////////////////////////////////////////////////
+    // NOTE: DN_Str8Builder_AppendF    ////////////////////////////////////////////////////////////
+    // NOTE: DN_Str8Builder_AppendFV   ////////////////////////////////////////////////////////////
+    // NOTE: DN_Str8Builder_AppendRef  ////////////////////////////////////////////////////////////
+    // NOTE: DN_Str8Builder_AppendCopy ////////////////////////////////////////////////////////////
     //
     // - Appends a string to the string builder as follows
     //
@@ -929,8 +941,8 @@ void Dqn_Docs_Demo()
     //     AppendCopy: Stores the string slice by copy (with builder's arena)
     //     AppendF/V:  Constructs a format string and calls 'AppendRef'
 
-    // NOTE: Dqn_Str8Builder_Build    ///////////////////////////////////////////////////////////
-    // NOTE: Dqn_Str8Builder_BuildCRT ///////////////////////////////////////////////////////////
+    // NOTE: DN_Str8Builder_Build    ///////////////////////////////////////////////////////////
+    // NOTE: DN_Str8Builder_BuildCRT ///////////////////////////////////////////////////////////
     //
     // Constructs the final string by merging all the appended strings into
     // one merged string.
@@ -938,11 +950,11 @@ void Dqn_Docs_Demo()
     // The CRT variant calls into 'malloc' and the string *must* be released
     // using 'free'.
 
-    // NOTE: Dqn_Str8Builder_BuildSlice  ///////////////////////////////////////////////////////////
+    // NOTE: DN_Str8Builder_BuildSlice  ///////////////////////////////////////////////////////////
     //
     // Constructs the final string into an array of strings (e.g. a slice)
 
-    // NOTE: Dqn_TicketMutex ///////////////////////////////////////////////////////////////////////
+    // NOTE: DN_TicketMutex ///////////////////////////////////////////////////////////////////////
     //
     // A mutex implemented using an atomic compare and swap on tickets handed
     // out for each critical section.
@@ -958,28 +970,28 @@ void Dqn_Docs_Demo()
     // ideal for long blocking operations. This mutex does not issue any syscalls
     // and relies entirely on atomic instructions.
     {
-        Dqn_TicketMutex mutex = {};
-        Dqn_TicketMutex_Begin(&mutex); // Simple procedural mutual exclusion lock
-        Dqn_TicketMutex_End(&mutex);
+        DN_TicketMutex mutex = {};
+        DN_TicketMutex_Begin(&mutex); // Simple procedural mutual exclusion lock
+        DN_TicketMutex_End(&mutex);
 
-        // NOTE: Dqn_TicketMutex_MakeTicket ////////////////////////////////////////////////////////
+        // NOTE: DN_TicketMutex_MakeTicket ////////////////////////////////////////////////////////
         //
         // Request the next available ticket for locking from the mutex.
-        Dqn_uint ticket = Dqn_TicketMutex_MakeTicket(&mutex);
+        DN_UInt ticket = DN_TicketMutex_MakeTicket(&mutex);
 
-        if (Dqn_TicketMutex_CanLock(&mutex, ticket)) {
-            // NOTE: Dqn_TicketMutex_BeginTicket ///////////////////////////////////////////////////
+        if (DN_TicketMutex_CanLock(&mutex, ticket)) {
+            // NOTE: DN_TicketMutex_BeginTicket ///////////////////////////////////////////////////
             //
             // Locks the mutex using the given ticket if possible. If it's not
             // the next ticket to be locked the executing thread will block
             // until the mutex can lock the ticket, i.e. All prior tickets are
             // returned, in sequence, to the mutex.
-            Dqn_TicketMutex_BeginTicket(&mutex, ticket);
-            Dqn_TicketMutex_End(&mutex);
+            DN_TicketMutex_BeginTicket(&mutex, ticket);
+            DN_TicketMutex_End(&mutex);
         }
     }
 
-    // NOTE: Dqn_ThreadContext /////////////////////////////////////////////////////////////////////
+    // NOTE: DN_ThreadContext /////////////////////////////////////////////////////////////////////
     //
     // Each thread is assigned in their thread-local storage (TLS) tmem and
     // permanent arena allocators. These can be used for allocations with a
@@ -989,7 +1001,7 @@ void Dqn_Docs_Demo()
     // TLS in this implementation is implemented using the `thread_local` C/C++
     // keyword.
     //
-    // 99% of the time you will want Dqn_TLS_TMem(...) which returns you a
+    // 99% of the time you will want DN_TLS_TMem(...) which returns you a
     // temporary arena for function lifetime allocations. On scope exit, the
     // arena is cleared out.
     //
@@ -1002,21 +1014,21 @@ void Dqn_Docs_Demo()
     // as the tmem arena requested in the function, we risk the tmem arena
     // on scope exit deallocating memory belonging to the caller.
     //
-    // To avoid this we the 'Dqn_TLS_TMem(...)' API takes in a list of arenas
+    // To avoid this we the 'DN_TLS_TMem(...)' API takes in a list of arenas
     // to ensure that we provide a tmem arena that *won't* alias with the
     // caller's arena. If arena aliasing occurs, with ASAN on, generally
     // the library will trap and report use-after-poison once violated.
     {
-        Dqn_TLSTMem tmem_a = Dqn_TLS_TMem(nullptr);
+        DN_TLSTMem tmem_a = DN_TLS_TMem(nullptr);
 
         // Now imagine we call a function where we pass tmem_a.arena down
         // into it .. If we call tmem again, we need to pass in the arena
         // to prevent aliasing.
-        Dqn_TLSTMem tmem_b = Dqn_TLS_TMem(tmem_a.arena);
-        DQN_ASSERT(tmem_a.arena != tmem_b.arena);
+        DN_TLSTMem tmem_b = DN_TLS_TMem(tmem_a.arena);
+        DN_ASSERT(tmem_a.arena != tmem_b.arena);
     }
 
-    // @proc Dqn_Thread_GetTMem
+    // @proc DN_Thread_GetTMem
     //   @desc Retrieve the per-thread temporary arena allocator that is reset on scope
     //   exit.
 
@@ -1029,22 +1041,22 @@ void Dqn_Docs_Demo()
     //   @param[in] conflict_arena A pointer to the arena currently being used in the
     //   function
 
-    // NOTE: Dqn_U64ToStr8 /////////////////////////////////////////////////////////////////////////
+    // NOTE: DN_U64ToStr8 /////////////////////////////////////////////////////////////////////////
     {
-        Dqn_U64Str8 string = Dqn_U64ToStr8(123123, ',');
+        DN_U64Str8 string = DN_U64ToStr8(123123, ',');
         if (0) // Prints "123,123"
-            printf("%.*s", DQN_STR_FMT(string));
+            printf("%.*s", DN_STR_FMT(string));
     }
 
-    // NOTE: Dqn_U64ToAge //////////////////////////////////////////////////////////////////////////
+    // NOTE: DN_U64ToAge //////////////////////////////////////////////////////////////////////////
     {
-        Dqn_TLSTMem tmem = Dqn_TLS_TMem(nullptr);
-        Dqn_Str8    string  = Dqn_U64ToAge(tmem.arena, DQN_HOURS_TO_S(2) + DQN_MINS_TO_S(30), Dqn_U64AgeUnit_All);
+        DN_TLSTMem tmem = DN_TLS_TMem(nullptr);
+        DN_Str8    string  = DN_U64ToAge(tmem.arena, DN_HOURS_TO_S(2) + DN_MINS_TO_S(30), DN_U64AgeUnit_All);
         if (0) // Prints "2hr 30m"
-            printf("%.*s", DQN_STR_FMT(string));
+            printf("%.*s", DN_STR_FMT(string));
     }
 
-    // NOTE: Dqn_VArray ////////////////////////////////////////////////////////////////////////////
+    // NOTE: DN_VArray ////////////////////////////////////////////////////////////////////////////
     //
     // An array that is backed by virtual memory by reserving addressing space
     // and comitting pages as items are allocated in the array. This array never
@@ -1068,21 +1080,21 @@ void Dqn_Docs_Demo()
     // In addition to no realloc on expansion or shrinking.
     //
     {
-        // NOTE: Dqn_VArray_Init         ///////////////////////////////////////////////////////////
-        // NOTE: Dqn_VArray_InitByteSize ///////////////////////////////////////////////////////////
+        // NOTE: DN_VArray_Init         ///////////////////////////////////////////////////////////
+        // NOTE: DN_VArray_InitByteSize ///////////////////////////////////////////////////////////
         //
         // Initialise an array with the requested byte size or item capacity
         // respectively. The returned array may have a higher capacity than the
         // requested amount since requested memory from the OS may have a certain
         // alignment requirement (e.g. on Windows reserve/commit are 64k/4k
         // aligned).
-        Dqn_VArray<int> array = Dqn_VArray_Init<int>(1024, Dqn_ArenaFlag_Nil);
-        DQN_ASSERT(array.size == 0 && array.max >= 1024);
+        DN_VArray<int> array = DN_VArray_Init<int>(1024);
+        DN_ASSERT(array.size == 0 && array.max >= 1024);
 
-        // NOTE: Dqn_VArray_Make      //////////////////////////////////////////////////////////////
-        // NOTE: Dqn_VArray_Add       //////////////////////////////////////////////////////////////
-        // NOTE: Dqn_VArray_MakeArray //////////////////////////////////////////////////////////////
-        // NOTE: Dqn_VArray_AddArray  //////////////////////////////////////////////////////////////
+        // NOTE: DN_VArray_Make      //////////////////////////////////////////////////////////////
+        // NOTE: DN_VArray_Add       //////////////////////////////////////////////////////////////
+        // NOTE: DN_VArray_MakeArray //////////////////////////////////////////////////////////////
+        // NOTE: DN_VArray_AddArray  //////////////////////////////////////////////////////////////
         //
         // Allocate items from the array where:
         //
@@ -1091,21 +1103,21 @@ void Dqn_Docs_Demo()
         //
         // If the array has run out of capacity or was never initialised, a null
         // pointer is returned.
-        int *item = Dqn_VArray_Add(&array, 0xCAFE);
-        DQN_ASSERT(*item == 0xCAFE && array.size == 1);
+        int *item = DN_VArray_Add(&array, 0xCAFE);
+        DN_ASSERT(*item == 0xCAFE && array.size == 1);
 
-        // NOTE: Dqn_VArray_AddCArray  /////////////////////////////////////////////////////////////
-        Dqn_VArray_AddCArray(&array, {1, 2, 3});
-        DQN_ASSERT(array.size == 4);
+        // NOTE: DN_VArray_AddCArray  /////////////////////////////////////////////////////////////
+        DN_VArray_AddCArray(&array, {1, 2, 3});
+        DN_ASSERT(array.size == 4);
 
         // TODO(doyle): There's a bug here with the negative erase!
         // Loop over the array items and erase 1 item.
         #if 0
-        for (Dqn_usize index = 0; index < array.size; index++) {
+        for (DN_USize index = 0; index < array.size; index++) {
             if (index != 1)
                 continue;
 
-            // NOTE: Dqn_VArray_EraseRange /////////////////////////////////////////////////////////
+            // NOTE: DN_VArray_EraseRange /////////////////////////////////////////////////////////
             //
             // Erase the next 'count' items at 'begin_index' in the array.
             // 'count' can be positive or negative which dictates the if we
@@ -1123,24 +1135,24 @@ void Dqn_Docs_Demo()
 
             // TODO(doyle): There's a bug here! This doesn't work.
             // Erase index 0 with the negative count!
-            Dqn_ArrayEraseResult erase_result = Dqn_VArray_EraseRange(&array,
+            DN_ArrayEraseResult erase_result = DN_VArray_EraseRange(&array,
                                                                       /*begin_index*/ index,
                                                                       /*count*/ -1,
-                                                                      /*erase*/ Dqn_ArrayErase_Stable);
-            DQN_ASSERT(erase_result.items_erased == 1);
+                                                                      /*erase*/ DN_ArrayErase_Stable);
+            DN_ASSERT(erase_result.items_erased == 1);
 
             // Use the index returned to continue linearly iterating the array
             index = erase_result.it_index;
-            DQN_ASSERT(array.data[index + 1] == 2); // Next loop iteration will process item '2'
+            DN_ASSERT(array.data[index + 1] == 2); // Next loop iteration will process item '2'
         }
 
-        DQN_ASSERT(array.size    == 3 &&
+        DN_ASSERT(array.size    == 3 &&
                    array.data[0] == 1 &&
                    array.data[1] == 2 &&
                    array.data[2] == 3);
         #endif
 
-        // NOTE: Dqn_VArray_Reserve ////////////////////////////////////////////////////////////////////
+        // NOTE: DN_VArray_Reserve ////////////////////////////////////////////////////////////////////
         //
         // Ensure that the requested number of items are backed by physical pages
         // from the OS. Calling this pre-emptively will minimise syscalls into the
@@ -1148,36 +1160,36 @@ void Dqn_Docs_Demo()
         // in bytes to the allocation granularity of OS allocation APIs hence the
         // reserved space may be greater than the requested amount (e.g. this is 4k
         // on Windows).
-        Dqn_VArray_Reserve(&array, /*count*/ 8);
+        DN_VArray_Reserve(&array, /*count*/ 8);
 
-        Dqn_VArray_Deinit(&array);
+        DN_VArray_Deinit(&array);
     }
 
-    // NOTE: Dqn_Win_LastError         /////////////////////////////////////////////////////////////
-    // NOTE: Dqn_Win_ErrorCodeToMsg    /////////////////////////////////////////////////////////////
-    #if defined(DQN_PLATFORM_WIN32)
+    // NOTE: DN_Win_LastError         /////////////////////////////////////////////////////////////
+    // NOTE: DN_Win_ErrorCodeToMsg    /////////////////////////////////////////////////////////////
+    #if defined(DN_PLATFORM_WIN32)
     if (0) {
         // Generate the error string for the last Win32 API called that return
         // an error value.
-        Dqn_TLSTMem     tmem        = Dqn_TLS_TMem(nullptr);
-        Dqn_WinError get_last_error = Dqn_Win_LastError(tmem.arena);
-        printf("Error (%lu): %.*s", get_last_error.code, DQN_STR_FMT(get_last_error.msg));
+        DN_TLSTMem     tmem        = DN_TLS_TMem(nullptr);
+        DN_WinError get_last_error = DN_Win_LastError(tmem.arena);
+        printf("Error (%lu): %.*s", get_last_error.code, DN_STR_FMT(get_last_error.msg));
 
         // Alternatively, pass in the error code directly
-        Dqn_WinError error_msg_for_code = Dqn_Win_ErrorCodeToMsg(tmem.arena, /*error_code*/ 0);
-        printf("Error (%lu): %.*s", error_msg_for_code.code, DQN_STR_FMT(error_msg_for_code.msg));
+        DN_WinError error_msg_for_code = DN_Win_ErrorCodeToMsg(tmem.arena, /*error_code*/ 0);
+        printf("Error (%lu): %.*s", error_msg_for_code.code, DN_STR_FMT(error_msg_for_code.msg));
     }
 
-    // NOTE: Dqn_Win_MakeProcessDPIAware ///////////////////////////////////////////////////////////
+    // NOTE: DN_Win_MakeProcessDPIAware ///////////////////////////////////////////////////////////
     //
     // Call once at application start-up to ensure that the application is DPI
     // aware on Windows and ensure that application UI is scaled up
     // appropriately for the monitor.
 
-    // NOTE: Dqn_Win_Str8ToStr16       /////////////////////////////////////////////////////////////
-    // NOTE: Dqn_Win_Str8ToStr16Buffer /////////////////////////////////////////////////////////////
-    // NOTE: Dqn_Win_Str16ToStr8       /////////////////////////////////////////////////////////////
-    // NOTE: Dqn_Win_Str16ToStr8Buffer /////////////////////////////////////////////////////////////
+    // NOTE: DN_Win_Str8ToStr16       /////////////////////////////////////////////////////////////
+    // NOTE: DN_Win_Str8ToStr16Buffer /////////////////////////////////////////////////////////////
+    // NOTE: DN_Win_Str16ToStr8       /////////////////////////////////////////////////////////////
+    // NOTE: DN_Win_Str16ToStr8Buffer /////////////////////////////////////////////////////////////
     //
     // Convert a UTF8 <-> UTF16 string.
     //
@@ -1189,16 +1201,7 @@ void Dqn_Docs_Demo()
     //
     // Returns the number of u8's (for UTF16->8) OR u16's (for UTF8->16)
     // written/required for conversion. 0 if there was a conversion error and can be
-    // queried using 'Dqn_Win_LastError'
-
-    // NOTE: Dqn_Win_FolderIterate /////////////////////////////////////////////////////////////////
-    //
-    // Iterate the files within the passed in folder
-    if (0) {
-        for (Dqn_Win_FolderIterator it = {}; Dqn_Win_FolderIterate(DQN_STR8("C:/your/path/"), &it); ) {
-            printf("%.*s\n", DQN_STR_FMT(it.file_name));
-        }
-    }
+    // queried using 'DN_Win_LastError'
     #endif
 }
-DQN_MSVC_WARNING_POP
+DN_MSVC_WARNING_POP

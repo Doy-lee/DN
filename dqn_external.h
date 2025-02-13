@@ -19,12 +19,12 @@
 */
 
 // NOTE: [$OS_H] OS Headers ////////////////////////////////////////////////////////////////////////
-#if !defined(DQN_OS_WIN32) || defined(DQN_OS_WIN32_USE_PTHREADS)
+#if !defined(DN_OS_WIN32) || defined(DN_OS_WIN32_USE_PTHREADS)
     #include <pthread.h>
     #include <semaphore.h>
 #endif
 
-#if defined(DQN_OS_UNIX) || defined(DQN_PLATFORM_EMSCRIPTEN)
+#if defined(DN_OS_UNIX) || defined(DN_PLATFORM_EMSCRIPTEN)
     #include <errno.h>        // errno
     #include <fcntl.h>        // O_RDONLY ... etc
     #include <sys/ioctl.h>    // ioctl
@@ -36,31 +36,31 @@
     #include <time.h>         // clock_gettime, nanosleep
     #include <unistd.h>       // access, gettid, write
 
-    #if defined(DQN_PLATFORM_EMSCRIPTEN)
+    #if defined(DN_PLATFORM_EMSCRIPTEN)
     #else
     #include <sys/sendfile.h> // sendfile
     #include <linux/fs.h>     // FICLONE
     #endif
 #endif
 
-#if defined(DQN_PLATFORM_EMSCRIPTEN)
-    #include <emscripten/fetch.h> // emscripten_fetch (for Dqn_OSHttpResponse)
+#if defined(DN_PLATFORM_EMSCRIPTEN)
+    #include <emscripten/fetch.h> // emscripten_fetch (for DN_OSHttpResponse)
 #endif
 
 // NOTE: [$STBS] stb_sprintf ///////////////////////////////////////////////////////////////////////
-#if defined(DQN_USE_STD_PRINTF)
+#if defined(DN_USE_STD_PRINTF)
     #include <stdio.h>
-    #define DQN_SPRINTF(...) sprintf(__VA_ARGS__)
-    #define DQN_SNPRINTF(...) snprintf(__VA_ARGS__)
-    #define DQN_VSPRINTF(...) vsprintf(__VA_ARGS__)
-    #define DQN_VSNPRINTF(...) vsnprintf(__VA_ARGS__)
+    #define DN_SPRINTF(...) sprintf(__VA_ARGS__)
+    #define DN_SNPRINTF(...) snprintf(__VA_ARGS__)
+    #define DN_VSPRINTF(...) vsprintf(__VA_ARGS__)
+    #define DN_VSNPRINTF(...) vsnprintf(__VA_ARGS__)
 #else
-    #define DQN_SPRINTF(...) STB_SPRINTF_DECORATE(sprintf)(__VA_ARGS__)
-    #define DQN_SNPRINTF(...) STB_SPRINTF_DECORATE(snprintf)(__VA_ARGS__)
-    #define DQN_VSPRINTF(...) STB_SPRINTF_DECORATE(vsprintf)(__VA_ARGS__)
-    #define DQN_VSNPRINTF(...) STB_SPRINTF_DECORATE(vsnprintf)(__VA_ARGS__)
+    #define DN_SPRINTF(...) STB_SPRINTF_DECORATE(sprintf)(__VA_ARGS__)
+    #define DN_SNPRINTF(...) STB_SPRINTF_DECORATE(snprintf)(__VA_ARGS__)
+    #define DN_VSPRINTF(...) STB_SPRINTF_DECORATE(vsprintf)(__VA_ARGS__)
+    #define DN_VSNPRINTF(...) STB_SPRINTF_DECORATE(vsnprintf)(__VA_ARGS__)
 
-    #if (DQN_HAS_FEATURE(address_sanitizer) || defined(__SANITIZE_ADDRESS__)) && defined(DQN_COMPILER_MSVC)
+    #if (DN_HAS_FEATURE(address_sanitizer) || defined(__SANITIZE_ADDRESS__)) && defined(DN_COMPILER_MSVC)
         #error The STB implementation of sprintf triggers MSVCs implementation of ASAN. Compiling ASAN with STB sprintf is not supported.
 
         // NOTE: stb_sprintf assumes c-string literals are 4 byte aligned which is
@@ -70,7 +70,7 @@
         //
         // ==12072==ERROR: AddressSanitizer: global-buffer-overflow on address
         // READ of size 4 at 0x7ff6f442a0d8 thread T0
-        //     #0 0x7ff6f42d3be8 in stbsp_vsprintfcb C:\Home\Code\dqn\dqn_external.cpp:199
+        //     #0 0x7ff6f42d3be8 in stbsp_vsprintfcb C:\Home\Code\dn\dn_external.cpp:199
 
         #define STBSP__ASAN __declspec(no_sanitize_address)
     #endif
@@ -290,4 +290,4 @@ STBSP__PUBLICDEC int STB_SPRINTF_DECORATE(snprintf)(char *buf, int count, char c
 STBSP__PUBLICDEC int STB_SPRINTF_DECORATE(vsprintfcb)(STBSP_SPRINTFCB *callback, void *user, char *buf, char const *fmt, va_list va);
 STBSP__PUBLICDEC void STB_SPRINTF_DECORATE(set_separators)(char comma, char period);
 #endif // STB_SPRINTF_H_INCLUDE
-#endif // !defined(DQN_USE_STD_PRINTF)
+#endif // !defined(DN_USE_STD_PRINTF)

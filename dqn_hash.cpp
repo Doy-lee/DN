@@ -18,55 +18,55 @@
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 */
 
-// NOTE: [$FNV1] Dqn_FNV1A /////////////////////////////////////////////////////////////////////////
+// NOTE: [$FNV1] DN_FNV1A /////////////////////////////////////////////////////////////////////////
 // Default values recommended by: http://isthe.com/chongo/tech/comp/fnv/
-DQN_API uint32_t Dqn_FNV1A32_Iterate(void const *bytes, Dqn_usize size, uint32_t hash)
+DN_API uint32_t DN_FNV1A32_Iterate(void const *bytes, DN_USize size, uint32_t hash)
 {
-    auto buffer = DQN_CAST(uint8_t const *)bytes;
-    for (Dqn_usize i = 0; i < size; i++)
+    auto buffer = DN_CAST(uint8_t const *)bytes;
+    for (DN_USize i = 0; i < size; i++)
         hash = (buffer[i] ^ hash) * 16777619 /*FNV Prime*/;
     return hash;
 }
 
-DQN_API uint32_t Dqn_FNV1A32_Hash(void const *bytes, Dqn_usize size)
+DN_API uint32_t DN_FNV1A32_Hash(void const *bytes, DN_USize size)
 {
-    uint32_t result = Dqn_FNV1A32_Iterate(bytes, size, DQN_FNV1A32_SEED);
+    uint32_t result = DN_FNV1A32_Iterate(bytes, size, DN_FNV1A32_SEED);
     return result;
 }
 
-DQN_API uint64_t Dqn_FNV1A64_Iterate(void const *bytes, Dqn_usize size, uint64_t hash)
+DN_API uint64_t DN_FNV1A64_Iterate(void const *bytes, DN_USize size, uint64_t hash)
 {
-    auto buffer = DQN_CAST(uint8_t const *)bytes;
-    for (Dqn_usize i = 0; i < size; i++)
+    auto buffer = DN_CAST(uint8_t const *)bytes;
+    for (DN_USize i = 0; i < size; i++)
         hash = (buffer[i] ^ hash) * 1099511628211 /*FNV Prime*/;
     return hash;
 }
 
-DQN_API uint64_t Dqn_FNV1A64_Hash(void const *bytes, Dqn_usize size)
+DN_API uint64_t DN_FNV1A64_Hash(void const *bytes, DN_USize size)
 {
-    uint64_t result = Dqn_FNV1A64_Iterate(bytes, size, DQN_FNV1A64_SEED);
+    uint64_t result = DN_FNV1A64_Iterate(bytes, size, DN_FNV1A64_SEED);
     return result;
 }
 
-// NOTE: [$MMUR] Dqn_MurmurHash3 ///////////////////////////////////////////////////////////////////
-#if defined(DQN_COMPILER_MSVC) || defined(DQN_COMPILER_CLANG_CL)
-    #define DQN_MMH3_ROTL32(x, y) _rotl(x, y)
-    #define DQN_MMH3_ROTL64(x, y) _rotl64(x, y)
+// NOTE: [$MMUR] DN_MurmurHash3 ///////////////////////////////////////////////////////////////////
+#if defined(DN_COMPILER_MSVC) || defined(DN_COMPILER_CLANG_CL)
+    #define DN_MMH3_ROTL32(x, y) _rotl(x, y)
+    #define DN_MMH3_ROTL64(x, y) _rotl64(x, y)
 #else
-    #define DQN_MMH3_ROTL32(x, y) ((x) << (y)) | ((x) >> (32 - (y)))
-    #define DQN_MMH3_ROTL64(x, y) ((x) << (y)) | ((x) >> (64 - (y)))
+    #define DN_MMH3_ROTL32(x, y) ((x) << (y)) | ((x) >> (32 - (y)))
+    #define DN_MMH3_ROTL64(x, y) ((x) << (y)) | ((x) >> (64 - (y)))
 #endif
 
 //-----------------------------------------------------------------------------
 // Block read - if your platform needs to do endian-swapping or can only
 // handle aligned reads, do the conversion here
 
-DQN_FORCE_INLINE uint32_t Dqn_MurmurHash3_GetBlock32(uint32_t const *p, int i)
+DN_FORCE_INLINE uint32_t DN_MurmurHash3_GetBlock32(uint32_t const *p, int i)
 {
     return p[i];
 }
 
-DQN_FORCE_INLINE uint64_t Dqn_MurmurHash3_GetBlock64(uint64_t const *p, int i)
+DN_FORCE_INLINE uint64_t DN_MurmurHash3_GetBlock64(uint64_t const *p, int i)
 {
     return p[i];
 }
@@ -74,7 +74,7 @@ DQN_FORCE_INLINE uint64_t Dqn_MurmurHash3_GetBlock64(uint64_t const *p, int i)
 //-----------------------------------------------------------------------------
 // Finalization mix - force all bits of a hash block to avalanche
 
-DQN_FORCE_INLINE uint32_t Dqn_MurmurHash3_FMix32(uint32_t h)
+DN_FORCE_INLINE uint32_t DN_MurmurHash3_FMix32(uint32_t h)
 {
     h ^= h >> 16;
     h *= 0x85ebca6b;
@@ -84,7 +84,7 @@ DQN_FORCE_INLINE uint32_t Dqn_MurmurHash3_FMix32(uint32_t h)
     return h;
 }
 
-DQN_FORCE_INLINE uint64_t Dqn_MurmurHash3_FMix64(uint64_t k)
+DN_FORCE_INLINE uint64_t DN_MurmurHash3_FMix64(uint64_t k)
 {
     k ^= k >> 33;
     k *= 0xff51afd7ed558ccd;
@@ -94,7 +94,7 @@ DQN_FORCE_INLINE uint64_t Dqn_MurmurHash3_FMix64(uint64_t k)
     return k;
 }
 
-DQN_API uint32_t Dqn_MurmurHash3_x86U32(void const *key, int len, uint32_t seed)
+DN_API uint32_t DN_MurmurHash3_x86U32(void const *key, int len, uint32_t seed)
 {
     const uint8_t *data = (const uint8_t *)key;
     const int nblocks   = len / 4;
@@ -111,14 +111,14 @@ DQN_API uint32_t Dqn_MurmurHash3_x86U32(void const *key, int len, uint32_t seed)
 
     for (int i = -nblocks; i; i++)
     {
-        uint32_t k1 = Dqn_MurmurHash3_GetBlock32(blocks, i);
+        uint32_t k1 = DN_MurmurHash3_GetBlock32(blocks, i);
 
         k1 *= c1;
-        k1 = DQN_MMH3_ROTL32(k1, 15);
+        k1 = DN_MMH3_ROTL32(k1, 15);
         k1 *= c2;
 
         h1 ^= k1;
-        h1 = DQN_MMH3_ROTL32(h1, 13);
+        h1 = DN_MMH3_ROTL32(h1, 13);
         h1 = h1 * 5 + 0xe6546b64;
     }
 
@@ -138,7 +138,7 @@ DQN_API uint32_t Dqn_MurmurHash3_x86U32(void const *key, int len, uint32_t seed)
         case 1:
             k1 ^= tail[0];
             k1 *= c1;
-            k1 = DQN_MMH3_ROTL32(k1, 15);
+            k1 = DN_MMH3_ROTL32(k1, 15);
             k1 *= c2;
             h1 ^= k1;
     };
@@ -148,12 +148,12 @@ DQN_API uint32_t Dqn_MurmurHash3_x86U32(void const *key, int len, uint32_t seed)
 
     h1 ^= len;
 
-    h1 = Dqn_MurmurHash3_FMix32(h1);
+    h1 = DN_MurmurHash3_FMix32(h1);
 
     return h1;
 }
 
-DQN_API Dqn_MurmurHash3 Dqn_MurmurHash3_x64U128(void const *key, int len, uint32_t seed)
+DN_API DN_MurmurHash3 DN_MurmurHash3_x64U128(void const *key, int len, uint32_t seed)
 {
     const uint8_t *data = (const uint8_t *)key;
     const int nblocks   = len / 16;
@@ -171,24 +171,24 @@ DQN_API Dqn_MurmurHash3 Dqn_MurmurHash3_x64U128(void const *key, int len, uint32
 
     for (int i = 0; i < nblocks; i++)
     {
-        uint64_t k1 = Dqn_MurmurHash3_GetBlock64(blocks, i * 2 + 0);
-        uint64_t k2 = Dqn_MurmurHash3_GetBlock64(blocks, i * 2 + 1);
+        uint64_t k1 = DN_MurmurHash3_GetBlock64(blocks, i * 2 + 0);
+        uint64_t k2 = DN_MurmurHash3_GetBlock64(blocks, i * 2 + 1);
 
         k1 *= c1;
-        k1 = DQN_MMH3_ROTL64(k1, 31);
+        k1 = DN_MMH3_ROTL64(k1, 31);
         k1 *= c2;
         h1 ^= k1;
 
-        h1 = DQN_MMH3_ROTL64(h1, 27);
+        h1 = DN_MMH3_ROTL64(h1, 27);
         h1 += h2;
         h1 = h1 * 5 + 0x52dce729;
 
         k2 *= c2;
-        k2 = DQN_MMH3_ROTL64(k2, 33);
+        k2 = DN_MMH3_ROTL64(k2, 33);
         k2 *= c1;
         h2 ^= k2;
 
-        h2 = DQN_MMH3_ROTL64(h2, 31);
+        h2 = DN_MMH3_ROTL64(h2, 31);
         h2 += h1;
         h2 = h2 * 5 + 0x38495ab5;
     }
@@ -218,7 +218,7 @@ DQN_API Dqn_MurmurHash3 Dqn_MurmurHash3_x64U128(void const *key, int len, uint32
         case 9:
             k2 ^= ((uint64_t)tail[8]) << 0;
             k2 *= c2;
-            k2 = DQN_MMH3_ROTL64(k2, 33);
+            k2 = DN_MMH3_ROTL64(k2, 33);
             k2 *= c1;
             h2 ^= k2;
 
@@ -239,7 +239,7 @@ DQN_API Dqn_MurmurHash3 Dqn_MurmurHash3_x64U128(void const *key, int len, uint32
         case 1:
             k1 ^= ((uint64_t)tail[0]) << 0;
             k1 *= c1;
-            k1 = DQN_MMH3_ROTL64(k1, 31);
+            k1 = DN_MMH3_ROTL64(k1, 31);
             k1 *= c2;
             h1 ^= k1;
     };
@@ -253,13 +253,13 @@ DQN_API Dqn_MurmurHash3 Dqn_MurmurHash3_x64U128(void const *key, int len, uint32
     h1 += h2;
     h2 += h1;
 
-    h1 = Dqn_MurmurHash3_FMix64(h1);
-    h2 = Dqn_MurmurHash3_FMix64(h2);
+    h1 = DN_MurmurHash3_FMix64(h1);
+    h2 = DN_MurmurHash3_FMix64(h2);
 
     h1 += h2;
     h2 += h1;
 
-    Dqn_MurmurHash3 result = {};
+    DN_MurmurHash3 result = {};
     result.e[0]            = h1;
     result.e[1]            = h2;
     return result;

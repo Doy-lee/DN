@@ -17,77 +17,77 @@
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //
-// [$OMEM] Dqn_OSMem           --               -- Memory allocation (typically virtual memory if supported)
-// [$DATE] Dqn_OSDate          --               -- Date time APIs
-// [$FILE] Dqn_OSPathInfo/File --               -- File path info/reading/writing
-// [$PATH] Dqn_OSPath          --               -- Construct native OS paths helpers
-// [$EXEC] Dqn_OSExec          --               -- Execute programs programatically
-// [$SEMA] Dqn_OSSemaphore     -- DQN_SEMAPHORE --
-// [$MUTX] Dqn_OSMutex         --               --
-// [$THRD] Dqn_OSThread        -- DQN_THREAD    --
-// [$HTTP] Dqn_OSHttp          --               --
+// [$OMEM] DN_OSMem           --               -- Memory allocation (typically virtual memory if supported)
+// [$DATE] DN_OSDate          --               -- Date time APIs
+// [$FILE] DN_OSPathInfo/File --               -- File path info/reading/writing
+// [$PATH] DN_OSPath          --               -- Construct native OS paths helpers
+// [$EXEC] DN_OSExec          --               -- Execute programs programatically
+// [$SEMA] DN_OSSemaphore     -- DN_SEMAPHORE --
+// [$MUTX] DN_OSMutex         --               --
+// [$THRD] DN_OSThread        -- DN_THREAD    --
+// [$HTTP] DN_OSHttp          --               --
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 */
 
-// NOTE: [$OMEM] Dqn_OSMem //////////////////////////////////////////////////////////////////////////
-enum Dqn_OSMemCommit
+// NOTE: [$OMEM] DN_OSMem //////////////////////////////////////////////////////////////////////////
+enum DN_OSMemCommit
 {
-    Dqn_OSMemCommit_No,
-    Dqn_OSMemCommit_Yes,
+    DN_OSMemCommit_No,
+    DN_OSMemCommit_Yes,
 };
 
-enum Dqn_OSMemPage
+enum DN_OSMemPage
 {
     // Exception on read/write with a page. This flag overrides the read/write 
     // access.
-    Dqn_OSMemPage_NoAccess  = 1 << 0,
+    DN_OSMemPage_NoAccess  = 1 << 0,
 
-    Dqn_OSMemPage_Read      = 1 << 1, // Only read permitted on the page.
+    DN_OSMemPage_Read      = 1 << 1, // Only read permitted on the page.
 
     // Only write permitted on the page. On Windows this is not supported and
     // will be promoted to read+write permissions.
-    Dqn_OSMemPage_Write     = 1 << 2,
+    DN_OSMemPage_Write     = 1 << 2,
 
-    Dqn_OSMemPage_ReadWrite = Dqn_OSMemPage_Read | Dqn_OSMemPage_Write,
+    DN_OSMemPage_ReadWrite = DN_OSMemPage_Read | DN_OSMemPage_Write,
 
     // Modifier used in conjunction with previous flags. Raises exception on
     // first access to the page, then, the underlying protection flags are
     // active. This is supported on Windows, on other OS's using this flag will
-    // set the OS equivalent of Dqn_OSMemPage_NoAccess.
-    // This flag must only be used in Dqn_OSMem_Protect
-    Dqn_OSMemPage_Guard     = 1 << 3,
+    // set the OS equivalent of DN_OSMemPage_NoAccess.
+    // This flag must only be used in DN_OSMem_Protect
+    DN_OSMemPage_Guard     = 1 << 3,
 
     // If leak tracing is enabled, this flag will allow the allocation recorded
     // from the reserve call to be leaked, e.g. not printed when leaks are
     // dumped to the console.
-    Dqn_OSMemPage_AllocRecordLeakPermitted = 1 << 4,
+    DN_OSMemPage_AllocRecordLeakPermitted = 1 << 4,
 
     // If leak tracing is enabled this flag will prevent any allocation record
     // from being created in the allocation table at all. If this flag is
     // enabled, 'OSMemPage_AllocRecordLeakPermitted' has no effect since the
     // record will never be created.
-    Dqn_OSMemPage_NoAllocRecordEntry = 1 << 5,
+    DN_OSMemPage_NoAllocRecordEntry = 1 << 5,
 
     // [INTERNAL] Do not use. All flags together do not constitute a correct
     // configuration of pages.
-    Dqn_OSMemPage_All                = Dqn_OSMemPage_NoAccess |
-                                      Dqn_OSMemPage_ReadWrite |
-                                      Dqn_OSMemPage_Guard |
-                                      Dqn_OSMemPage_AllocRecordLeakPermitted |
-                                      Dqn_OSMemPage_NoAllocRecordEntry,
+    DN_OSMemPage_All                = DN_OSMemPage_NoAccess |
+                                      DN_OSMemPage_ReadWrite |
+                                      DN_OSMemPage_Guard |
+                                      DN_OSMemPage_AllocRecordLeakPermitted |
+                                      DN_OSMemPage_NoAllocRecordEntry,
 };
 
-// NOTE: [$DATE] Dqn_OSDate ////////////////////////////////////////////////////////////////////////
-struct Dqn_OSDateTimeStr8
+// NOTE: [$DATE] DN_OSDate ////////////////////////////////////////////////////////////////////////
+struct DN_OSDateTimeStr8
 {
-    char    date[DQN_ARRAY_UCOUNT("YYYY-MM-SS")];
+    char    date[DN_ARRAY_UCOUNT("YYYY-MM-SS")];
     uint8_t date_size;
-    char    hms[DQN_ARRAY_UCOUNT("HH:MM:SS")];
+    char    hms[DN_ARRAY_UCOUNT("HH:MM:SS")];
     uint8_t hms_size;
 };
 
-struct Dqn_OSDateTime
+struct DN_OSDateTime
 {
     uint8_t  day;
     uint8_t  month;
@@ -97,126 +97,136 @@ struct Dqn_OSDateTime
     uint8_t  seconds;
 };
 
-struct Dqn_OSTimer /// Record time between two time-points using the OS's performance counter.
+struct DN_OSTimer /// Record time between two time-points using the OS's performance counter.
 {
     uint64_t start;
     uint64_t end;
 };
 
-#if !defined(DQN_NO_OS_FILE_API)
-// NOTE: [$FSYS] Dqn_OSFile ////////////////////////////////////////////////////////////////////////
-enum Dqn_OSPathInfoType
+#if !defined(DN_NO_OS_FILE_API)
+// NOTE: [$FSYS] DN_OSFile ////////////////////////////////////////////////////////////////////////
+enum DN_OSPathInfoType
 {
-    Dqn_OSPathInfoType_Unknown,
-    Dqn_OSPathInfoType_Directory,
-    Dqn_OSPathInfoType_File,
+    DN_OSPathInfoType_Unknown,
+    DN_OSPathInfoType_Directory,
+    DN_OSPathInfoType_File,
 };
 
-struct Dqn_OSPathInfo
+struct DN_OSPathInfo
 {
     bool               exists;
-    Dqn_OSPathInfoType type;
+    DN_OSPathInfoType type;
     uint64_t           create_time_in_s;
     uint64_t           last_write_time_in_s;
     uint64_t           last_access_time_in_s;
     uint64_t           size;
 };
 
-struct Dqn_OS_DirIterator
+struct DN_OSDirIterator
 {
     void    *handle;
-    Dqn_Str8 file_name;
+    DN_Str8 file_name;
     char     buffer[512];
 };
 
 // NOTE: R/W Stream API ////////////////////////////////////////////////////////////////////////////
-struct Dqn_OSFile
+struct DN_OSFile
 {
     bool  error;
     void *handle;
 };
 
-enum Dqn_OSFileOpen
+enum DN_OSFileOpen
 {
-    Dqn_OSFileOpen_CreateAlways, // Create file if it does not exist, otherwise, zero out the file and open
-    Dqn_OSFileOpen_OpenIfExist,  // Open file at path only if it exists
-    Dqn_OSFileOpen_OpenAlways,   // Open file at path, create file if it does not exist
+    DN_OSFileOpen_CreateAlways, // Create file if it does not exist, otherwise, zero out the file and open
+    DN_OSFileOpen_OpenIfExist,  // Open file at path only if it exists
+    DN_OSFileOpen_OpenAlways,   // Open file at path, create file if it does not exist
 };
 
-enum Dqn_OSFileAccess
+typedef uint32_t DN_OSFileAccess;
+enum DN_OSFileAccess_
 {
-    Dqn_OSFileAccess_Read       = 1 << 0,
-    Dqn_OSFileAccess_Write      = 1 << 1,
-    Dqn_OSFileAccess_Execute    = 1 << 2,
-    Dqn_OSFileAccess_AppendOnly = 1 << 3, // This flag cannot be combined with any other access mode
-    Dqn_OSFileAccess_ReadWrite  = Dqn_OSFileAccess_Read      | Dqn_OSFileAccess_Write,
-    Dqn_OSFileAccess_All        = Dqn_OSFileAccess_ReadWrite | Dqn_OSFileAccess_Execute,
+    DN_OSFileAccess_Read       = 1 << 0,
+    DN_OSFileAccess_Write      = 1 << 1,
+    DN_OSFileAccess_Execute    = 1 << 2,
+    DN_OSFileAccess_AppendOnly = 1 << 3, // This flag cannot be combined with any other access mode
+    DN_OSFileAccess_ReadWrite  = DN_OSFileAccess_Read      | DN_OSFileAccess_Write,
+    DN_OSFileAccess_All        = DN_OSFileAccess_ReadWrite | DN_OSFileAccess_Execute | DN_OSFileAccess_AppendOnly,
 };
-#endif // DQN_NO_OS_FILE_API
+#endif // DN_NO_OS_FILE_API
 
-// NOTE: Dqn_OSPath ////////////////////////////////////////////////////////////////////////////////
-#if !defined(Dqn_OSPathSeperator)
-    #if defined(DQN_OS_WIN32)
-        #define Dqn_OSPathSeperator "\\"
+// NOTE: DN_OSPath ////////////////////////////////////////////////////////////////////////////////
+#if !defined(DN_OSPathSeperator)
+    #if defined(DN_OS_WIN32)
+        #define DN_OSPathSeperator "\\"
     #else
-        #define Dqn_OSPathSeperator "/"
+        #define DN_OSPathSeperator "/"
     #endif
-    #define Dqn_OSPathSeperatorString DQN_STR8(Dqn_OSPathSeperator)
+    #define DN_OSPathSeperatorString DN_STR8(DN_OSPathSeperator)
 #endif
 
-struct Dqn_OSPathLink
+struct DN_OSPathLink
 {
-    Dqn_Str8        string;
-    Dqn_OSPathLink *next;
-    Dqn_OSPathLink *prev;
+    DN_Str8        string;
+    DN_OSPathLink *next;
+    DN_OSPathLink *prev;
 };
 
-struct Dqn_OSPath
+struct DN_OSPath
 {
     bool            has_prefix_path_separator;
-    Dqn_OSPathLink *head;
-    Dqn_OSPathLink *tail;
-    Dqn_usize       string_size;
+    DN_OSPathLink *head;
+    DN_OSPathLink *tail;
+    DN_USize       string_size;
     uint16_t        links_size;
 };
 
-// NOTE: [$EXEC] Dqn_OSExec ////////////////////////////////////////////////////////////////////////
-enum Dqn_OSExecFlag
+// NOTE: [$EXEC] DN_OSExec ////////////////////////////////////////////////////////////////////////
+typedef uint32_t DN_OSExecFlags;
+enum DN_OSExecFlags_
 {
-    Dqn_OSExecFlag_Nil                 = 0,
-    Dqn_OSExecFlag_SaveStdout          = 1 << 0,
-    Dqn_OSExecFlag_SaveStderr          = 1 << 1,
-    Dqn_OSExecFlag_SaveOutput          = Dqn_OSExecFlag_SaveStdout | Dqn_OSExecFlag_SaveStderr,
-    Dqn_OSExecFlag_MergeStderrToStdout = 1 << 2                    | Dqn_OSExecFlag_SaveOutput,
+    DN_OSExecFlags_Nil                 = 0,
+    DN_OSExecFlags_SaveStdout          = 1 << 0,
+    DN_OSExecFlags_SaveStderr          = 1 << 1,
+    DN_OSExecFlags_SaveOutput          = DN_OSExecFlags_SaveStdout | DN_OSExecFlags_SaveStderr,
+    DN_OSExecFlags_MergeStderrToStdout = 1 << 2                     | DN_OSExecFlags_SaveOutput,
 };
 
-struct Dqn_OSExecAsyncHandle
+struct DN_OSExecAsyncHandle
 {
-    uint8_t   exec_flags;
-    uint32_t  os_error_code;
-    uint32_t  exit_code;
-    void     *process;
-    void     *stdout_read;
-    void     *stdout_write;
-    void     *stderr_read;
-    void     *stderr_write;
+    DN_OSExecFlags exec_flags;
+    uint32_t        os_error_code;
+    uint32_t        exit_code;
+    void           *process;
+    void           *stdout_read;
+    void           *stdout_write;
+    void           *stderr_read;
+    void           *stderr_write;
 };
 
-struct Dqn_OSExecResult
+struct DN_OSExecResult
 {
-    Dqn_Str8 stdout_text;
-    Dqn_Str8 stderr_text;
+    bool     finished;
+    DN_Str8 stdout_text;
+    DN_Str8 stderr_text;
     uint32_t os_error_code;
     uint32_t exit_code;
 };
 
-#if !defined(DQN_NO_SEMAPHORE)
-// NOTE: [$SEMA] Dqn_OSSemaphore ///////////////////////////////////////////////////////////////////
-uint32_t const DQN_OS_SEMAPHORE_INFINITE_TIMEOUT = UINT32_MAX;
-
-struct Dqn_OSSemaphore
+struct DN_OSExecArgs
 {
-    #if defined(DQN_OS_WIN32) && !defined(DQN_OS_WIN32_USE_PTHREADS)
+    DN_OSExecFlags     flags;
+    DN_Str8            working_dir;
+    DN_Slice<DN_Str8> environment;
+};
+
+#if !defined(DN_NO_SEMAPHORE)
+// NOTE: [$SEMA] DN_OSSemaphore ///////////////////////////////////////////////////////////////////
+uint32_t const DN_OS_SEMAPHORE_INFINITE_TIMEOUT = UINT32_MAX;
+
+struct DN_OSSemaphore
+{
+    #if defined(DN_OS_WIN32) && !defined(DN_OS_WIN32_USE_PTHREADS)
     void *win32_handle;
     #else
     sem_t posix_handle;
@@ -224,189 +234,212 @@ struct Dqn_OSSemaphore
     #endif
 };
 
-enum Dqn_OSSemaphoreWaitResult
+enum DN_OSSemaphoreWaitResult
 {
-    Dqn_OSSemaphoreWaitResult_Failed,
-    Dqn_OSSemaphoreWaitResult_Success,
-    Dqn_OSSemaphoreWaitResult_Timeout,
+    DN_OSSemaphoreWaitResult_Failed,
+    DN_OSSemaphoreWaitResult_Success,
+    DN_OSSemaphoreWaitResult_Timeout,
 };
-#endif // !defined(DQN_NO_SEMAPHORE)
+#endif // !defined(DN_NO_SEMAPHORE)
 
-// NOTE: [$THRD] Dqn_OSThread /////////////////////////////////////////////////////////////////////
-#if !defined(DQN_NO_THREAD) && !defined(DQN_NO_SEMAPHORE)
-typedef int32_t (Dqn_OSThreadFunc)(struct Dqn_OSThread*);
+// NOTE: [$THRD] DN_OSThread /////////////////////////////////////////////////////////////////////
+#if !defined(DN_NO_THREAD) && !defined(DN_NO_SEMAPHORE)
+typedef int32_t (DN_OSThreadFunc)(struct DN_OSThread*);
 
-struct Dqn_OSThread
+struct DN_OSThread
 {
-    Dqn_TLS           tls;
+    DN_FStr8<64>     name;
+    DN_TLS           tls;
     void             *handle;
     uint64_t          thread_id;
     void             *user_context;
-    Dqn_OSThreadFunc *func;
-    Dqn_OSSemaphore   init_semaphore;
+    DN_OSThreadFunc *func;
+    DN_OSSemaphore   init_semaphore;
 };
-#endif // !defined(DQN_NO_THREAD)
+#endif // !defined(DN_NO_THREAD)
 
-// NOTE: [$HTTP] Dqn_OSHttp ////////////////////////////////////////////////////////////////////////
-enum Dqn_OSHttpRequestSecure
+// NOTE: [$HTTP] DN_OSHttp ////////////////////////////////////////////////////////////////////////
+enum DN_OSHttpRequestSecure
 {
-    Dqn_OSHttpRequestSecure_No,
-    Dqn_OSHttpRequestSecure_Yes,
+    DN_OSHttpRequestSecure_No,
+    DN_OSHttpRequestSecure_Yes,
 };
 
-struct Dqn_OSHttpResponse
+struct DN_OSHttpResponse
 {
     // NOTE: Response data
     uint32_t   error_code;
-    Dqn_Str8   error_msg;
+    DN_Str8   error_msg;
     uint16_t   http_status;
-    Dqn_Str8   body;
-    Dqn_b32    done;
+    DN_Str8   body;
+    DN_B32    done;
 
     // NOTE: Book-keeping
-    Dqn_Arena *arena; // Allocates memory for the response
+    DN_Arena *arena; // Allocates memory for the response
 
     // NOTE: Async book-keeping
     // Synchronous HTTP response uses the TLS scratch arena whereas async
     // calls use their own dedicated arena.
-    Dqn_Arena         tmp_arena;
-    Dqn_Arena        *tmem_arena;
-    Dqn_Str8Builder   builder;
-    Dqn_OSSemaphore   on_complete_semaphore;
+    DN_Arena         tmp_arena;
+    DN_Arena        *tmem_arena;
+    DN_Str8Builder   builder;
+    DN_OSSemaphore   on_complete_semaphore;
 
-    #if defined(DQN_PLATFORM_EMSCRIPTEN)
+    #if defined(DN_PLATFORM_EMSCRIPTEN)
     emscripten_fetch_t  *em_handle;
-    #elif defined(DQN_OS_WIN32)
+    #elif defined(DN_OS_WIN32)
     HINTERNET            win32_request_session;
     HINTERNET            win32_request_connection;
     HINTERNET            win32_request_handle;
     #endif
 };
 
+DN_API void                      DN_OS_Init();
+
 // NOTE: [$OMEM] Memory //////////////////////////////////////////////////////////////////////////
-DQN_API void *                    Dqn_OS_MemReserve (Dqn_usize size, Dqn_OSMemCommit commit, uint32_t page_flags);
-DQN_API bool                      Dqn_OS_MemCommit  (void *ptr, Dqn_usize size, uint32_t page_flags);
-DQN_API void                      Dqn_OS_MemDecommit(void *ptr, Dqn_usize size);
-DQN_API void                      Dqn_OS_MemRelease (void *ptr, Dqn_usize size);
-DQN_API int                       Dqn_OS_MemProtect (void *ptr, Dqn_usize size, uint32_t page_flags);
+DN_API void *                    DN_OS_MemReserve (DN_USize size, DN_OSMemCommit commit, uint32_t page_flags);
+DN_API bool                      DN_OS_MemCommit  (void *ptr, DN_USize size, uint32_t page_flags);
+DN_API void                      DN_OS_MemDecommit(void *ptr, DN_USize size);
+DN_API void                      DN_OS_MemRelease (void *ptr, DN_USize size);
+DN_API int                       DN_OS_MemProtect (void *ptr, DN_USize size, uint32_t page_flags);
+
+// NOTE: Heap
+DN_API void                     *DN_OS_MemAlloc   (DN_USize size, DN_ZeroMem zero_mem);
+DN_API void                      DN_OS_MemDealloc (void *ptr);
 
 // NOTE: [$DATE] Date //////////////////////////////////////////////////////////////////////////////
-DQN_API Dqn_OSDateTime            Dqn_OS_DateLocalTimeNow    ();
-DQN_API Dqn_OSDateTimeStr8        Dqn_OS_DateLocalTimeStr8Now(char date_separator = '-', char hms_separator = ':');
-DQN_API Dqn_OSDateTimeStr8        Dqn_OS_DateLocalTimeStr8   (Dqn_OSDateTime time, char date_separator = '-', char hms_separator = ':');
-DQN_API uint64_t                  Dqn_OS_DateUnixTime        ();
-DQN_API Dqn_OSDateTime            Dqn_OS_DateUnixTimeToDate  (uint64_t time);
-DQN_API uint64_t                  Dqn_OS_DateToUnixTime      (Dqn_OSDateTime date);
-DQN_API bool                      Dqn_OS_DateIsValid         (Dqn_OSDateTime date);
+DN_API DN_OSDateTime             DN_OS_DateLocalTimeNow    ();
+DN_API DN_OSDateTimeStr8         DN_OS_DateLocalTimeStr8Now(char date_separator = '-', char hms_separator = ':');
+DN_API DN_OSDateTimeStr8         DN_OS_DateLocalTimeStr8   (DN_OSDateTime time, char date_separator = '-', char hms_separator = ':');
+DN_API uint64_t                  DN_OS_DateUnixTimeNs      ();
+DN_API uint64_t                  DN_OS_DateUnixTimeS       ();
+DN_API DN_OSDateTime             DN_OS_DateUnixTimeSToDate (uint64_t time);
+DN_API uint64_t                  DN_OS_DateLocalToUnixTimeS(DN_OSDateTime date);
+DN_API uint64_t                  DN_OS_DateToUnixTimeS     (DN_OSDateTime date);
+DN_API bool                      DN_OS_DateIsValid         (DN_OSDateTime date);
 
 // NOTE: Other /////////////////////////////////////////////////////////////////////////////////////
-DQN_API bool                      Dqn_OS_SecureRNGBytes      (void *buffer, uint32_t size);
-DQN_API Dqn_Str8                  Dqn_OS_EXEPath             (Dqn_Arena *arena);
-DQN_API Dqn_Str8                  Dqn_OS_EXEDir              (Dqn_Arena *arena);
-#define                           Dqn_OS_EXEDir_TLS()        Dqn_OS_EXEDir(Dqn_TLS_TopArena())
-DQN_API void                      Dqn_OS_SleepMs             (Dqn_uint milliseconds);
-// NOTE: Counters //////////////////////////////////////////////////////////////////////////////////
-DQN_API uint64_t                  Dqn_OS_PerfCounterNow      ();
-DQN_API uint64_t                  Dqn_OS_PerfCounterFrequency();
-DQN_API Dqn_f64                   Dqn_OS_PerfCounterS        (uint64_t begin, uint64_t end);
-DQN_API Dqn_f64                   Dqn_OS_PerfCounterMs       (uint64_t begin, uint64_t end);
-DQN_API Dqn_f64                   Dqn_OS_PerfCounterUs       (uint64_t begin, uint64_t end);
-DQN_API Dqn_f64                   Dqn_OS_PerfCounterNs       (uint64_t begin, uint64_t end);
-DQN_API Dqn_OSTimer               Dqn_OS_TimerBegin          ();
-DQN_API void                      Dqn_OS_TimerEnd            (Dqn_OSTimer *timer);
-DQN_API Dqn_f64                   Dqn_OS_TimerS              (Dqn_OSTimer timer);
-DQN_API Dqn_f64                   Dqn_OS_TimerMs             (Dqn_OSTimer timer);
-DQN_API Dqn_f64                   Dqn_OS_TimerUs             (Dqn_OSTimer timer);
-DQN_API Dqn_f64                   Dqn_OS_TimerNs             (Dqn_OSTimer timer);
-DQN_API uint64_t                  Dqn_OS_EstimateTSCPerSecond(uint64_t duration_ms_to_gauge_tsc_frequency);
+DN_API bool                      DN_OS_SecureRNGBytes      (void *buffer, uint32_t size);
+DN_API bool                      DN_OS_SetEnvVar           (DN_Str8 name, DN_Str8 value);
+DN_API DN_Str8                   DN_OS_EXEPath             (DN_Arena *arena);
+DN_API DN_Str8                   DN_OS_EXEDir              (DN_Arena *arena);
+#define                          DN_OS_EXEDir_TLS()        DN_OS_EXEDir(DN_TLS_TopArena())
+DN_API void                      DN_OS_SleepMs             (DN_UInt milliseconds);
 
-#if !defined(DQN_NO_OS_FILE_API)
+// NOTE: Counters //////////////////////////////////////////////////////////////////////////////////
+DN_API uint64_t                  DN_OS_PerfCounterNow      ();
+DN_API uint64_t                  DN_OS_PerfCounterFrequency();
+DN_API DN_F64                    DN_OS_PerfCounterS        (uint64_t begin, uint64_t end);
+DN_API DN_F64                    DN_OS_PerfCounterMs       (uint64_t begin, uint64_t end);
+DN_API DN_F64                    DN_OS_PerfCounterUs       (uint64_t begin, uint64_t end);
+DN_API DN_F64                    DN_OS_PerfCounterNs       (uint64_t begin, uint64_t end);
+DN_API DN_OSTimer                DN_OS_TimerBegin          ();
+DN_API void                      DN_OS_TimerEnd            (DN_OSTimer *timer);
+DN_API DN_F64                    DN_OS_TimerS              (DN_OSTimer timer);
+DN_API DN_F64                    DN_OS_TimerMs             (DN_OSTimer timer);
+DN_API DN_F64                    DN_OS_TimerUs             (DN_OSTimer timer);
+DN_API DN_F64                    DN_OS_TimerNs             (DN_OSTimer timer);
+DN_API uint64_t                  DN_OS_EstimateTSCPerSecond(uint64_t duration_ms_to_gauge_tsc_frequency);
+#if !defined(DN_NO_OS_FILE_API)
 // NOTE: File system paths /////////////////////////////////////////////////////////////////////////
-DQN_API Dqn_OSPathInfo            Dqn_OS_PathInfo       (Dqn_Str8 path);
-DQN_API bool                      Dqn_OS_FileIsOlderThan(Dqn_Str8 file, Dqn_Str8 check_against);
-DQN_API bool                      Dqn_OS_PathDelete     (Dqn_Str8 path);
-DQN_API bool                      Dqn_OS_FileExists     (Dqn_Str8 path);
-DQN_API bool                      Dqn_OS_CopyFile       (Dqn_Str8 src, Dqn_Str8 dest, bool overwrite, Dqn_ErrorSink *error);
-DQN_API bool                      Dqn_OS_MoveFile       (Dqn_Str8 src, Dqn_Str8 dest, bool overwrite, Dqn_ErrorSink *error);
-DQN_API bool                      Dqn_OS_MakeDir        (Dqn_Str8 path);
-DQN_API bool                      Dqn_OS_DirExists      (Dqn_Str8 path);
-DQN_API bool                      Dqn_OS_DirIterate     (Dqn_Str8 path, Dqn_OS_DirIterator *it);
+DN_API DN_OSPathInfo             DN_OS_PathInfo       (DN_Str8 path);
+DN_API bool                      DN_OS_FileIsOlderThan(DN_Str8 file, DN_Str8 check_against);
+DN_API bool                      DN_OS_PathDelete     (DN_Str8 path);
+DN_API bool                      DN_OS_FileExists     (DN_Str8 path);
+DN_API bool                      DN_OS_CopyFile       (DN_Str8 src, DN_Str8 dest, bool overwrite, DN_ErrSink *err);
+DN_API bool                      DN_OS_MoveFile       (DN_Str8 src, DN_Str8 dest, bool overwrite, DN_ErrSink *err);
+DN_API bool                      DN_OS_MakeDir        (DN_Str8 path);
+DN_API bool                      DN_OS_DirExists      (DN_Str8 path);
+DN_API bool                      DN_OS_DirIterate     (DN_Str8 path, DN_OSDirIterator *it);
 
 // NOTE: R/W Stream API ////////////////////////////////////////////////////////////////////////////
-DQN_API Dqn_OSFile                Dqn_OS_FileOpen    (Dqn_Str8 path, Dqn_OSFileOpen open_mode, uint32_t access, Dqn_ErrorSink *error);
-DQN_API bool                      Dqn_OS_FileRead    (Dqn_OSFile *file, void *buffer, Dqn_usize size, Dqn_ErrorSink *error);
-DQN_API bool                      Dqn_OS_FileWritePtr(Dqn_OSFile *file, void const *data, Dqn_usize size, Dqn_ErrorSink *error);
-DQN_API bool                      Dqn_OS_FileWrite   (Dqn_OSFile *file, Dqn_Str8 buffer, Dqn_ErrorSink *error);
-DQN_API bool                      Dqn_OS_FileWriteFV (Dqn_OSFile *file, Dqn_ErrorSink *error, DQN_FMT_ATTRIB char const *fmt, va_list args);
-DQN_API bool                      Dqn_OS_FileWriteF  (Dqn_OSFile *file, Dqn_ErrorSink *error, DQN_FMT_ATTRIB char const *fmt, ...);
-DQN_API void                      Dqn_OS_FileClose   (Dqn_OSFile *file);
+DN_API DN_OSFile                 DN_OS_FileOpen    (DN_Str8 path, DN_OSFileOpen open_mode, DN_OSFileAccess access, DN_ErrSink *err);
+DN_API bool                      DN_OS_FileRead    (DN_OSFile *file, void *buffer, DN_USize size, DN_ErrSink *err);
+DN_API bool                      DN_OS_FileWritePtr(DN_OSFile *file, void const *data, DN_USize size, DN_ErrSink *err);
+DN_API bool                      DN_OS_FileWrite   (DN_OSFile *file, DN_Str8 buffer, DN_ErrSink *err);
+DN_API bool                      DN_OS_FileWriteFV (DN_OSFile *file, DN_ErrSink *err, DN_FMT_ATTRIB char const *fmt, va_list args);
+DN_API bool                      DN_OS_FileWriteF  (DN_OSFile *file, DN_ErrSink *err, DN_FMT_ATTRIB char const *fmt, ...);
+DN_API bool                      DN_OS_FileFlush   (DN_OSFile *file, DN_ErrSink *err);
+DN_API void                      DN_OS_FileClose   (DN_OSFile *file);
 
 // NOTE: R/W Entire File ///////////////////////////////////////////////////////////////////////////
-DQN_API Dqn_Str8                  Dqn_OS_ReadAll          (Dqn_Arena *arena, Dqn_Str8 path, Dqn_ErrorSink *error);
-#define                           Dqn_OS_ReadAll_TLS(...) Dqn_OS_ReadAll(Dqn_TLS_TopArena(), ##__VA_ARGS__)
-DQN_API bool                      Dqn_OS_WriteAll         (Dqn_Str8 path, Dqn_Str8 buffer, Dqn_ErrorSink *error);
-DQN_API bool                      Dqn_OS_WriteAllFV       (Dqn_Str8 path, Dqn_ErrorSink *error, DQN_FMT_ATTRIB char const *fmt, va_list args);
-DQN_API bool                      Dqn_OS_WriteAllF        (Dqn_Str8 path, Dqn_ErrorSink *error, DQN_FMT_ATTRIB char const *fmt, ...);
-DQN_API bool                      Dqn_OS_WriteAllSafe     (Dqn_Str8 path, Dqn_Str8 buffer, Dqn_ErrorSink *error);
-DQN_API bool                      Dqn_OS_WriteAllSafeFV   (Dqn_Str8 path, Dqn_ErrorSink *error, DQN_FMT_ATTRIB char const *fmt, va_list args);
-DQN_API bool                      Dqn_OS_WriteAllSafeF    (Dqn_Str8 path, Dqn_ErrorSink *error, DQN_FMT_ATTRIB char const *fmt, ...);
-#endif // !defined(DQN_NO_OS_FILE_API)
+DN_API DN_Str8                   DN_OS_ReadAll          (DN_Arena *arena, DN_Str8 path, DN_ErrSink *err);
+#define                          DN_OS_ReadAll_TLS(...) DN_OS_ReadAll(DN_TLS_TopArena(), ##__VA_ARGS__)
+DN_API bool                      DN_OS_WriteAll         (DN_Str8 path, DN_Str8 buffer, DN_ErrSink *err);
+DN_API bool                      DN_OS_WriteAllFV       (DN_Str8 path, DN_ErrSink *err, DN_FMT_ATTRIB char const *fmt, va_list args);
+DN_API bool                      DN_OS_WriteAllF        (DN_Str8 path, DN_ErrSink *err, DN_FMT_ATTRIB char const *fmt, ...);
+DN_API bool                      DN_OS_WriteAllSafe     (DN_Str8 path, DN_Str8 buffer, DN_ErrSink *err);
+DN_API bool                      DN_OS_WriteAllSafeFV   (DN_Str8 path, DN_ErrSink *err, DN_FMT_ATTRIB char const *fmt, va_list args);
+DN_API bool                      DN_OS_WriteAllSafeF    (DN_Str8 path, DN_ErrSink *err, DN_FMT_ATTRIB char const *fmt, ...);
+#endif // !defined(DN_NO_OS_FILE_API)
 
 // NOTE: File system paths /////////////////////////////////////////////////////////////////////////
-DQN_API bool                      Dqn_OS_PathAddRef                             (Dqn_Arena *arena, Dqn_OSPath *fs_path, Dqn_Str8 path);
-#define                           Dqn_OS_PathAddRef_TLS(...)                    Dqn_OS_PathAddRef(Dqn_TLS_TopArena(), ##__VA_ARGS__)
-DQN_API bool                      Dqn_OS_PathAdd                                (Dqn_Arena *arena, Dqn_OSPath *fs_path, Dqn_Str8 path);
-#define                           Dqn_OS_PathAdd_TLS(...)                       Dqn_OS_PathAdd(Dqn_TLS_TopArena(), ##__VA_ARGS__)
-DQN_API bool                      Dqn_OS_PathAddF                               (Dqn_Arena *arena, Dqn_OSPath *fs_path, DQN_FMT_ATTRIB char const *fmt, ...);
-#define                           Dqn_OS_PathAddF_TLS(...)                      Dqn_OS_PathAddF(Dqn_TLS_TopArena(), ##__VA_ARGS__)
-DQN_API bool                      Dqn_OS_PathPop                                (Dqn_OSPath *fs_path);
-DQN_API Dqn_Str8                  Dqn_OS_PathBuildWithSeparator                 (Dqn_Arena *arena, Dqn_OSPath const *fs_path, Dqn_Str8 path_separator);
-#define                           Dqn_OS_PathBuildWithSeperator_TLS(...)        Dqn_OS_PathBuildWithSeperator(Dqn_TLS_TopArena(), ##__VA_ARGS__)
-DQN_API Dqn_Str8                  Dqn_OS_PathTo                                 (Dqn_Arena *arena, Dqn_Str8 path, Dqn_Str8 path_separtor);
-#define                           Dqn_OS_PathTo_TLS(...)                        Dqn_OS_PathTo(Dqn_TLS_TopArena(), ##__VA_ARGS__)
-DQN_API Dqn_Str8                  Dqn_OS_PathToF                                (Dqn_Arena *arena, Dqn_Str8 path_separator, DQN_FMT_ATTRIB char const *fmt, ...);
-#define                           Dqn_OS_PathToF_TLS(...)                       Dqn_OS_PathToF(Dqn_TLS_TopArena(), ##__VA_ARGS__)
-DQN_API Dqn_Str8                  Dqn_OS_Path                                   (Dqn_Arena *arena, Dqn_Str8 path);
-#define                           Dqn_OS_Path_TLS(...)                          Dqn_OS_Path(Dqn_TLS_TopArena(), ##__VA_ARGS__)
-DQN_API Dqn_Str8                  Dqn_OS_PathF                                  (Dqn_Arena *arena, DQN_FMT_ATTRIB char const *fmt, ...);
-#define                           Dqn_OS_PathF_TLS(...)                         Dqn_OS_PathF(Dqn_TLS_TopArena(), ##__VA_ARGS__)
-#define                           Dqn_OS_PathBuildFwdSlash(allocator, fs_path)  Dqn_OS_PathBuildWithSeparator(allocator, fs_path, DQN_STR8("/"))
-#define                           Dqn_OS_PathBuildBackSlash(allocator, fs_path) Dqn_OS_PathBuildWithSeparator(allocator, fs_path, DQN_STR8("\\"))
-#define                           Dqn_OS_PathBuild(allocator, fs_path)          Dqn_OS_PathBuildWithSeparator(allocator, fs_path, Dqn_OSPathSeparatorString)
+DN_API bool                      DN_OS_PathAddRef                             (DN_Arena *arena, DN_OSPath *fs_path, DN_Str8 path);
+#define                          DN_OS_PathAddRef_TLS(...)                    DN_OS_PathAddRef(DN_TLS_TopArena(), ##__VA_ARGS__)
+#define                          DN_OS_PathAddRef_Frame(...)                  DN_OS_PathAddRef(DN_TLS_FrameArena(), ##__VA_ARGS__)
+DN_API bool                      DN_OS_PathAdd                                (DN_Arena *arena, DN_OSPath *fs_path, DN_Str8 path);
+#define                          DN_OS_PathAdd_TLS(...)                       DN_OS_PathAdd(DN_TLS_TopArena(), ##__VA_ARGS__)
+#define                          DN_OS_PathAdd_Frame(...)                     DN_OS_PathAdd(DN_TLS_FrameArena(), ##__VA_ARGS__)
+DN_API bool                      DN_OS_PathAddF                               (DN_Arena *arena, DN_OSPath *fs_path, DN_FMT_ATTRIB char const *fmt, ...);
+#define                          DN_OS_PathAddF_TLS(...)                      DN_OS_PathAddF(DN_TLS_TopArena(), ##__VA_ARGS__)
+#define                          DN_OS_PathAddF_Frame(...)                    DN_OS_PathAddF(DN_TLS_FrameArena(), ##__VA_ARGS__)
+DN_API bool                      DN_OS_PathPop                                (DN_OSPath *fs_path);
+DN_API DN_Str8                   DN_OS_PathBuildWithSeparator                 (DN_Arena *arena, DN_OSPath const *fs_path, DN_Str8 path_separator);
+#define                          DN_OS_PathBuildWithSeperator_TLS(...)        DN_OS_PathBuildWithSeperator(DN_TLS_TopArena(), ##__VA_ARGS__)
+#define                          DN_OS_PathBuildWithSeperator_Frame(...)      DN_OS_PathBuildWithSeperator(DN_TLS_FrameArena(), ##__VA_ARGS__)
+DN_API DN_Str8                   DN_OS_PathTo                                 (DN_Arena *arena, DN_Str8 path, DN_Str8 path_separtor);
+#define                          DN_OS_PathTo_TLS(...)                        DN_OS_PathTo(DN_TLS_TopArena(), ##__VA_ARGS__)
+#define                          DN_OS_PathTo_Frame(...)                      DN_OS_PathTo(DN_TLS_FrameArena(), ##__VA_ARGS__)
+DN_API DN_Str8                   DN_OS_PathToF                                (DN_Arena *arena, DN_Str8 path_separator, DN_FMT_ATTRIB char const *fmt, ...);
+#define                          DN_OS_PathToF_TLS(...)                       DN_OS_PathToF(DN_TLS_TopArena(), ##__VA_ARGS__)
+#define                          DN_OS_PathToF_Frame(...)                     DN_OS_PathToF(DN_TLS_FrameArena(), ##__VA_ARGS__)
+DN_API DN_Str8                   DN_OS_Path                                   (DN_Arena *arena, DN_Str8 path);
+#define                          DN_OS_Path_TLS(...)                          DN_OS_Path(DN_TLS_TopArena(), ##__VA_ARGS__)
+#define                          DN_OS_Path_Frame(...)                        DN_OS_Path(DN_TLS_FrameArena(), ##__VA_ARGS__)
+DN_API DN_Str8                   DN_OS_PathF                                  (DN_Arena *arena, DN_FMT_ATTRIB char const *fmt, ...);
+#define                          DN_OS_PathF_TLS(...)                         DN_OS_PathF(DN_TLS_TopArena(), ##__VA_ARGS__)
+#define                          DN_OS_PathF_Frame(...)                       DN_OS_PathF(DN_TLS_FrameArena(), ##__VA_ARGS__)
 
-// NOTE: [$EXEC] Dqn_OSExec ////////////////////////////////////////////////////////////////////////
-DQN_API void                      Dqn_OS_Exit                 (int32_t exit_code);
-DQN_API Dqn_OSExecResult          Dqn_OS_ExecWait             (Dqn_OSExecAsyncHandle handle, Dqn_Arena *arena, Dqn_ErrorSink *error);
-DQN_API Dqn_OSExecAsyncHandle     Dqn_OS_ExecAsync            (Dqn_Slice<Dqn_Str8> cmd_line, Dqn_Str8 working_dir, uint8_t exec_flags, Dqn_ErrorSink *error);
-DQN_API Dqn_OSExecResult          Dqn_OS_Exec                 (Dqn_Slice<Dqn_Str8> cmd_line, Dqn_Str8 working_dir, uint8_t exec_flags, Dqn_Arena *arena, Dqn_ErrorSink *error);
-DQN_API Dqn_OSExecResult          Dqn_OS_ExecOrAbort          (Dqn_Slice<Dqn_Str8> cmd_line, Dqn_Str8 working_dir, uint8_t exec_flags, Dqn_Arena *arena);
-#define                           Dqn_OS_ExecOrAbort_TLS(...) Dqn_OS_ExecOrAbort(__VA_ARGS__, Dqn_TLS_TopArena())
+#define                          DN_OS_PathBuildFwdSlash(allocator, fs_path)  DN_OS_PathBuildWithSeparator(allocator, fs_path, DN_STR8("/"))
+#define                          DN_OS_PathBuildBackSlash(allocator, fs_path) DN_OS_PathBuildWithSeparator(allocator, fs_path, DN_STR8("\\"))
+#define                          DN_OS_PathBuild(allocator, fs_path)          DN_OS_PathBuildWithSeparator(allocator, fs_path, DN_OSPathSeparatorString)
 
-// NOTE: [$SEMA] Dqn_OSSemaphore ///////////////////////////////////////////////////////////////////
-#if !defined(DQN_NO_SEMAPHORE)
-DQN_API Dqn_OSSemaphore           Dqn_OS_SemaphoreInit     (uint32_t initial_count);
-DQN_API bool                      Dqn_OS_SemaphoreIsValid  (Dqn_OSSemaphore *semaphore);
-DQN_API void                      Dqn_OS_SemaphoreDeinit   (Dqn_OSSemaphore *semaphore);
-DQN_API void                      Dqn_OS_SemaphoreIncrement(Dqn_OSSemaphore *semaphore, uint32_t amount);
-DQN_API Dqn_OSSemaphoreWaitResult Dqn_OS_SemaphoreWait     (Dqn_OSSemaphore *semaphore, uint32_t timeout_ms);
-#endif // !defined(DQN_NO_SEMAPHORE)
+// NOTE: [$EXEC] DN_OSExec ////////////////////////////////////////////////////////////////////////
+DN_API void                      DN_OS_Exit                 (int32_t exit_code);
+DN_API DN_OSExecResult           DN_OS_ExecPump             (DN_OSExecAsyncHandle handle, char *stdout_buffer, size_t *stdout_size, char *stderr_buffer, size_t *stderr_size, uint32_t timeout_ms, DN_ErrSink  *err);
+DN_API DN_OSExecResult           DN_OS_ExecWait             (DN_OSExecAsyncHandle handle, DN_Arena *arena, DN_ErrSink *err);
+DN_API DN_OSExecAsyncHandle      DN_OS_ExecAsync            (DN_Slice<DN_Str8> cmd_line, DN_OSExecArgs *args, DN_ErrSink *err);
+DN_API DN_OSExecResult           DN_OS_Exec                 (DN_Slice<DN_Str8> cmd_line, DN_OSExecArgs *args, DN_Arena *arena, DN_ErrSink *err);
+DN_API DN_OSExecResult           DN_OS_ExecOrAbort          (DN_Slice<DN_Str8> cmd_line, DN_OSExecArgs *args, DN_Arena *arena);
+#define                          DN_OS_ExecOrAbort_TLS(...) DN_OS_ExecOrAbort(__VA_ARGS__, DN_TLS_TopArena())
 
-// NOTE: [$MUTX] Dqn_OSMutex ///////////////////////////////////////////////////////////////////////
-DQN_API Dqn_OSMutex               Dqn_OS_MutexInit  ();
-DQN_API void                      Dqn_OS_MutexDeinit(Dqn_OSMutex *mutex);
-DQN_API void                      Dqn_OS_MutexLock  (Dqn_OSMutex *mutex);
-DQN_API void                      Dqn_OS_MutexUnlock(Dqn_OSMutex *mutex);
+// NOTE: [$SEMA] DN_OSSemaphore ///////////////////////////////////////////////////////////////////
+#if !defined(DN_NO_SEMAPHORE)
+DN_API DN_OSSemaphore            DN_OS_SemaphoreInit     (uint32_t initial_count);
+DN_API bool                      DN_OS_SemaphoreIsValid  (DN_OSSemaphore *semaphore);
+DN_API void                      DN_OS_SemaphoreDeinit   (DN_OSSemaphore *semaphore);
+DN_API void                      DN_OS_SemaphoreIncrement(DN_OSSemaphore *semaphore, uint32_t amount);
+DN_API DN_OSSemaphoreWaitResult  DN_OS_SemaphoreWait     (DN_OSSemaphore *semaphore, uint32_t timeout_ms);
+#endif // !defined(DN_NO_SEMAPHORE)
 
-// NOTE: [$THRD] Dqn_OSThread /////////////////////////////////////////////////////////////////////
-#if !defined(DQN_NO_THREAD) && !defined(DQN_NO_SEMAPHORE)
-DQN_API bool                      Dqn_OS_ThreadInit  (Dqn_OSThread *thread, Dqn_OSThreadFunc *func, void *user_context);
-DQN_API void                      Dqn_OS_ThreadDeinit(Dqn_OSThread thread);
-DQN_API uint32_t                  Dqn_OS_ThreadID    ();
-DQN_API void                      Dqn_OS_ThreadSetTLS(Dqn_TLS *tls);
-#endif // !defined(DQN_NO_THREAD)
+// NOTE: [$MUTX] DN_OSMutex ///////////////////////////////////////////////////////////////////////
+DN_API DN_OSMutex                DN_OS_MutexInit  ();
+DN_API void                      DN_OS_MutexDeinit(DN_OSMutex *mutex);
+DN_API void                      DN_OS_MutexLock  (DN_OSMutex *mutex);
+DN_API void                      DN_OS_MutexUnlock(DN_OSMutex *mutex);
+#define DN_OS_Mutex(mutex) DN_DEFER_LOOP(DN_OS_MutexLock(mutex), DN_OS_MutexUnlock(mutex))
 
-// NOTE: [$HTTP] Dqn_OSHttp ////////////////////////////////////////////////////////////////////////
-DQN_API void                      Dqn_OS_HttpRequestAsync(Dqn_OSHttpResponse *response, Dqn_Arena *arena, Dqn_Str8 host, Dqn_Str8 path, Dqn_OSHttpRequestSecure secure, Dqn_Str8 method, Dqn_Str8 body, Dqn_Str8 headers);
-DQN_API void                      Dqn_OS_HttpRequestWait (Dqn_OSHttpResponse *response);
-DQN_API void                      Dqn_OS_HttpRequestFree (Dqn_OSHttpResponse *response);
-DQN_API Dqn_OSHttpResponse        Dqn_OS_HttpRequest     (Dqn_Arena *arena, Dqn_Str8 host, Dqn_Str8 path, Dqn_OSHttpRequestSecure secure, Dqn_Str8 method, Dqn_Str8 body, Dqn_Str8 headers);
+// NOTE: [$THRD] DN_OSThread /////////////////////////////////////////////////////////////////////
+#if !defined(DN_NO_THREAD) && !defined(DN_NO_SEMAPHORE)
+DN_API bool                      DN_OS_ThreadInit  (DN_OSThread *thread, DN_OSThreadFunc *func, void *user_context);
+DN_API void                      DN_OS_ThreadDeinit(DN_OSThread *thread);
+DN_API uint32_t                  DN_OS_ThreadID    ();
+DN_API void                      DN_OS_ThreadSetTLS(DN_TLS *tls);
+DN_API void                      DN_OS_ThreadSetName(DN_Str8 name);
+#endif // !defined(DN_NO_THREAD)
+
+// NOTE: [$HTTP] DN_OSHttp ////////////////////////////////////////////////////////////////////////
+DN_API void                      DN_OS_HttpRequestAsync(DN_OSHttpResponse *response, DN_Arena *arena, DN_Str8 host, DN_Str8 path, DN_OSHttpRequestSecure secure, DN_Str8 method, DN_Str8 body, DN_Str8 headers);
+DN_API void                      DN_OS_HttpRequestWait (DN_OSHttpResponse *response);
+DN_API void                      DN_OS_HttpRequestFree (DN_OSHttpResponse *response);
+DN_API DN_OSHttpResponse         DN_OS_HttpRequest     (DN_Arena *arena, DN_Str8 host, DN_Str8 path, DN_OSHttpRequestSecure secure, DN_Str8 method, DN_Str8 body, DN_Str8 headers);

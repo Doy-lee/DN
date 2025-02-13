@@ -1,5 +1,5 @@
-#if !defined(DQN_AVX512F_H)
-#define DQN_AVX512F_H
+#if !defined(DN_AVX512F_H)
+#define DN_AVX512F_H
 
 /*
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -20,11 +20,11 @@
 
 #include "dqn.h"
 
-DQN_API Dqn_Str8FindResult        Dqn_Str8_FindStr8AVX512F       (Dqn_Str8 string, Dqn_Str8 find);
-DQN_API Dqn_Str8FindResult        Dqn_Str8_FindLastStr8AVX512F   (Dqn_Str8 string, Dqn_Str8 find);
-DQN_API Dqn_Str8BinarySplitResult Dqn_Str8_BinarySplitAVX512F    (Dqn_Str8 string, Dqn_Str8 find);
-DQN_API Dqn_Str8BinarySplitResult Dqn_Str8_BinarySplitLastAVX512F(Dqn_Str8 string, Dqn_Str8 find);
-DQN_API Dqn_usize                 Dqn_Str8_SplitAVX512F          (Dqn_Str8 string, Dqn_Str8 delimiter, Dqn_Str8 *splits, Dqn_usize splits_count, Dqn_Str8SplitIncludeEmptyStrings mode);
-DQN_API Dqn_Slice<Dqn_Str8>       Dqn_Str8_SplitAllocAVX512F     (Dqn_Arena *arena, Dqn_Str8 string, Dqn_Str8 delimiter, Dqn_Str8SplitIncludeEmptyStrings mode);
+DN_API DN_Str8FindResult        DN_Str8_FindStr8AVX512F       (DN_Str8 string, DN_Str8 find);
+DN_API DN_Str8FindResult        DN_Str8_FindLastStr8AVX512F   (DN_Str8 string, DN_Str8 find);
+DN_API DN_Str8BinarySplitResult DN_Str8_BinarySplitAVX512F    (DN_Str8 string, DN_Str8 find);
+DN_API DN_Str8BinarySplitResult DN_Str8_BinarySplitLastAVX512F(DN_Str8 string, DN_Str8 find);
+DN_API DN_USize                 DN_Str8_SplitAVX512F          (DN_Str8 string, DN_Str8 delimiter, DN_Str8 *splits, DN_USize splits_count, DN_Str8SplitIncludeEmptyStrings mode);
+DN_API DN_Slice<DN_Str8>        DN_Str8_SplitAllocAVX512F     (DN_Arena *arena, DN_Str8 string, DN_Str8 delimiter, DN_Str8SplitIncludeEmptyStrings mode);
 
-#endif // DQN_AVX512F_H
+#endif // DN_AVX512F_H

@@ -15,7 +15,7 @@
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 */
 
-#if !defined(DQN_USE_STD_PRINTF) && !defined(DQN_STB_SPRINTF_HEADER_ONLY)
+#if !defined(DN_USE_STD_PRINTF) && !defined(DN_STB_SPRINTF_HEADER_ONLY)
 // NOTE: [$STBS] stb_sprintf ///////////////////////////////////////////////////////////////////////
 #define STB_SPRINTF_IMPLEMENTATION
 #ifdef STB_SPRINTF_IMPLEMENTATION
@@ -1710,4 +1710,4 @@ ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ------------------------------------------------------------------------------
 */
-#endif // !defined(DQN_USE_STD_PRINTF) && !defined(DQN_STB_SPRINTF_HEADER_ONLY)
+#endif // !defined(DN_USE_STD_PRINTF) && !defined(DN_STB_SPRINTF_HEADER_ONLY)

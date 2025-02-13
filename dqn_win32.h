@@ -13,12 +13,12 @@
 //   $$  /   \$$ |$$$$$$\ $$ | \$$ |\$$$$$$  |$$$$$$$$\
 //   \__/     \__|\______|\__|  \__| \______/ \________|
 //
-//   dqn_win32.h -- Windows replacement header
+//   dn_win32.h -- Windows replacement header
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 */
 
-#if defined(DQN_COMPILER_MSVC) || defined(DQN_COMPILER_CLANG_CL)
+#if defined(DN_COMPILER_MSVC) || defined(DN_COMPILER_CLANG_CL)
     #pragma comment(lib, "bcrypt")
     #pragma comment(lib, "winhttp")
     #pragma comment(lib, "dbghelp")
@@ -27,18 +27,19 @@
     #pragma comment(lib, "shlwapi")
 #endif
 
-#if defined(DQN_NO_WIN32_MIN_HEADER) || defined(_INC_WINDOWS)
+#if defined(DN_NO_WIN32_MIN_HEADER) || defined(_INC_WINDOWS)
     #define WIN32_LEAN_AND_MEAN
     #include <Windows.h>  // LONG
-    #include <bcrypt.h>   // Dqn_OS_SecureRNGBytes -> BCryptOpenAlgorithmProvider ... etc
-    #include <shellapi.h> // Dqn_Win_MakeProcessDPIAware -> SetProcessDpiAwareProc
+    #include <bcrypt.h>   // DN_OS_SecureRNGBytes -> BCryptOpenAlgorithmProvider ... etc
+    #include <shellapi.h> // DN_Win_MakeProcessDPIAware -> SetProcessDpiAwareProc
     #include <shlwapi.h>  // PathRelativePathTO
     #include <pathcch.h>  // PathCchCanonicalizeEx
     #include <winhttp.h>  // WinHttp*
+    #include <commdlg.h>  // OPENFILENAMEW
     #include <DbgHelp.h>
 #else
-    DQN_MSVC_WARNING_PUSH
-    DQN_MSVC_WARNING_DISABLE(4201) // warning C4201: nonstandard extension used: nameless struct/union
+    DN_MSVC_WARNING_PUSH
+    DN_MSVC_WARNING_DISABLE(4201) // warning C4201: nonstandard extension used: nameless struct/union
 
     // NOTE: basetsd.h /////////////////////////////////////////////////////////////////////////////
     typedef unsigned __int64 ULONG_PTR, *PULONG_PTR;
@@ -110,6 +111,25 @@
     #define PAGE_READONLY 0x02
     #define PAGE_READWRITE 0x04
     #define PAGE_GUARD 0x100
+
+    // NOTE: HeapAlloc
+    #define HEAP_ZERO_MEMORY                0x00000008
+    #define HEAP_NO_SERIALIZE               0x00000001
+    #define HEAP_GROWABLE                   0x00000002
+    #define HEAP_GENERATE_EXCEPTIONS        0x00000004
+    #define HEAP_ZERO_MEMORY                0x00000008
+    #define HEAP_REALLOC_IN_PLACE_ONLY      0x00000010
+    #define HEAP_TAIL_CHECKING_ENABLED      0x00000020
+    #define HEAP_FREE_CHECKING_ENABLED      0x00000040
+    #define HEAP_DISABLE_COALESCE_ON_FREE   0x00000080
+    #define HEAP_CREATE_ALIGN_16            0x00010000
+    #define HEAP_CREATE_ENABLE_TRACING      0x00020000
+    #define HEAP_CREATE_ENABLE_EXECUTE      0x00040000
+    #define HEAP_MAXIMUM_TAG                0x0FFF
+    #define HEAP_PSEUDO_TAG_FLAG            0x8000
+    #define HEAP_TAG_SHIFT                  18
+    #define HEAP_CREATE_SEGMENT_HEAP        0x00000100
+    #define HEAP_CREATE_HARDENED            0x00000200
 
     // NOTE: FormatMessageA
     #define MAKELANGID(p, s) ((((WORD  )(s)) << 10) | (WORD  )(p))
@@ -331,6 +351,19 @@
     __declspec(dllimport) BOOL    __stdcall SymUnloadModule64(HANDLE hProcess, DWORD64 BaseOfDll);
     }
 
+    // NOTE: um/heapapi.h ////////////////////////////////////////////////////////////////////
+    extern "C"
+    {
+    __declspec(dllimport) HANDLE __stdcall HeapCreate(DWORD flOptions, SIZE_T dwInitialSize, SIZE_T dwMaximumSize);
+    __declspec(dllimport) BOOL   __stdcall HeapDestroy(HANDLE hHeap);
+    __declspec(dllimport) VOID * __stdcall HeapAlloc(HANDLE hHeap, DWORD dwFlags,SIZE_T dwBytes);
+    __declspec(dllimport) VOID * __stdcall HeapReAlloc(HANDLE hHeap, DWORD dwFlags, VOID *lpMem, SIZE_T dwBytes);
+    __declspec(dllimport) BOOL   __stdcall HeapFree(HANDLE hHeap, DWORD dwFlags, VOID *lpMem);
+    __declspec(dllimport) SIZE_T __stdcall HeapSize(HANDLE hHeap, DWORD dwFlags, VOID const *lpMem);
+    __declspec(dllimport) HANDLE __stdcall GetProcessHeap(VOID);
+    __declspec(dllimport) SIZE_T __stdcall HeapCompact(HANDLE hHeap, DWORD dwFlags);
+    }
+
     // NOTE: shared/windef.h ////////////////////////////////////////////////////////////////////
     typedef struct tagPOINT
     {
@@ -366,6 +399,10 @@
     #define WAIT_OBJECT_0    ((STATUS_WAIT_0 ) + 0 )
     #define WAIT_ABANDONED   ((STATUS_ABANDONED_WAIT_0 ) + 0 )
     #define WAIT_ABANDONED_0 ((STATUS_ABANDONED_WAIT_0 ) + 0 )
+
+    // NOTE: CreateProcessW
+    #define CREATE_UNICODE_ENVIRONMENT 0x00000400
+    #define CREATE_NO_WINDOW           0x08000000
 
     typedef enum _GET_FILEEX_INFO_LEVELS {
         GetFileExInfoStandard,
@@ -499,9 +536,12 @@
 
     extern "C"
     {
+    __declspec(dllimport) BOOL   __stdcall FlushFileBuffers    (HANDLE hFile);
     __declspec(dllimport) BOOL   __stdcall CreateDirectoryW    (const WCHAR *lpPathName, SECURITY_ATTRIBUTES *lpSecurityAttributes);
     __declspec(dllimport) BOOL   __stdcall RemoveDirectoryW    (const WCHAR *lpPathName);
     __declspec(dllimport) BOOL   __stdcall FindNextFileW       (HANDLE hFindFile, WIN32_FIND_DATAW *lpFindFileData);
+    __declspec(dllimport) BOOL   __stdcall FindClose           (HANDLE hFindFile);
+
     __declspec(dllimport) HANDLE __stdcall FindFirstFileExW    (const WCHAR *lpFileName, FINDEX_INFO_LEVELS fInfoLevelId, VOID *lpFindFileData, FINDEX_SEARCH_OPS fSearchOp, VOID *lpSearchFilter, DWORD dwAdditionalFlags);
     __declspec(dllimport) BOOL   __stdcall GetFileAttributesExW(const WCHAR *lpFileName, GET_FILEEX_INFO_LEVELS fInfoLevelId, VOID *lpFileInformation);
     __declspec(dllimport) BOOL   __stdcall GetFileSizeEx       (HANDLE hFile, LARGE_INTEGER *lpFileSize);
@@ -509,14 +549,17 @@
     __declspec(dllimport) HANDLE __stdcall CreateFileW         (const WCHAR *lpFileName, DWORD dwDesiredAccess, DWORD dwShareMode, SECURITY_ATTRIBUTES *lpSecurityAttributes, DWORD dwCreationDisposition, DWORD dwFlagsAndAttributes, HANDLE hTemplateFile);
     __declspec(dllimport) BOOL   __stdcall ReadFile            (HANDLE hFile, VOID *lpBuffer, DWORD nNumberOfBytesToRead, DWORD *lpNumberOfBytesRead, OVERLAPPED *lpOverlapped);
     __declspec(dllimport) BOOL   __stdcall WriteFile           (HANDLE hFile, const VOID *lpBuffer, DWORD nNumberOfBytesToWrite, DWORD *lpNumberOfBytesWritten, OVERLAPPED *lpOverlapped);
-
     }
 
     // NOTE: um/processenv.h ///////////////////////////////////////////////////////////////////////
     extern "C"
     {
-    __declspec(dllimport) DWORD  __stdcall GetCurrentDirectoryW(DWORD nBufferLength, WCHAR *lpBuffer);
-    __declspec(dllimport) HANDLE __stdcall GetStdHandle(DWORD nStdHandle);
+    __declspec(dllimport) DWORD  __stdcall GetCurrentDirectoryW   (DWORD nBufferLength, WCHAR *lpBuffer);
+    __declspec(dllimport) HANDLE __stdcall GetStdHandle           (DWORD nStdHandle);
+    __declspec(dllimport) WCHAR* __stdcall GetEnvironmentStringsW ();
+    __declspec(dllimport) BOOL   __stdcall FreeEnvironmentStringsW(WCHAR *penv);
+    __declspec(dllimport) DWORD  __stdcall GetEnvironmentVariableW(WCHAR const *lpName, WCHAR *lpBuffer, DWORD nSize);
+    __declspec(dllimport) BOOL   __stdcall SetEnvironmentVariableW(WCHAR const *lpName, WCHAR const *lpValue);
     }
 
     // NOTE: um/sysinfoapi.h ///////////////////////////////////////////////////////////////////////
@@ -548,10 +591,21 @@
     }
 
     // NOTE: um/timezoneapi.h //////////////////////////////////////////////////////////////////////
+    typedef struct _TIME_ZONE_INFORMATION {
+        LONG       Bias;
+        WCHAR      StandardName[32];
+        SYSTEMTIME StandardDate;
+        LONG       StandardBias;
+        WCHAR      DaylightName[32];
+        SYSTEMTIME DaylightDate;
+        LONG       DaylightBias;
+    } TIME_ZONE_INFORMATION, *PTIME_ZONE_INFORMATION, *LPTIME_ZONE_INFORMATION;
+
     extern "C"
     {
-    __declspec(dllimport) BOOL __stdcall FileTimeToSystemTime(const FILETIME* lpFileTime, SYSTEMTIME *lpSystemTime);
-    __declspec(dllimport) BOOL __stdcall SystemTimeToFileTime(const SYSTEMTIME* lpSystemTime, FILETIME *lpFileTime);
+    __declspec(dllimport) BOOL __stdcall FileTimeToSystemTime           (const FILETIME* lpFileTime, SYSTEMTIME *lpSystemTime);
+    __declspec(dllimport) BOOL __stdcall SystemTimeToFileTime           (const SYSTEMTIME* lpSystemTime, FILETIME *lpFileTime);
+    __declspec(dllimport) BOOL __stdcall TzSpecificLocalTimeToSystemTime(const TIME_ZONE_INFORMATION* lpTimeZoneInformation, const SYSTEMTIME* lpLocalTime, const LPSYSTEMTIME lpUniversalTime);
     }
 
     // NOTE: shared/windef.h ///////////////////////////////////////////////////////////////////////
@@ -1249,5 +1303,16 @@
         __declspec(dllimport) HRESULT __stdcall PathCchCanonicalizeEx(PWSTR pszPathOut, size_t cchPathOut, WCHAR const *pszPathIn, ULONG dwFlags);
     };
 
-    DQN_MSVC_WARNING_POP
+    // NOTE: um/errhandlingapi.h ///////////////////////////////////////////////////////////////////
+    extern "C"
+    {
+        __declspec(dllimport) VOID __stdcall RaiseException(DWORD dwExceptionCode, DWORD dwExceptionFlags, DWORD nNumberOfArguments, const ULONG_PTR* lpArguments);
+    };
+
+    // NOTE: include/excpt.h ///////////////////////////////////////////////////////////////////
+    #define EXCEPTION_EXECUTE_HANDLER      1
+    #define EXCEPTION_CONTINUE_SEARCH      0
+    #define EXCEPTION_CONTINUE_EXECUTION (-1)
+
+    DN_MSVC_WARNING_POP
 #endif // !defined(_INC_WINDOWS)

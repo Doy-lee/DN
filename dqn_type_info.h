@@ -18,44 +18,44 @@
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 */
 
-enum Dqn_TypeKind
+enum DN_TypeKind
 {
-    Dqn_TypeKind_Nil,
-    Dqn_TypeKind_Basic,
-    Dqn_TypeKind_Enum,
-    Dqn_TypeKind_Struct,
+    DN_TypeKind_Nil,
+    DN_TypeKind_Basic,
+    DN_TypeKind_Enum,
+    DN_TypeKind_Struct,
 };
 
-struct Dqn_TypeField
+struct DN_TypeField
 {
-    uint16_t                   index;
-    Dqn_Str8                   name;
-    Dqn_Str8                   label;
-    Dqn_isize                  value;
-    Dqn_usize                  offset_of;
-    Dqn_usize                  size_of;
-    Dqn_usize                  align_of;
-    Dqn_Str8                   type_decl;
-    uint32_t                   type_enum;
-    bool                       is_pointer;
-    uint16_t                   array_size;
-    Dqn_TypeField const *      array_size_field;
+    uint16_t             index;
+    DN_Str8              name;
+    DN_Str8              label;
+    DN_ISize             value;
+    DN_USize             offset_of;
+    DN_USize             size_of;
+    DN_USize             align_of;
+    DN_Str8              type_decl;
+    uint32_t             type_enum;
+    bool                 is_pointer;
+    uint16_t             array_size;
+    DN_TypeField const * array_size_field;
 };
 
-struct Dqn_TypeInfo
+struct DN_TypeInfo
 {
-    Dqn_Str8             name;
-    Dqn_TypeKind         kind;
-    Dqn_usize            size_of;
-    Dqn_TypeField const *fields;
-    uint16_t             fields_count;
+    DN_Str8             name;
+    DN_TypeKind         kind;
+    DN_USize            size_of;
+    DN_TypeField const *fields;
+    uint16_t            fields_count;
 };
 
-struct Dqn_TypeGetField
+struct DN_TypeGetField
 {
-    bool           success;
-    Dqn_usize      index;
-    Dqn_TypeField *field;
+    bool          success;
+    DN_USize      index;
+    DN_TypeField *field;
 };
 
-Dqn_TypeGetField Dqn_Type_GetField(Dqn_TypeInfo const *type_info, Dqn_Str8 name);
+DN_TypeGetField DN_Type_GetField(DN_TypeInfo const *type_info, DN_Str8 name);

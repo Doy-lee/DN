@@ -16,57 +16,58 @@
 //
 // [$MACR] Macros          -- General macros
 // [$TYPE] Types           -- Basic types and typedefs
+// [$SDLL] DN_SentinelDLL -- Doubly linked list w/ sentinel macros
 // [$INTR] Intrinsics      -- Platform agnostic functions for CPU instructions (e.g. atomics, cpuid, ...)
-// [$CALL] Dqn_CallSite    -- Source code location/tracing
-// [$TMUT] Dqn_TicketMutex -- Userland mutex via spinlocking atomics
-// [$PRIN] Dqn_Print       -- Console printing
-// [$LLOG] Dqn_Log         -- Console logging macros
+// [$CALL] DN_CallSite    -- Source code location/tracing
+// [$TMUT] DN_TicketMutex -- Userland mutex via spinlocking atomics
+// [$PRIN] DN_Print       -- Console printing
+// [$LLOG] DN_Log         -- Console logging macros
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 */
 
 // NOTE: [$MACR] Macros ////////////////////////////////////////////////////////////////////////////
-#define DQN_STRINGIFY(x) #x
-#define DQN_TOKEN_COMBINE2(x, y) x ## y
-#define DQN_TOKEN_COMBINE(x, y) DQN_TOKEN_COMBINE2(x, y)
+#define DN_STRINGIFY(x) #x
+#define DN_TOKEN_COMBINE2(x, y) x ## y
+#define DN_TOKEN_COMBINE(x, y) DN_TOKEN_COMBINE2(x, y)
 
 // NOTE: Warning! Order is important here, clang-cl on Windows defines _MSC_VER
 #if defined(_MSC_VER)
     #if defined(__clang__)
-        #define DQN_COMPILER_CLANG_CL
-        #define DQN_COMPILER_CLANG
+        #define DN_COMPILER_CLANG_CL
+        #define DN_COMPILER_CLANG
     #else
-        #define DQN_COMPILER_MSVC
+        #define DN_COMPILER_MSVC
     #endif
 #elif defined(__clang__)
-    #define DQN_COMPILER_CLANG
+    #define DN_COMPILER_CLANG
 #elif defined(__GNUC__)
-    #define DQN_COMPILER_GCC
+    #define DN_COMPILER_GCC
 #endif
 
 // NOTE: Declare struct literals that work in both C and C++ because the syntax 
 // is different between languages.
 #if 0
     struct Foo { int a; }
-    struct Foo foo = DQN_LITERAL(Foo){32}; // Works on both C and C++
+    struct Foo foo = DN_LITERAL(Foo){32}; // Works on both C and C++
 #endif
 
 #if defined(__cplusplus)
-    #define DQN_LITERAL(T) T
+    #define DN_LITERAL(T) T
 #else
-    #define DQN_LITERAL(T) (T)
+    #define DN_LITERAL(T) (T)
 #endif
 
 #if defined(__cplusplus)
-    #define DQN_THREAD_LOCAL thread_local
+    #define DN_THREAD_LOCAL thread_local
 #else
-    #define DQN_THREAD_LOCAL _Thread_local
+    #define DN_THREAD_LOCAL _Thread_local
 #endif
 
 #if defined(_WIN32)
-    #define DQN_OS_WIN32
+    #define DN_OS_WIN32
 #elif defined(__gnu_linux__) || defined(__linux__)
-    #define DQN_OS_UNIX
+    #define DN_OS_UNIX
 #endif
 
 #include <stdarg.h>
@@ -75,119 +76,123 @@
 #include <limits.h>
 #include <inttypes.h> // PRIu64...
 
-#if !defined(DQN_OS_WIN32)
+#if !defined(DN_OS_WIN32)
 #include <stdlib.h> // exit()
 #endif
 
-#if !defined(DQN_PLATFORM_EMSCRIPTEN) && \
-    !defined(DQN_PLATFORM_POSIX)      && \
-    !defined(DQN_PLATFORM_WIN32)
+#if !defined(DN_PLATFORM_EMSCRIPTEN) && \
+    !defined(DN_PLATFORM_POSIX)      && \
+    !defined(DN_PLATFORM_WIN32)
     #if defined(__aarch64__) || defined(_M_ARM64)
-        #define DQN_PLATFORM_ARM64
+        #define DN_PLATFORM_ARM64
     #elif defined(__EMSCRIPTEN__)
-        #define DQN_PLATFORM_EMSCRIPTEN
-    #elif defined(DQN_OS_WIN32)
-        #define DQN_PLATFORM_WIN32
+        #define DN_PLATFORM_EMSCRIPTEN
+    #elif defined(DN_OS_WIN32)
+        #define DN_PLATFORM_WIN32
     #else
-        #define DQN_PLATFORM_POSIX
+        #define DN_PLATFORM_POSIX
     #endif
 #endif
 
-#if defined(DQN_COMPILER_MSVC) || defined(DQN_COMPILER_CLANG_CL)
+#if defined(DN_COMPILER_MSVC) || defined(DN_COMPILER_CLANG_CL)
     #if defined(_CRT_SECURE_NO_WARNINGS)
-        #define DQN_CRT_SECURE_NO_WARNINGS_PREVIOUSLY_DEFINED
+        #define DN_CRT_SECURE_NO_WARNINGS_PREVIOUSLY_DEFINED
     #else
         #define _CRT_SECURE_NO_WARNINGS
     #endif
 #endif
 
-#if defined(DQN_COMPILER_MSVC)
-    #define DQN_FMT_ATTRIB _Printf_format_string_
-    #define DQN_MSVC_WARNING_PUSH __pragma(warning(push))
-    #define DQN_MSVC_WARNING_DISABLE(...) __pragma(warning(disable: ##__VA_ARGS__))
-    #define DQN_MSVC_WARNING_POP __pragma(warning(pop))
+#if defined(DN_COMPILER_MSVC)
+    #define DN_FMT_ATTRIB _Printf_format_string_
+    #define DN_MSVC_WARNING_PUSH __pragma(warning(push))
+    #define DN_MSVC_WARNING_DISABLE(...) __pragma(warning(disable: ##__VA_ARGS__))
+    #define DN_MSVC_WARNING_POP __pragma(warning(pop))
 #else
-    #define DQN_FMT_ATTRIB
-    #define DQN_MSVC_WARNING_PUSH
-    #define DQN_MSVC_WARNING_DISABLE(...)
-    #define DQN_MSVC_WARNING_POP
+    #define DN_FMT_ATTRIB
+    #define DN_MSVC_WARNING_PUSH
+    #define DN_MSVC_WARNING_DISABLE(...)
+    #define DN_MSVC_WARNING_POP
 #endif
 
-#if defined(DQN_COMPILER_CLANG) || defined(DQN_COMPILER_GCC) || defined(DQN_COMPILER_CLANG_CL)
-    #define DQN_GCC_WARNING_PUSH _Pragma("GCC diagnostic push")
-    #define DQN_GCC_WARNING_DISABLE_HELPER_0(x) #x
-    #define DQN_GCC_WARNING_DISABLE_HELPER_1(y) DQN_GCC_WARNING_DISABLE_HELPER_0(GCC diagnostic ignored #y)
-    #define DQN_GCC_WARNING_DISABLE(warning) _Pragma(DQN_GCC_WARNING_DISABLE_HELPER_1(warning))
-    #define DQN_GCC_WARNING_POP _Pragma("GCC diagnostic pop")
+#if defined(DN_COMPILER_CLANG) || defined(DN_COMPILER_GCC) || defined(DN_COMPILER_CLANG_CL)
+    #define DN_GCC_WARNING_PUSH _Pragma("GCC diagnostic push")
+    #define DN_GCC_WARNING_DISABLE_HELPER_0(x) #x
+    #define DN_GCC_WARNING_DISABLE_HELPER_1(y) DN_GCC_WARNING_DISABLE_HELPER_0(GCC diagnostic ignored #y)
+    #define DN_GCC_WARNING_DISABLE(warning) _Pragma(DN_GCC_WARNING_DISABLE_HELPER_1(warning))
+    #define DN_GCC_WARNING_POP _Pragma("GCC diagnostic pop")
 #else
-    #define DQN_GCC_WARNING_PUSH
-    #define DQN_GCC_WARNING_DISABLE(...)
-    #define DQN_GCC_WARNING_POP
+    #define DN_GCC_WARNING_PUSH
+    #define DN_GCC_WARNING_DISABLE(...)
+    #define DN_GCC_WARNING_POP
 #endif
 
 // NOTE: MSVC does not support the feature detection macro for instance so we
 // compile it out
 #if defined(__has_feature)
-    #define DQN_HAS_FEATURE(expr) __has_feature(expr)
+    #define DN_HAS_FEATURE(expr) __has_feature(expr)
 #else
-    #define DQN_HAS_FEATURE(expr) 0
+    #define DN_HAS_FEATURE(expr) 0
 #endif
 
-#define DQN_FOR_UINDEX(index, size) for (Dqn_usize index = 0; index < size; index++)
-#define DQN_FOR_IINDEX(index, size) for (Dqn_isize index = 0; index < size; index++)
+#define DN_FOR_UINDEX(index, size) for (DN_USize index = 0; index < size; index++)
+#define DN_FOR_IINDEX(index, size) for (DN_isize index = 0; index < size; index++)
 
-#define Dqn_AlignUpPowerOfTwo(value, pot) (((uintptr_t)(value) + ((uintptr_t)(pot) - 1)) & ~((uintptr_t)(pot) - 1))
-#define Dqn_AlignDownPowerOfTwo(value, pot) ((uintptr_t)(value) & ~((uintptr_t)(pot) - 1))
-#define Dqn_IsPowerOfTwo(value) ((((uintptr_t)(value)) & (((uintptr_t)(value)) - 1)) == 0)
-#define Dqn_IsPowerOfTwoAligned(value, pot) ((((uintptr_t)value) & (((uintptr_t)pot) - 1)) == 0)
+#define DN_ForItSize(it, T, array, size) for (struct { USize index; T *data; } it = {0, &(array)[0]};       it.index < (size);                it.index++, it.data++)
+#define DN_ForIt(it, T, array)           for (struct { USize index; T *data; } it = {0, &(array)->data[0]}; it.index < (array)->size;         it.index++, it.data++)
+#define DN_ForItCArray(it, T, array)     for (struct { USize index; T *data; } it = {0, &(array)[0]};       it.index < DN_ARRAY_UCOUNT(array); it.index++, it.data++)
+
+#define DN_AlignUpPowerOfTwo(value, pot) (((uintptr_t)(value) + ((uintptr_t)(pot) - 1)) & ~((uintptr_t)(pot) - 1))
+#define DN_AlignDownPowerOfTwo(value, pot) ((uintptr_t)(value) & ~((uintptr_t)(pot) - 1))
+#define DN_IsPowerOfTwo(value) ((((uintptr_t)(value)) & (((uintptr_t)(value)) - 1)) == 0)
+#define DN_IsPowerOfTwoAligned(value, pot) ((((uintptr_t)value) & (((uintptr_t)pot) - 1)) == 0)
 
 // NOTE: String.h Dependencies /////////////////////////////////////////////////////////////////////
-#if !defined(DQN_MEMCPY) || !defined(DQN_MEMSET) || !defined(DQN_MEMCMP) || !defined(DQN_MEMMOVE)
+#if !defined(DN_MEMCPY) || !defined(DN_MEMSET) || !defined(DN_MEMCMP) || !defined(DN_MEMMOVE)
     #include <string.h>
-    #if !defined(DQN_MEMCPY)
-        #define DQN_MEMCPY(dest, src, count) memcpy((dest), (src), (count))
+    #if !defined(DN_MEMCPY)
+        #define DN_MEMCPY(dest, src, count) memcpy((dest), (src), (count))
     #endif
-    #if !defined(DQN_MEMSET)
-        #define DQN_MEMSET(dest, value, count) memset((dest), (value), (count))
+    #if !defined(DN_MEMSET)
+        #define DN_MEMSET(dest, value, count) memset((dest), (value), (count))
     #endif
-    #if !defined(DQN_MEMCMP)
-        #define DQN_MEMCMP(lhs, rhs, count) memcmp((lhs), (rhs), (count))
+    #if !defined(DN_MEMCMP)
+        #define DN_MEMCMP(lhs, rhs, count) memcmp((lhs), (rhs), (count))
     #endif
-    #if !defined(DQN_MEMMOVE)
-        #define DQN_MEMMOVE(dest, src, count) memmove((dest), (src), (count))
+    #if !defined(DN_MEMMOVE)
+        #define DN_MEMMOVE(dest, src, count) memmove((dest), (src), (count))
     #endif
 #endif
 
 // NOTE: Math.h Dependencies ///////////////////////////////////////////////////////////////////////
-#if !defined(DQN_SQRTF) || !defined(DQN_SINF) || !defined(DQN_COSF) || !defined(DQN_TANF)
+#if !defined(DN_SQRTF) || !defined(DN_SINF) || !defined(DN_COSF) || !defined(DN_TANF)
     #include <math.h>
-    #if !defined(DQN_SQRTF)
-        #define DQN_SQRTF(val) sqrtf(val)
+    #if !defined(DN_SQRTF)
+        #define DN_SQRTF(val) sqrtf(val)
     #endif
-    #if !defined(DQN_SINF)
-        #define DQN_SINF(val) sinf(val)
+    #if !defined(DN_SINF)
+        #define DN_SINF(val) sinf(val)
     #endif
-    #if !defined(DQN_COSF)
-        #define DQN_COSF(val) cosf(val)
+    #if !defined(DN_COSF)
+        #define DN_COSF(val) cosf(val)
     #endif
-    #if !defined(DQN_TANF)
-        #define DQN_TANF(val) tanf(val)
+    #if !defined(DN_TANF)
+        #define DN_TANF(val) tanf(val)
     #endif
 #endif
 
 // NOTE: Math //////////////////////////////////////////////////////////////////////////////////////
-#define DQN_PI 3.14159265359f
+#define DN_PI 3.14159265359f
 
-#define DQN_DEGREE_TO_RADIAN(degrees) ((degrees) * (DQN_PI / 180.0f))
-#define DQN_RADIAN_TO_DEGREE(radians) ((radians) * (180.f * DQN_PI))
+#define DN_DEGREE_TO_RADIAN(degrees) ((degrees) * (DN_PI / 180.0f))
+#define DN_RADIAN_TO_DEGREE(radians) ((radians) * (180.f * DN_PI))
 
-#define DQN_ABS(val) (((val) < 0) ? (-(val)) : (val))
-#define DQN_MAX(a, b) (((a) > (b)) ? (a) : (b))
-#define DQN_MIN(a, b) (((a) < (b)) ? (a) : (b))
-#define DQN_CLAMP(val, lo, hi) DQN_MAX(DQN_MIN(val, hi), lo)
-#define DQN_SQUARED(val) ((val) * (val))
+#define DN_ABS(val) (((val) < 0) ? (-(val)) : (val))
+#define DN_MAX(a, b) (((a) > (b)) ? (a) : (b))
+#define DN_MIN(a, b) (((a) < (b)) ? (a) : (b))
+#define DN_CLAMP(val, lo, hi) DN_MAX(DN_MIN(val, hi), lo)
+#define DN_SQUARED(val) ((val) * (val))
 
-#define DQN_SWAP(a, b)   \
+#define DN_SWAP(a, b)   \
     do                   \
     {                    \
         auto temp = a;   \
@@ -196,173 +201,200 @@
     } while (0)
 
 // NOTE: Function/Variable Annotations /////////////////////////////////////////////////////////////
-#if defined(DQN_STATIC_API)
-    #define DQN_API static
+#if defined(DN_STATIC_API)
+    #define DN_API static
 #else
-    #define DQN_API
+    #define DN_API
 #endif
 
-#define DQN_LOCAL_PERSIST static
-#define DQN_FILE_SCOPE static
-#define DQN_CAST(val) (val)
+#define DN_LOCAL_PERSIST static
+#define DN_FILE_SCOPE static
+#define DN_CAST(val) (val)
 
-#if defined(DQN_COMPILER_MSVC) || defined(DQN_COMPILER_CLANG_CL)
-    #define DQN_FORCE_INLINE __forceinline
+#if defined(DN_COMPILER_MSVC) || defined(DN_COMPILER_CLANG_CL)
+    #define DN_FORCE_INLINE __forceinline
 #else
-    #define DQN_FORCE_INLINE inline __attribute__((always_inline))
+    #define DN_FORCE_INLINE inline __attribute__((always_inline))
 #endif
 
 // NOTE: Size //////////////////////////////////////////////////////////////////////////////////////
-#define DQN_ISIZEOF(val) DQN_CAST(ptrdiff_t)sizeof(val)
-#define DQN_ARRAY_UCOUNT(array) (sizeof(array)/(sizeof((array)[0])))
-#define DQN_ARRAY_ICOUNT(array) (Dqn_isize)DQN_ARRAY_UCOUNT(array)
-#define DQN_CHAR_COUNT(string) (sizeof(string) - 1)
+#define DN_ISIZEOF(val) DN_CAST(ptrdiff_t)sizeof(val)
+#define DN_ARRAY_UCOUNT(array) (sizeof(array)/(sizeof((array)[0])))
+#define DN_ARRAY_ICOUNT(array) (DN_ISize)DN_ARRAY_UCOUNT(array)
+#define DN_CHAR_COUNT(string) (sizeof(string) - 1)
 
 // NOTE: SI Byte ///////////////////////////////////////////////////////////////////////////////////
-#define DQN_BYTES(val)     ((uint64_t)val)
-#define DQN_KILOBYTES(val) ((uint64_t)1024 * DQN_BYTES(val))
-#define DQN_MEGABYTES(val) ((uint64_t)1024 * DQN_KILOBYTES(val))
-#define DQN_GIGABYTES(val) ((uint64_t)1024 * DQN_MEGABYTES(val))
+#define DN_BYTES(val)     ((uint64_t)val)
+#define DN_KILOBYTES(val) ((uint64_t)1024 * DN_BYTES(val))
+#define DN_MEGABYTES(val) ((uint64_t)1024 * DN_KILOBYTES(val))
+#define DN_GIGABYTES(val) ((uint64_t)1024 * DN_MEGABYTES(val))
 
 // NOTE: Time //////////////////////////////////////////////////////////////////////////////////////
-#define DQN_SECONDS_TO_MS(val) ((val) * 1000)
-#define DQN_MINS_TO_S(val)     ((val) * 60ULL)
-#define DQN_HOURS_TO_S(val)    (DQN_MINS_TO_S(val)  * 60ULL)
-#define DQN_DAYS_TO_S(val)     (DQN_HOURS_TO_S(val) * 24ULL)
-#define DQN_WEEKS_TO_S(val)    (DQN_DAYS_TO_S(val)  *  7ULL)
-#define DQN_YEARS_TO_S(val)    (DQN_WEEKS_TO_S(val) * 52ULL)
+#define DN_SECONDS_TO_MS(val) ((val) * 1000)
+#define DN_MINS_TO_S(val)     ((val) * 60ULL)
+#define DN_HOURS_TO_S(val)    (DN_MINS_TO_S(val)  * 60ULL)
+#define DN_DAYS_TO_S(val)     (DN_HOURS_TO_S(val) * 24ULL)
+#define DN_WEEKS_TO_S(val)    (DN_DAYS_TO_S(val)  *  7ULL)
+#define DN_YEARS_TO_S(val)    (DN_WEEKS_TO_S(val) * 52ULL)
 
 #if defined(__has_builtin)
-    #define DQN_HAS_BUILTIN(expr) __has_builtin(expr)
+    #define DN_HAS_BUILTIN(expr) __has_builtin(expr)
 #else
-    #define DQN_HAS_BUILTIN(expr) 0
+    #define DN_HAS_BUILTIN(expr) 0
 #endif
 
 // NOTE: Debug Break ///////////////////////////////////////////////////////////////////////////////
-#if !defined(DQN_DEBUG_BREAK)
+#if !defined(DN_DEBUG_BREAK)
     #if defined(NDEBUG)
-        #define DQN_DEBUG_BREAK
+        #define DN_DEBUG_BREAK
     #else
-        #if defined(DQN_COMPILER_MSVC) || defined(DQN_COMPILER_CLANG_CL)
-            #define DQN_DEBUG_BREAK __debugbreak()
-        #elif DQN_HAS_BUILTIN(__builtin_debugtrap)
-            #define DQN_DEBUG_BREAK __builtin_debugtrap()
-        #elif DQN_HAS_BUILTIN(__builtin_trap) || defined(DQN_COMPILER_GCC)
-            #define DQN_DEBUG_BREAK __builtin_trap()
+        #if defined(DN_COMPILER_MSVC) || defined(DN_COMPILER_CLANG_CL)
+            #define DN_DEBUG_BREAK __debugbreak()
+        #elif DN_HAS_BUILTIN(__builtin_debugtrap)
+            #define DN_DEBUG_BREAK __builtin_debugtrap()
+        #elif DN_HAS_BUILTIN(__builtin_trap) || defined(DN_COMPILER_GCC)
+            #define DN_DEBUG_BREAK __builtin_trap()
         #else
             #include <signal.h>
             #if defined(SIGTRAP)
-                #define DQN_DEBUG_BREAK raise(SIGTRAP)
+                #define DN_DEBUG_BREAK raise(SIGTRAP)
             #else
-                #define DQN_DEBUG_BREAK raise(SIGABRT)
+                #define DN_DEBUG_BREAK raise(SIGABRT)
             #endif
         #endif
     #endif
 #endif
 
 // NOTE: Assert Macros /////////////////////////////////////////////////////////////////////////////
-#define DQN_HARD_ASSERT(expr) DQN_HARD_ASSERTF(expr, "")
-#define DQN_HARD_ASSERTF(expr, fmt, ...)                                                   \
+#define DN_HARD_ASSERT(expr) DN_HARD_ASSERTF(expr, "")
+#define DN_HARD_ASSERTF(expr, fmt, ...)                                                   \
     do {                                                                                   \
         if (!(expr)) {                                                                     \
-            Dqn_Str8 stack_trace_ = Dqn_StackTrace_WalkStr8CRT(128 /*limit*/, 2 /*skip*/); \
-            Dqn_Log_ErrorF("Hard assertion [" #expr "], stack trace was:\n\n%.*s\n\n" fmt, \
-                           DQN_STR_FMT(stack_trace_),                                      \
+            DN_Str8 stack_trace_ = DN_StackTrace_WalkStr8CRT(128 /*limit*/, 2 /*skip*/); \
+            DN_Log_ErrorF("Hard assertion [" #expr "], stack trace was:\n\n%.*s\n\n" fmt, \
+                           DN_STR_FMT(stack_trace_),                                      \
                            ##__VA_ARGS__);                                                 \
-            DQN_DEBUG_BREAK;                                                               \
+            DN_DEBUG_BREAK;                                                               \
         }                                                                                  \
     } while (0)
 
-#if defined(DQN_NO_ASSERT)
-    #define DQN_ASSERTF(...)
-    #define DQN_ASSERT(...)
+#if defined(DN_NO_ASSERT)
+    #define DN_ASSERT(...)
+    #define DN_ASSERT_ONCE(...)
+    #define DN_ASSERTF(...)
+    #define DN_ASSERTF_ONCE(...)
 #else
-    #define DQN_ASSERT(expr) DQN_ASSERTF((expr), "")
-    #define DQN_ASSERTF(expr, fmt, ...)                                                        \
+    #define DN_ASSERT(expr) DN_ASSERTF((expr), "")
+    #define DN_ASSERT_ONCE(expr) DN_ASSERTF_ONCE((expr), "")
+
+    #define DN_ASSERTF(expr, fmt, ...)                                                        \
         do {                                                                                   \
             if (!(expr)) {                                                                     \
-                Dqn_Str8 stack_trace_ = Dqn_StackTrace_WalkStr8CRT(128 /*limit*/, 2 /*skip*/); \
-                Dqn_Log_ErrorF("Assertion [" #expr "], stack trace was:\n\n%.*s\n\n" fmt,      \
-                               DQN_STR_FMT(stack_trace_),                                      \
+                DN_Str8 stack_trace_ = DN_StackTrace_WalkStr8CRT(128 /*limit*/, 2 /*skip*/); \
+                DN_Log_ErrorF("Assertion [" #expr "], stack trace was:\n\n%.*s\n\n" fmt,      \
+                               DN_STR_FMT(stack_trace_),                                      \
                                ##__VA_ARGS__);                                                 \
-                DQN_DEBUG_BREAK;                                                               \
+                DN_DEBUG_BREAK;                                                               \
+            }                                                                                  \
+        } while (0)
+
+    #define DN_ASSERTF_ONCE(expr, fmt, ...)                                                   \
+        do {                                                                                   \
+            static bool once = true;                                                           \
+            if (!(expr) && once) {                                                             \
+                DN_Str8 stack_trace_ = DN_StackTrace_WalkStr8CRT(128 /*limit*/, 2 /*skip*/); \
+                DN_Log_ErrorF("Assertion [" #expr "], stack trace was:\n\n%.*s\n\n" fmt,      \
+                               DN_STR_FMT(stack_trace_),                                      \
+                               ##__VA_ARGS__);                                                 \
+                once = false;                                                                  \
+                DN_DEBUG_BREAK;                                                               \
             }                                                                                  \
         } while (0)
 #endif
 
-#define DQN_INVALID_CODE_PATHF(fmt, ...) DQN_HARD_ASSERTF(0, fmt, ##__VA_ARGS__)
-#define DQN_INVALID_CODE_PATH            DQN_INVALID_CODE_PATHF("Invalid code path triggered")
+#define DN_INVALID_CODE_PATHF(fmt, ...) DN_HARD_ASSERTF(0, fmt, ##__VA_ARGS__)
+#define DN_INVALID_CODE_PATH            DN_INVALID_CODE_PATHF("Invalid code path triggered")
 
 // NOTE: Check macro ///////////////////////////////////////////////////////////////////////////////
-#define DQN_CHECK(expr) DQN_CHECKF(expr, "")
+#define DN_CHECK(expr) DN_CHECKF(expr, "")
 
-#if defined(DQN_NO_CHECK_BREAK)
-    #define DQN_CHECKF(expr, fmt, ...) \
-        ((expr) ? true : (Dqn_Log_TypeFCallSite(Dqn_LogType_Warning, DQN_CALL_SITE, fmt, ## __VA_ARGS__), false))
+#if defined(DN_NO_CHECK_BREAK)
+    #define DN_CHECKF(expr, fmt, ...) \
+        ((expr) ? true : (DN_Log_TypeFCallSite(DN_LogType_Warning, DN_CALL_SITE, fmt, ## __VA_ARGS__), false))
 #else
-    #define DQN_CHECKF(expr, fmt, ...) \
-        ((expr) ? true : (Dqn_Log_TypeFCallSite(Dqn_LogType_Error, DQN_CALL_SITE, fmt, ## __VA_ARGS__), Dqn_StackTrace_Print(128 /*limit*/), DQN_DEBUG_BREAK, false))
+    #define DN_CHECKF(expr, fmt, ...) \
+        ((expr) ? true : (DN_Log_TypeFCallSite(DN_LogType_Error, DN_CALL_SITE, fmt, ## __VA_ARGS__), DN_StackTrace_Print(128 /*limit*/), DN_DEBUG_BREAK, false))
 #endif
 
 // NOTE: Zero initialisation macro /////////////////////////////////////////////////////////////////
 #if defined(__cplusplus)
-    #define DQN_ZERO_INIT {}
+    #define DN_ZERO_INIT {}
 #else
-    #define DQN_ZERO_INIT {0}
+    #define DN_ZERO_INIT {0}
 #endif
 
 // NOTE: Defer Macro ///////////////////////////////////////////////////////////////////////////////
 #if defined(__cplusplus)
 template <typename Procedure>
-struct Dqn_Defer
+struct DN_Defer
 {
     Procedure proc;
-    Dqn_Defer(Procedure p) : proc(p) {}
-    ~Dqn_Defer() { proc(); }
+    DN_Defer(Procedure p) : proc(p) {}
+    ~DN_Defer() { proc(); }
 };
 
-struct Dqn_DeferHelper
+struct DN_DeferHelper
 {
     template <typename Lambda>
-    Dqn_Defer<Lambda> operator+(Lambda lambda) { return Dqn_Defer<Lambda>(lambda); };
+    DN_Defer<Lambda> operator+(Lambda lambda) { return DN_Defer<Lambda>(lambda); };
 };
 
-#define DQN_UNIQUE_NAME(prefix) DQN_TOKEN_COMBINE(prefix, __LINE__)
-#define DQN_DEFER const auto DQN_UNIQUE_NAME(defer_lambda_) = Dqn_DeferHelper() + [&]()
+#define DN_UNIQUE_NAME(prefix) DN_TOKEN_COMBINE(prefix, __LINE__)
+#define DN_DEFER const auto DN_UNIQUE_NAME(defer_lambda_) = DN_DeferHelper() + [&]()
 #endif // defined(__cplusplus)
 
-#define DQN_DEFER_LOOP(begin, end)                   \
-    for (bool DQN_UNIQUE_NAME(once) = (begin, true); \
-         DQN_UNIQUE_NAME(once);                      \
-         end, DQN_UNIQUE_NAME(once) = false)
+#define DN_DEFER_LOOP(begin, end)                   \
+    for (bool DN_UNIQUE_NAME(once) = (begin, true); \
+         DN_UNIQUE_NAME(once);                      \
+         end, DN_UNIQUE_NAME(once) = false)
 
 // NOTE: [$TYPE] Types /////////////////////////////////////////////////////////////////////////////
-typedef intptr_t     Dqn_isize;
-typedef uintptr_t    Dqn_usize;
-typedef intptr_t     Dqn_isize;
-typedef float        Dqn_f32;
-typedef double       Dqn_f64;
-typedef unsigned int Dqn_uint;
-typedef int32_t      Dqn_b32;
+typedef intptr_t     DN_ISize;
+typedef uintptr_t    DN_USize;
 
-#define DQN_F32_MAX   3.402823466e+38F
-#define DQN_F32_MIN   1.175494351e-38F
-#define DQN_F64_MAX   1.7976931348623158e+308
-#define DQN_F64_MIN   2.2250738585072014e-308
-#define DQN_USIZE_MAX UINTPTR_MAX
-#define DQN_ISIZE_MAX INTPTR_MAX
-#define DQN_ISIZE_MIN INTPTR_MIN
+typedef int8_t       DN_I8;
+typedef int16_t      DN_I16;
+typedef int32_t      DN_I32;
+typedef int64_t      DN_I64;
 
-enum Dqn_ZeroMem
+typedef uint8_t      DN_U8;
+typedef uint16_t     DN_U16;
+typedef uint32_t     DN_U32;
+typedef uint64_t     DN_U64;
+
+typedef float        DN_F32;
+typedef double       DN_F64;
+typedef unsigned int DN_UInt;
+typedef int32_t      DN_B32;
+
+#define DN_F32_MAX   3.402823466e+38F
+#define DN_F32_MIN   1.175494351e-38F
+#define DN_F64_MAX   1.7976931348623158e+308
+#define DN_F64_MIN   2.2250738585072014e-308
+#define DN_USIZE_MAX UINTPTR_MAX
+#define DN_ISIZE_MAX INTPTR_MAX
+#define DN_ISIZE_MIN INTPTR_MIN
+
+enum DN_ZeroMem
 {
-    Dqn_ZeroMem_No,  // Memory can be handed out without zero-ing it out
-    Dqn_ZeroMem_Yes, // Memory should be zero-ed out before giving to the callee
+    DN_ZeroMem_No,  // Memory can be handed out without zero-ing it out
+    DN_ZeroMem_Yes, // Memory should be zero-ed out before giving to the callee
 };
 
-struct Dqn_Str8
+struct DN_Str8
 {
     char      *data; // The bytes of the string
-    Dqn_usize  size; // The number of bytes in the string
+    DN_USize  size; // The number of bytes in the string
 
     char const *begin() const { return data; }
     char const *end  () const { return data + size; }
@@ -370,10 +402,10 @@ struct Dqn_Str8
     char       *end  ()       { return data + size; }
 };
 
-template <typename T> struct Dqn_Slice // A pointer and length container of data
+template <typename T> struct DN_Slice // A pointer and length container of data
 {
     T         *data;
-    Dqn_usize  size;
+    DN_USize  size;
 
     T       *begin()       { return data; }
     T       *end  ()       { return data + size; }
@@ -381,87 +413,110 @@ template <typename T> struct Dqn_Slice // A pointer and length container of data
     T const *end  () const { return data + size; }
 };
 
-// NOTE: [$CALL] Dqn_CallSite //////////////////////////////////////////////////////////////////////
-struct Dqn_CallSite
+// NOTE: [$CALL] DN_CallSite //////////////////////////////////////////////////////////////////////
+struct DN_CallSite
 {
-    Dqn_Str8 file;
-    Dqn_Str8 function;
+    DN_Str8 file;
+    DN_Str8 function;
     uint32_t line;
 };
-#define DQN_CALL_SITE Dqn_CallSite{DQN_STR8(__FILE__), DQN_STR8(__func__), __LINE__}
+#define DN_CALL_SITE DN_CallSite{DN_STR8(__FILE__), DN_STR8(__func__), __LINE__}
 
-// NOTE: [$ERRS] Dqn_ErrorSink /////////////////////////////////////////////////////////////////////
-enum Dqn_ErrorSinkMode
+// NOTE: [$ErrS] DN_ErrSink /////////////////////////////////////////////////////////////////////
+enum DN_ErrSinkMode
 {
-    Dqn_ErrorSinkMode_Nil,
-    Dqn_ErrorSinkMode_ExitOnError,
+    // Default behaviour to accumulate errors into the sink
+    DN_ErrSinkMode_Nil,
+
+    // Break into the debugger (int3) when error is encountered and the sink is
+    // ended by the 'end and log' functions.
+    DN_ErrSinkMode_DebugBreakOnEndAndLog,
+
+    // When an error is encountered, exit the program with the error code of the
+    // error that was caught.
+    DN_ErrSinkMode_ExitOnError,
 };
 
-struct Dqn_ErrorSinkNode
+struct DN_ErrSinkMsg
 {
-    Dqn_ErrorSinkMode  mode;
-    bool               error;
-    int32_t            error_code;
-    Dqn_Str8           msg;
-    Dqn_CallSite       call_site;
-    Dqn_ErrorSinkNode *next;
-    uint64_t           arena_pos;
+    int32_t         error_code;
+    DN_Str8        msg;
+    DN_CallSite    call_site;
+    DN_ErrSinkMsg *next;
+    DN_ErrSinkMsg *prev;
 };
 
-struct Dqn_ErrorSink
+struct DN_ErrSinkNode
 {
-    struct Dqn_Arena  *arena;
-    Dqn_ErrorSinkNode *stack;
+    DN_ErrSinkMode  mode;         // Controls how the sink behaves when an error is registered onto the sink.
+    DN_ErrSinkMsg  *msg_sentinel; // List of error messages accumulated for the current scope
+    DN_ErrSinkNode *next;         // Next error scope
+    uint64_t         arena_pos;    // Position to reset the arena when the scope is ended
+};
+
+struct DN_ErrSink
+{
+    // Arena solely for handling errors take from the thread's TLS
+    struct DN_Arena *arena;
+
+    // Each entry in the stack represents the errors accumulated in the scope
+    // between a begin and end scope of the stink. The base sink is stored in
+    // the thread's TLS.
+    //
+    // The stack has the latest error scope at the front.
+    DN_ErrSinkNode  *stack;
+
+    size_t debug_open_close_counter;
 };
 
 // NOTE: [$INTR] Intrinsics ////////////////////////////////////////////////////////////////////////
-// NOTE: Dqn_Atomic_Add/Exchange return the previous value store in the target
-#if defined(DQN_COMPILER_MSVC) || defined(DQN_COMPILER_CLANG_CL)
+// NOTE: DN_Atomic_Add/Exchange return the previous value store in the target
+#if defined(DN_COMPILER_MSVC) || defined(DN_COMPILER_CLANG_CL)
     #include <intrin.h>
-    #define Dqn_Atomic_CompareExchange64(dest, desired_val, prev_val) _InterlockedCompareExchange64((__int64 volatile *)dest, desired_val, prev_val)
-    #define Dqn_Atomic_CompareExchange32(dest, desired_val, prev_val) _InterlockedCompareExchange((long volatile *)dest, desired_val, prev_val)
-    #define Dqn_Atomic_AddU32(target, value)                          _InterlockedExchangeAdd((long volatile *)target, value)
-    #define Dqn_Atomic_AddU64(target, value)                          _InterlockedExchangeAdd64((__int64 volatile *)target, value)
-    #define Dqn_Atomic_SubU32(target, value)                          Dqn_Atomic_AddU32(DQN_CAST(long volatile *)target, (long)-value)
-    #define Dqn_Atomic_SubU64(target, value)                          Dqn_Atomic_AddU64(target, (uint64_t)-value)
+    #define DN_Atomic_CompareExchange64(dest, desired_val, prev_val) _InterlockedCompareExchange64((__int64 volatile *)dest, desired_val, prev_val)
+    #define DN_Atomic_CompareExchange32(dest, desired_val, prev_val) _InterlockedCompareExchange((long volatile *)dest, desired_val, prev_val)
+    #define DN_Atomic_AddU32(target, value)                          _InterlockedExchangeAdd((long volatile *)target, value)
+    #define DN_Atomic_AddU64(target, value)                          _InterlockedExchangeAdd64((__int64 volatile *)target, value)
+    #define DN_Atomic_SubU32(target, value)                          DN_Atomic_AddU32(DN_CAST(long volatile *)target, (long)-value)
+    #define DN_Atomic_SubU64(target, value)                          DN_Atomic_AddU64(target, (uint64_t)-value)
 
-    #define Dqn_CountLeadingZerosU64(value)                           __lzcnt64(value)
+    #define DN_CountLeadingZerosU64(value)                           __lzcnt64(value)
 
-    #define Dqn_CPU_TSC()                                             __rdtsc()
-    #define Dqn_CompilerReadBarrierAndCPUReadFence                    _ReadBarrier(); _mm_lfence()
-    #define Dqn_CompilerWriteBarrierAndCPUWriteFence                  _WriteBarrier(); _mm_sfence()
-#elif defined(DQN_COMPILER_GCC) || defined(DQN_COMPILER_CLANG)
+    #define DN_CPU_TSC()                                             __rdtsc()
+    #define DN_CompilerReadBarrierAndCPUReadFence                    _ReadBarrier(); _mm_lfence()
+    #define DN_CompilerWriteBarrierAndCPUWriteFence                  _WriteBarrier(); _mm_sfence()
+#elif defined(DN_COMPILER_GCC) || defined(DN_COMPILER_CLANG)
     #if defined(__ANDROID__)
-    #elif defined(DQN_PLATFORM_EMSCRIPTEN)
+    #elif defined(DN_PLATFORM_EMSCRIPTEN)
         #include <emmintrin.h>
     #else
         #include <x86intrin.h>
     #endif
 
-    #define Dqn_Atomic_AddU32(target, value) __atomic_fetch_add(target, value, __ATOMIC_ACQ_REL)
-    #define Dqn_Atomic_AddU64(target, value) __atomic_fetch_add(target, value, __ATOMIC_ACQ_REL)
-    #define Dqn_Atomic_SubU32(target, value) __atomic_fetch_sub(target, value, __ATOMIC_ACQ_REL)
-    #define Dqn_Atomic_SubU64(target, value) __atomic_fetch_sub(target, value, __ATOMIC_ACQ_REL)
+    #define DN_Atomic_AddU32(target, value) __atomic_fetch_add(target, value, __ATOMIC_ACQ_REL)
+    #define DN_Atomic_AddU64(target, value) __atomic_fetch_add(target, value, __ATOMIC_ACQ_REL)
+    #define DN_Atomic_SubU32(target, value) __atomic_fetch_sub(target, value, __ATOMIC_ACQ_REL)
+    #define DN_Atomic_SubU64(target, value) __atomic_fetch_sub(target, value, __ATOMIC_ACQ_REL)
 
-    #define Dqn_CountLeadingZerosU64(value)                           __builtin_clzll(value)
-    #if defined(DQN_COMPILER_GCC)
-        #define Dqn_CPU_TSC() __rdtsc()
+    #define DN_CountLeadingZerosU64(value)                           __builtin_clzll(value)
+    #if defined(DN_COMPILER_GCC)
+        #define DN_CPU_TSC() __rdtsc()
     #else
-        #define Dqn_CPU_TSC() __builtin_readcyclecounter()
+        #define DN_CPU_TSC() __builtin_readcyclecounter()
     #endif
-    #if defined(DQN_PLATFORM_EMSCRIPTEN)
-        #define Dqn_CompilerReadBarrierAndCPUReadFence
-        #define Dqn_CompilerWriteBarrierAndCPUWriteFence
+    #if defined(DN_PLATFORM_EMSCRIPTEN)
+        #define DN_CompilerReadBarrierAndCPUReadFence
+        #define DN_CompilerWriteBarrierAndCPUWriteFence
     #else
-        #define Dqn_CompilerReadBarrierAndCPUReadFence   asm volatile("lfence" ::: "memory")
-        #define Dqn_CompilerWriteBarrierAndCPUWriteFence asm volatile("sfence" ::: "memory")
+        #define DN_CompilerReadBarrierAndCPUReadFence   asm volatile("lfence" ::: "memory")
+        #define DN_CompilerWriteBarrierAndCPUWriteFence asm volatile("sfence" ::: "memory")
     #endif
 #else
     #error "Compiler not supported"
 #endif
 
-#if !defined(DQN_PLATFORM_ARM64)
-struct Dqn_CPURegisters
+#if !defined(DN_PLATFORM_ARM64)
+struct DN_CPURegisters
 {
     int eax;
     int ebx;
@@ -469,115 +524,115 @@ struct Dqn_CPURegisters
     int edx;
 };
 
-union Dqn_CPUIDResult
+union DN_CPUIDResult
 {
-    Dqn_CPURegisters reg;
+    DN_CPURegisters reg;
     int              values[4];
 };
 
-struct Dqn_CPUIDArgs
+struct DN_CPUIDArgs
 {
     int eax;
     int ecx;
 };
 
-#define DQN_CPU_FEAT_XMACRO                 \
-    DQN_CPU_FEAT_XENTRY(3DNow)              \
-    DQN_CPU_FEAT_XENTRY(3DNowExt)           \
-    DQN_CPU_FEAT_XENTRY(ABM)                \
-    DQN_CPU_FEAT_XENTRY(AES)                \
-    DQN_CPU_FEAT_XENTRY(AVX)                \
-    DQN_CPU_FEAT_XENTRY(AVX2)               \
-    DQN_CPU_FEAT_XENTRY(AVX512F)            \
-    DQN_CPU_FEAT_XENTRY(AVX512DQ)           \
-    DQN_CPU_FEAT_XENTRY(AVX512IFMA)         \
-    DQN_CPU_FEAT_XENTRY(AVX512PF)           \
-    DQN_CPU_FEAT_XENTRY(AVX512ER)           \
-    DQN_CPU_FEAT_XENTRY(AVX512CD)           \
-    DQN_CPU_FEAT_XENTRY(AVX512BW)           \
-    DQN_CPU_FEAT_XENTRY(AVX512VL)           \
-    DQN_CPU_FEAT_XENTRY(AVX512VBMI)         \
-    DQN_CPU_FEAT_XENTRY(AVX512VBMI2)        \
-    DQN_CPU_FEAT_XENTRY(AVX512VNNI)         \
-    DQN_CPU_FEAT_XENTRY(AVX512BITALG)       \
-    DQN_CPU_FEAT_XENTRY(AVX512VPOPCNTDQ)    \
-    DQN_CPU_FEAT_XENTRY(AVX5124VNNIW)       \
-    DQN_CPU_FEAT_XENTRY(AVX5124FMAPS)       \
-    DQN_CPU_FEAT_XENTRY(AVX512VP2INTERSECT) \
-    DQN_CPU_FEAT_XENTRY(AVX512FP16)         \
-    DQN_CPU_FEAT_XENTRY(CLZERO)             \
-    DQN_CPU_FEAT_XENTRY(CMPXCHG8B)          \
-    DQN_CPU_FEAT_XENTRY(CMPXCHG16B)         \
-    DQN_CPU_FEAT_XENTRY(F16C)               \
-    DQN_CPU_FEAT_XENTRY(FMA)                \
-    DQN_CPU_FEAT_XENTRY(FMA4)               \
-    DQN_CPU_FEAT_XENTRY(FP128)              \
-    DQN_CPU_FEAT_XENTRY(FP256)              \
-    DQN_CPU_FEAT_XENTRY(FPU)                \
-    DQN_CPU_FEAT_XENTRY(MMX)                \
-    DQN_CPU_FEAT_XENTRY(MONITOR)            \
-    DQN_CPU_FEAT_XENTRY(MOVBE)              \
-    DQN_CPU_FEAT_XENTRY(MOVU)               \
-    DQN_CPU_FEAT_XENTRY(MmxExt)             \
-    DQN_CPU_FEAT_XENTRY(PCLMULQDQ)          \
-    DQN_CPU_FEAT_XENTRY(POPCNT)             \
-    DQN_CPU_FEAT_XENTRY(RDRAND)             \
-    DQN_CPU_FEAT_XENTRY(RDSEED)             \
-    DQN_CPU_FEAT_XENTRY(RDTSCP)             \
-    DQN_CPU_FEAT_XENTRY(SHA)                \
-    DQN_CPU_FEAT_XENTRY(SSE)                \
-    DQN_CPU_FEAT_XENTRY(SSE2)               \
-    DQN_CPU_FEAT_XENTRY(SSE3)               \
-    DQN_CPU_FEAT_XENTRY(SSE41)              \
-    DQN_CPU_FEAT_XENTRY(SSE42)              \
-    DQN_CPU_FEAT_XENTRY(SSE4A)              \
-    DQN_CPU_FEAT_XENTRY(SSSE3)              \
-    DQN_CPU_FEAT_XENTRY(TSC)                \
-    DQN_CPU_FEAT_XENTRY(TscInvariant)       \
-    DQN_CPU_FEAT_XENTRY(VAES)               \
-    DQN_CPU_FEAT_XENTRY(VPCMULQDQ)
+#define DN_CPU_FEAT_XMACRO                 \
+    DN_CPU_FEAT_XENTRY(3DNow)              \
+    DN_CPU_FEAT_XENTRY(3DNowExt)           \
+    DN_CPU_FEAT_XENTRY(ABM)                \
+    DN_CPU_FEAT_XENTRY(AES)                \
+    DN_CPU_FEAT_XENTRY(AVX)                \
+    DN_CPU_FEAT_XENTRY(AVX2)               \
+    DN_CPU_FEAT_XENTRY(AVX512F)            \
+    DN_CPU_FEAT_XENTRY(AVX512DQ)           \
+    DN_CPU_FEAT_XENTRY(AVX512IFMA)         \
+    DN_CPU_FEAT_XENTRY(AVX512PF)           \
+    DN_CPU_FEAT_XENTRY(AVX512ER)           \
+    DN_CPU_FEAT_XENTRY(AVX512CD)           \
+    DN_CPU_FEAT_XENTRY(AVX512BW)           \
+    DN_CPU_FEAT_XENTRY(AVX512VL)           \
+    DN_CPU_FEAT_XENTRY(AVX512VBMI)         \
+    DN_CPU_FEAT_XENTRY(AVX512VBMI2)        \
+    DN_CPU_FEAT_XENTRY(AVX512VNNI)         \
+    DN_CPU_FEAT_XENTRY(AVX512BITALG)       \
+    DN_CPU_FEAT_XENTRY(AVX512VPOPCNTDQ)    \
+    DN_CPU_FEAT_XENTRY(AVX5124VNNIW)       \
+    DN_CPU_FEAT_XENTRY(AVX5124FMAPS)       \
+    DN_CPU_FEAT_XENTRY(AVX512VP2INTERSECT) \
+    DN_CPU_FEAT_XENTRY(AVX512FP16)         \
+    DN_CPU_FEAT_XENTRY(CLZERO)             \
+    DN_CPU_FEAT_XENTRY(CMPXCHG8B)          \
+    DN_CPU_FEAT_XENTRY(CMPXCHG16B)         \
+    DN_CPU_FEAT_XENTRY(F16C)               \
+    DN_CPU_FEAT_XENTRY(FMA)                \
+    DN_CPU_FEAT_XENTRY(FMA4)               \
+    DN_CPU_FEAT_XENTRY(FP128)              \
+    DN_CPU_FEAT_XENTRY(FP256)              \
+    DN_CPU_FEAT_XENTRY(FPU)                \
+    DN_CPU_FEAT_XENTRY(MMX)                \
+    DN_CPU_FEAT_XENTRY(MONITOR)            \
+    DN_CPU_FEAT_XENTRY(MOVBE)              \
+    DN_CPU_FEAT_XENTRY(MOVU)               \
+    DN_CPU_FEAT_XENTRY(MmxExt)             \
+    DN_CPU_FEAT_XENTRY(PCLMULQDQ)          \
+    DN_CPU_FEAT_XENTRY(POPCNT)             \
+    DN_CPU_FEAT_XENTRY(RDRAND)             \
+    DN_CPU_FEAT_XENTRY(RDSEED)             \
+    DN_CPU_FEAT_XENTRY(RDTSCP)             \
+    DN_CPU_FEAT_XENTRY(SHA)                \
+    DN_CPU_FEAT_XENTRY(SSE)                \
+    DN_CPU_FEAT_XENTRY(SSE2)               \
+    DN_CPU_FEAT_XENTRY(SSE3)               \
+    DN_CPU_FEAT_XENTRY(SSE41)              \
+    DN_CPU_FEAT_XENTRY(SSE42)              \
+    DN_CPU_FEAT_XENTRY(SSE4A)              \
+    DN_CPU_FEAT_XENTRY(SSSE3)              \
+    DN_CPU_FEAT_XENTRY(TSC)                \
+    DN_CPU_FEAT_XENTRY(TscInvariant)       \
+    DN_CPU_FEAT_XENTRY(VAES)               \
+    DN_CPU_FEAT_XENTRY(VPCMULQDQ)
 
-enum Dqn_CPUFeature
+enum DN_CPUFeature
 {
-    #define DQN_CPU_FEAT_XENTRY(label) Dqn_CPUFeature_##label,
-    DQN_CPU_FEAT_XMACRO
-    #undef DQN_CPU_FEAT_XENTRY
-    Dqn_CPUFeature_Count,
+    #define DN_CPU_FEAT_XENTRY(label) DN_CPUFeature_##label,
+    DN_CPU_FEAT_XMACRO
+    #undef DN_CPU_FEAT_XENTRY
+    DN_CPUFeature_Count,
 };
 
-struct Dqn_CPUFeatureDecl
+struct DN_CPUFeatureDecl
 {
-    Dqn_CPUFeature value;
-    Dqn_Str8       label;
+    DN_CPUFeature value;
+    DN_Str8       label;
 };
 
-struct Dqn_CPUFeatureQuery
+struct DN_CPUFeatureQuery
 {
-    Dqn_CPUFeature feature;
+    DN_CPUFeature feature;
     bool           available;
 };
 
-struct Dqn_CPUReport
+struct DN_CPUReport
 {
     char     vendor  [4 /*bytes*/ * 3 /*EDX, ECX, EBX*/ + 1 /*null*/];
     char     brand   [48];
-    uint64_t features[(Dqn_CPUFeature_Count / (sizeof(uint64_t) * 8)) + 1];
+    uint64_t features[(DN_CPUFeature_Count / (sizeof(uint64_t) * 8)) + 1];
 };
 
-extern Dqn_CPUFeatureDecl g_dqn_cpu_feature_decl[Dqn_CPUFeature_Count];
-#endif // DQN_PLATFORM_ARM64
+extern DN_CPUFeatureDecl g_dn_cpu_feature_decl[DN_CPUFeature_Count];
+#endif // DN_PLATFORM_ARM64
 
-// NOTE: [$TMUT] Dqn_TicketMutex ///////////////////////////////////////////////////////////////////
-struct Dqn_TicketMutex
+// NOTE: [$TMUT] DN_TicketMutex ///////////////////////////////////////////////////////////////////
+struct DN_TicketMutex
 {
     unsigned int volatile ticket;  // The next ticket to give out to the thread taking the mutex
     unsigned int volatile serving; // The ticket ID to block the mutex on until it is returned
 };
 
-// NOTE: [$MUTX] Dqn_OSMutex ///////////////////////////////////////////////////////////////////////
-struct Dqn_OSMutex
+// NOTE: [$MUTX] DN_OSMutex ///////////////////////////////////////////////////////////////////////
+struct DN_OSMutex
 {
-    #if defined(DQN_OS_WIN32) && !defined(DQN_OS_WIN32_USE_PTHREADS)
+    #if defined(DN_OS_WIN32) && !defined(DN_OS_WIN32_USE_PTHREADS)
     char                win32_handle[48];
     #else
     pthread_mutex_t     posix_handle;
@@ -585,193 +640,271 @@ struct Dqn_OSMutex
     #endif
 };
 
-// NOTE: [$PRIN] Dqn_Print /////////////////////////////////////////////////////////////////////////
-enum Dqn_PrintStd
+// NOTE: [$PRIN] DN_Print /////////////////////////////////////////////////////////////////////////
+enum DN_PrintStd
 {
-    Dqn_PrintStd_Out,
-    Dqn_PrintStd_Err,
+    DN_PrintStd_Out,
+    DN_PrintStd_Err,
 };
 
-enum Dqn_PrintBold
+enum DN_PrintBold
 {
-    Dqn_PrintBold_No,
-    Dqn_PrintBold_Yes,
+    DN_PrintBold_No,
+    DN_PrintBold_Yes,
 };
 
-struct Dqn_PrintStyle
+struct DN_PrintStyle
 {
-    Dqn_PrintBold bold;
+    DN_PrintBold bold;
     bool          colour;
     uint8_t       r, g, b;
 };
 
-enum Dqn_PrintESCColour
+enum DN_PrintESCColour
 {
-    Dqn_PrintESCColour_Fg,
-    Dqn_PrintESCColour_Bg,
+    DN_PrintESCColour_Fg,
+    DN_PrintESCColour_Bg,
 };
 
 
-// NOTE: [$LLOG] Dqn_Log ///////////////////////////////////////////////////////////////////////////
-enum Dqn_LogType
+// NOTE: [$LLOG] DN_Log ///////////////////////////////////////////////////////////////////////////
+enum DN_LogType
 {
-    Dqn_LogType_Debug,
-    Dqn_LogType_Info,
-    Dqn_LogType_Warning,
-    Dqn_LogType_Error,
-    Dqn_LogType_Count,
+    DN_LogType_Debug,
+    DN_LogType_Info,
+    DN_LogType_Warning,
+    DN_LogType_Error,
+    DN_LogType_Count,
 };
 
-typedef void Dqn_LogProc(Dqn_Str8 type,
+typedef void DN_LogProc(DN_Str8 type,
                          int log_type,
                          void *user_data,
-                         Dqn_CallSite call_site,
-                         DQN_FMT_ATTRIB char const *fmt,
+                         DN_CallSite call_site,
+                         DN_FMT_ATTRIB char const *fmt,
                          va_list va);
 
 // NOTE: [$INTR] Intrinsics ////////////////////////////////////////////////////////////////////////
-DQN_FORCE_INLINE uint64_t           Dqn_Atomic_SetValue64                       (uint64_t volatile *target, uint64_t value);
-DQN_FORCE_INLINE long               Dqn_Atomic_SetValue32                       (long volatile *target, long value);
-#if !defined(DQN_PLATFORM_ARM64)
-DQN_API          Dqn_CPUIDResult    Dqn_CPU_ID                                  (Dqn_CPUIDArgs args);
-DQN_API          Dqn_usize          Dqn_CPU_HasFeatureArray                     (Dqn_CPUReport const *report, Dqn_CPUFeatureQuery *features, Dqn_usize features_size);
-DQN_API          bool               Dqn_CPU_HasFeature                          (Dqn_CPUReport const *report, Dqn_CPUFeature feature);
-DQN_API          bool               Dqn_CPU_HasAllFeatures                      (Dqn_CPUReport const *report, Dqn_CPUFeature const *features, Dqn_usize features_size);
-template <Dqn_usize N> bool         Dqn_CPU_HasAllFeaturesCArray                (Dqn_CPUReport const *report, Dqn_CPUFeature const (&features)[N]);
-DQN_API          void               Dqn_CPU_SetFeature                          (Dqn_CPUReport *report, Dqn_CPUFeature feature);
-DQN_API          Dqn_CPUReport      Dqn_CPU_Report                              ();
+DN_FORCE_INLINE       uint64_t       DN_Atomic_SetValue64                       (uint64_t volatile *target, uint64_t value);
+DN_FORCE_INLINE       long           DN_Atomic_SetValue32                       (long volatile *target, long value);
+#if !defined(DN_PLATFORM_ARM64)
+DN_API                DN_CPUIDResult DN_CPU_ID                                  (DN_CPUIDArgs args);
+DN_API                DN_USize       DN_CPU_HasFeatureArray                     (DN_CPUReport const *report, DN_CPUFeatureQuery *features, DN_USize features_size);
+DN_API                bool           DN_CPU_HasFeature                          (DN_CPUReport const *report, DN_CPUFeature feature);
+DN_API                bool           DN_CPU_HasAllFeatures                      (DN_CPUReport const *report, DN_CPUFeature const *features, DN_USize features_size);
+template <DN_USize N> bool           DN_CPU_HasAllFeaturesCArray                (DN_CPUReport const *report, DN_CPUFeature const (&features)[N]);
+DN_API                void           DN_CPU_SetFeature                          (DN_CPUReport *report, DN_CPUFeature feature);
+DN_API                DN_CPUReport   DN_CPU_Report                              ();
 #endif
 
-// NOTE: [$TMUT] Dqn_TicketMutex ///////////////////////////////////////////////////////////////////
-DQN_API          void               Dqn_TicketMutex_Begin                       (Dqn_TicketMutex *mutex);
-DQN_API          void               Dqn_TicketMutex_End                         (Dqn_TicketMutex *mutex);
-DQN_API          Dqn_uint           Dqn_TicketMutex_MakeTicket                  (Dqn_TicketMutex *mutex);
-DQN_API          void               Dqn_TicketMutex_BeginTicket                 (Dqn_TicketMutex const *mutex, Dqn_uint ticket);
-DQN_API          bool               Dqn_TicketMutex_CanLock                     (Dqn_TicketMutex const *mutex, Dqn_uint ticket);
+// NOTE: [$TMUT] DN_TicketMutex ///////////////////////////////////////////////////////////////////
+DN_API          void                 DN_TicketMutex_Begin                       (DN_TicketMutex *mutex);
+DN_API          void                 DN_TicketMutex_End                         (DN_TicketMutex *mutex);
+DN_API          DN_UInt              DN_TicketMutex_MakeTicket                  (DN_TicketMutex *mutex);
+DN_API          void                 DN_TicketMutex_BeginTicket                 (DN_TicketMutex const *mutex, DN_UInt ticket);
+DN_API          bool                 DN_TicketMutex_CanLock                     (DN_TicketMutex const *mutex, DN_UInt ticket);
 
-// NOTE: [$PRIN] Dqn_Print /////////////////////////////////////////////////////////////////////////
+// NOTE: [$PRIN] DN_Print /////////////////////////////////////////////////////////////////////////
 // NOTE: Print Style ///////////////////////////////////////////////////////////////////////////////
-DQN_API          Dqn_PrintStyle     Dqn_Print_StyleColour                       (uint8_t r, uint8_t g, uint8_t b, Dqn_PrintBold bold);
-DQN_API          Dqn_PrintStyle     Dqn_Print_StyleColourU32                    (uint32_t rgb, Dqn_PrintBold bold);
-DQN_API          Dqn_PrintStyle     Dqn_Print_StyleBold                         ();
+DN_API          DN_PrintStyle        DN_Print_StyleColour                       (uint8_t r, uint8_t g, uint8_t b, DN_PrintBold bold);
+DN_API          DN_PrintStyle        DN_Print_StyleColourU32                    (uint32_t rgb, DN_PrintBold bold);
+DN_API          DN_PrintStyle        DN_Print_StyleBold                         ();
 
 // NOTE: Print Macros //////////////////////////////////////////////////////////////////////////////
-#define                             Dqn_Print(string)                           Dqn_Print_Std(Dqn_PrintStd_Out, string)
-#define                             Dqn_Print_F(fmt, ...)                       Dqn_Print_StdF(Dqn_PrintStd_Out, fmt, ## __VA_ARGS__)
-#define                             Dqn_Print_FV(fmt, args)                     Dqn_Print_StdFV(Dqn_PrintStd_Out, fmt, args)
+#define                              DN_Print(string)                           DN_Print_Std(DN_PrintStd_Out, string)
+#define                              DN_Print_F(fmt, ...)                       DN_Print_StdF(DN_PrintStd_Out, fmt, ## __VA_ARGS__)
+#define                              DN_Print_FV(fmt, args)                     DN_Print_StdFV(DN_PrintStd_Out, fmt, args)
 
-#define                             Dqn_Print_Style(style, string)              Dqn_Print_StdStyle(Dqn_PrintStd_Out, style, string)
-#define                             Dqn_Print_FStyle(style, fmt, ...)           Dqn_Print_StdFStyle(Dqn_PrintStd_Out, style, fmt, ## __VA_ARGS__)
-#define                             Dqn_Print_FVStyle(style, fmt, args, ...)    Dqn_Print_StdFVStyle(Dqn_PrintStd_Out, style, fmt, args)
+#define                              DN_Print_Style(style, string)              DN_Print_StdStyle(DN_PrintStd_Out, style, string)
+#define                              DN_Print_FStyle(style, fmt, ...)           DN_Print_StdFStyle(DN_PrintStd_Out, style, fmt, ## __VA_ARGS__)
+#define                              DN_Print_FVStyle(style, fmt, args, ...)    DN_Print_StdFVStyle(DN_PrintStd_Out, style, fmt, args)
 
-#define                             Dqn_Print_Ln(string)                        Dqn_Print_StdLn(Dqn_PrintStd_Out, string)
-#define                             Dqn_Print_LnF(fmt, ...)                     Dqn_Print_StdLnF(Dqn_PrintStd_Out, fmt, ## __VA_ARGS__)
-#define                             Dqn_Print_LnFV(fmt, args)                   Dqn_Print_StdLnFV(Dqn_PrintStd_Out, fmt, args)
+#define                              DN_Print_Ln(string)                        DN_Print_StdLn(DN_PrintStd_Out, string)
+#define                              DN_Print_LnF(fmt, ...)                     DN_Print_StdLnF(DN_PrintStd_Out, fmt, ## __VA_ARGS__)
+#define                              DN_Print_LnFV(fmt, args)                   DN_Print_StdLnFV(DN_PrintStd_Out, fmt, args)
 
-#define                             Dqn_Print_LnStyle(style, string)            Dqn_Print_StdLnStyle(Dqn_PrintStd_Out, style, string);
-#define                             Dqn_Print_LnFStyle(style, fmt, ...)         Dqn_Print_StdLnFStyle(Dqn_PrintStd_Out, style, fmt, ## __VA_ARGS__);
-#define                             Dqn_Print_LnFVStyle(style, fmt, args)       Dqn_Print_StdLnFVStyle(Dqn_PrintStd_Out, style, fmt, args);
+#define                              DN_Print_LnStyle(style, string)            DN_Print_StdLnStyle(DN_PrintStd_Out, style, string);
+#define                              DN_Print_LnFStyle(style, fmt, ...)         DN_Print_StdLnFStyle(DN_PrintStd_Out, style, fmt, ## __VA_ARGS__);
+#define                              DN_Print_LnFVStyle(style, fmt, args)       DN_Print_StdLnFVStyle(DN_PrintStd_Out, style, fmt, args);
 
-#define                             Dqn_Print_Err(string)                       Dqn_Print_Std(Dqn_PrintStd_Err, string)
-#define                             Dqn_Print_ErrF(fmt, ...)                    Dqn_Print_StdF(Dqn_PrintStd_Err, fmt, ## __VA_ARGS__)
-#define                             Dqn_Print_ErrFV(fmt, args)                  Dqn_Print_StdFV(Dqn_PrintStd_Err, fmt, args)
+#define                              DN_Print_Err(string)                       DN_Print_Std(DN_PrintStd_Err, string)
+#define                              DN_Print_ErrF(fmt, ...)                    DN_Print_StdF(DN_PrintStd_Err, fmt, ## __VA_ARGS__)
+#define                              DN_Print_ErrFV(fmt, args)                  DN_Print_StdFV(DN_PrintStd_Err, fmt, args)
 
-#define                             Dqn_Print_ErrStyle(style, string)           Dqn_Print_StdStyle(Dqn_PrintStd_Err, style, string)
-#define                             Dqn_Print_ErrFStyle(style, fmt, ...)        Dqn_Print_StdFStyle(Dqn_PrintStd_Err, style, fmt, ## __VA_ARGS__)
-#define                             Dqn_Print_ErrFVStyle(style, fmt, args, ...) Dqn_Print_StdFVStyle(Dqn_PrintStd_Err, style, fmt, args)
+#define                              DN_Print_ErrStyle(style, string)           DN_Print_StdStyle(DN_PrintStd_Err, style, string)
+#define                              DN_Print_ErrFStyle(style, fmt, ...)        DN_Print_StdFStyle(DN_PrintStd_Err, style, fmt, ## __VA_ARGS__)
+#define                              DN_Print_ErrFVStyle(style, fmt, args, ...) DN_Print_StdFVStyle(DN_PrintStd_Err, style, fmt, args)
 
-#define                             Dqn_Print_ErrLn(string)                     Dqn_Print_StdLn(Dqn_PrintStd_Err, string)
-#define                             Dqn_Print_ErrLnF(fmt, ...)                  Dqn_Print_StdLnF(Dqn_PrintStd_Err, fmt, ## __VA_ARGS__)
-#define                             Dqn_Print_ErrLnFV(fmt, args)                Dqn_Print_StdLnFV(Dqn_PrintStd_Err, fmt, args)
+#define                              DN_Print_ErrLn(string)                     DN_Print_StdLn(DN_PrintStd_Err, string)
+#define                              DN_Print_ErrLnF(fmt, ...)                  DN_Print_StdLnF(DN_PrintStd_Err, fmt, ## __VA_ARGS__)
+#define                              DN_Print_ErrLnFV(fmt, args)                DN_Print_StdLnFV(DN_PrintStd_Err, fmt, args)
 
-#define                             Dqn_Print_ErrLnStyle(style, string)         Dqn_Print_StdLnStyle(Dqn_PrintStd_Err, style, string);
-#define                             Dqn_Print_ErrLnFStyle(style, fmt, ...)      Dqn_Print_StdLnFStyle(Dqn_PrintStd_Err, style, fmt, ## __VA_ARGS__);
-#define                             Dqn_Print_ErrLnFVStyle(style, fmt, args)    Dqn_Print_StdLnFVStyle(Dqn_PrintStd_Err, style, fmt, args);
+#define                              DN_Print_ErrLnStyle(style, string)         DN_Print_StdLnStyle(DN_PrintStd_Err, style, string);
+#define                              DN_Print_ErrLnFStyle(style, fmt, ...)      DN_Print_StdLnFStyle(DN_PrintStd_Err, style, fmt, ## __VA_ARGS__);
+#define                              DN_Print_ErrLnFVStyle(style, fmt, args)    DN_Print_StdLnFVStyle(DN_PrintStd_Err, style, fmt, args);
 // NOTE: Print /////////////////////////////////////////////////////////////////////////////////////
-DQN_API          void               Dqn_Print_Std                               (Dqn_PrintStd std_handle, Dqn_Str8 string);
-DQN_API          void               Dqn_Print_StdF                              (Dqn_PrintStd std_handle, DQN_FMT_ATTRIB char const *fmt, ...);
-DQN_API          void               Dqn_Print_StdFV                             (Dqn_PrintStd std_handle, DQN_FMT_ATTRIB char const *fmt, va_list args);
+DN_API          void                 DN_Print_Std                               (DN_PrintStd std_handle, DN_Str8 string);
+DN_API          void                 DN_Print_StdF                              (DN_PrintStd std_handle, DN_FMT_ATTRIB char const *fmt, ...);
+DN_API          void                 DN_Print_StdFV                             (DN_PrintStd std_handle, DN_FMT_ATTRIB char const *fmt, va_list args);
 
-DQN_API          void               Dqn_Print_StdStyle                          (Dqn_PrintStd std_handle, Dqn_PrintStyle style, Dqn_Str8 string);
-DQN_API          void               Dqn_Print_StdFStyle                         (Dqn_PrintStd std_handle, Dqn_PrintStyle style, DQN_FMT_ATTRIB char const *fmt, ...);
-DQN_API          void               Dqn_Print_StdFVStyle                        (Dqn_PrintStd std_handle, Dqn_PrintStyle style, DQN_FMT_ATTRIB char const *fmt, va_list args);
+DN_API          void                 DN_Print_StdStyle                          (DN_PrintStd std_handle, DN_PrintStyle style, DN_Str8 string);
+DN_API          void                 DN_Print_StdFStyle                         (DN_PrintStd std_handle, DN_PrintStyle style, DN_FMT_ATTRIB char const *fmt, ...);
+DN_API          void                 DN_Print_StdFVStyle                        (DN_PrintStd std_handle, DN_PrintStyle style, DN_FMT_ATTRIB char const *fmt, va_list args);
 
-DQN_API          void               Dqn_Print_StdLn                             (Dqn_PrintStd std_handle, Dqn_Str8 string);
-DQN_API          void               Dqn_Print_StdLnF                            (Dqn_PrintStd std_handle, DQN_FMT_ATTRIB char const *fmt, ...);
-DQN_API          void               Dqn_Print_StdLnFV                           (Dqn_PrintStd std_handle, DQN_FMT_ATTRIB char const *fmt, va_list args);
+DN_API          void                 DN_Print_StdLn                             (DN_PrintStd std_handle, DN_Str8 string);
+DN_API          void                 DN_Print_StdLnF                            (DN_PrintStd std_handle, DN_FMT_ATTRIB char const *fmt, ...);
+DN_API          void                 DN_Print_StdLnFV                           (DN_PrintStd std_handle, DN_FMT_ATTRIB char const *fmt, va_list args);
 
-DQN_API          void               Dqn_Print_StdLnStyle                        (Dqn_PrintStd std_handle, Dqn_PrintStyle style, Dqn_Str8 string);
-DQN_API          void               Dqn_Print_StdLnFStyle                       (Dqn_PrintStd std_handle, Dqn_PrintStyle style, DQN_FMT_ATTRIB char const *fmt, ...);
-DQN_API          void               Dqn_Print_StdLnFVStyle                      (Dqn_PrintStd std_handle, Dqn_PrintStyle style, DQN_FMT_ATTRIB char const *fmt, va_list args);
+DN_API          void                 DN_Print_StdLnStyle                        (DN_PrintStd std_handle, DN_PrintStyle style, DN_Str8 string);
+DN_API          void                 DN_Print_StdLnFStyle                       (DN_PrintStd std_handle, DN_PrintStyle style, DN_FMT_ATTRIB char const *fmt, ...);
+DN_API          void                 DN_Print_StdLnFVStyle                      (DN_PrintStd std_handle, DN_PrintStyle style, DN_FMT_ATTRIB char const *fmt, va_list args);
 
 // NOTE: ANSI Formatting Codes /////////////////////////////////////////////////////////////////////
-DQN_API          Dqn_Str8           Dqn_Print_ESCColourStr8                     (Dqn_PrintESCColour colour, uint8_t r, uint8_t g, uint8_t b);
-DQN_API          Dqn_Str8           Dqn_Print_ESCColourU32Str8                  (Dqn_PrintESCColour colour, uint32_t value);
+DN_API          DN_Str8              DN_Print_ESCColourStr8                     (DN_PrintESCColour colour, uint8_t r, uint8_t g, uint8_t b);
+DN_API          DN_Str8              DN_Print_ESCColourU32Str8                  (DN_PrintESCColour colour, uint32_t value);
 
-#define                             Dqn_Print_ESCColourFgStr8(r, g, b)          Dqn_Print_ESCColourStr8(Dqn_PrintESCColour_Fg, r, g, b)
-#define                             Dqn_Print_ESCColourBgStr8(r, g, b)          Dqn_Print_ESCColourStr8(Dqn_PrintESCColour_Bg, r, g, b)
-#define                             Dqn_Print_ESCColourFg(r, g, b)              Dqn_Print_ESCColourStr8(Dqn_PrintESCColour_Fg, r, g, b).data
-#define                             Dqn_Print_ESCColourBg(r, g, b)              Dqn_Print_ESCColourStr8(Dqn_PrintESCColour_Bg, r, g, b).data
+#define                              DN_Print_ESCColourFgStr8(r, g, b)          DN_Print_ESCColourStr8(DN_PrintESCColour_Fg, r, g, b)
+#define                              DN_Print_ESCColourBgStr8(r, g, b)          DN_Print_ESCColourStr8(DN_PrintESCColour_Bg, r, g, b)
+#define                              DN_Print_ESCColourFg(r, g, b)              DN_Print_ESCColourStr8(DN_PrintESCColour_Fg, r, g, b).data
+#define                              DN_Print_ESCColourBg(r, g, b)              DN_Print_ESCColourStr8(DN_PrintESCColour_Bg, r, g, b).data
 
-#define                             Dqn_Print_ESCColourFgU32Str8(value)         Dqn_Print_ESCColourU32Str8(Dqn_PrintESCColour_Fg, value)
-#define                             Dqn_Print_ESCColourBgU32Str8(value)         Dqn_Print_ESCColourU32Str8(Dqn_PrintESCColour_Bg, value)
-#define                             Dqn_Print_ESCColourFgU32(value)             Dqn_Print_ESCColourU32Str8(Dqn_PrintESCColour_Fg, value).data
-#define                             Dqn_Print_ESCColourBgU32(value)             Dqn_Print_ESCColourU32Str8(Dqn_PrintESCColour_Bg, value).data
+#define                              DN_Print_ESCColourFgU32Str8(value)         DN_Print_ESCColourU32Str8(DN_PrintESCColour_Fg, value)
+#define                              DN_Print_ESCColourBgU32Str8(value)         DN_Print_ESCColourU32Str8(DN_PrintESCColour_Bg, value)
+#define                              DN_Print_ESCColourFgU32(value)             DN_Print_ESCColourU32Str8(DN_PrintESCColour_Fg, value).data
+#define                              DN_Print_ESCColourBgU32(value)             DN_Print_ESCColourU32Str8(DN_PrintESCColour_Bg, value).data
 
-#define                             Dqn_Print_ESCReset                          "\x1b[0m"
-#define                             Dqn_Print_ESCBold                           "\x1b[1m"
-#define                             Dqn_Print_ESCResetStr8                      DQN_STR8(Dqn_Print_ESCReset)
-#define                             Dqn_Print_ESCBoldStr8                       DQN_STR8(Dqn_Print_ESCBold)
-// NOTE: [$LLOG] Dqn_Log ///////////////////////////////////////////////////////////////////////////
-#define                             Dqn_LogTypeColourU32_Info                   0x00'87'ff'ff // Blue
-#define                             Dqn_LogTypeColourU32_Warning                0xff'ff'00'ff // Yellow
-#define                             Dqn_LogTypeColourU32_Error                  0xff'00'00'ff // Red
+#define                              DN_Print_ESCReset                          "\x1b[0m"
+#define                              DN_Print_ESCBold                           "\x1b[1m"
+#define                              DN_Print_ESCResetStr8                      DN_STR8(DN_Print_ESCReset)
+#define                              DN_Print_ESCBoldStr8                       DN_STR8(DN_Print_ESCBold)
+// NOTE: [$LLOG] DN_Log ///////////////////////////////////////////////////////////////////////////
+#define                              DN_LogTypeColourU32_Info                   0x00'87'ff'ff // Blue
+#define                              DN_LogTypeColourU32_Warning                0xff'ff'00'ff // Yellow
+#define                              DN_LogTypeColourU32_Error                  0xff'00'00'ff // Red
 
-#define                             Dqn_Log_DebugF(fmt, ...)                    Dqn_Log_TypeFCallSite (Dqn_LogType_Debug, DQN_CALL_SITE, fmt, ## __VA_ARGS__)
-#define                             Dqn_Log_InfoF(fmt, ...)                     Dqn_Log_TypeFCallSite (Dqn_LogType_Info, DQN_CALL_SITE, fmt, ## __VA_ARGS__)
-#define                             Dqn_Log_WarningF(fmt, ...)                  Dqn_Log_TypeFCallSite (Dqn_LogType_Warning, DQN_CALL_SITE, fmt, ## __VA_ARGS__)
-#define                             Dqn_Log_ErrorF(fmt, ...)                    Dqn_Log_TypeFCallSite (Dqn_LogType_Error, DQN_CALL_SITE, fmt, ## __VA_ARGS__)
-#define                             Dqn_Log_DebugFV(fmt, args)                  Dqn_Log_TypeFVCallSite(Dqn_LogType_Debug, DQN_CALL_SITE, fmt, args)
-#define                             Dqn_Log_InfoFV(fmt, args)                   Dqn_Log_TypeFVCallSite(Dqn_LogType_Info, DQN_CALL_SITE, fmt, args)
-#define                             Dqn_Log_WarningFV(fmt, args)                Dqn_Log_TypeFVCallSite(Dqn_LogType_Warning, DQN_CALL_SITE, fmt, args)
-#define                             Dqn_Log_ErrorFV(fmt, args)                  Dqn_Log_TypeFVCallSite(Dqn_LogType_Error, DQN_CALL_SITE, fmt, args)
-#define                             Dqn_Log_TypeFV(type, fmt, args)             Dqn_Log_TypeFVCallSite(type, DQN_CALL_SITE, fmt, args)
-#define                             Dqn_Log_TypeF(type, fmt, ...)               Dqn_Log_TypeFCallSite (type, DQN_CALL_SITE, fmt, ## __VA_ARGS__)
-#define                             Dqn_Log_FV(type, fmt, args)                 Dqn_Log_FVCallSite    (type, DQN_CALL_SITE, fmt, args)
-#define                             Dqn_Log_F(type, fmt, ...)                   Dqn_Log_FCallSite     (type, DQN_CALL_SITE, fmt, ## __VA_ARGS__)
+#define                              DN_Log_DebugF(fmt, ...)                    DN_Log_TypeFCallSite (DN_LogType_Debug, DN_CALL_SITE, fmt, ## __VA_ARGS__)
+#define                              DN_Log_InfoF(fmt, ...)                     DN_Log_TypeFCallSite (DN_LogType_Info, DN_CALL_SITE, fmt, ## __VA_ARGS__)
+#define                              DN_Log_WarningF(fmt, ...)                  DN_Log_TypeFCallSite (DN_LogType_Warning, DN_CALL_SITE, fmt, ## __VA_ARGS__)
+#define                              DN_Log_ErrorF(fmt, ...)                    DN_Log_TypeFCallSite (DN_LogType_Error, DN_CALL_SITE, fmt, ## __VA_ARGS__)
+#define                              DN_Log_DebugFV(fmt, args)                  DN_Log_TypeFVCallSite(DN_LogType_Debug, DN_CALL_SITE, fmt, args)
+#define                              DN_Log_InfoFV(fmt, args)                   DN_Log_TypeFVCallSite(DN_LogType_Info, DN_CALL_SITE, fmt, args)
+#define                              DN_Log_WarningFV(fmt, args)                DN_Log_TypeFVCallSite(DN_LogType_Warning, DN_CALL_SITE, fmt, args)
+#define                              DN_Log_ErrorFV(fmt, args)                  DN_Log_TypeFVCallSite(DN_LogType_Error, DN_CALL_SITE, fmt, args)
+#define                              DN_Log_TypeFV(type, fmt, args)             DN_Log_TypeFVCallSite(type, DN_CALL_SITE, fmt, args)
+#define                              DN_Log_TypeF(type, fmt, ...)               DN_Log_TypeFCallSite (type, DN_CALL_SITE, fmt, ## __VA_ARGS__)
+#define                              DN_Log_FV(type, fmt, args)                 DN_Log_FVCallSite    (type, DN_CALL_SITE, fmt, args)
+#define                              DN_Log_F(type, fmt, ...)                   DN_Log_FCallSite     (type, DN_CALL_SITE, fmt, ## __VA_ARGS__)
 
-DQN_API          Dqn_Str8           Dqn_Log_MakeStr8                            (struct Dqn_Arena *arena, bool colour, Dqn_Str8 type, int log_type, Dqn_CallSite call_site, DQN_FMT_ATTRIB char const *fmt, va_list args);
-DQN_API          void               Dqn_Log_TypeFVCallSite                      (Dqn_LogType type, Dqn_CallSite call_site, DQN_FMT_ATTRIB char const *fmt, va_list va);
-DQN_API          void               Dqn_Log_TypeFCallSite                       (Dqn_LogType type, Dqn_CallSite call_site, DQN_FMT_ATTRIB char const *fmt, ...);
-DQN_API          void               Dqn_Log_FVCallSite                          (Dqn_Str8 type, Dqn_CallSite call_site, DQN_FMT_ATTRIB char const *fmt, va_list va);
-DQN_API          void               Dqn_Log_FCallSite                           (Dqn_Str8 type, Dqn_CallSite call_site, DQN_FMT_ATTRIB char const *fmt, ...);
+DN_API          DN_Str8              DN_Log_MakeStr8                            (struct DN_Arena *arena, bool colour, DN_Str8 type, int log_type, DN_CallSite call_site, DN_FMT_ATTRIB char const *fmt, va_list args);
+DN_API          void                 DN_Log_TypeFVCallSite                      (DN_LogType type, DN_CallSite call_site, DN_FMT_ATTRIB char const *fmt, va_list va);
+DN_API          void                 DN_Log_TypeFCallSite                       (DN_LogType type, DN_CallSite call_site, DN_FMT_ATTRIB char const *fmt, ...);
+DN_API          void                 DN_Log_FVCallSite                          (DN_Str8 type, DN_CallSite call_site, DN_FMT_ATTRIB char const *fmt, va_list va);
+DN_API          void                 DN_Log_FCallSite                           (DN_Str8 type, DN_CallSite call_site, DN_FMT_ATTRIB char const *fmt, ...);
 
-// NOTE: [$ERRS] Dqn_ErrorSink /////////////////////////////////////////////////////////////////////
-DQN_API          Dqn_ErrorSink *    Dqn_ErrorSink_Begin                         (Dqn_ErrorSinkMode mode);
-DQN_API          bool               Dqn_ErrorSink_HasError                      (Dqn_ErrorSink *error);
-DQN_API          Dqn_ErrorSinkNode  Dqn_ErrorSink_End                           (Dqn_Arena *arena, Dqn_ErrorSink *error);
-DQN_API          void               Dqn_ErrorSink_EndAndIgnore                  (Dqn_ErrorSink *error);
-DQN_API          bool               Dqn_ErrorSink_EndAndLogError                (Dqn_ErrorSink *error, Dqn_Str8 error_msg);
-DQN_API          bool               Dqn_ErrorSink_EndAndLogErrorFV              (Dqn_ErrorSink *error, DQN_FMT_ATTRIB char const *fmt, va_list args);
-DQN_API          bool               Dqn_ErrorSink_EndAndLogErrorF               (Dqn_ErrorSink *error, DQN_FMT_ATTRIB char const *fmt, ...);
-DQN_API          void               Dqn_ErrorSink_EndAndExitIfErrorF            (Dqn_ErrorSink *error, uint32_t exit_code, DQN_FMT_ATTRIB char const *fmt, ...);
-DQN_API          void               Dqn_ErrorSink_EndAndExitIfErrorFV           (Dqn_ErrorSink *error, uint32_t exit_code, DQN_FMT_ATTRIB char const *fmt, va_list args);
+// NOTE: [$ERRS] DN_ErrSink /////////////////////////////////////////////////////////////////////
+DN_API          DN_ErrSink *         DN_ErrSink_Begin                           (DN_ErrSinkMode mode);
+#define                              DN_ErrSink_BeginDefault()                  DN_ErrSink_Begin(DN_ErrSinkMode_Nil)
+DN_API          bool                 DN_ErrSink_HasError                        (DN_ErrSink *err);
+DN_API          DN_ErrSinkMsg*       DN_ErrSink_End                             (DN_Arena *arena, DN_ErrSink *err);
+DN_API          DN_Str8              DN_ErrSink_EndStr8                         (DN_Arena *arena, DN_ErrSink *err);
+DN_API          void                 DN_ErrSink_EndAndIgnore                    (DN_ErrSink *err);
 
-#define                             Dqn_ErrorSink_MakeFV(error, error_code, fmt, args) do { Dqn_TLS_SaveCallSite; Dqn_ErrorSink_MakeFV_(error, error_code, fmt, args); } while (0)
-#define                             Dqn_ErrorSink_MakeF(error, error_code, fmt, ...)   do { Dqn_TLS_SaveCallSite; Dqn_ErrorSink_MakeF_(error, error_code, fmt, ## __VA_ARGS__); } while (0)
-DQN_API          void               Dqn_ErrorSink_MakeFV_                       (Dqn_ErrorSink *error, uint32_t error_code, DQN_FMT_ATTRIB char const *fmt, va_list args);
-DQN_API          void               Dqn_ErrorSink_MakeF_                        (Dqn_ErrorSink *error, uint32_t error_code, DQN_FMT_ATTRIB char const *fmt, ...);
+#define                              DN_ErrSink_EndAndLogError(err, err_msg)                  DN_ErrSink_EndAndLogError_     (err, DN_CALL_SITE, err_msg)
+#define                              DN_ErrSink_EndAndLogErrorFV(err, fmt, args)              DN_ErrSink_EndAndLogErrorFV_   (err, DN_CALL_SITE, fmt, args)
+#define                              DN_ErrSink_EndAndLogErrorF(err, fmt, ...)                DN_ErrSink_EndAndLogErrorF_    (err, DN_CALL_SITE, fmt, ##__VA_ARGS__)
+#define                              DN_ErrSink_EndAndExitIfErrorFV(err, exit_val, fmt, args) DN_ErrSink_EndAndExitIfErrorFV_(err, DN_CALL_SITE, exit_val, fmt, args)
+#define                              DN_ErrSink_EndAndExitIfErrorF(err, exit_val, fmt, ...)   DN_ErrSink_EndAndExitIfErrorF_ (err, DN_CALL_SITE, exit_val, fmt, ##__VA_ARGS__)
+
+DN_API          bool                 DN_ErrSink_EndAndLogError_                 (DN_ErrSink *err, DN_CallSite call_site, DN_Str8 msg);
+DN_API          bool                 DN_ErrSink_EndAndLogErrorFV_               (DN_ErrSink *err, DN_CallSite call_site,                    DN_FMT_ATTRIB char const *fmt, va_list args);
+DN_API          bool                 DN_ErrSink_EndAndLogErrorF_                (DN_ErrSink *err, DN_CallSite call_site,                    DN_FMT_ATTRIB char const *fmt, ...);
+DN_API          void                 DN_ErrSink_EndAndExitIfErrorF_             (DN_ErrSink *err, DN_CallSite call_site, uint32_t exit_val, DN_FMT_ATTRIB char const *fmt, ...);
+DN_API          void                 DN_ErrSink_EndAndExitIfErrorFV_            (DN_ErrSink *err, DN_CallSite call_site, uint32_t exit_val, DN_FMT_ATTRIB char const *fmt, va_list args);
+
+#define                              DN_ErrSink_AppendFV(error, error_code, fmt, args) do { DN_TLS_SaveCallSite; DN_ErrSink_AppendFV_(error, error_code, fmt, args); } while (0)
+#define                              DN_ErrSink_AppendF(error, error_code, fmt, ...)   do { DN_TLS_SaveCallSite; DN_ErrSink_AppendF_(error, error_code, fmt, ## __VA_ARGS__); } while (0)
+DN_API          void                 DN_ErrSink_AppendFV_                       (DN_ErrSink *err, uint32_t error_code, DN_FMT_ATTRIB char const *fmt, va_list args);
+DN_API          void                 DN_ErrSink_AppendF_                        (DN_ErrSink *err, uint32_t error_code, DN_FMT_ATTRIB char const *fmt, ...);
+
+// NOTE: [$SDLL] DN_SentinelDLL ///////////////////////////////////////////////////////////////////
+#define DN_SentinelDLL_Init(list) \
+    (list)->next = (list)->prev = (list)
+
+#define DN_SentinelDLL_InitArena(list, T, arena)                \
+    do {                                                         \
+        (list)       = DN_Arena_New(arena, T, DN_ZeroMem_Yes); \
+        DN_SentinelDLL_Init(list);                              \
+    } while (0)
+
+#define DN_SentinelDLL_InitPool(list, T, pool) \
+    do {                                        \
+        (list)       = DN_Pool_New(pool, T);   \
+        DN_SentinelDLL_Init(list);             \
+    } while (0)
+
+#define DN_SentinelDLL_Detach(item)           \
+    do {                                       \
+        if (item) {                            \
+            (item)->prev->next = (item)->next; \
+            (item)->next->prev = (item)->prev; \
+            (item)->next       = nullptr;      \
+            (item)->prev       = nullptr;      \
+        }                                      \
+    } while (0)
+
+#define DN_SentinelDLL_Dequeue(list, dest_ptr) \
+    if (DN_SentinelDLL_HasItems(list)) {       \
+        dest_ptr = (list)->next;                \
+        DN_SentinelDLL_Detach(dest_ptr);       \
+    }
+
+#define DN_SentinelDLL_Append(list, item)     \
+    do {                                       \
+        if (item) {                            \
+            if ((item)->next)                  \
+                DN_SentinelDLL_Detach(item);  \
+            (item)->next       = (list)->next; \
+            (item)->prev       = (list);       \
+            (item)->next->prev = (item);       \
+            (item)->prev->next = (item);       \
+        }                                      \
+    } while (0)
+
+#define DN_SentinelDLL_Prepend(list, item)    \
+    do {                                       \
+        if (item) {                            \
+            if ((item)->next)                  \
+                DN_SentinelDLL_Detach(item);  \
+            (item)->next       = (list);       \
+            (item)->prev       = (list)->prev; \
+            (item)->next->prev = (item);       \
+            (item)->prev->next = (item);       \
+        }                                      \
+    } while (0)
+
+#define DN_SentinelDLL_IsEmpty(list) \
+    (!(list) || ((list) == (list)->next))
+
+#define DN_SentinelDLL_IsInit(list) \
+    ((list)->next && (list)->prev)
+
+#define DN_SentinelDLL_HasItems(list) \
+    ((list) && ((list) != (list)->next))
+
+#define DN_SentinelDLL_ForEach(it_name, list) \
+    auto *it_name = (list)->next; (it_name) != (list); (it_name) = (it_name)->next
+
 
 // NOTE: [$INTR] Intrinsics ////////////////////////////////////////////////////////////////////////
-DQN_FORCE_INLINE uint64_t Dqn_Atomic_SetValue64(uint64_t volatile *target, uint64_t value)
+DN_FORCE_INLINE uint64_t DN_Atomic_SetValue64(uint64_t volatile *target, uint64_t value)
 {
-    #if defined(DQN_COMPILER_MSVC) || defined(DQN_COMPILER_CLANG_CL)
+    #if defined(DN_COMPILER_MSVC) || defined(DN_COMPILER_CLANG_CL)
     __int64 result;
     do {
         result = *target;
-    } while (Dqn_Atomic_CompareExchange64(target, value, result) != result);
-    return DQN_CAST(uint64_t)result;
-    #elif defined(DQN_COMPILER_GCC) || defined(DQN_COMPILER_CLANG)
+    } while (DN_Atomic_CompareExchange64(target, value, result) != result);
+    return DN_CAST(uint64_t)result;
+    #elif defined(DN_COMPILER_GCC) || defined(DN_COMPILER_CLANG)
     uint64_t result = __sync_lock_test_and_set(target, value);
     return result;
     #else
@@ -779,15 +912,15 @@ DQN_FORCE_INLINE uint64_t Dqn_Atomic_SetValue64(uint64_t volatile *target, uint6
     #endif
 }
 
-DQN_FORCE_INLINE long Dqn_Atomic_SetValue32(long volatile *target, long value)
+DN_FORCE_INLINE long DN_Atomic_SetValue32(long volatile *target, long value)
 {
-    #if defined(DQN_COMPILER_MSVC) || defined(DQN_COMPILER_CLANG_CL)
+    #if defined(DN_COMPILER_MSVC) || defined(DN_COMPILER_CLANG_CL)
     long result;
     do {
         result = *target;
-    } while (Dqn_Atomic_CompareExchange32(target, value, result) != result);
+    } while (DN_Atomic_CompareExchange32(target, value, result) != result);
     return result;
-    #elif defined(DQN_COMPILER_GCC) || defined(DQN_COMPILER_CLANG)
+    #elif defined(DN_COMPILER_GCC) || defined(DN_COMPILER_CLANG)
     long result = __sync_lock_test_and_set(target, value);
     return result;
     #else
@@ -795,8 +928,10 @@ DQN_FORCE_INLINE long Dqn_Atomic_SetValue32(long volatile *target, long value)
     #endif
 }
 
-template <Dqn_usize N> bool Dqn_CPU_HasAllFeaturesCArray(Dqn_CPUReport const *report, Dqn_CPUFeature const (&features)[N])
+template <DN_USize N> bool DN_CPU_HasAllFeaturesCArray(DN_CPUReport const *report, DN_CPUFeature const (&features)[N])
 {
-    bool result = Dqn_CPU_HasAllFeatures(report, features, N);
+    bool result = DN_CPU_HasAllFeatures(report, features, N);
     return result;
 }
+
+extern struct DN_Core *g_dn_core;
