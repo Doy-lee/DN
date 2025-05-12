@@ -1,8 +1,7 @@
----
-IndentWidth: 4
-TabWidth: 4
----
 Language: Cpp
+
+IndentWidth: 2
+TabWidth: 2
 
 # Align parameters on the open bracket, e.g.:
 # someLongFunction(argument1,
@@ -27,10 +26,10 @@ AlignArrayOfStructures: Left
 # int d = 3;
 # /* A comment. */
 # double e = 4;
-AlignConsecutiveAssignments: Consecutive
-AlignConsecutiveBitFields: Consecutive
+AlignConsecutiveAssignments:  Consecutive
+AlignConsecutiveBitFields:    Consecutive
 AlignConsecutiveDeclarations: Consecutive
-AlignConsecutiveMacros: Consecutive
+AlignConsecutiveMacros:       Consecutive
 
 # Align escaped newlines as far left as possible.
 # #define A   \
@@ -135,7 +134,7 @@ AlwaysBreakTemplateDeclarations: MultiLine
 #     aaaaaaaaaaaaaaaaaaaa,
 #     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa);
 # }
-BinPackArguments: false
+BinPackArguments:  false
 BinPackParameters: false # As BinPackArguments but for function definition parameters
 
 # Add space after the : only (space may be added before if needed for
@@ -154,9 +153,9 @@ BitFieldColonSpacing: After
 #                  ccccccccccccccccccccccccccccccccccccccccc;
 BreakBeforeBinaryOperators: None
 
-# Always attach braces to surrounding context, but break before braces on
-# function, namespace and class definitions.
-BreakBeforeBraces: Linux
+# BS_Attach (in configuration: Attach) Always attach braces to surrounding context.
+# BS_Mozilla (in configuration: Mozilla) Like Attach, but break before braces on enum, function, and record definitions.
+BreakBeforeBraces: Mozilla
 
 # true:
 #  template<typename T>
@@ -197,7 +196,7 @@ BreakInheritanceList: AfterComma
 #                 "ryVeryVeryVeryVeryVery"
 #                 "VeryLongString";
 BreakStringLiterals: true
-ColumnLimit: 100
+ColumnLimit: 0
 
 # false:
 # namespace Foo {

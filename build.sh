@@ -11,9 +11,9 @@ pushd Build
         -Werror \
         -fsanitize=address \
         -std=c++17 \
-        -D DQN_UNIT_TESTS_WITH_MAIN \
-        -D DQN_UNIT_TESTS_WITH_KECCAK \
-        -x ${code_dir}/dqn.cpp \
+        -D DN_UNIT_TESTS_WITH_MAIN \
+        -D DN_UNIT_TESTS_WITH_KECCAK \
+        -x ${code_dir}/dn.cpp \
         -g \
-        -o dqn_unit_tests
+        -o dn_unit_tests
 popd
