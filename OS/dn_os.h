@@ -1,11 +1,13 @@
 #if !defined(DN_OS_H)
 #define DN_OS_H
 
+#include <new> // operator new
+
 #if defined(DN_PLATFORM_EMSCRIPTEN) || defined(DN_PLATFORM_POSIX) || defined(DN_PLATFORM_ARM64)
   #include "dn_os_posix.h"
 #elif defined(DN_PLATFORM_WIN32)
   #include "dn_os_windows.h"
-  #include "dn_os_win32.h"
+  #include "dn_os_w32.h"
 #else
   #error Please define a platform e.g. 'DN_PLATFORM_WIN32' to enable the correct implementation for platform APIs
 #endif
@@ -36,10 +38,6 @@
 
 #if defined(DN_PLATFORM_EMSCRIPTEN)
   #include <emscripten/fetch.h> // emscripten_fetch (for DN_OSHttpResponse)
-#endif
-
-#if defined(DN_PLATFORM_WIN32)
-typedef HRESULT DN_WinSetThreadDescriptionFunc(HANDLE hThread, PWSTR const lpThreadDescription);
 #endif
 
 // NOTE: DN_OSDate /////////////////////////////////////////////////////////////////////////////////
@@ -178,11 +176,11 @@ struct DN_OSExecAsyncHandle
 
 struct DN_OSExecResult
 {
-  bool     finished;
-  DN_Str8  stdout_text;
-  DN_Str8  stderr_text;
-  DN_U32 os_error_code;
-  DN_U32 exit_code;
+  bool    finished;
+  DN_Str8 stdout_text;
+  DN_Str8 stderr_text;
+  DN_U32  os_error_code;
+  DN_U32  exit_code;
 };
 
 struct DN_OSExecArgs
@@ -192,18 +190,12 @@ struct DN_OSExecArgs
   DN_Slice<DN_Str8> environment;
 };
 
-#if !defined(DN_NO_SEMAPHORE)
 // NOTE: DN_OSSemaphore ////////////////////////////////////////////////////////////////////////////
 DN_U32 const DN_OS_SEMAPHORE_INFINITE_TIMEOUT = UINT32_MAX;
 
 struct DN_OSSemaphore
 {
-  #if defined(DN_OS_WIN32) && !defined(DN_OS_WIN32_USE_PTHREADS)
-  void *win32_handle;
-  #else
-  sem_t posix_handle;
-  bool  posix_init;
-  #endif
+  DN_U64 handle;
 };
 
 enum DN_OSSemaphoreWaitResult
@@ -212,35 +204,31 @@ enum DN_OSSemaphoreWaitResult
   DN_OSSemaphoreWaitResult_Success,
   DN_OSSemaphoreWaitResult_Timeout,
 };
-#endif // !defined(DN_NO_SEMAPHORE)
 
-// NOTE: DN_OSMutex ////////////////////////////////////////////////////////////////////////////////
 struct DN_OSMutex
 {
-#if defined(DN_OS_WIN32) && !defined(DN_OS_WIN32_USE_PTHREADS)
-  char win32_handle[48];
-#else
-  pthread_mutex_t     posix_handle;
-  pthread_mutexattr_t posix_attribs;
-#endif
+  DN_U64 handle;
+};
+
+struct DN_OSConditionVariable
+{
+  DN_U64 handle;
 };
 
 // NOTE: DN_OSThread ///////////////////////////////////////////////////////////////////////////////
-#if !defined(DN_NO_THREAD) && !defined(DN_NO_SEMAPHORE)
-typedef int32_t(DN_OSThreadFunc)(struct DN_OSThread *);
+typedef DN_I32(DN_OSThreadFunc)(struct DN_OSThread *);
 
 struct DN_OSThread
 {
   DN_FStr8<64>     name;
-  DN_OSTLS           tls;
-  DN_OSTLSInitArgs   tls_init_args;
+  DN_OSTLS         tls;
+  DN_OSTLSInitArgs tls_init_args;
   void            *handle;
   DN_U64           thread_id;
   void            *user_context;
   DN_OSThreadFunc *func;
   DN_OSSemaphore   init_semaphore;
 };
-#endif // !defined(DN_NO_THREAD)
 
 // NOTE: DN_OSHttp /////////////////////////////////////////////////////////////////////////////////
 enum DN_OSHttpRequestSecure
@@ -272,9 +260,9 @@ struct DN_OSHttpResponse
   #if defined(DN_PLATFORM_EMSCRIPTEN)
   emscripten_fetch_t *em_handle;
   #elif defined(DN_PLATFORM_WIN32)
-  HINTERNET win32_request_session;
-  HINTERNET win32_request_connection;
-  HINTERNET win32_request_handle;
+  HINTERNET w32_request_session;
+  HINTERNET w32_request_connection;
+  HINTERNET w32_request_handle;
   #endif
 };
 
@@ -300,6 +288,7 @@ struct DN_OSCore
   bool                            log_no_colour;            // Disable colours in the logging output
 
   // NOTE: OS //////////////////////////////////////////////////////////////////////////////////////
+  DN_U32                          logical_processor_count;
   DN_U32                          page_size;
   DN_U32                          alloc_granularity;
 
@@ -312,14 +301,8 @@ struct DN_OSCore
   DN_U64                          mem_allocs_total;
   DN_U64                          mem_allocs_frame;         // Total OS heap allocs since the last 'DN_Core_FrameBegin' was invoked
 
-  // NOTE: Win32 /////////////////////////////////////////////////////////////////////////////////
-  #if defined(DN_PLATFORM_WIN32)
-  DN_WinSetThreadDescriptionFunc *win32_set_thread_description;
-  LARGE_INTEGER                   win32_qpc_frequency;
-  void *                          win32_bcrypt_rng_handle;
-  bool                            win32_bcrypt_init_success;
-  bool                            win32_sym_initialised;
-  #endif
+  DN_Arena                        arena;
+  void                           *platform_context;
 };
 
 struct DN_OSDiskSpace
@@ -349,6 +332,8 @@ DN_API DN_OSDateTime             DN_OS_DateLocalTimeNow    ();
 DN_API DN_OSDateTimeStr8         DN_OS_DateLocalTimeStr8Now(char date_separator = '-', char hms_separator = ':');
 DN_API DN_OSDateTimeStr8         DN_OS_DateLocalTimeStr8   (DN_OSDateTime time, char date_separator = '-', char hms_separator = ':');
 DN_API DN_U64                    DN_OS_DateUnixTimeNs      ();
+#define                          DN_OS_DateUnixTimeUs()    (DN_OS_DateUnixTimeNs() / 1000)
+#define                          DN_OS_DateUnixTimeMs()    (DN_OS_DateUnixTimeNs() / 1000 * 1000)
 DN_API DN_U64                    DN_OS_DateUnixTimeS       ();
 DN_API DN_OSDateTime             DN_OS_DateUnixTimeSToDate (DN_U64 time);
 DN_API DN_U64                    DN_OS_DateLocalToUnixTimeS(DN_OSDateTime date);
@@ -451,31 +436,30 @@ DN_API DN_OSExecResult           DN_OS_Exec                 (DN_Slice<DN_Str8> c
 DN_API DN_OSExecResult           DN_OS_ExecOrAbort          (DN_Slice<DN_Str8> cmd_line, DN_OSExecArgs *args, DN_Arena *arena);
 #define                          DN_OS_ExecOrAbortFromTLS(...) DN_OS_ExecOrAbort(__VA_ARGS__, DN_OS_TLSTopArena())
 
-// NOTE: DN_OSSemaphore ////////////////////////////////////////////////////////////////////////////
-#if !defined(DN_NO_SEMAPHORE)
 DN_API DN_OSSemaphore            DN_OS_SemaphoreInit     (DN_U32 initial_count);
 DN_API bool                      DN_OS_SemaphoreIsValid  (DN_OSSemaphore *semaphore);
 DN_API void                      DN_OS_SemaphoreDeinit   (DN_OSSemaphore *semaphore);
 DN_API void                      DN_OS_SemaphoreIncrement(DN_OSSemaphore *semaphore, DN_U32 amount);
 DN_API DN_OSSemaphoreWaitResult  DN_OS_SemaphoreWait     (DN_OSSemaphore *semaphore, DN_U32 timeout_ms);
-#endif // !defined(DN_NO_SEMAPHORE)
 
-// NOTE: DN_OSMutex ////////////////////////////////////////////////////////////////////////////////
 DN_API DN_OSMutex                DN_OS_MutexInit  ();
 DN_API void                      DN_OS_MutexDeinit(DN_OSMutex *mutex);
 DN_API void                      DN_OS_MutexLock  (DN_OSMutex *mutex);
 DN_API void                      DN_OS_MutexUnlock(DN_OSMutex *mutex);
-#define DN_OS_Mutex(mutex) DN_DEFER_LOOP(DN_OS_MutexLock(mutex), DN_OS_MutexUnlock(mutex))
+#define DN_OS_MutexScope(mutex)  DN_DeferLoop(DN_OS_MutexLock(mutex), DN_OS_MutexUnlock(mutex))
 
-// NOTE: DN_OSThread ///////////////////////////////////////////////////////////////////////////////
-#if !defined(DN_NO_THREAD) && !defined(DN_NO_SEMAPHORE)
+DN_API DN_OSConditionVariable    DN_OS_ConditionVariableInit     ();
+DN_API void                      DN_OS_ConditionVariableDeinit   (DN_OSConditionVariable *cv);
+DN_API bool                      DN_OS_ConditionVariableWait     (DN_OSConditionVariable *cv, DN_OSMutex *mutex, DN_U64 sleep_ms);
+DN_API bool                      DN_OS_ConditionVariableWaitUntil(DN_OSConditionVariable *cv, DN_OSMutex *mutex, DN_U64 end_ts_ms);
+DN_API void                      DN_OS_ConditionVariableSignal   (DN_OSConditionVariable *cv);
+DN_API void                      DN_OS_ConditionVariableBroadcast(DN_OSConditionVariable *cv);
+
 DN_API bool                      DN_OS_ThreadInit  (DN_OSThread *thread, DN_OSThreadFunc *func, void *user_context);
 DN_API void                      DN_OS_ThreadDeinit(DN_OSThread *thread);
 DN_API DN_U32                    DN_OS_ThreadID    ();
 DN_API void                      DN_OS_ThreadSetName(DN_Str8 name);
-#endif // !defined(DN_NO_THREAD)
 
-// NOTE: DN_OSHttp /////////////////////////////////////////////////////////////////////////////////
 DN_API void                      DN_OS_HttpRequestAsync(DN_OSHttpResponse *response, DN_Arena *arena, DN_Str8 host, DN_Str8 path, DN_OSHttpRequestSecure secure, DN_Str8 method, DN_Str8 body, DN_Str8 headers);
 DN_API void                      DN_OS_HttpRequestWait (DN_OSHttpResponse *response);
 DN_API void                      DN_OS_HttpRequestFree (DN_OSHttpResponse *response);

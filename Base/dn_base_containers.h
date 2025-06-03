@@ -1,6 +1,16 @@
 #if !defined(DN_CONTAINERS_H)
 #define DN_CONTAINERS_H
 
+#include "../dn_base_inc.h"
+
+struct DN_Ring
+{
+  DN_U64 size;
+  char  *base;
+  DN_U64 write_pos;
+  DN_U64 read_pos;
+};
+
 // NOTE: DN_CArray /////////////////////////////////////////////////////////////////////////////////
 enum DN_ArrayErase
 {
@@ -148,6 +158,11 @@ template <typename T> struct DN_List
   DN_ListChunk<T> *tail;
 };
 #endif // !defined(DN_NO_LIST)
+
+DN_API                                          bool                  DN_Ring_HasSpace                  (DN_Ring const *ring, DN_U64 size);
+DN_API                                          bool                  DN_Ring_HasData                   (DN_Ring const *ring, DN_U64 size);
+DN_API                                          void                  DN_Ring_Write                     (DN_Ring *ring, void const *src, DN_U64 src_size);
+DN_API                                          void                  DN_Ring_Read                      (DN_Ring *ring, void *dest, DN_U64 dest_size);
 
 template <typename T>                           DN_ArrayEraseResult   DN_CArray_EraseRange              (T *data, DN_USize *size, DN_USize begin_index, DN_ISize count, DN_ArrayErase erase);
 template <typename T>                           T *                   DN_CArray_MakeArray               (T *data, DN_USize *size, DN_USize max, DN_USize count, DN_ZeroMem zero_mem);

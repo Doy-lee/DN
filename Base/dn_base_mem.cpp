@@ -336,13 +336,12 @@ DN_API bool DN_Arena_OwnsPtr(DN_Arena const *arena, void *ptr)
 DN_API DN_ArenaStats DN_Arena_SumStatsArray(DN_ArenaStats const *array, DN_USize size)
 {
   DN_ArenaStats result = {};
-  DN_ForItSize(it, DN_ArenaStats const, array, size)
-  {
-    DN_ArenaStats stats  = *it.data;
-    result.info.used    += stats.info.used;
-    result.info.commit  += stats.info.commit;
+  for (DN_ForItSize(it, DN_ArenaStats const, array, size)) {
+    DN_ArenaStats stats = *it.data;
+    result.info.used += stats.info.used;
+    result.info.commit += stats.info.commit;
     result.info.reserve += stats.info.reserve;
-    result.info.blocks  += stats.info.blocks;
+    result.info.blocks += stats.info.blocks;
 
     result.hwm.used      = DN_Max(result.hwm.used, result.info.used);
     result.hwm.commit    = DN_Max(result.hwm.commit, result.info.commit);

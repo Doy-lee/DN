@@ -1,3 +1,6 @@
+#if !defined(DN_OS_INC_H)
+#define DN_OS_INC_H
+
 #include "OS/dn_os_tls.h"
 #include "OS/dn_os.h"
 #include "OS/dn_os_allocator.h"
@@ -7,7 +10,9 @@
 
 #if defined(DN_PLATFORM_WIN32)
   #include "OS/dn_os_windows.h"
-  #include "OS/dn_os_win32.h"
+  #include "OS/dn_os_w32.h"
 #elif defined(DN_PLATFORM_POSIX)
   #include "OS/dn_os_posix.h"
 #endif
+
+#endif // DN_OS_INC_H

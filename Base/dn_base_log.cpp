@@ -60,12 +60,14 @@ DN_API DN_LOGPrefixSize DN_LOG_MakePrefix(DN_LOGStyle style, DN_LOGTypeParam typ
   DN_GCC_WARNING_PUSH
   DN_GCC_WARNING_DISABLE(-Wformat)
   DN_GCC_WARNING_DISABLE(-Wformat-extra-args)
+  DN_MSVC_WARNING_PUSH
+  DN_MSVC_WARNING_DISABLE(4477)
   int     size      = DN_SNPrintF(dest,
                          DN_CAST(int)dest_size,
                          "%04u-%02u-%02uT%02u:%02u:%02u" // date
                          "%S"                            // colour
                          "%S"                            // bold
-                         "%S"                            // type
+                         " %S"                           // type
                          "%.*s"                          // type padding
                          "%S"                            // reset
                          " %S"                           // file name
@@ -85,6 +87,7 @@ DN_API DN_LOGPrefixSize DN_LOG_MakePrefix(DN_LOGStyle style, DN_LOGTypeParam typ
                          reset_esc,       // reset
                          file_name,       // file name
                          call_site.line); // line number
+  DN_MSVC_WARNING_POP // '%S' requires an argument of type 'wchar_t *', but variadic argument 7 has type 'DN_Str8'
   DN_GCC_WARNING_POP
 
   static DN_USize max_header_length  = 0;

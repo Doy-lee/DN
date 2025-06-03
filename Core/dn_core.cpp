@@ -55,12 +55,12 @@ DN_API void DN_Core_Init(DN_Core *core, DN_CoreOnInit on_init)
     DN_MSVC_WARNING_POP
 
     DN_USize longest_feature_name = 0;
-    DN_ForIndexU(feature_index, DN_CPUFeature_Count) {
+    for (DN_ForIndexU(feature_index, DN_CPUFeature_Count)) {
       DN_CPUFeatureDecl feature_decl = g_dn_cpu_feature_decl[feature_index];
       longest_feature_name           = DN_Max(longest_feature_name, feature_decl.label.size);
     }
 
-    DN_ForIndexU(feature_index, DN_CPUFeature_Count) {
+    for (DN_ForIndexU(feature_index, DN_CPUFeature_Count)) {
       DN_CPUFeatureDecl feature_decl = g_dn_cpu_feature_decl[feature_index];
       bool              has_feature  = DN_CPU_HasFeature(report, feature_decl.value);
       DN_Str8Builder_AppendF(&builder,

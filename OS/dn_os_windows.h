@@ -296,6 +296,10 @@
       WORD   Identifier;
   } RTL_CRITICAL_SECTION_DEBUG, *PRTL_CRITICAL_SECTION_DEBUG, RTL_RESOURCE_DEBUG, *PRTL_RESOURCE_DEBUG;
 
+  typedef struct _RTL_CONDITION_VARIABLE {
+    PVOID Ptr;
+  } RTL_CONDITION_VARIABLE, *PRTL_CONDITION_VARIABLE;
+
   #pragma pack(push, 8)
   typedef struct _RTL_CRITICAL_SECTION {
       PRTL_CRITICAL_SECTION_DEBUG DebugInfo;
@@ -1065,8 +1069,15 @@
   }
 
   // NOTE: um/synchapi.h /////////////////////////////////////////////////////////////////////////
+  typedef RTL_CONDITION_VARIABLE CONDITION_VARIABLE, *PCONDITION_VARIABLE;
+
   extern "C"
   {
+  __declspec(dllimport) VOID  __stdcall InitializeConditionVariable          (CONDITION_VARIABLE *ConditionVariable);
+  __declspec(dllimport) VOID  __stdcall WakeConditionVariable                (CONDITION_VARIABLE *ConditionVariable);
+  __declspec(dllimport) VOID  __stdcall WakeAllConditionVariable             (CONDITION_VARIABLE *ConditionVariable);
+  __declspec(dllimport) BOOL  __stdcall SleepConditionVariableCS             (CONDITION_VARIABLE *ConditionVariable, CRITICAL_SECTION *CriticalSection, DWORD dwMilliseconds);
+
   __declspec(dllimport) VOID  __stdcall InitializeCriticalSection            (CRITICAL_SECTION *lpCriticalSection);
   __declspec(dllimport) VOID  __stdcall EnterCriticalSection                 (CRITICAL_SECTION *lpCriticalSection);
   __declspec(dllimport) VOID  __stdcall LeaveCriticalSection                 (CRITICAL_SECTION *lpCriticalSection);
@@ -1075,6 +1086,7 @@
   __declspec(dllimport) DWORD __stdcall SetCriticalSectionSpinCount          (CRITICAL_SECTION *lpCriticalSection, DWORD dwSpinCount);
   __declspec(dllimport) BOOL  __stdcall TryEnterCriticalSection              (CRITICAL_SECTION *lpCriticalSection);
   __declspec(dllimport) VOID  __stdcall DeleteCriticalSection                (CRITICAL_SECTION *lpCriticalSection);
+
   __declspec(dllimport) DWORD __stdcall WaitForSingleObject                  (HANDLE hHandle, DWORD dwMilliseconds);
   __declspec(dllimport) BOOL  __stdcall ReleaseSemaphore                     (HANDLE hSemaphore, LONG lReleaseCount, LONG *lpPreviousCount);
   __declspec(dllimport) VOID  __stdcall Sleep                                (DWORD dwMilliseconds);

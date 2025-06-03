@@ -4,11 +4,11 @@
 #include <sys/statvfs.h>
 
 // NOTE: DN_OSMem //////////////////////////////////////////////////////////////////////////////////
-static uint32_t DN_OS_MemConvertPageToOSFlags_(uint32_t protect)
+static DN_U32 DN_OS_MemConvertPageToOSFlags_(DN_U32 protect)
 {
   DN_Assert((protect & ~DN_MemPage_All) == 0);
   DN_Assert(protect != 0);
-  uint32_t result = 0;
+  DN_U32 result = 0;
 
   if (protect & (DN_MemPage_NoAccess | DN_MemPage_Guard)) {
     result = PROT_NONE;
@@ -21,7 +21,7 @@ static uint32_t DN_OS_MemConvertPageToOSFlags_(uint32_t protect)
   return result;
 }
 
-DN_API void *DN_OS_MemReserve(DN_USize size, DN_MemCommit commit, uint32_t page_flags)
+DN_API void *DN_OS_MemReserve(DN_USize size, DN_MemCommit commit, DN_U32 page_flags)
 {
   unsigned long os_page_flags = DN_OS_MemConvertPageToOSFlags_(page_flags);
 
@@ -36,7 +36,7 @@ DN_API void *DN_OS_MemReserve(DN_USize size, DN_MemCommit commit, uint32_t page_
   return result;
 }
 
-DN_API bool DN_OS_MemCommit(void *ptr, DN_USize size, uint32_t page_flags)
+DN_API bool DN_OS_MemCommit(void *ptr, DN_USize size, DN_U32 page_flags)
 {
   bool result = false;
   if (!ptr || size == 0)
@@ -60,7 +60,7 @@ DN_API void DN_OS_MemRelease(void *ptr, DN_USize size)
   munmap(ptr, size);
 }
 
-DN_API int DN_OS_MemProtect(void *ptr, DN_USize size, uint32_t page_flags)
+DN_API int DN_OS_MemProtect(void *ptr, DN_USize size, DN_U32 page_flags)
 {
   if (!ptr || size == 0)
     return 0;
@@ -162,7 +162,7 @@ DN_API DN_OSDateTime DN_OS_DateUnixTimeSToDate(uint64_t time)
   return result;
 }
 
-DN_API bool DN_OS_SecureRNGBytes(void *buffer, uint32_t size)
+DN_API bool DN_OS_SecureRNGBytes(void *buffer, DN_U32 size)
 {
 #if defined(DN_PLATFORM_EMSCRIPTEN)
   (void)buffer;
@@ -182,7 +182,7 @@ DN_API bool DN_OS_SecureRNGBytes(void *buffer, uint32_t size)
   // TODO(doyle):
   // https://github.com/jedisct1/libsodium/blob/master/src/libsodium/randombytes/sysrandom/randombytes_sysrandom.c
   // TODO(doyle): https://man7.org/linux/man-pages/man2/getrandom.2.html
-  uint32_t read_bytes = 0;
+  DN_U32 read_bytes = 0;
   do {
     read_bytes =
         getrandom(buffer, size, 0); // NOTE: EINTR can not be triggered if size <= 32 bytes
@@ -211,7 +211,7 @@ DN_API DN_OSDiskSpace DN_OS_DiskSpace(DN_Str8 path)
     return result;
 
   result.success = true;
-  result.free    = info.f_bavail * info.f_frsize;
+  result.avail   = info.f_bavail * info.f_frsize;
   result.size    = info.f_blocks * info.f_frsize;
   return result;
 }
@@ -275,7 +275,7 @@ DN_API void DN_OS_SleepMs(DN_UInt milliseconds)
 {
   struct timespec ts;
   ts.tv_sec  = milliseconds / 1000;
-  ts.tv_nsec = (milliseconds % 1000) * 1000000; // Convert remaining milliseconds to nanoseconds
+  ts.tv_nsec = (milliseconds % 1000) * 1'000'000; // Convert remaining milliseconds to nanoseconds
   // nanosleep can fail if interrupted by a signal, so we loop until the full sleep time has passed
   while (nanosleep(&ts, &ts) == -1 && errno == EINTR)
     ;
@@ -916,8 +916,7 @@ DN_API DN_OSExecAsyncHandle DN_OS_ExecAsync(DN_Slice<DN_Str8> cmd_line,
       return result;
     }
 
-    DN_ForIndexU(arg_index, cmd_line.size)
-    {
+    for (DN_ForIndexU(arg_index, cmd_line.size)) {
       DN_Str8 arg     = cmd_line.data[arg_index];
       argv[arg_index] = DN_Str8_Copy(tmem.arena, arg).data; // NOTE: Copy string to guarantee it is null-terminated
     }
@@ -990,7 +989,7 @@ DN_API DN_OSExecResult DN_OS_ExecPump(DN_OSExecAsyncHandle handle,
                                       size_t              *stdout_size,
                                       char                *stderr_buffer,
                                       size_t              *stderr_size,
-                                      uint32_t             timeout_ms,
+                                      DN_U32             timeout_ms,
                                       DN_OSErrSink          *err)
 {
   DN_InvalidCodePath;
@@ -998,75 +997,111 @@ DN_API DN_OSExecResult DN_OS_ExecPump(DN_OSExecAsyncHandle handle,
   return result;
 }
 
-#if !defined(DN_NO_SEMAPHORE)
-// NOTE: DN_OSSemaphore ////////////////////////////////////////////////////////////////////////////
-DN_API DN_OSSemaphore DN_OS_SemaphoreInit(uint32_t initial_count)
+static DN_POSIXCore *DN_OS_GetPOSIXCore_()
 {
-  DN_OSSemaphore result  = {};
-  int            pshared = 0; // Share the semaphore across all threads in the process
-  if (sem_init(&result.posix_handle, pshared, initial_count) == 0)
-    result.posix_init = true;
+  DN_Assert(g_dn_os_core_ && g_dn_os_core_->platform_context);
+  DN_POSIXCore *result = DN_CAST(DN_POSIXCore *)g_dn_os_core_->platform_context;
   return result;
 }
 
-DN_API bool DN_OS_SemaphoreIsValid(DN_OSSemaphore *semaphore)
+static DN_POSIXSyncPrimitive *DN_OS_U64ToPOSIXSyncPrimitive_(DN_U64 u64)
 {
-  bool result = false;
-  if (semaphore)
-    result = semaphore->posix_init;
+  DN_POSIXSyncPrimitive *result = nullptr;
+  DN_Memcpy(&result, &u64, sizeof(u64));
+  return result;
+}
+
+static DN_U64 DN_POSIX_SyncPrimitiveToU64(DN_POSIXSyncPrimitive *primitive)
+{
+  DN_U64 result = 0;
+  static_assert(sizeof(result) == sizeof(primitive), "Pointer size mis-match");
+  DN_Memcpy(&result, &primitive, sizeof(result));
+  return result;
+}
+
+static DN_POSIXSyncPrimitive *DN_POSIX_AllocSyncPrimitive_()
+{
+  DN_POSIXCore          *posix  = DN_OS_GetPOSIXCore_();
+  DN_POSIXSyncPrimitive *result = nullptr;
+  pthread_mutex_lock(&posix->sync_primitive_free_list_mutex);
+  {
+    if (posix->sync_primitive_free_list) {
+      result                          = posix->sync_primitive_free_list;
+      posix->sync_primitive_free_list = posix->sync_primitive_free_list->next;
+      result->next                    = nullptr;
+    } else {
+      DN_OSCore *os = g_dn_os_core_;
+      result        = DN_Arena_New(&os->arena, DN_POSIXSyncPrimitive, DN_ZeroMem_Yes);
+    }
+  }
+  pthread_mutex_unlock(&posix->sync_primitive_free_list_mutex);
+  return result;
+}
+
+static void DN_POSIX_DeallocSyncPrimitive_(DN_POSIXSyncPrimitive *primitive)
+{
+  if (primitive) {
+    DN_POSIXCore *posix = DN_OS_GetPOSIXCore_();
+    pthread_mutex_lock(&posix->sync_primitive_free_list_mutex);
+    primitive->next                 = posix->sync_primitive_free_list;
+    posix->sync_primitive_free_list = primitive;
+    pthread_mutex_unlock(&posix->sync_primitive_free_list_mutex);
+  }
+}
+
+// NOTE: DN_OSSemaphore ////////////////////////////////////////////////////////////////////////////
+DN_API DN_OSSemaphore DN_OS_SemaphoreInit(DN_U32 initial_count)
+{
+  DN_POSIXCore *posix = g_dn_os_core->posix_context;
+  DN_Assert(posix);
+
+  DN_OSSemaphore         result    = {};
+  DN_POSIXSyncPrimitive *primitive = DN_POSIX_AllocSyncPrimitive_();
+  if (primitive) {
+    int pshared = 0; // Share the semaphore across all threads in the process
+    if (sem_init(&primitive->sem, pshared, initial_count) == 0)
+      result.handle = DN_POSIX_SyncPrimitiveToU64(primitive);
+    else
+      DN_POSIX_DeallocSyncPrimitive_(primitive);
+  }
   return result;
 }
 
 DN_API void DN_OS_SemaphoreDeinit(DN_OSSemaphore *semaphore)
 {
-  if (!DN_OS_SemaphoreIsValid(semaphore))
-    return;
-  // TODO(doyle): Error handling?
-  if (semaphore->posix_init)
-    sem_destroy(&semaphore->posix_handle);
-  *semaphore = {};
+  if (semaphore.handle != 0) {
+    DN_POSIXSyncPrimitive *primitive = DN_OS_U64ToPOSIXSyncPrimitive_(semaphore->handle);
+    sem_destroy(&primitive->sem);
+    DN_POSIX_DeallocSyncPrimitive_(posix_sem);
+    *semaphore = {};
+  }
 }
 
-// NOTE: These functions don't need semaphore to be passed by pointer, **BUT**
-// the POSIX implementation disallows copies of sem_t. In particular:
-//
-// Source: The Open Group Base Specifications Issue 7, 2018 edition
-// https://pubs.opengroup.org/onlinepubs/9699919799/functions/V2_chap02.html#tag_15_09_09
-//
-// 2.9.9 Synchronization Object Copies and Alternative Mappings
-//
-// For barriers, condition variables, mutexes, and read-write locks, [TSH]
-// [Option Start]  if the process-shared attribute is set to
-// PTHREAD_PROCESS_PRIVATE, [Option End]  only the synchronization object at the
-// address used to initialize it can be used for performing synchronization. The
-// effect of referring to another mapping of the same object when locking,
-// unlocking, or destroying the object is undefined. [...] The effect of
-// referring to a copy of the object when locking, unlocking, or destroying it
-// is undefined.
-
-DN_API void DN_OS_SemaphoreIncrement(DN_OSSemaphore *semaphore, uint32_t amount)
+DN_API void DN_OS_SemaphoreIncrement(DN_OSSemaphore *semaphore, DN_U32 amount)
 {
-  if (!DN_OS_SemaphoreIsValid(semaphore))
-    return;
-  #if defined(DN_OS_WIN32)
-  sem_post_multiple(&semaphore->posix_handle, amount); // mingw extension
-  #else
-  DN_ForIndexU(index, amount)
-    sem_post(&semaphore->posix_handle);
-  #endif // !defined(DN_OS_WIN32)
+  if (semaphore.handle != 0) {
+    DN_POSIXSyncPrimitive *primitive = DN_OS_U64ToPOSIXSyncPrimitive_(semaphore->handle);
+    #if defined(DN_OS_WIN32)
+    sem_post_multiple(&primitive->sem, amount); // mingw extension
+    #else
+    for (DN_ForIndexU(index, amount))
+      sem_post(&primitive->sem);
+    #endif // !defined(DN_OS_WIN32)
+  }
 }
 
 DN_API DN_OSSemaphoreWaitResult DN_OS_SemaphoreWait(DN_OSSemaphore *semaphore,
-                                                    uint32_t        timeout_ms)
+                                                    DN_U32          timeout_ms)
 {
   DN_OSSemaphoreWaitResult result = {};
-  if (!DN_OS_SemaphoreIsValid(semaphore))
+  if (semaphore.handle == 0)
     return result;
 
+  DN_POSIXSyncPrimitive *primitive = DN_OS_U64ToPOSIXSyncPrimitive_(semaphore->handle);
   if (timeout_ms == DN_OS_SEMAPHORE_INFINITE_TIMEOUT) {
     int wait_result = 0;
     do {
-      wait_result = sem_wait(&semaphore->posix_handle);
+      wait_result = sem_wait(&primitive->sem);
     } while (wait_result == -1 && errno == EINTR);
 
     if (wait_result == 0)
@@ -1075,47 +1110,115 @@ DN_API DN_OSSemaphoreWaitResult DN_OS_SemaphoreWait(DN_OSSemaphore *semaphore,
     struct timespec abs_timeout = {};
     abs_timeout.tv_sec          = timeout_ms / 1000;
     abs_timeout.tv_nsec         = (timeout_ms % 1000) * 1'000'000;
-    if (sem_timedwait(&semaphore->posix_handle, &abs_timeout) == 0)
+    if (sem_timedwait(&primitive->sem) == 0)
       result = DN_OSSemaphoreWaitResult_Success;
     else if (errno == ETIMEDOUT)
       result = DN_OSSemaphoreWaitResult_Timeout;
   }
   return result;
 }
-#endif // !defined(DN_NO_SEMAPHORE)
 
-#if !defined(DN_NO_THREAD)
 // NOTE: DN_OSMutex ////////////////////////////////////////////////////////////////////////////////
 DN_API DN_OSMutex DN_OS_MutexInit()
 {
-  DN_OSMutex result = {};
-  if (pthread_mutexattr_init(&result.posix_attribs) != 0)
-    return result;
-  if (pthread_mutex_init(&result.posix_handle, &result.posix_attribs) != 0)
-    return result;
+  DN_W32SyncPrimitive *primitive = DN_W32_AllocSyncPrimitive_();
+  DN_OSMutex           result    = {};
+  if (primitive) {
+    int pshared = 0; // Share the semaphore across all threads in the process
+    if (pthread_mutex_init(mutex, pshared, nullptr) == 0)
+      result.handle = DN_POSIX_SyncPrimitiveToU64(primitive);
+    else
+      DN_POSIX_DeallocSyncPrimitive_(primitive);
+  }
   return result;
 }
 
 DN_API void DN_OS_MutexDeinit(DN_OSMutex *mutex)
 {
-  if (!mutex)
-    return;
-  pthread_mutexattr_destroy(&mutex->posix_attribs);
-  pthread_mutex_destroy(&mutex->posix_handle);
+  if (mutex && mutex->handle != 0) {
+    DN_POSIXSyncPrimitive *primitive = DN_OS_U64ToPOSIXSyncPrimitive_(semaphore->handle);
+    pthread_mutex_destroy(&primitive->mutex);
+    DN_POSIX_DeallocSyncPrimitive_(primitive);
+    *mutex = {};
+  }
 }
 
 DN_API void DN_OS_MutexLock(DN_OSMutex *mutex)
 {
-  if (!mutex)
-    return;
-  pthread_mutex_lock(&mutex->posix_handle);
+  if (mutex && mutex->handle != 0) {
+    DN_POSIXSyncPrimitive *primitive = DN_OS_U64ToPOSIXSyncPrimitive_(semaphore->handle);
+    pthread_mutex_lock(&primitive->mutex);
+  }
 }
 
 DN_API void DN_OS_MutexUnlock(DN_OSMutex *mutex)
 {
-  if (!mutex)
-    return;
-  pthread_mutex_unlock(&mutex->posix_handle);
+  if (mutex && mutex->handle != 0) {
+    DN_POSIXSyncPrimitive *primitive = DN_OS_U64ToPOSIXSyncPrimitive_(semaphore->handle);
+    pthread_mutex_unlock(&primitive->mutex);
+  }
+}
+
+DN_API DN_OSConditionVariable DN_OS_ConditionVariableInit()
+{
+  DN_POSIXSyncPrimitive *primitive = DN_POSIX_AllocSyncPrimitive_();
+  DN_OSConditionVariable result    = {};
+  if (primitive) {
+    if (pthread_cond_init(&primitive->cv) == 0)
+      result.handle = DN_POSIX_SyncPrimitiveToU64(primitive);
+    else
+      DN_POSIX_DeallocSyncPrimitive_(primitive);
+  }
+  return result;
+}
+
+DN_API bool DN_OS_ConditionVariableDeinit(DN_OSConditionVariable *cv)
+{
+  if (cv && cv->handle != 0) {
+    DN_POSIXSyncPrimitive *primitive = DN_OS_U64ToPOSIXSyncPrimitive_(cv->handle);
+    pthread_cond_destroy(&primitive->cv);
+    DN_POSIX_DeallocSyncPrimitive_(primitive);
+    *cv = {};
+  }
+}
+
+DN_API bool DN_OS_ConditionVariableWaitUntil(DN_OSConditionVariable *cv, DN_OSMutex *mutex, DN_U64 end_ts_ms)
+{
+  bool result = false;
+  if (cv && mutex && mutex->handle != 0 && cv->handle != 0) {
+    DN_POSIXSyncPrimitive *cv_primitive    = DN_OS_U64ToPOSIXSyncPrimitive_(cv->handle);
+    DN_POSIXSyncPrimitive *mutex_primitive = DN_OS_U64ToPOSIXSyncPrimitive_(mutex->handle);
+
+    struct timespec time;
+    time.tv_sec     = end_ts_ms / 1'000;
+    time.tv_nsec    = 1'000'000 * (end_ts_ms - (end_ts_ms / 1'000) * 1'000);
+    int wait_result = pthread_cond_timedwait(&cv_primitive->cv, &mutex_primitive->mutex, &time);
+    result          = (wait_result != ETIMEDOUT);
+  }
+  return result;
+}
+
+DN_API bool DN_OS_ConditionVariableWait(DN_OSConditionVariable *cv, DN_OSMutex *mutex, DN_U64 sleep_ms)
+{
+  DN_U64 end_ts_ms = DN_OS_DateUnixTimeMs() + sleep_ms;
+  bool   result    = DN_OS_ConditionVariableWaitUntil(cv, mutex, end_ts_ms);
+  return result;
+}
+
+DN_API void DN_OS_ConditionVariableSignal(DN_OSConditionVariable *cv)
+{
+  if (cv && cv->handle != 0) {
+    DN_POSIXSyncPrimitive *primitive = DN_OS_U64ToPOSIXSyncPrimitive_(cv->handle);
+    pthread_cond_signal(&primitive->cv);
+  }
+}
+
+DN_API void DN_OS_ConditionVariableBroadcast(DN_OSConditionVariable *cv)
+{
+  if (cv && cv->handle != 0) {
+    DN_POSIXSyncPrimitive *primitive = DN_OS_U64ToPOSIXSyncPrimitive_(cv->handle);
+    pthread_cond_broadcast(&primitive->cv);
+  }
 }
 
 // NOTE: DN_OSThread ///////////////////////////////////////////////////////////////////////////////
@@ -1181,11 +1284,11 @@ DN_API void DN_OS_ThreadDeinit(DN_OSThread *thread)
   thread->thread_id = {};
 }
 
-DN_API uint32_t DN_OS_ThreadID()
+DN_API DN_U32 DN_OS_ThreadID()
 {
   pid_t result = gettid();
   DN_Assert(gettid() >= 0);
-  return DN_CAST(uint32_t) result;
+  return DN_CAST(DN_U32) result;
 }
 
 DN_API void DN_Posix_ThreadSetName(DN_Str8 name)
@@ -1195,7 +1298,6 @@ DN_API void DN_Posix_ThreadSetName(DN_Str8 name)
   pthread_t  thread = pthread_self();
   pthread_setname_np(thread, (char *)copy.data);
 }
-#endif // !defined(DN_NO_THREAD)
 
 DN_API DN_POSIXProcSelfStatus DN_Posix_ProcSelfStatus()
 {
@@ -1230,7 +1332,7 @@ DN_API DN_POSIXProcSelfStatus DN_Posix_ProcSelfStatus()
     DN_Str8                status_buf = DN_Str8Builder_BuildFromTLS(&builder);
     DN_Slice<DN_Str8>      lines      = DN_Str8_SplitAllocFromTLS(status_buf, DN_STR8("\n"), DN_Str8SplitIncludeEmptyStrings_No);
 
-    DN_ForIt(line_it, DN_Str8, &lines) {
+    for (DN_ForIt(line_it, DN_Str8, &lines)) {
       DN_Str8       line    = DN_Str8_TrimWhitespaceAround(*line_it.data);
       if (DN_Str8_StartsWith(line, NAME, DN_Str8EqCase_Insensitive)) {
         DN_Str8 str8     = DN_Str8_TrimWhitespaceAround(DN_Str8_Slice(line, NAME.size, line.size));
@@ -1312,7 +1414,7 @@ static void DN_OS_HttpRequestEMFetchOnSuccessCallback(emscripten_fetch_t *fetch)
   if (!DN_Check(response))
     return;
 
-  response->http_status = DN_CAST(uint32_t) fetch->status;
+  response->http_status = DN_CAST(DN_U32) fetch->status;
   response->body        = DN_Str8_Alloc(response->arena, fetch->numBytes, DN_ZeroMem_No);
   if (response->body.data)
     DN_Memcpy(response->body.data, fetch->data, fetch->numBytes);
@@ -1327,7 +1429,7 @@ static void DN_OS_HttpRequestEMFetchOnErrorCallback(emscripten_fetch_t *fetch)
   if (!DN_Check(response))
     return;
 
-  response->http_status = DN_CAST(uint32_t) fetch->status;
+  response->http_status = DN_CAST(DN_U32) fetch->status;
   response->body        = DN_Str8_Alloc(response->arena, fetch->numBytes, DN_ZeroMem_No);
   if (response->body.size)
     DN_Memcpy(response->body.data, fetch->data, fetch->numBytes);
@@ -1372,7 +1474,7 @@ DN_API void DN_OS_HttpRequestAsync(DN_OSHttpResponse     *response,
     DN_CheckF(method.size < sizeof(fetch_attribs.requestMethod),
               "%.*s",
               DN_STR_FMT(response->error_msg));
-    response->error_code = DN_CAST(uint32_t) - 1;
+    response->error_code = DN_CAST(DN_U32) - 1;
     DN_Atomic_AddU32(&response->done, 1);
     return;
   }
@@ -1409,7 +1511,6 @@ DN_API void DN_OS_HttpRequestFree(DN_OSHttpResponse *response)
 #endif // #elif defined(DN_OS_WIN32)
 
   DN_Arena_Deinit(&response->tmp_arena);
-  if (DN_OS_SemaphoreIsValid(&response->on_complete_semaphore))
-    DN_OS_SemaphoreDeinit(&response->on_complete_semaphore);
+  DN_OS_SemaphoreDeinit(&response->on_complete_semaphore);
   *response = {};
 }

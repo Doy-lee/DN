@@ -142,22 +142,21 @@ DN_API void                DN_PCG32_Advance                       (DN_PCG32 *rng
 
 #if !defined(DN_NO_JSON_BUILDER)
 // NOTE: DN_JSONBuilder ////////////////////////////////////////////////////////////////////////////
-#define DN_JSONBuilder_Object(builder)                  \
-    DN_DEFER_LOOP(DN_JSONBuilder_ObjectBegin(builder), \
-                   DN_JSONBuilder_ObjectEnd(builder))
+#define DN_JSONBuilder_Object(builder)              \
+  DN_DeferLoop(DN_JSONBuilder_ObjectBegin(builder), \
+                DN_JSONBuilder_ObjectEnd(builder))
 
-#define DN_JSONBuilder_ObjectNamed(builder, name)                  \
-    DN_DEFER_LOOP(DN_JSONBuilder_ObjectBeginNamed(builder, name), \
-                   DN_JSONBuilder_ObjectEnd(builder))
+#define DN_JSONBuilder_ObjectNamed(builder, name)              \
+  DN_DeferLoop(DN_JSONBuilder_ObjectBeginNamed(builder, name), \
+                DN_JSONBuilder_ObjectEnd(builder))
 
-#define DN_JSONBuilder_Array(builder)                  \
-    DN_DEFER_LOOP(DN_JSONBuilder_ArrayBegin(builder), \
-                   DN_JSONBuilder_ArrayEnd(builder))
+#define DN_JSONBuilder_Array(builder)              \
+  DN_DeferLoop(DN_JSONBuilder_ArrayBegin(builder), \
+                DN_JSONBuilder_ArrayEnd(builder))
 
-#define DN_JSONBuilder_ArrayNamed(builder, name)                  \
-    DN_DEFER_LOOP(DN_JSONBuilder_ArrayBeginNamed(builder, name), \
-                   DN_JSONBuilder_ArrayEnd(builder))
-
+#define DN_JSONBuilder_ArrayNamed(builder, name)              \
+  DN_DeferLoop(DN_JSONBuilder_ArrayBeginNamed(builder, name), \
+                DN_JSONBuilder_ArrayEnd(builder))
 
 DN_API DN_JSONBuilder      DN_JSONBuilder_Init                    (DN_Arena *arena, int spaces_per_indent);
 DN_API DN_Str8             DN_JSONBuilder_Build                   (DN_JSONBuilder const *builder, DN_Arena *arena);

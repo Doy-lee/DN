@@ -13,12 +13,13 @@ DN_API DN_StackTraceWalkResult DN_StackTrace_Walk(DN_Arena *arena, uint16_t limi
   HANDLE thread  = GetCurrentThread();
   result.process = GetCurrentProcess();
 
-  if (!g_dn_os_core_->win32_sym_initialised) {
-    g_dn_os_core_->win32_sym_initialised = true;
+  DN_W32Core *w32 = DN_OS_GetW32Core_();
+  if (!w32->sym_initialised) {
+    w32->sym_initialised = true;
     SymSetOptions(SYMOPT_LOAD_LINES);
     if (!SymInitialize(result.process, nullptr /*UserSearchPath*/, true /*fInvadeProcess*/)) {
       DN_OSTLSTMem  tmem  = DN_OS_TLSTMem(arena);
-      DN_WinError error = DN_Win_LastError(tmem.arena);
+      DN_W32Error error = DN_W32_LastError(tmem.arena);
       DN_LOG_ErrorF("SymInitialize failed, stack trace can not be generated (%lu): %.*s\n", error.code, DN_STR_FMT(error.msg));
     }
   }
@@ -177,8 +178,8 @@ DN_API DN_StackTraceFrame DN_StackTrace_RawFrameToFrame(DN_Arena *arena, DN_Stac
     DN_StackTraceFrame result = {};
     result.address             = raw_frame.base_addr;
     result.line_number         = line.LineNumber;
-    result.file_name           = DN_Win_Str16ToStr8(arena, file_name16);
-    result.function_name       = DN_Win_Str16ToStr8(arena, function_name16);
+    result.file_name           = DN_W32_Str16ToStr8(arena, file_name16);
+    result.function_name       = DN_W32_Str16ToStr8(arena, function_name16);
 
     if (!DN_Str8_HasData(result.function_name))
         result.function_name = DN_STR8("<unknown function>");

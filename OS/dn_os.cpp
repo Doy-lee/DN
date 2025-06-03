@@ -1,5 +1,10 @@
 #define DN_OS_CPP
 
+#if defined(DN_PLATFORM_POSIX)
+#include <sys/sysinfo.h> // get_nprocs
+#include <unistd.h>      // getpagesize
+#endif
+
 static DN_OSCore *g_dn_os_core_;
 
 static void DN_OS_LOGEmitFromTypeTypeFV_(DN_LOGTypeParam type, void *user_data, DN_CallSite call_site, DN_FMT_ATTRIB char const *fmt, va_list args)
@@ -86,34 +91,46 @@ DN_API void DN_OS_Init(DN_OSCore *os, DN_OSInitArgs *args)
     #if defined(DN_PLATFORM_WIN32)
     SYSTEM_INFO system_info = {};
     GetSystemInfo(&system_info);
-    os->page_size         = system_info.dwPageSize;
-    os->alloc_granularity = system_info.dwAllocationGranularity;
-    QueryPerformanceFrequency(&os->win32_qpc_frequency);
 
-    HMODULE module                   = LoadLibraryA("kernel32.dll");
-    os->win32_set_thread_description = DN_CAST(DN_WinSetThreadDescriptionFunc *) GetProcAddress(module, "SetThreadDescription");
-    FreeLibrary(module);
+    os->logical_processor_count = system_info.dwNumberOfProcessors;
+    os->page_size               = system_info.dwPageSize;
+    os->alloc_granularity       = system_info.dwAllocationGranularity;
     #else
-    // TODO(doyle): Get the proper page size from the OS.
-    os->page_size         = DN_Kilobytes(4);
-    os->alloc_granularity = DN_Kilobytes(64);
+    os->logical_processor_count = get_nprocs();
+    os->page_size               = getpagesize();
+    os->alloc_granularity       = os->page_size;
     #endif
   }
 
   // NOTE: Setup logging
   DN_OS_EmitLogsWithOSPrintFunctions(os);
 
-  #if defined(DN_PLATFORM_WIN32)
-  // NOTE: win32 bcrypt
   {
+    os->arena = DN_Arena_InitFromOSVMem(DN_Megabytes(1), DN_Kilobytes(4), DN_ArenaFlags_NoAllocTrack);
+    #if defined(DN_PLATFORM_WIN32)
+    os->platform_context = DN_Arena_New(&os->arena, DN_W32Core, DN_ZeroMem_Yes);
+    #elif defined(DN_PLATFORM_POSIX)
+    os->platform_context = DN_Arena_New(&os->arena, DN_POSIXCore, DN_ZeroMem_Yes);
+    #endif
+
+    #if defined(DN_PLATFORM_WIN32)
+    DN_W32Core *w32 = DN_CAST(DN_W32Core *) os->platform_context;
+    InitializeCriticalSection(&w32->sync_primitive_free_list_mutex);
+
+    QueryPerformanceFrequency(&w32->qpc_frequency);
+    HMODULE module              = LoadLibraryA("kernel32.dll");
+    w32->set_thread_description = DN_CAST(DN_W32SetThreadDescriptionFunc *) GetProcAddress(module, "SetThreadDescription");
+    FreeLibrary(module);
+
+    // NOTE: win32 bcrypt
     wchar_t const     BCRYPT_ALGORITHM[] = L"RNG";
-    long /*NTSTATUS*/ init_status        = BCryptOpenAlgorithmProvider(&os->win32_bcrypt_rng_handle, BCRYPT_ALGORITHM, nullptr /*implementation*/, 0 /*flags*/);
-    if (os->win32_bcrypt_rng_handle && init_status == 0)
-      os->win32_bcrypt_init_success = true;
+    long /*NTSTATUS*/ init_status        = BCryptOpenAlgorithmProvider(&w32->bcrypt_rng_handle, BCRYPT_ALGORITHM, nullptr /*implementation*/, 0 /*flags*/);
+    if (w32->bcrypt_rng_handle && init_status == 0)
+      w32->bcrypt_init_success = true;
     else
       DN_LOG_ErrorF("Failed to initialise Windows secure random number generator, error: %d", init_status);
+    #endif
   }
-  #endif
 
   // NOTE: Initialise tmem arenas which allocate memory and will be
   // recorded to the now initialised allocation table. The initialisation
@@ -135,7 +152,6 @@ DN_API void DN_OS_Init(DN_OSCore *os, DN_OSInitArgs *args)
   #define DN_CPU_FEAT_XENTRY(label) g_dn_cpu_feature_decl[DN_CPUFeature_##label] = {DN_CPUFeature_##label, DN_STR8(#label)};
   DN_CPU_FEAT_XMACRO
   #undef DN_CPU_FEAT_XENTRY
-
   DN_Assert(g_dn_os_core_);
 }
 
@@ -702,13 +718,13 @@ static void DN_OS_ThreadExecute_(void *user_context)
 
 DN_API void DN_OS_ThreadSetName(DN_Str8 name)
 {
-  DN_OSTLS *tls    = DN_OS_TLSGet();
+  DN_OSTLS *tls  = DN_OS_TLSGet();
   tls->name_size = DN_CAST(uint8_t) DN_Min(name.size, sizeof(tls->name) - 1);
   DN_Memcpy(tls->name, name.data, tls->name_size);
   tls->name[tls->name_size] = 0;
 
 #if defined(DN_PLATFORM_WIN32)
-  DN_Win_ThreadSetName(name);
+  DN_W32_ThreadSetName(name);
 #else
   DN_Posix_ThreadSetName(name);
 #endif
@@ -717,7 +733,7 @@ DN_API void DN_OS_ThreadSetName(DN_Str8 name)
 // NOTE: DN_OSHttp /////////////////////////////////////////////////////////////////////////////////
 DN_API void DN_OS_HttpRequestWait(DN_OSHttpResponse *response)
 {
-  if (response && DN_OS_SemaphoreIsValid(&response->on_complete_semaphore))
+  if (response && response->on_complete_semaphore.handle != 0)
     DN_OS_SemaphoreWait(&response->on_complete_semaphore, DN_OS_SEMAPHORE_INFINITE_TIMEOUT);
 }
 

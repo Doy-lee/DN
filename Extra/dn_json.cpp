@@ -407,22 +407,22 @@ void DN_JSON_ItErrorUnknownKeyValue_(DN_JSONIt *it, DN_CallSite call_site)
     json_string_s const *key = curr->name;
     if (it->flags & json_parse_flags_allow_location_information) {
         json_string_ex_s const *info = DN_CAST(json_string_ex_s const *)key;
-        DN_Log_TypeFCallSite(DN_LogType_Warning,
-                              call_site,
-                              "Unknown key-value pair in object [loc=%zu:%zu, key=%.*s, value=%.*s]",
-                              info->line_no,
-                              info->row_no,
-                              DN_CAST(int)key->string_size,
-                              key->string,
-                              DN_CAST(int)value_type_size,
-                              value_type);
+        DN_LOG_EmitFromType(DN_LOG_MakeU32LogTypeParam(DN_LOGType_Warning),
+                            call_site,
+                            "Unknown key-value pair in object [loc=%zu:%zu, key=%.*s, value=%.*s]",
+                            info->line_no,
+                            info->row_no,
+                            DN_CAST(int) key->string_size,
+                            key->string,
+                            DN_CAST(int) value_type_size,
+                            value_type);
     } else {
-        DN_Log_TypeFCallSite(DN_LogType_Warning,
-                              call_site,
-                              "Unknown key-value pair in object [key=%.*s, value=%.*s]",
-                              DN_CAST(int)key->string_size,
-                              key->string,
-                              DN_CAST(int)value_type_size,
-                              value_type);
+      DN_LOG_EmitFromType(DN_LOG_MakeU32LogTypeParam(DN_LOGType_Warning),
+                           call_site,
+                           "Unknown key-value pair in object [key=%.*s, value=%.*s]",
+                           DN_CAST(int) key->string_size,
+                           key->string,
+                           DN_CAST(int) value_type_size,
+                           value_type);
     }
 }

@@ -16,11 +16,11 @@
 #include <stdlib.h> // exit()
 #endif
 
-#define DN_ForIndexU(index, size)        for (DN_USize index = 0; index < size; index++)
-#define DN_ForIndexI(index, size)        for (DN_ISize index = 0; index < size; index++)
-#define DN_ForItSize(it, T, array, size) for (struct { DN_USize index; T *data; } it = {0, &(array)[0]};       it.index < (size);                 it.index++, it.data++)
-#define DN_ForIt(it, T, array)           for (struct { DN_USize index; T *data; } it = {0, &(array)->data[0]}; it.index < (array)->size;          it.index++, it.data++)
-#define DN_ForItCArray(it, T, array)     for (struct { DN_USize index; T *data; } it = {0, &(array)[0]};       it.index < DN_ArrayCountU(array); it.index++, it.data++)
+#define DN_ForIndexU(index, size)        DN_USize index = 0; index < size; index++
+#define DN_ForIndexI(index, size)        DN_ISize index = 0; index < size; index++
+#define DN_ForItSize(it, T, array, size) struct { DN_USize index; T *data; } it = {0, &(array)[0]};       it.index < (size);                it.index++, it.data++
+#define DN_ForIt(it, T, array)           struct { DN_USize index; T *data; } it = {0, &(array)->data[0]}; it.index < (array)->size;         it.index++, it.data++
+#define DN_ForItCArray(it, T, array)     struct { DN_USize index; T *data; } it = {0, &(array)[0]};       it.index < DN_ArrayCountU(array); it.index++, it.data++
 
 #define DN_AlignUpPowerOfTwo(value, pot)   (((uintptr_t)(value) + ((uintptr_t)(pot) - 1)) & ~((uintptr_t)(pot) - 1))
 #define DN_AlignDownPowerOfTwo(value, pot) ((uintptr_t)(value) & ~((uintptr_t)(pot) - 1))
@@ -152,10 +152,10 @@ struct DN_DeferHelper
 #define DN_DEFER               const auto DN_UniqueName(defer_lambda_) = DN_DeferHelper() + [&]()
 #endif // defined(__cplusplus)
 
-#define DN_DEFER_LOOP(begin, end)                 \
-  for (bool DN_UniqueName(once) = (begin, true);  \
-       DN_UniqueName(once);                       \
-       end, DN_UniqueName(once) = false)
+#define DN_DeferLoop(begin, end)            \
+  bool DN_UniqueName(once) = (begin, true); \
+  DN_UniqueName(once);                      \
+  end, DN_UniqueName(once) = false
 
 // NOTE: Types /////////////////////////////////////////////////////////////////////////////////////
 typedef intptr_t  DN_ISize;
@@ -246,20 +246,18 @@ struct DN_CallSite
   #include <intrin.h>
   #define DN_Atomic_CompareExchange64(dest, desired_val, prev_val) _InterlockedCompareExchange64((__int64 volatile *)dest, desired_val, prev_val)
   #define DN_Atomic_CompareExchange32(dest, desired_val, prev_val) _InterlockedCompareExchange((long volatile *)dest, desired_val, prev_val)
+
+  #define DN_Atomic_LoadU64(target)                                *(target)
+  #define DN_Atomic_LoadU32(target)                                *(target)
   #define DN_Atomic_AddU32(target, value)                          _InterlockedExchangeAdd((long volatile *)target, value)
   #define DN_Atomic_AddU64(target, value)                          _InterlockedExchangeAdd64((__int64 volatile *)target, value)
   #define DN_Atomic_SubU32(target, value)                          DN_Atomic_AddU32(DN_CAST(long volatile *) target, (long)-value)
   #define DN_Atomic_SubU64(target, value)                          DN_Atomic_AddU64(target, (DN_U64) - value)
 
-  #define DN_CountLeadingZerosU64(value) __lzcnt64(value)
-
-  #define DN_CPU_TSC() __rdtsc()
-  #define DN_CompilerReadBarrierAndCPUReadFence \
-    _ReadBarrier();                             \
-    _mm_lfence()
-  #define DN_CompilerWriteBarrierAndCPUWriteFence \
-    _WriteBarrier();                              \
-    _mm_sfence()
+  #define DN_CountLeadingZerosU64(value)                           __lzcnt64(value)
+  #define DN_CPU_TSC()                                             __rdtsc()
+  #define DN_CompilerReadBarrierAndCPUReadFence                    _ReadBarrier();  _mm_lfence()
+  #define DN_CompilerWriteBarrierAndCPUWriteFence                  _WriteBarrier(); _mm_sfence()
 #elif defined(DN_COMPILER_GCC) || defined(DN_COMPILER_CLANG)
   #if defined(__ANDROID__)
   #elif defined(DN_PLATFORM_EMSCRIPTEN)
@@ -268,17 +266,20 @@ struct DN_CallSite
     #include <x86intrin.h>
   #endif
 
-  #define DN_Atomic_AddU32(target, value) __atomic_fetch_add(target, value, __ATOMIC_ACQ_REL)
-  #define DN_Atomic_AddU64(target, value) __atomic_fetch_add(target, value, __ATOMIC_ACQ_REL)
-  #define DN_Atomic_SubU32(target, value) __atomic_fetch_sub(target, value, __ATOMIC_ACQ_REL)
-  #define DN_Atomic_SubU64(target, value) __atomic_fetch_sub(target, value, __ATOMIC_ACQ_REL)
+  #define DN_Atomic_LoadU64(target)                                __atomic_load_n(x, __ATOMIC_SEQ_CST)
+  #define DN_Atomic_LoadU32(target)                                __atomic_load_n(x, __ATOMIC_SEQ_CST)
+  #define DN_Atomic_AddU32(target, value)                          __atomic_fetch_add(target, value, __ATOMIC_ACQ_REL)
+  #define DN_Atomic_AddU64(target, value)                          __atomic_fetch_add(target, value, __ATOMIC_ACQ_REL)
+  #define DN_Atomic_SubU32(target, value)                          __atomic_fetch_sub(target, value, __ATOMIC_ACQ_REL)
+  #define DN_Atomic_SubU64(target, value)                          __atomic_fetch_sub(target, value, __ATOMIC_ACQ_REL)
 
-  #define DN_CountLeadingZerosU64(value) __builtin_clzll(value)
+  #define DN_CountLeadingZerosU64(value)                           __builtin_clzll(value)
   #if defined(DN_COMPILER_GCC)
     #define DN_CPU_TSC() __rdtsc()
   #else
     #define DN_CPU_TSC() __builtin_readcyclecounter()
   #endif
+
   #if defined(DN_PLATFORM_EMSCRIPTEN)
     #define DN_CompilerReadBarrierAndCPUReadFence
     #define DN_CompilerWriteBarrierAndCPUWriteFence
@@ -406,7 +407,7 @@ struct DN_TicketMutex
 
 // NOTE: Intrinsics ////////////////////////////////////////////////////////////////////////////////
 DN_FORCE_INLINE DN_U64 DN_Atomic_SetValue64       (DN_U64 volatile *target, DN_U64 value);
-DN_FORCE_INLINE long   DN_Atomic_SetValue32       (long volatile *target, long value);
+DN_FORCE_INLINE DN_U32 DN_Atomic_SetValue32       (DN_U32 volatile *target, DN_U32 value);
 
 #if !defined (DN_PLATFORM_ARM64)
 DN_API DN_CPUIDResult  DN_CPU_ID                  (DN_CPUIDArgs args);
@@ -515,7 +516,7 @@ DN_FORCE_INLINE DN_U64 DN_Atomic_SetValue64(DN_U64 volatile *target, DN_U64 valu
 #endif
 }
 
-DN_FORCE_INLINE long DN_Atomic_SetValue32(long volatile *target, long value)
+DN_FORCE_INLINE DN_U32 DN_Atomic_SetValue32(DN_U32 volatile *target, DN_U32 value)
 {
 #if defined(DN_COMPILER_MSVC) || defined(DN_COMPILER_CLANG_CL)
   long result;

@@ -35,9 +35,9 @@ DN_API void DN_OS_TLSInit(DN_OSTLS *tls, DN_OSTLSInitArgs args)
   // TODO: We shouldn't have the no alloc track flag here but the initial TLS
   // init on OS init happens before CORE init. CORE init is the one responsible
   // for setting up the alloc tracking data structures.
-  DN_ForIndexU(index, DN_OSTLSArena_Count) {
-    DN_Arena *arena = tls->arenas + index;
-    switch (DN_CAST(DN_OSTLSArena) index) {
+  for (DN_ForItCArray(it, DN_Arena, tls->arenas)) {
+    DN_Arena *arena = it.data;
+    switch (DN_CAST(DN_OSTLSArena) it.index) {
       default:                      *arena = DN_Arena_InitFromOSVMem(reserve, commit, DN_ArenaFlags_AllocCanLeak | DN_ArenaFlags_NoAllocTrack); break;
       case DN_OSTLSArena_ErrorSink: *arena = DN_Arena_InitFromOSVMem(err_sink_reserve, err_sink_commit, DN_ArenaFlags_AllocCanLeak | DN_ArenaFlags_NoAllocTrack); break;
       case DN_OSTLSArena_Count:     DN_InvalidCodePath; break;
@@ -54,10 +54,8 @@ DN_API void DN_OS_TLSDeinit(DN_OSTLS *tls)
   tls->init              = false;
   tls->err_sink          = {};
   tls->arena_stack_index = {};
-  DN_ForIndexU(index, DN_OSTLSArena_Count) {
-    DN_Arena *arena = tls->arenas + index;
-    DN_Arena_Deinit(arena);
-  }
+  for (DN_ForItCArray(it, DN_Arena, tls->arenas))
+    DN_Arena_Deinit(it.data);
 }
 
 DN_THREAD_LOCAL DN_OSTLS *g_dn_curr_thread_tls;
@@ -170,7 +168,7 @@ DN_API DN_OSErrSink *DN_OS_ErrSinkBegin_(DN_OSErrSinkMode mode, DN_CallSite call
   if (tls->err_sink.stack_size == DN_ArrayCountU(err->stack)) {
     DN_Str8Builder builder = DN_Str8Builder_InitFromTLS();
     DN_USize       counter = 0;
-    DN_ForItSize(it, DN_OSErrSinkNode, err->stack, err->stack_size) {
+    for (DN_ForItSize(it, DN_OSErrSinkNode, err->stack, err->stack_size)) {
       DN_MSVC_WARNING_PUSH
       DN_MSVC_WARNING_DISABLE(6284) // Object passed as _Param_(4) when a string is required in call to 'DN_Str8Builder_AppendF' Actual type: 'struct DN_Str8'.
       DN_Str8Builder_AppendF(&builder, "  [%04zu] %S:%u %S\n", counter++, it.data->call_site.file, it.data->call_site.line, it.data->call_site.function);
@@ -185,9 +183,9 @@ DN_API DN_OSErrSink *DN_OS_ErrSinkBegin_(DN_OSErrSinkMode mode, DN_CallSite call
   }
 
   DN_OSErrSinkNode *node = tls->err_sink.stack + tls->err_sink.stack_size++;
-  node->arena_pos      = arena_pos;
-  node->mode           = mode;
-  node->call_site      = call_site;
+  node->arena_pos        = arena_pos;
+  node->mode             = mode;
+  node->call_site        = call_site;
   DN_DLList_InitArena(node->msg_sentinel, DN_OSErrSinkMsg, result->arena);
 
   // NOTE: Handle allocation error

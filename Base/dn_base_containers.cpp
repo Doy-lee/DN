@@ -1,5 +1,49 @@
 #define DN_CONTAINERS_CPP
 
+#include "../dn_base_inc.h"
+
+DN_API bool DN_Ring_HasSpace(DN_Ring const *ring, DN_U64 size)
+{
+  DN_U64 avail  = ring->write_pos - ring->read_pos;
+  DN_U64 space  = ring->size - avail;
+  bool   result = space >= size;
+  return result;
+}
+
+DN_API bool DN_Ring_HasData(DN_Ring const *ring, DN_U64 size)
+{
+  DN_U64 data   = ring->write_pos - ring->read_pos;
+  bool   result = data >= size;
+  return result;
+}
+
+DN_API void DN_Ring_Write(DN_Ring *ring, void const *src, DN_U64 src_size)
+{
+  DN_Assert(src_size <= ring->size);
+  DN_U64 offset               = ring->write_pos % ring->size;
+  DN_U64 bytes_before_split   = ring->size - offset;
+  DN_U64 pre_split_bytes      = DN_Min(bytes_before_split, src_size);
+  DN_U64 post_split_bytes     = src_size - pre_split_bytes;
+  void const *pre_split_data  = src;
+  void const *post_split_data = ((char *)src + pre_split_bytes);
+  DN_Memcpy(ring->base + offset, pre_split_data,  pre_split_bytes);
+  DN_Memcpy(ring->base,          post_split_data, post_split_bytes);
+  ring->write_pos += src_size;
+}
+
+DN_API void DN_Ring_Read(DN_Ring *ring, void *dest, DN_U64 dest_size)
+{
+  DN_Assert(dest_size <= ring->size);
+  DN_U64 offset             = ring->read_pos % ring->size;
+  DN_U64 bytes_before_split = ring->size - offset;
+  DN_U64 pre_split_bytes    = DN_Min(bytes_before_split, dest_size);
+  DN_U64 post_split_bytes   = dest_size - pre_split_bytes;
+  DN_Memcpy(dest,                           ring->base + offset, pre_split_bytes);
+  DN_Memcpy((char *)dest + pre_split_bytes, ring->base,          post_split_bytes);
+  ring->read_pos += dest_size;
+}
+#define DN_Ring_WriteStruct(ring, item) DN_Ring_Write((ring), (item), sizeof(*(item)))
+
 // NOTE: DN_CArray /////////////////////////////////////////////////////////////////////////////////
 template <typename T>
 DN_ArrayEraseResult DN_CArray_EraseRange(T *data, DN_USize *size, DN_USize begin_index, DN_ISize count, DN_ArrayErase erase)
@@ -936,7 +980,7 @@ template <typename T, size_t N>
 DN_List<T> DN_List_InitCArray(DN_Arena *arena, DN_USize chunk_size, T const (&array)[N])
 {
   DN_List<T> result = DN_List_Init<T>(arena, chunk_size);
-  DN_ForIndexU(index, N)
+  for (DN_ForIndexU(index, N))
     DN_List_Add(&result, array[index]);
   return result;
 }
@@ -945,7 +989,7 @@ template <typename T>
 DN_List<T> DN_List_InitSliceCopy(DN_Arena *arena, DN_USize chunk_size, DN_Slice<T> slice)
 {
   DN_List<T> result = DN_List_Init<T>(arena, chunk_size);
-  DN_ForIndexU(index, slice.size)
+  for (DN_ForIndexU(index, slice.size))
     DN_List_Add(&result, slice.data[index]);
   return result;
 }

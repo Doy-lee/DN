@@ -272,7 +272,7 @@ DN_API DN_Str8 DN_Str8_Segment(DN_Arena *arena, DN_Str8 src, DN_USize segment_si
   DN_USize segment_counter = 0;
   DN_Str8  result          = DN_Str8_Alloc(arena, src.size + segments, DN_ZeroMem_Yes);
   DN_USize write_index     = 0;
-  DN_ForIndexU(src_index, src.size) {
+  for (DN_ForIndexU(src_index, src.size)) {
     result.data[write_index++] = src.data[src_index];
     if ((src_index + 1) % segment_size == 0 && segment_counter < segments) {
       result.data[write_index++] = segment_char;
@@ -664,7 +664,7 @@ DN_API DN_Str8DotTruncateResult DN_Str8_DotTruncateMiddle(DN_Arena *arena, DN_St
 DN_API DN_Str8 DN_Str8_Lower(DN_Arena *arena, DN_Str8 string)
 {
   DN_Str8 result = DN_Str8_Copy(arena, string);
-  DN_ForIndexU(index, result.size)
+  for (DN_ForIndexU(index, result.size))
     result.data[index] = DN_Char_ToLower(result.data[index]);
   return result;
 }
@@ -672,7 +672,7 @@ DN_API DN_Str8 DN_Str8_Lower(DN_Arena *arena, DN_Str8 string)
 DN_API DN_Str8 DN_Str8_Upper(DN_Arena *arena, DN_Str8 string)
 {
   DN_Str8 result = DN_Str8_Copy(arena, string);
-  DN_ForIndexU(index, result.size)
+  for (DN_ForIndexU(index, result.size))
     result.data[index] = DN_Char_ToUpper(result.data[index]);
   return result;
 }
@@ -774,7 +774,7 @@ DN_API bool DN_Str8Builder_AddArrayRef(DN_Str8Builder *builder, DN_Str8 const *s
     return false;
 
   if (add == DN_Str8BuilderAdd_Append) {
-    DN_ForIndexU(index, size) {
+    for (DN_ForIndexU(index, size)) {
       DN_Str8      string = strings[index];
       DN_Str8Link *link   = links + index;
 
@@ -821,8 +821,7 @@ DN_API bool DN_Str8Builder_AddArrayCopy(DN_Str8Builder *builder, DN_Str8 const *
   DN_ArenaTempMem tmp_mem      = DN_Arena_TempMemBegin(builder->arena);
   bool            result       = true;
   DN_Str8        *strings_copy = DN_Arena_NewArray(builder->arena, DN_Str8, size, DN_ZeroMem_No);
-  DN_ForIndexU(index, size)
-  {
+  for (DN_ForIndexU(index, size)) {
     strings_copy[index] = DN_Str8_Copy(builder->arena, strings[index]);
     if (strings_copy[index].size != strings[index].size) {
       result = false;

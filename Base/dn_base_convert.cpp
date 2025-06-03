@@ -151,7 +151,7 @@ DN_API DN_Str8 DN_CVT_F64ToAge(DN_Arena *arena, DN_F64 age_s, DN_CVTU64AgeUnit u
   if (!arena)
     return result;
 
-  char           buffer[128];
+  char           buffer[256];
   DN_Arena       stack_arena = DN_Arena_InitFromBuffer(buffer, sizeof(buffer), DN_ArenaFlags_NoPoison);
   DN_Str8Builder builder     = DN_Str8Builder_Init(&stack_arena);
   DN_F64         remainder   = age_s;

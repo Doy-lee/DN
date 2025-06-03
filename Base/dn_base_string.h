@@ -1,30 +1,22 @@
 #if !defined(DN_BASE_STRING_H)
 #define DN_BASE_STRING_H
 
-#if defined(DN_USE_STD_PRINTF)
-  #include <stdio.h>
-  #define DN_SPrintF(...) sprintf(__VA_ARGS__)
-  #define DN_SNPrintF(...) snprintf(__VA_ARGS__)
-  #define DN_VSPrintF(...) vsprintf(__VA_ARGS__)
-  #define DN_VSNPrintF(...) vsnprintf(__VA_ARGS__)
-#else
-  #if !defined(DN_STB_SPRINTF_HEADER_ONLY)
-    #define STB_SPRINTF_IMPLEMENTATION
-    #define STB_SPRINTF_STATIC
-  #endif
-  DN_MSVC_WARNING_PUSH
-  DN_MSVC_WARNING_DISABLE(4505) // Unused function warning
-  DN_GCC_WARNING_PUSH
-  DN_GCC_WARNING_DISABLE(-Wunused-function)
-  #include "../External/stb_sprintf.h"
-  DN_GCC_WARNING_POP
-  DN_MSVC_WARNING_POP
-
-  #define DN_SPrintF(...) STB_SPRINTF_DECORATE(sprintf)(__VA_ARGS__)
-  #define DN_SNPrintF(...) STB_SPRINTF_DECORATE(snprintf)(__VA_ARGS__)
-  #define DN_VSPrintF(...) STB_SPRINTF_DECORATE(vsprintf)(__VA_ARGS__)
-  #define DN_VSNPrintF(...) STB_SPRINTF_DECORATE(vsnprintf)(__VA_ARGS__)
+#if !defined(DN_STB_SPRINTF_HEADER_ONLY)
+  #define STB_SPRINTF_IMPLEMENTATION
+  #define STB_SPRINTF_STATIC
 #endif
+DN_MSVC_WARNING_PUSH
+DN_MSVC_WARNING_DISABLE(4505) // Unused function warning
+DN_GCC_WARNING_PUSH
+DN_GCC_WARNING_DISABLE(-Wunused-function)
+#include "../External/stb_sprintf.h"
+DN_GCC_WARNING_POP
+DN_MSVC_WARNING_POP
+
+#define DN_SPrintF(...) STB_SPRINTF_DECORATE(sprintf)(__VA_ARGS__)
+#define DN_SNPrintF(...) STB_SPRINTF_DECORATE(snprintf)(__VA_ARGS__)
+#define DN_VSPrintF(...) STB_SPRINTF_DECORATE(vsprintf)(__VA_ARGS__)
+#define DN_VSNPrintF(...) STB_SPRINTF_DECORATE(vsnprintf)(__VA_ARGS__)
 
 /*
 ////////////////////////////////////////////////////////////////////////////////////////////////////

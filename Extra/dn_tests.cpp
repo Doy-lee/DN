@@ -1151,8 +1151,8 @@ static DN_UTCore DN_Tests_Intrinsics()
 
     DN_UT_Test(&result, "DN_Atomic_SetValue32")
     {
-      long a = 0;
-      long b = 111;
+      DN_U32 a = 0;
+      DN_U32 b = 111;
       DN_Atomic_SetValue32(&a, b);
       DN_UT_AssertF(&result, a == b, "a: %ld, b: %ld", a, b);
     }
@@ -1574,6 +1574,8 @@ static DN_UTCore DN_Tests_M4()
 static DN_UTCore DN_Tests_OS()
 {
   DN_UTCore result = DN_UT_Init();
+
+  #if defined(DN_OS_INC_CPP) || 1
   DN_UT_LogF(&result, "DN_OS\n");
   {
     DN_UT_Test(&result, "Generate secure RNG bytes with nullptr")
@@ -1689,6 +1691,58 @@ static DN_UTCore DN_Tests_OS()
       DN_UT_Assert(&result, delete_non_existent_src_file == false);
     }
   }
+
+  DN_UT_LogF(&result, "\nSemaphore\n");
+  {
+    DN_OSSemaphore sem = DN_OS_SemaphoreInit(0);
+
+    DN_UT_Test(&result, "Wait timeout")
+    {
+      DN_U64                   begin       = DN_OS_PerfCounterNow();
+      DN_OSSemaphoreWaitResult wait_result = DN_OS_SemaphoreWait(&sem, 100 /*timeout_ms*/);
+      DN_U64                   end         = DN_OS_PerfCounterNow();
+      DN_UT_AssertF(&result, wait_result == DN_OSSemaphoreWaitResult_Timeout, "Received wait result %zu", wait_result);
+      DN_F64 elapsed_ms = DN_OS_PerfCounterMs(begin, end);
+      DN_UT_AssertF(&result, elapsed_ms >= 100, "Expected to sleep for >= 100ms, slept %f ms", elapsed_ms);
+    }
+
+    DN_UT_Test(&result, "Wait success")
+    {
+      DN_OS_SemaphoreIncrement(&sem, 1);
+      DN_OSSemaphoreWaitResult wait_result = DN_OS_SemaphoreWait(&sem, 0 /*timeout_ms*/);
+      DN_UT_AssertF(&result, wait_result == DN_OSSemaphoreWaitResult_Success, "Received wait result %zu", wait_result);
+    }
+
+    DN_OS_SemaphoreDeinit(&sem);
+  }
+
+  DN_UT_LogF(&result, "\nMutex\n");
+  {
+    DN_OSMutex mutex = DN_OS_MutexInit();
+    DN_UT_Test(&result, "Lock")
+    {
+      DN_OS_MutexLock(&mutex);
+      DN_OS_MutexUnlock(&mutex);
+    }
+    DN_OS_MutexDeinit(&mutex);
+  }
+
+  DN_UT_LogF(&result, "\nCondition Variable\n");
+  {
+    DN_OSMutex             mutex = DN_OS_MutexInit();
+    DN_OSConditionVariable cv    = DN_OS_ConditionVariableInit();
+    DN_UT_Test(&result, "Lock and timeout")
+    {
+      DN_U64 begin = DN_OS_PerfCounterNow();
+      DN_OS_ConditionVariableWait(&cv, &mutex, 100 /*sleep_ms*/);
+      DN_U64 end        = DN_OS_PerfCounterNow();
+      DN_F64 elapsed_ms = DN_OS_PerfCounterMs(begin, end);
+      DN_UT_AssertF(&result, elapsed_ms >= 100, "Expected to sleep for >= 100ms, slept %f ms", elapsed_ms);
+    }
+    DN_OS_MutexDeinit(&mutex);
+    DN_OS_ConditionVariableDeinit(&cv);
+  }
+  #endif
 
   return result;
 }
@@ -2372,25 +2426,25 @@ static DN_UTCore DN_Tests_Win()
 
     DN_UT_Test(&result, "Str8 to Str16")
     {
-      DN_Str16 str_result = DN_Win_Str8ToStr16(tmem.arena, input8);
+      DN_Str16 str_result = DN_W32_Str8ToStr16(tmem.arena, input8);
       DN_UT_Assert(&result, str_result == input16);
     }
 
     DN_UT_Test(&result, "Str16 to Str8")
     {
-      DN_Str8 str_result = DN_Win_Str16ToStr8(tmem.arena, input16);
+      DN_Str8 str_result = DN_W32_Str16ToStr8(tmem.arena, input16);
       DN_UT_Assert(&result, str_result == input8);
     }
 
     DN_UT_Test(&result, "Str16 to Str8: Null terminates string")
     {
-      int   size_required = DN_Win_Str16ToStr8Buffer(input16, nullptr, 0);
+      int   size_required = DN_W32_Str16ToStr8Buffer(input16, nullptr, 0);
       char *string        = DN_Arena_NewArray(tmem.arena, char, size_required + 1, DN_ZeroMem_No);
 
       // Fill the string with error sentinels
       DN_Memset(string, 'Z', size_required + 1);
 
-      int        size_returned = DN_Win_Str16ToStr8Buffer(input16, string, size_required + 1);
+      int        size_returned = DN_W32_Str16ToStr8Buffer(input16, string, size_required + 1);
       char const EXPECTED[]    = {'S', 't', 'r', 'i', 'n', 'g', 0};
 
       DN_UT_AssertF(&result, size_required == size_returned, "string_size: %d, result: %d", size_required, size_returned);
@@ -2400,8 +2454,8 @@ static DN_UTCore DN_Tests_Win()
 
     DN_UT_Test(&result, "Str16 to Str8: Arena null terminates string")
     {
-      DN_Str8    string8       = DN_Win_Str16ToStr8(tmem.arena, input16);
-      int        size_returned = DN_Win_Str16ToStr8Buffer(input16, nullptr, 0);
+      DN_Str8    string8       = DN_W32_Str16ToStr8(tmem.arena, input16);
+      int        size_returned = DN_W32_Str16ToStr8Buffer(input16, nullptr, 0);
       char const EXPECTED[]    = {'S', 't', 'r', 'i', 'n', 'g', 0};
 
       DN_UT_AssertF(&result, DN_CAST(int) string8.size == size_returned, "string_size: %d, result: %d", DN_CAST(int) string8.size, size_returned);

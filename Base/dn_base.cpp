@@ -36,11 +36,11 @@ DN_API DN_USize DN_CPU_HasFeatureArray(DN_CPUReport const *report, DN_CPUFeature
 {
   DN_USize       result = 0;
   DN_USize const BITS   = sizeof(report->features[0]) * 8;
-  DN_ForIndexU(feature_index, features_size) {
+  for (DN_ForIndexU(feature_index, features_size)) {
     DN_CPUFeatureQuery *query       = features + feature_index;
     DN_USize            chunk_index = query->feature / BITS;
     DN_USize            chunk_bit   = query->feature % BITS;
-    DN_U64            chunk       = report->features[chunk_index];
+    DN_U64              chunk       = report->features[chunk_index];
     query->available                = chunk & (1ULL << chunk_bit);
     result += DN_CAST(int) query->available;
   }

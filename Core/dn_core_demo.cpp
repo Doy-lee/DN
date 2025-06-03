@@ -403,10 +403,10 @@ void DN_Docs_Demo()
     }
   }
 
-  // NOTE: DN_LogProc ///////////////////////////////////////////////////////////////////////////
+  // NOTE: DN_LOGProc ///////////////////////////////////////////////////////////////////////////
   //
   // Function prototype of the logging interface exposed by this library. Logs
-  // emitted using the DN_Log_* family of functions are routed through this
+  // emitted using the DN_LOG_* family of functions are routed through this
   // routine.
 
   // NOTE: DN_FNV1A /////////////////////////////////////////////////////////////////////////////
@@ -660,7 +660,7 @@ void DN_Docs_Demo()
   // returned in add and multiply operations, and, the minimum is returned in
   // subtraction and division.
 
-  // NOTE: DN_Safe_SaturateCast* ////////////////////////////////////////////////////////////////
+  // NOTE: DN_SaturateCast* ////////////////////////////////////////////////////////////////
   //
   // Truncate the passed in value to the return type clamping the resulting
   // value to the max value of the desired data type. It DN_Check's the
@@ -1175,31 +1175,31 @@ void DN_Docs_Demo()
     DN_VArray_Deinit(&array);
   }
 
-  // NOTE: DN_Win_LastError         /////////////////////////////////////////////////////////////
-  // NOTE: DN_Win_ErrorCodeToMsg    /////////////////////////////////////////////////////////////
+  // NOTE: DN_W32_LastError         /////////////////////////////////////////////////////////////
+  // NOTE: DN_W32_ErrorCodeToMsg    /////////////////////////////////////////////////////////////
   #if defined(DN_PLATFORM_WIN32)
     if (0) {
       // Generate the error string for the last Win32 API called that return
       // an error value.
       DN_OSTLSTMem  tmem           = DN_OS_TLSTMem(nullptr);
-      DN_WinError get_last_error = DN_Win_LastError(tmem.arena);
+      DN_W32Error get_last_error = DN_W32_LastError(tmem.arena);
       printf("Error (%lu): %.*s", get_last_error.code, DN_STR_FMT(get_last_error.msg));
 
       // Alternatively, pass in the error code directly
-      DN_WinError error_msg_for_code = DN_Win_ErrorCodeToMsg(tmem.arena, /*error_code*/ 0);
+      DN_W32Error error_msg_for_code = DN_W32_ErrorCodeToMsg(tmem.arena, /*error_code*/ 0);
       printf("Error (%lu): %.*s", error_msg_for_code.code, DN_STR_FMT(error_msg_for_code.msg));
     }
 
-  // NOTE: DN_Win_MakeProcessDPIAware ///////////////////////////////////////////////////////////
+  // NOTE: DN_W32_MakeProcessDPIAware ///////////////////////////////////////////////////////////
   //
   // Call once at application start-up to ensure that the application is DPI
   // aware on Windows and ensure that application UI is scaled up
   // appropriately for the monitor.
 
-  // NOTE: DN_Win_Str8ToStr16       /////////////////////////////////////////////////////////////
-  // NOTE: DN_Win_Str8ToStr16Buffer /////////////////////////////////////////////////////////////
-  // NOTE: DN_Win_Str16ToStr8       /////////////////////////////////////////////////////////////
-  // NOTE: DN_Win_Str16ToStr8Buffer /////////////////////////////////////////////////////////////
+  // NOTE: DN_W32_Str8ToStr16       /////////////////////////////////////////////////////////////
+  // NOTE: DN_W32_Str8ToStr16Buffer /////////////////////////////////////////////////////////////
+  // NOTE: DN_W32_Str16ToStr8       /////////////////////////////////////////////////////////////
+  // NOTE: DN_W32_Str16ToStr8Buffer /////////////////////////////////////////////////////////////
   //
   // Convert a UTF8 <-> UTF16 string.
   //
@@ -1211,7 +1211,7 @@ void DN_Docs_Demo()
   //
   // Returns the number of u8's (for UTF16->8) OR u16's (for UTF8->16)
   // written/required for conversion. 0 if there was a conversion error and can be
-  // queried using 'DN_Win_LastError'
+  // queried using 'DN_W32_LastError'
   #endif
 }
 
