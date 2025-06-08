@@ -1052,9 +1052,6 @@ static void DN_POSIX_DeallocSyncPrimitive_(DN_POSIXSyncPrimitive *primitive)
 // NOTE: DN_OSSemaphore ////////////////////////////////////////////////////////////////////////////
 DN_API DN_OSSemaphore DN_OS_SemaphoreInit(DN_U32 initial_count)
 {
-  DN_POSIXCore *posix = g_dn_os_core->posix_context;
-  DN_Assert(posix);
-
   DN_OSSemaphore         result    = {};
   DN_POSIXSyncPrimitive *primitive = DN_POSIX_AllocSyncPrimitive_();
   if (primitive) {
@@ -1069,17 +1066,17 @@ DN_API DN_OSSemaphore DN_OS_SemaphoreInit(DN_U32 initial_count)
 
 DN_API void DN_OS_SemaphoreDeinit(DN_OSSemaphore *semaphore)
 {
-  if (semaphore.handle != 0) {
+  if (semaphore && semaphore->handle != 0) {
     DN_POSIXSyncPrimitive *primitive = DN_OS_U64ToPOSIXSyncPrimitive_(semaphore->handle);
     sem_destroy(&primitive->sem);
-    DN_POSIX_DeallocSyncPrimitive_(posix_sem);
+    DN_POSIX_DeallocSyncPrimitive_(primitive);
     *semaphore = {};
   }
 }
 
 DN_API void DN_OS_SemaphoreIncrement(DN_OSSemaphore *semaphore, DN_U32 amount)
 {
-  if (semaphore.handle != 0) {
+  if (semaphore && semaphore->handle != 0) {
     DN_POSIXSyncPrimitive *primitive = DN_OS_U64ToPOSIXSyncPrimitive_(semaphore->handle);
     #if defined(DN_OS_WIN32)
     sem_post_multiple(&primitive->sem, amount); // mingw extension
@@ -1094,7 +1091,7 @@ DN_API DN_OSSemaphoreWaitResult DN_OS_SemaphoreWait(DN_OSSemaphore *semaphore,
                                                     DN_U32          timeout_ms)
 {
   DN_OSSemaphoreWaitResult result = {};
-  if (semaphore.handle == 0)
+  if (!semaphore || semaphore->handle == 0)
     return result;
 
   DN_POSIXSyncPrimitive *primitive = DN_OS_U64ToPOSIXSyncPrimitive_(semaphore->handle);
@@ -1107,10 +1104,13 @@ DN_API DN_OSSemaphoreWaitResult DN_OS_SemaphoreWait(DN_OSSemaphore *semaphore,
     if (wait_result == 0)
       result = DN_OSSemaphoreWaitResult_Success;
   } else {
+    DN_U64 now_ms    = DN_OS_DateUnixTimeMs();
+    DN_U64 end_ts_ms = now_ms + timeout_ms;
+
     struct timespec abs_timeout = {};
-    abs_timeout.tv_sec          = timeout_ms / 1000;
-    abs_timeout.tv_nsec         = (timeout_ms % 1000) * 1'000'000;
-    if (sem_timedwait(&primitive->sem) == 0)
+    abs_timeout.tv_sec          = end_ts_ms / 1'000;
+    abs_timeout.tv_nsec         = 1'000'000 * (end_ts_ms - (end_ts_ms / 1'000) * 1'000);
+    if (sem_timedwait(&primitive->sem, &abs_timeout) == 0)
       result = DN_OSSemaphoreWaitResult_Success;
     else if (errno == ETIMEDOUT)
       result = DN_OSSemaphoreWaitResult_Timeout;
@@ -1121,11 +1121,10 @@ DN_API DN_OSSemaphoreWaitResult DN_OS_SemaphoreWait(DN_OSSemaphore *semaphore,
 // NOTE: DN_OSMutex ////////////////////////////////////////////////////////////////////////////////
 DN_API DN_OSMutex DN_OS_MutexInit()
 {
-  DN_W32SyncPrimitive *primitive = DN_W32_AllocSyncPrimitive_();
-  DN_OSMutex           result    = {};
+  DN_POSIXSyncPrimitive *primitive = DN_POSIX_AllocSyncPrimitive_();
+  DN_OSMutex             result    = {};
   if (primitive) {
-    int pshared = 0; // Share the semaphore across all threads in the process
-    if (pthread_mutex_init(mutex, pshared, nullptr) == 0)
+    if (pthread_mutex_init(&primitive->mutex, nullptr) == 0)
       result.handle = DN_POSIX_SyncPrimitiveToU64(primitive);
     else
       DN_POSIX_DeallocSyncPrimitive_(primitive);
@@ -1136,7 +1135,7 @@ DN_API DN_OSMutex DN_OS_MutexInit()
 DN_API void DN_OS_MutexDeinit(DN_OSMutex *mutex)
 {
   if (mutex && mutex->handle != 0) {
-    DN_POSIXSyncPrimitive *primitive = DN_OS_U64ToPOSIXSyncPrimitive_(semaphore->handle);
+    DN_POSIXSyncPrimitive *primitive = DN_OS_U64ToPOSIXSyncPrimitive_(mutex->handle);
     pthread_mutex_destroy(&primitive->mutex);
     DN_POSIX_DeallocSyncPrimitive_(primitive);
     *mutex = {};
@@ -1146,7 +1145,7 @@ DN_API void DN_OS_MutexDeinit(DN_OSMutex *mutex)
 DN_API void DN_OS_MutexLock(DN_OSMutex *mutex)
 {
   if (mutex && mutex->handle != 0) {
-    DN_POSIXSyncPrimitive *primitive = DN_OS_U64ToPOSIXSyncPrimitive_(semaphore->handle);
+    DN_POSIXSyncPrimitive *primitive = DN_OS_U64ToPOSIXSyncPrimitive_(mutex->handle);
     pthread_mutex_lock(&primitive->mutex);
   }
 }
@@ -1154,7 +1153,7 @@ DN_API void DN_OS_MutexLock(DN_OSMutex *mutex)
 DN_API void DN_OS_MutexUnlock(DN_OSMutex *mutex)
 {
   if (mutex && mutex->handle != 0) {
-    DN_POSIXSyncPrimitive *primitive = DN_OS_U64ToPOSIXSyncPrimitive_(semaphore->handle);
+    DN_POSIXSyncPrimitive *primitive = DN_OS_U64ToPOSIXSyncPrimitive_(mutex->handle);
     pthread_mutex_unlock(&primitive->mutex);
   }
 }
@@ -1164,7 +1163,7 @@ DN_API DN_OSConditionVariable DN_OS_ConditionVariableInit()
   DN_POSIXSyncPrimitive *primitive = DN_POSIX_AllocSyncPrimitive_();
   DN_OSConditionVariable result    = {};
   if (primitive) {
-    if (pthread_cond_init(&primitive->cv) == 0)
+    if (pthread_cond_init(&primitive->cv, nullptr) == 0)
       result.handle = DN_POSIX_SyncPrimitiveToU64(primitive);
     else
       DN_POSIX_DeallocSyncPrimitive_(primitive);
@@ -1172,7 +1171,7 @@ DN_API DN_OSConditionVariable DN_OS_ConditionVariableInit()
   return result;
 }
 
-DN_API bool DN_OS_ConditionVariableDeinit(DN_OSConditionVariable *cv)
+DN_API void DN_OS_ConditionVariableDeinit(DN_OSConditionVariable *cv)
 {
   if (cv && cv->handle != 0) {
     DN_POSIXSyncPrimitive *primitive = DN_OS_U64ToPOSIXSyncPrimitive_(cv->handle);
@@ -1189,11 +1188,11 @@ DN_API bool DN_OS_ConditionVariableWaitUntil(DN_OSConditionVariable *cv, DN_OSMu
     DN_POSIXSyncPrimitive *cv_primitive    = DN_OS_U64ToPOSIXSyncPrimitive_(cv->handle);
     DN_POSIXSyncPrimitive *mutex_primitive = DN_OS_U64ToPOSIXSyncPrimitive_(mutex->handle);
 
-    struct timespec time;
-    time.tv_sec     = end_ts_ms / 1'000;
-    time.tv_nsec    = 1'000'000 * (end_ts_ms - (end_ts_ms / 1'000) * 1'000);
-    int wait_result = pthread_cond_timedwait(&cv_primitive->cv, &mutex_primitive->mutex, &time);
-    result          = (wait_result != ETIMEDOUT);
+    struct timespec time = {};
+    time.tv_sec          = end_ts_ms / 1'000;
+    time.tv_nsec         = 1'000'000 * (end_ts_ms - (end_ts_ms / 1'000) * 1'000);
+    int wait_result      = pthread_cond_timedwait(&cv_primitive->cv, &mutex_primitive->mutex, &time);
+    result               = (wait_result != ETIMEDOUT);
   }
   return result;
 }

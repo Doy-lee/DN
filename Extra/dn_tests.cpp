@@ -1703,7 +1703,7 @@ static DN_UTCore DN_Tests_OS()
       DN_U64                   end         = DN_OS_PerfCounterNow();
       DN_UT_AssertF(&result, wait_result == DN_OSSemaphoreWaitResult_Timeout, "Received wait result %zu", wait_result);
       DN_F64 elapsed_ms = DN_OS_PerfCounterMs(begin, end);
-      DN_UT_AssertF(&result, elapsed_ms >= 100, "Expected to sleep for >= 100ms, slept %f ms", elapsed_ms);
+      DN_UT_AssertF(&result, elapsed_ms >= 99 && elapsed_ms <= 120, "Expected to sleep for ~100ms, slept %f ms", elapsed_ms);
     }
 
     DN_UT_Test(&result, "Wait success")
@@ -1737,7 +1737,7 @@ static DN_UTCore DN_Tests_OS()
       DN_OS_ConditionVariableWait(&cv, &mutex, 100 /*sleep_ms*/);
       DN_U64 end        = DN_OS_PerfCounterNow();
       DN_F64 elapsed_ms = DN_OS_PerfCounterMs(begin, end);
-      DN_UT_AssertF(&result, elapsed_ms >= 100, "Expected to sleep for >= 100ms, slept %f ms", elapsed_ms);
+      DN_UT_AssertF(&result, elapsed_ms >= 99 && elapsed_ms <= 120, "Expected to sleep for ~100ms, slept %f ms", elapsed_ms);
     }
     DN_OS_MutexDeinit(&mutex);
     DN_OS_ConditionVariableDeinit(&cv);

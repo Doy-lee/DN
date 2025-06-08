@@ -129,6 +129,10 @@ DN_API void DN_OS_Init(DN_OSCore *os, DN_OSInitArgs *args)
       w32->bcrypt_init_success = true;
     else
       DN_LOG_ErrorF("Failed to initialise Windows secure random number generator, error: %d", init_status);
+    #else
+    DN_POSIXCore *posix = DN_CAST(DN_POSIXCore *) os->platform_context;
+    int mutex_init = pthread_mutex_init(&posix->sync_primitive_free_list_mutex, nullptr);
+    DN_Assert(mutex_init == 0);
     #endif
   }
 
@@ -258,12 +262,6 @@ DN_API DN_OSDateTimeStr8 DN_OS_DateLocalTimeStr8Now(char date_separator, char hm
 {
   DN_OSDateTime     time   = DN_OS_DateLocalTimeNow();
   DN_OSDateTimeStr8 result = DN_OS_DateLocalTimeStr8(time, date_separator, hms_separator);
-  return result;
-}
-
-DN_API uint64_t DN_OS_DateUnixTimeS()
-{
-  uint64_t result = DN_OS_DateUnixTimeNs() / (1'000 /*us*/ * 1'000 /*ms*/ * 1'000 /*s*/);
   return result;
 }
 

@@ -333,8 +333,8 @@ DN_API DN_OSDateTimeStr8         DN_OS_DateLocalTimeStr8Now(char date_separator 
 DN_API DN_OSDateTimeStr8         DN_OS_DateLocalTimeStr8   (DN_OSDateTime time, char date_separator = '-', char hms_separator = ':');
 DN_API DN_U64                    DN_OS_DateUnixTimeNs      ();
 #define                          DN_OS_DateUnixTimeUs()    (DN_OS_DateUnixTimeNs() / 1000)
-#define                          DN_OS_DateUnixTimeMs()    (DN_OS_DateUnixTimeNs() / 1000 * 1000)
-DN_API DN_U64                    DN_OS_DateUnixTimeS       ();
+#define                          DN_OS_DateUnixTimeMs()    (DN_OS_DateUnixTimeNs() / (1000 * 1000))
+#define                          DN_OS_DateUnixTimeS()     (DN_OS_DateUnixTimeNs() / (1000 * 1000 * 1000))
 DN_API DN_OSDateTime             DN_OS_DateUnixTimeSToDate (DN_U64 time);
 DN_API DN_U64                    DN_OS_DateLocalToUnixTimeS(DN_OSDateTime date);
 DN_API DN_U64                    DN_OS_DateToUnixTimeS     (DN_OSDateTime date);

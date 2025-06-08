@@ -69,6 +69,7 @@ struct DN_POSIXSyncPrimitive
 struct DN_POSIXCore
 {
   DN_POSIXSyncPrimitive *sync_primitive_free_list;
+  pthread_mutex_t        sync_primitive_free_list_mutex;
 };
 
 DN_API void                   DN_Posix_ThreadSetName(DN_Str8 name);

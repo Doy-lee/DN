@@ -495,7 +495,7 @@ DN_API bool    DN_TicketMutex_CanLock    (DN_TicketMutex const *mutex, DN_UInt t
   ((list) && ((list) != (list)->next))
 
 #define DN_DLList_ForEach(it, list) \
-  auto *it = (list)->next; (it) != (list); (it) = (it)->next \
+  auto *it = (list)->next; (it) != (list); (it) = (it)->next
 
 // NOTE: Intrinsics ////////////////////////////////////////////////////////////////////////////////
 DN_FORCE_INLINE DN_U64 DN_Atomic_SetValue64(DN_U64 volatile *target, DN_U64 value)
