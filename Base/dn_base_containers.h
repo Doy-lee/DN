@@ -159,6 +159,64 @@ template <typename T> struct DN_List
 };
 #endif // !defined(DN_NO_LIST)
 
+// NOTE: Macros for operating on data structures that are embedded into a C style struct or from a
+// set of defined variables from the available scope. Keep it stupid simple, structs and functions.
+// Minimal amount of container types with flexible construction leads to less duplicated container
+// code and less template meta-programming.
+//
+// LArray => Literal Array
+//   Define a C array and size:
+//
+//   ```
+//   MyStruct buffer[TB_ASType_Count] = {};
+//   DN_USize size                    = 0;
+//   MyStruct *item                   = DN_LArray_Make(buffer, size, DN_ArrayCountU(buffer), DN_ZeroMem_No);
+//   ```
+//
+// IArray => Intrusive Array
+//   Define a struct with the members 'data', 'size' and 'max':
+//
+//   ```
+//   struct MyArray {
+//     MyStruct *data;
+//     DN_USize  size;
+//     DN_USize  max;
+//   } my_array = {};
+//
+//   MyStruct *item = DN_IArray_Make(&my_array, MyArray, DN_ZeroMem_No);
+//   ```
+// ISLList => Intrusive Singly Linked List
+//   Define a struct with the members 'next':
+//
+//   ```
+//   struct MyLinkItem {
+//     int         data;
+//     MyLinkItem *next;
+//   } my_link = {};
+//
+//   MyLinkItem *first_item = DN_ISLList_Detach(&my_link, MyLinkItem);
+//   ```
+
+#define DN_ISLList_Detach(list)                                  (decltype(list)) DN_CSLList_Detach((void **)&(list), (void **)&(list)->next)
+
+#define DN_LArray_MakeArray(c_array, size, max, count, zero_mem) (decltype(&(c_array)[0])) DN_CArray2_MakeArray(c_array, size, max, sizeof(c_array[0]), count, zero_mem)
+#define DN_LArray_MakeArrayZ(c_array, size, max, count)          DN_LArray_MakeArray(c_array, size, max, count, DN_ZeroMem_Yes)
+#define DN_LArray_Make(c_array, size, max, zero_mem)             DN_LArray_MakeArray(c_array, size, max, 1, zero_mem)
+#define DN_LArray_MakeZ(c_array, size, max)                      DN_LArray_Make(c_array, size, max, DN_ZeroMem_Yes)
+
+#define DN_IArray_Front(array)                                   (array)->data
+#define DN_IArray_GrowIfNeededFromPool(array, pool)              DN_CArray2_GrowIfNeededFromPool((void **)(&(array)->data), (array)->size, &(array)->max, sizeof((array)->data[0]), pool)
+#define DN_IArray_MakeArray(array, count, zero_mem)              DN_LArray_MakeArray((array)->data, &(array)->size, (array)->max, count, zero_mem)
+#define DN_IArray_MakeArrayZ(array, count)                       DN_LArray_MakeArray(array, count, DN_ZeroMem_Yes)
+#define DN_IArray_Make(array, zero_mem)                          DN_IArray_MakeArray(array, 1, zero_mem)
+#define DN_IArray_MakeZ(array)                                   DN_IArray_Make(array, DN_ZeroMem_Yes)
+
+
+DN_API DN_ArrayEraseResult  DN_CArray2_EraseRange          (void *data, DN_USize *size, DN_USize elem_size, DN_USize begin_index, DN_ISize count, DN_ArrayErase erase);
+DN_API void                *DN_CArray2_MakeArray           (void *data, DN_USize *size, DN_USize max, DN_USize data_size, DN_USize make_size, DN_ZeroMem zero_mem);
+DN_API bool                 DN_CArray2_GrowIfNeededFromPool(void **data, DN_USize size, DN_USize *max, DN_USize data_size, DN_Pool *pool);
+DN_API void                *DN_CSLList_Detach              (void **link, void **next);
+
 DN_API                                          bool                  DN_Ring_HasSpace                  (DN_Ring const *ring, DN_U64 size);
 DN_API                                          bool                  DN_Ring_HasData                   (DN_Ring const *ring, DN_U64 size);
 DN_API                                          void                  DN_Ring_Write                     (DN_Ring *ring, void const *src, DN_U64 src_size);

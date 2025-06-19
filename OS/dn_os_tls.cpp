@@ -124,13 +124,13 @@ DN_API DN_Arena *DN_OS_TLSTopArena()
 
 DN_API void DN_OS_TLSBeginFrame(DN_Arena *frame_arena)
 {
-  DN_OSTLS *tls      = DN_OS_TLSGet();
+  DN_OSTLS *tls    = DN_OS_TLSGet();
   tls->frame_arena = frame_arena;
 }
 
 DN_API DN_Arena *DN_OS_TLSFrameArena()
 {
-  DN_OSTLS   *tls    = DN_OS_TLSGet();
+  DN_OSTLS *tls    = DN_OS_TLSGet();
   DN_Arena *result = tls->frame_arena;
   DN_AssertF(result, "Frame arena must be set by calling DN_OS_TLSBeginFrame at the beginning of the frame");
   return result;

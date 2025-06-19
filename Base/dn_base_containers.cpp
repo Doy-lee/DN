@@ -2,6 +2,94 @@
 
 #include "../dn_base_inc.h"
 
+DN_API void *DN_CArray2_MakeArray(void *data, DN_USize *size, DN_USize max, DN_USize data_size, DN_USize make_size, DN_ZeroMem zero_mem)
+{
+  void *result = nullptr;
+  DN_USize new_size = *size + make_size;
+  if (new_size <= max) {
+    result = DN_CAST(char *) data + (data_size * size[0]);
+    *size  = new_size;
+    if (zero_mem == DN_ZeroMem_Yes)
+      DN_Memset(result, 0, data_size * make_size);
+  }
+
+  return result;
+}
+
+DN_API bool DN_CArray2_GrowIfNeededFromPool(void **data, DN_USize size, DN_USize *max, DN_USize data_size, DN_Pool *pool)
+{
+  bool result = true;
+  if (size >= *max) {
+    DN_USize new_max        = DN_Max(*max * 2, 8);
+    DN_USize bytes_to_alloc = data_size * new_max;
+    void    *buffer         = DN_Pool_NewArray(pool, DN_U8, bytes_to_alloc);
+    if (buffer) {
+      DN_USize bytes_to_copy = data_size * size;
+      DN_Memcpy(buffer, *data, bytes_to_copy);
+      DN_Pool_Dealloc(pool, *data);
+      *data = buffer;
+      *max  = new_max;
+    } else {
+      result = false;
+    }
+  }
+
+  return result;
+}
+
+DN_API DN_ArrayEraseResult DN_CArray2_EraseRange(void *data, DN_USize *size, DN_USize elem_size, DN_USize begin_index, DN_ISize count, DN_ArrayErase erase)
+{
+  DN_ArrayEraseResult result = {};
+  if (!data || !size || *size == 0 || count == 0)
+    return result;
+
+  // Compute the range to erase
+  DN_USize start = 0, end = 0;
+  if (count < 0) {
+    DN_USize abs_count = DN_Abs(count);
+    start = begin_index >= abs_count ? begin_index - abs_count + 1 : 0;
+    end   = begin_index >= abs_count ? begin_index + 1             : 0;
+  } else {
+    start = begin_index;
+    end   = begin_index + count;
+  }
+
+  // Clamp indices to valid bounds
+  start = DN_Min(start, *size);
+  end   = DN_Min(end,   *size);
+
+  // Erase the range [start, end)
+  DN_USize erase_count = end > start ? end - start : 0;
+  if (erase_count) {
+    char    *dest      = (char *)data + (elem_size * start);
+    char    *array_end = (char *)data + (elem_size * *size);
+    char    *src       = dest + (elem_size * erase_count);
+    if (erase == DN_ArrayErase_Stable) {
+      DN_USize move_size = array_end - src;
+      DN_Memmove(dest, src, move_size);
+    } else {
+      char    *unstable_src = array_end - (elem_size * erase_count);
+      DN_USize move_size    = array_end - unstable_src;
+      DN_Memcpy(dest, unstable_src, move_size);
+    }
+    *size -= erase_count;
+  }
+
+  result.items_erased = erase_count;
+  result.it_index     = start;
+  return result;
+}
+
+DN_API void *DN_CSLList_Detach(void **link, void **next)
+{
+  void *result = *link;
+  if (*link) {
+    *link = *next;
+    *next = nullptr;
+  }
+  return result;
+}
+
 DN_API bool DN_Ring_HasSpace(DN_Ring const *ring, DN_U64 size)
 {
   DN_U64 avail  = ring->write_pos - ring->read_pos;

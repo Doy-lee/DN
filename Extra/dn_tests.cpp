@@ -243,8 +243,7 @@ static DN_UTCore DN_Tests_Base()
   DN_RefImplCPUReport ref_cpu_report = DN_RefImplCPUReport_Init();
   DN_UT_LogF(&result, "DN_Base\n");
   {
-    DN_UT_Test(&result, "Query CPUID")
-    {
+    for (DN_UT_Test(&result, "Query CPUID")) {
       DN_CPUReport cpu_report = DN_CPU_Report();
 
       // NOTE: Sanity check our report against MSDN's example ////////////////////////////////////////
@@ -279,8 +278,8 @@ static DN_UTCore DN_Tests_Base()
       DN_UT_Assert(&result, DN_CPU_HasFeature(&cpu_report, DN_CPUFeature_SSE4A) == ref_cpu_report.SSE4a());
       DN_UT_Assert(&result, DN_CPU_HasFeature(&cpu_report, DN_CPUFeature_SSSE3) == ref_cpu_report.SSSE3());
 
-// NOTE: Feature flags we haven't bothered detecting yet but are in MSDN's example /////////////
-#if 0
+  // NOTE: Feature flags we haven't bothered detecting yet but are in MSDN's example /////////////
+  #if 0
             DN_UT_Assert(&result, DN_CPU_HasFeature(&cpu_report, DN_CPUFeature_ADX)         == DN_RefImplCPUReport::ADX());
             DN_UT_Assert(&result, DN_CPU_HasFeature(&cpu_report, DN_CPUFeature_BMI1)        == DN_RefImplCPUReport::BMI1());
             DN_UT_Assert(&result, DN_CPU_HasFeature(&cpu_report, DN_CPUFeature_BMI2)        == DN_RefImplCPUReport::BMI2());
@@ -302,7 +301,7 @@ static DN_UTCore DN_Tests_Base()
             DN_UT_Assert(&result, DN_CPU_HasFeature(&cpu_report, DN_CPUFeature_TBM)         == DN_RefImplCPUReport::TBM());
             DN_UT_Assert(&result, DN_CPU_HasFeature(&cpu_report, DN_CPUFeature_XOP)         == DN_RefImplCPUReport::XOP());
             DN_UT_Assert(&result, DN_CPU_HasFeature(&cpu_report, DN_CPUFeature_XSAVE)       == DN_RefImplCPUReport::XSAVE());
-#endif
+  #endif
     }
   }
 #endif // defined(DN_PLATFORM_WIN32) && defined(DN_COMPILER_MSVC)
@@ -314,8 +313,7 @@ static DN_UTCore DN_Tests_Arena()
   DN_UTCore result = DN_UT_Init();
   DN_UT_LogF(&result, "DN_Arena\n");
   {
-    DN_UT_Test(&result, "Reused memory is zeroed out")
-    {
+    for (DN_UT_Test(&result, "Reused memory is zeroed out")) {
       uint8_t  alignment  = 1;
       DN_USize alloc_size = DN_Kilobytes(128);
       DN_Arena arena      = DN_Arena_InitFromOSVMem(0, 0, DN_ArenaFlags_Nil);
@@ -345,8 +343,7 @@ static DN_UTCore DN_Tests_Arena()
         DN_UT_Assert(&result, ptr[i] == 0);
     }
 
-    DN_UT_Test(&result, "Test arena grows naturally, 1mb + 4mb")
-    {
+    for (DN_UT_Test(&result, "Test arena grows naturally, 1mb + 4mb")) {
       // NOTE: Allocate 1mb, then 4mb, this should force the arena to grow
       DN_Arena arena = DN_Arena_InitFromOSVMem(DN_Megabytes(2), DN_Megabytes(2), DN_ArenaFlags_Nil);
       DN_DEFER
@@ -371,8 +368,7 @@ static DN_UTCore DN_Tests_Arena()
       DN_UT_AssertF(&result, ptr_4mb >= DN_CAST(char *) block_4mb_begin && ptr_4mb <= block_4mb_end, "Pointer was not allocated from correct memory block");
     }
 
-    DN_UT_Test(&result, "Test arena grows naturally, 1mb, temp memory 4mb")
-    {
+    for (DN_UT_Test(&result, "Test arena grows naturally, 1mb, temp memory 4mb")) {
       DN_Arena arena = DN_Arena_InitFromOSVMem(DN_Megabytes(2), DN_Megabytes(2), DN_ArenaFlags_Nil);
       DN_DEFER
       {
@@ -401,11 +397,11 @@ static DN_UTCore DN_Tests_Arena()
       DN_Arena_TempMemEnd(temp_memory);
       DN_UT_Assert(&result, arena.curr->prev == nullptr);
       DN_UT_AssertF(&result,
-                       arena.curr->reserve >= DN_Megabytes(1),
-                       "size=%" PRIu64 "MiB (%" PRIu64 "B), expect=%" PRIu64 "B",
-                       (arena.curr->reserve / 1024 / 1024),
-                       arena.curr->reserve,
-                       DN_Megabytes(1));
+                    arena.curr->reserve >= DN_Megabytes(1),
+                    "size=%" PRIu64 "MiB (%" PRIu64 "B), expect=%" PRIu64 "B",
+                    (arena.curr->reserve / 1024 / 1024),
+                    arena.curr->reserve,
+                    DN_Megabytes(1));
     }
   }
   return result;
@@ -417,94 +413,80 @@ static DN_UTCore DN_Tests_Bin()
   DN_UTCore    test = DN_UT_Init();
   DN_UT_LogF(&test, "DN_Bin\n");
   {
-    DN_UT_Test(&test, "Convert 0x123")
-    {
+    for (DN_UT_Test(&test, "Convert 0x123")) {
       uint64_t result = DN_CVT_HexToU64(DN_STR8("0x123"));
       DN_UT_AssertF(&test, result == 0x123, "result: %" PRIu64, result);
     }
 
-    DN_UT_Test(&test, "Convert 0xFFFF")
-    {
+    for (DN_UT_Test(&test, "Convert 0xFFFF")) {
       uint64_t result = DN_CVT_HexToU64(DN_STR8("0xFFFF"));
       DN_UT_AssertF(&test, result == 0xFFFF, "result: %" PRIu64, result);
     }
 
-    DN_UT_Test(&test, "Convert FFFF")
-    {
+    for (DN_UT_Test(&test, "Convert FFFF")) {
       uint64_t result = DN_CVT_HexToU64(DN_STR8("FFFF"));
       DN_UT_AssertF(&test, result == 0xFFFF, "result: %" PRIu64, result);
     }
 
-    DN_UT_Test(&test, "Convert abCD")
-    {
+    for (DN_UT_Test(&test, "Convert abCD")) {
       uint64_t result = DN_CVT_HexToU64(DN_STR8("abCD"));
       DN_UT_AssertF(&test, result == 0xabCD, "result: %" PRIu64, result);
     }
 
-    DN_UT_Test(&test, "Convert 0xabCD")
-    {
+    for (DN_UT_Test(&test, "Convert 0xabCD")) {
       uint64_t result = DN_CVT_HexToU64(DN_STR8("0xabCD"));
       DN_UT_AssertF(&test, result == 0xabCD, "result: %" PRIu64, result);
     }
 
-    DN_UT_Test(&test, "Convert 0x")
-    {
+    for (DN_UT_Test(&test, "Convert 0x")) {
       uint64_t result = DN_CVT_HexToU64(DN_STR8("0x"));
       DN_UT_AssertF(&test, result == 0x0, "result: %" PRIu64, result);
     }
 
-    DN_UT_Test(&test, "Convert 0X")
-    {
+    for (DN_UT_Test(&test, "Convert 0X")) {
       uint64_t result = DN_CVT_HexToU64(DN_STR8("0X"));
       DN_UT_AssertF(&test, result == 0x0, "result: %" PRIu64, result);
     }
 
-    DN_UT_Test(&test, "Convert 3")
-    {
+    for (DN_UT_Test(&test, "Convert 3")) {
       uint64_t result = DN_CVT_HexToU64(DN_STR8("3"));
       DN_UT_AssertF(&test, result == 3, "result: %" PRIu64, result);
     }
 
-    DN_UT_Test(&test, "Convert f")
-    {
+    for (DN_UT_Test(&test, "Convert f")) {
       uint64_t result = DN_CVT_HexToU64(DN_STR8("f"));
       DN_UT_AssertF(&test, result == 0xf, "result: %" PRIu64, result);
     }
 
-    DN_UT_Test(&test, "Convert g")
-    {
+    for (DN_UT_Test(&test, "Convert g")) {
       uint64_t result = DN_CVT_HexToU64(DN_STR8("g"));
       DN_UT_AssertF(&test, result == 0, "result: %" PRIu64, result);
     }
 
-    DN_UT_Test(&test, "Convert -0x3")
-    {
+    for (DN_UT_Test(&test, "Convert -0x3")) {
       uint64_t result = DN_CVT_HexToU64(DN_STR8("-0x3"));
       DN_UT_AssertF(&test, result == 0, "result: %" PRIu64, result);
     }
 
     uint32_t number = 0xd095f6;
-    DN_UT_Test(&test, "Convert %x to string", number)
-    {
+    for (DN_UT_Test(&test, "Convert %x to string", number)) {
       DN_Str8 number_hex = DN_CVT_BytesToHex(tmem.arena, &number, sizeof(number));
       DN_UT_AssertF(&test, DN_Str8_Eq(number_hex, DN_STR8("f695d000")), "number_hex=%.*s", DN_STR_FMT(number_hex));
     }
 
     number = 0xf6ed00;
-    DN_UT_Test(&test, "Convert %x to string", number)
-    {
+    for (DN_UT_Test(&test, "Convert %x to string", number)) {
       DN_Str8 number_hex = DN_CVT_BytesToHex(tmem.arena, &number, sizeof(number));
       DN_UT_AssertF(&test, DN_Str8_Eq(number_hex, DN_STR8("00edf600")), "number_hex=%.*s", DN_STR_FMT(number_hex));
     }
 
     DN_Str8 hex = DN_STR8("0xf6ed00");
-    DN_UT_Test(&test, "Convert %.*s to bytes", DN_STR_FMT(hex))
-    {
+    for (DN_UT_Test(&test, "Convert %.*s to bytes", DN_STR_FMT(hex))) {
       DN_Str8 bytes = DN_CVT_HexToBytes(tmem.arena, hex);
       DN_UT_AssertF(&test,
-                       DN_Str8_Eq(bytes, DN_STR8("\xf6\xed\x00")),
-                       "number_hex=%.*s",
-                       DN_STR_FMT(DN_CVT_BytesToHex(tmem.arena, bytes.data, bytes.size)));
+                    DN_Str8_Eq(bytes, DN_STR8("\xf6\xed\x00")),
+                    "number_hex=%.*s",
+                    DN_STR_FMT(DN_CVT_BytesToHex(tmem.arena, bytes.data, bytes.size)));
     }
   }
   return test;
@@ -515,8 +497,7 @@ static DN_UTCore DN_Tests_BinarySearch()
   DN_UTCore result = DN_UT_Init();
   DN_UT_LogF(&result, "DN_BinarySearch\n");
   {
-    DN_UT_Test(&result, "Search array of 1 item")
-    {
+    for (DN_UT_Test(&result, "Search array of 1 item")) {
       uint32_t              array[] = {1};
       DN_BinarySearchResult search  = {};
 
@@ -560,8 +541,7 @@ static DN_UTCore DN_Tests_BinarySearch()
       DN_UT_Assert(&result, search.index == 1);
     }
 
-    DN_UT_Test(&result, "Search array of 2 items")
-    {
+    for (DN_UT_Test(&result, "Search array of 2 items")) {
       uint32_t              array[] = {1};
       DN_BinarySearchResult search  = {};
 
@@ -605,8 +585,7 @@ static DN_UTCore DN_Tests_BinarySearch()
       DN_UT_Assert(&result, search.index == 1);
     }
 
-    DN_UT_Test(&result, "Search array of 3 items")
-    {
+    for (DN_UT_Test(&result, "Search array of 3 items")) {
       uint32_t              array[] = {1, 2, 3};
       DN_BinarySearchResult search  = {};
 
@@ -674,8 +653,7 @@ static DN_UTCore DN_Tests_BinarySearch()
       DN_UT_Assert(&result, search.index == 3);
     }
 
-    DN_UT_Test(&result, "Search array of 4 items")
-    {
+    for (DN_UT_Test(&result, "Search array of 4 items")) {
       uint32_t              array[] = {1, 2, 3, 4};
       DN_BinarySearchResult search  = {};
 
@@ -755,8 +733,7 @@ static DN_UTCore DN_Tests_BinarySearch()
       DN_UT_Assert(&result, search.index == 4);
     }
 
-    DN_UT_Test(&result, "Search array with duplicate items")
-    {
+    for (DN_UT_Test(&result, "Search array with duplicate items")) {
       uint32_t              array[] = {1, 1, 2, 2, 3};
       DN_BinarySearchResult search  = {};
 
@@ -823,9 +800,10 @@ static DN_UTCore DN_Tests_BinarySearch()
   return result;
 }
 
-static DN_UTCore DN_Tests_DSMap()
+static DN_UTCore DN_Tests_BaseContainers()
 {
   DN_UTCore result = DN_UT_Init();
+
   DN_UT_LogF(&result, "DN_DSMap\n");
   {
     DN_OSTLSTMem tmem = DN_OS_TLSTMem(nullptr);
@@ -838,8 +816,7 @@ static DN_UTCore DN_Tests_DSMap()
         DN_DSMap_Deinit(&map, DN_ZeroMem_Yes);
       };
 
-      DN_UT_Test(&result, "Find non-existent value")
-      {
+      for (DN_UT_Test(&result, "Find non-existent value")) {
         DN_DSMapResult<uint64_t> find = DN_DSMap_FindKeyStr8(&map, DN_STR8("Foo"));
         DN_UT_Assert(&result, !find.found);
         DN_UT_Assert(&result, map.size == MAP_SIZE);
@@ -848,8 +825,7 @@ static DN_UTCore DN_Tests_DSMap()
       }
 
       DN_DSMapKey key = DN_DSMap_KeyCStr8(&map, "Bar");
-      DN_UT_Test(&result, "Insert value and lookup")
-      {
+      for (DN_UT_Test(&result, "Insert value and lookup")) {
         uint64_t  desired_value = 0xF00BAA;
         uint64_t *slot_value    = DN_DSMap_Set(&map, key, desired_value).value;
         DN_UT_Assert(&result, slot_value);
@@ -862,8 +838,7 @@ static DN_UTCore DN_Tests_DSMap()
         DN_UT_Assert(&result, *value == desired_value);
       }
 
-      DN_UT_Test(&result, "Remove key")
-      {
+      for (DN_UT_Test(&result, "Remove key")) {
         DN_DSMap_Erase(&map, key);
         DN_UT_Assert(&result, map.size == MAP_SIZE);
         DN_UT_Assert(&result, map.initial_size == MAP_SIZE);
@@ -894,8 +869,7 @@ static DN_UTCore DN_Tests_DSMap()
         DN_DSMap_Deinit(&map, DN_ZeroMem_Yes);
       };
 
-      DN_UT_Test(&result, "%.*s: Test growing", DN_STR_FMT(prefix))
-      {
+      for (DN_UT_Test(&result, "%.*s: Test growing", DN_STR_FMT(prefix))) {
         uint64_t map_start_size = map.size;
         uint64_t value          = 0;
         uint64_t grow_threshold = map_start_size * 3 / 4;
@@ -930,21 +904,19 @@ static DN_UTCore DN_Tests_DSMap()
         }
       }
 
-      DN_UT_Test(&result, "%.*s: Check the sentinel is present", DN_STR_FMT(prefix))
-      {
+      for (DN_UT_Test(&result, "%.*s: Check the sentinel is present", DN_STR_FMT(prefix))) {
         DN_DSMapSlot<uint64_t> NIL_SLOT = {};
         DN_DSMapSlot<uint64_t> sentinel = map.slots[DN_DS_MAP_SENTINEL_SLOT];
         DN_UT_Assert(&result, DN_Memcmp(&sentinel, &NIL_SLOT, sizeof(NIL_SLOT)) == 0);
       }
 
-      DN_UT_Test(&result, "%.*s: Recheck all the hash tables values after growing", DN_STR_FMT(prefix))
-      {
+      for (DN_UT_Test(&result, "%.*s: Recheck all the hash tables values after growing", DN_STR_FMT(prefix))) {
         for (uint64_t index = 1 /*Sentinel*/; index < map.occupied; index++) {
           DN_DSMapSlot<uint64_t> const *slot = map.slots + index;
 
           // NOTE: Validate each slot value
           uint64_t    value_result = index - 1;
-          DN_DSMapKey key        = DN_DSMap_KeyU64(&map, value_result);
+          DN_DSMapKey key          = DN_DSMap_KeyU64(&map, value_result);
           DN_UT_Assert(&result, DN_DSMap_KeyEquals(slot->key, key));
           if (result_type == DSMapTestType_Set)
             DN_UT_Assert(&result, slot->value == value_result);
@@ -958,8 +930,7 @@ static DN_UTCore DN_Tests_DSMap()
         }
       }
 
-      DN_UT_Test(&result, "%.*s: Test shrinking", DN_STR_FMT(prefix))
-      {
+      for (DN_UT_Test(&result, "%.*s: Test shrinking", DN_STR_FMT(prefix))) {
         uint64_t start_map_size     = map.size;
         uint64_t start_map_occupied = map.occupied;
         uint64_t value              = 0;
@@ -992,7 +963,7 @@ static DN_UTCore DN_Tests_DSMap()
         for (uint64_t index = 1 /*Sentinel*/; index < map.occupied; index++) {
           // NOTE: Generate the key
           uint64_t    value_result = value + (index - 1);
-          DN_DSMapKey key        = DN_DSMap_KeyU64(&map, value_result);
+          DN_DSMapKey key          = DN_DSMap_KeyU64(&map, value_result);
 
           // NOTE: Validate each slot value
           DN_DSMapResult<uint64_t> find_result = DN_DSMap_Find(&map, key);
@@ -1021,36 +992,156 @@ static DN_UTCore DN_Tests_DSMap()
       }
     }
   }
-  return result;
-}
 
-static DN_UTCore DN_Tests_FStr8()
-{
-  DN_UTCore result = DN_UT_Init();
-  DN_UT_LogF(&result, "DN_FStr8\n");
+  DN_UT_LogF(&result, "DN_IArray\n");
   {
-    DN_UT_Test(&result, "Append too much fails")
+    struct CustomArray
     {
-      DN_FStr8<4> str = {};
-      DN_UT_Assert(&result, !DN_FStr8_Add(&str, DN_STR8("abcde")));
-    }
+      int     *data;
+      DN_USize size;
+      DN_USize max;
+    };
 
-    DN_UT_Test(&result, "Append format string too much fails")
-    {
-      DN_FStr8<4> str = {};
-      DN_UT_Assert(&result, !DN_FStr8_AddF(&str, "abcde"));
+    int         array_buffer[16];
+    CustomArray array = {};
+    array.data        = array_buffer;
+    array.max         = DN_ArrayCountU(array_buffer);
+
+    for (DN_UT_Test(&result, "Make item")) {
+      int *item = DN_IArray_Make(&array, DN_ZeroMem_Yes);
+      DN_UT_Assert(&result, item && array.size == 1);
     }
   }
-  return result;
-}
 
-static DN_UTCore DN_Tests_FArray()
-{
-  DN_UTCore result = DN_UT_Init();
+  DN_UT_LogF(&result, "DN_CArray2");
+  {
+    for (DN_UT_Test(&result, "Positive count, middle of array, stable erase")) {
+      int                 arr[]      = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+      DN_USize            size       = 10;
+      DN_ArrayEraseResult erase      = DN_CArray2_EraseRange(arr, &size, sizeof(arr[0]), 3, 2, DN_ArrayErase_Stable);
+      int                 expected[] = {0, 1, 2, 5, 6, 7, 8, 9};
+      DN_UT_Assert(&result, erase.items_erased == 2);
+      DN_UT_Assert(&result, erase.it_index == 3);
+      DN_UT_Assert(&result, size == 8);
+      DN_UT_Assert(&result, DN_Memcmp(arr, expected, size * sizeof(arr[0])) == 0);
+    }
+
+    for (DN_UT_Test(&result, "Negative count, middle of array, stable erase")) {
+      int                 arr[]      = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+      DN_USize            size       = 10;
+      DN_ArrayEraseResult erase      = DN_CArray2_EraseRange(arr, &size, sizeof(arr[0]), 5, -3, DN_ArrayErase_Stable);
+      int                 expected[] = {0, 1, 2, 6, 7, 8, 9};
+      DN_UT_Assert(&result, erase.items_erased == 3);
+      DN_UT_Assert(&result, erase.it_index == 3);
+      DN_UT_Assert(&result, size == 7);
+      DN_UT_Assert(&result, DN_Memcmp(arr, expected, size * sizeof(arr[0])) == 0);
+    }
+
+    for (DN_UT_Test(&result, "count = -1, stable erase")) {
+      int                 arr[]      = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+      DN_USize            size       = 10;
+      DN_ArrayEraseResult erase      = DN_CArray2_EraseRange(arr, &size, sizeof(arr[0]), 5, -1, DN_ArrayErase_Stable);
+      int                 expected[] = {0, 1, 2, 3, 4, 6, 7, 8, 9};
+      DN_UT_Assert(&result, erase.items_erased == 1);
+      DN_UT_Assert(&result, erase.it_index == 5);
+      DN_UT_Assert(&result, size == 9);
+      DN_UT_Assert(&result, DN_Memcmp(arr, expected, size * sizeof(arr[0])) == 0);
+    }
+
+    for (DN_UT_Test(&result, "Positive count, unstable erase")) {
+      int                 arr[]      = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+      DN_USize            size       = 10;
+      DN_ArrayEraseResult erase      = DN_CArray2_EraseRange(arr, &size, sizeof(arr[0]), 3, 2, DN_ArrayErase_Unstable);
+      int                 expected[] = {0, 1, 2, 8, 9, 5, 6, 7};
+      DN_UT_Assert(&result, erase.items_erased == 2);
+      DN_UT_Assert(&result, erase.it_index == 3);
+      DN_UT_Assert(&result, size == 8);
+      DN_UT_Assert(&result, DN_Memcmp(arr, expected, size * sizeof(arr[0])) == 0);
+    }
+
+    for (DN_UT_Test(&result, "Negative count, unstable erase")) {
+      int                 arr[]      = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+      DN_USize            size       = 10;
+      DN_ArrayEraseResult erase      = DN_CArray2_EraseRange(arr, &size, sizeof(arr[0]), 5, -3, DN_ArrayErase_Unstable);
+      int                 expected[] = {0, 1, 2, 7, 8, 9, 6};
+      DN_UT_Assert(&result, erase.items_erased == 3);
+      DN_UT_Assert(&result, erase.it_index == 3);
+      DN_UT_Assert(&result, size == 7);
+      DN_UT_Assert(&result, DN_Memcmp(arr, expected, size * sizeof(arr[0])) == 0);
+    }
+
+    for (DN_UT_Test(&result, "Edge case - begin_index at start, negative count")) {
+      int                 arr[]      = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+      DN_USize            size       = 10;
+      DN_ArrayEraseResult erase      = DN_CArray2_EraseRange(arr, &size, sizeof(arr[0]), 0, -2, DN_ArrayErase_Stable);
+      int                 expected[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+      DN_UT_Assert(&result, erase.items_erased == 0);
+      DN_UT_Assert(&result, erase.it_index == 0);
+      DN_UT_Assert(&result, size == 10);
+      DN_UT_Assert(&result, DN_Memcmp(arr, expected, size * sizeof(arr[0])) == 0);
+    }
+
+    for (DN_UT_Test(&result, "Edge case - begin_index at end, positive count")) {
+      int                 arr[]      = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+      DN_USize            size       = 10;
+      DN_ArrayEraseResult erase      = DN_CArray2_EraseRange(arr, &size, sizeof(arr[0]), 9, 2, DN_ArrayErase_Stable);
+      int                 expected[] = {0, 1, 2, 3, 4, 5, 6, 7, 8};
+      DN_UT_Assert(&result, erase.items_erased == 1);
+      DN_UT_Assert(&result, erase.it_index == 9);
+      DN_UT_Assert(&result, size == 9);
+      DN_UT_Assert(&result, DN_Memcmp(arr, expected, size * sizeof(arr[0])) == 0);
+    }
+
+    for (DN_UT_Test(&result, "Invalid input - count = 0")) {
+      int                 arr[]      = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+      DN_USize            size       = 10;
+      DN_ArrayEraseResult erase      = DN_CArray2_EraseRange(arr, &size, sizeof(arr[0]), 5, 0, DN_ArrayErase_Stable);
+      int                 expected[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+      DN_UT_Assert(&result, erase.items_erased == 0);
+      DN_UT_Assert(&result, erase.it_index == 0);
+      DN_UT_Assert(&result, size == 10);
+      DN_UT_Assert(&result, DN_Memcmp(arr, expected, size * sizeof(arr[0])) == 0);
+    }
+
+    for (DN_UT_Test(&result, "Invalid input - null data")) {
+      DN_USize            size  = 10;
+      DN_ArrayEraseResult erase = DN_CArray2_EraseRange(nullptr, &size, sizeof(int), 5, 2, DN_ArrayErase_Stable);
+      DN_UT_Assert(&result, erase.items_erased == 0);
+      DN_UT_Assert(&result, erase.it_index == 0);
+      DN_UT_Assert(&result, size == 10);
+    }
+
+    for (DN_UT_Test(&result, "Invalid input - null size")) {
+      int                 arr[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+      DN_ArrayEraseResult erase = DN_CArray2_EraseRange(arr, NULL, sizeof(arr[0]), 5, 2, DN_ArrayErase_Stable);
+      DN_UT_Assert(&result, erase.items_erased == 0);
+      DN_UT_Assert(&result, erase.it_index == 0);
+    }
+
+    for (DN_UT_Test(&result, "Invalid input - empty array")) {
+      int                 arr[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+      DN_USize            size  = 0;
+      DN_ArrayEraseResult erase = DN_CArray2_EraseRange(arr, &size, sizeof(arr[0]), 5, 2, DN_ArrayErase_Stable);
+      DN_UT_Assert(&result, erase.items_erased == 0);
+      DN_UT_Assert(&result, erase.it_index == 0);
+      DN_UT_Assert(&result, size == 0);
+    }
+
+    for (DN_UT_Test(&result, "Out-of-bounds begin_index")) {
+      int                 arr[]      = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+      DN_USize            size       = 10;
+      DN_ArrayEraseResult erase      = DN_CArray2_EraseRange(arr, &size, sizeof(arr[0]), 15, 2, DN_ArrayErase_Stable);
+      int                 expected[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+      DN_UT_Assert(&result, erase.items_erased == 0);
+      DN_UT_Assert(&result, erase.it_index == 10);
+      DN_UT_Assert(&result, size == 10);
+      DN_UT_Assert(&result, DN_Memcmp(arr, expected, size * sizeof(arr[0])) == 0);
+    }
+  }
+
   DN_UT_LogF(&result, "DN_FArray\n");
   {
-    DN_UT_Test(&result, "Initialise from raw array")
-    {
+    for (DN_UT_Test(&result, "Initialise from raw array")) {
       int  raw_array[] = {1, 2};
       auto array       = DN_FArray_Init<int, 4>(raw_array, DN_ArrayCountU(raw_array));
       DN_UT_Assert(&result, array.size == 2);
@@ -1058,8 +1149,7 @@ static DN_UTCore DN_Tests_FArray()
       DN_UT_Assert(&result, array.data[1] == 2);
     }
 
-    DN_UT_Test(&result, "Erase stable 1 element from array")
-    {
+    for (DN_UT_Test(&result, "Erase stable 1 element from array")) {
       int  raw_array[] = {1, 2, 3};
       auto array       = DN_FArray_Init<int, 4>(raw_array, DN_ArrayCountU(raw_array));
       DN_FArray_EraseRange(&array, 1 /*begin_index*/, 1 /*count*/, DN_ArrayErase_Stable);
@@ -1068,8 +1158,7 @@ static DN_UTCore DN_Tests_FArray()
       DN_UT_Assert(&result, array.data[1] == 3);
     }
 
-    DN_UT_Test(&result, "Erase unstable 1 element from array")
-    {
+    for (DN_UT_Test(&result, "Erase unstable 1 element from array")) {
       int  raw_array[] = {1, 2, 3};
       auto array       = DN_FArray_Init<int, 4>(raw_array, DN_ArrayCountU(raw_array));
       DN_FArray_EraseRange(&array, 0 /*begin_index*/, 1 /*count*/, DN_ArrayErase_Unstable);
@@ -1078,8 +1167,7 @@ static DN_UTCore DN_Tests_FArray()
       DN_UT_Assert(&result, array.data[1] == 2);
     }
 
-    DN_UT_Test(&result, "Add 1 element to array")
-    {
+    for (DN_UT_Test(&result, "Add 1 element to array")) {
       int const ITEM        = 2;
       int       raw_array[] = {1};
       auto      array       = DN_FArray_Init<int, 4>(raw_array, DN_ArrayCountU(raw_array));
@@ -1089,12 +1177,174 @@ static DN_UTCore DN_Tests_FArray()
       DN_UT_Assert(&result, array.data[1] == ITEM);
     }
 
-    DN_UT_Test(&result, "Clear array")
-    {
+    for (DN_UT_Test(&result, "Clear array")) {
       int  raw_array[] = {1};
       auto array       = DN_FArray_Init<int, 4>(raw_array, DN_ArrayCountU(raw_array));
       DN_FArray_Clear(&array);
       DN_UT_Assert(&result, array.size == 0);
+    }
+  }
+
+  DN_UT_LogF(&result, "DN_VArray\n");
+  {
+    {
+      DN_VArray<uint32_t> array = DN_VArray_InitByteSize<uint32_t>(DN_Kilobytes(64));
+      DN_DEFER
+      {
+        DN_VArray_Deinit(&array);
+      };
+
+      for (DN_UT_Test(&result, "Test adding an array of items to the array")) {
+        uint32_t array_literal[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
+        DN_VArray_AddArray<uint32_t>(&array, array_literal, DN_ArrayCountU(array_literal));
+        DN_UT_Assert(&result, array.size == DN_ArrayCountU(array_literal));
+        DN_UT_Assert(&result, DN_Memcmp(array.data, array_literal, DN_ArrayCountU(array_literal) * sizeof(array_literal[0])) == 0);
+      }
+
+      for (DN_UT_Test(&result, "Test stable erase, 1 item, the '2' value from the array")) {
+        DN_VArray_EraseRange(&array, 2 /*begin_index*/, 1 /*count*/, DN_ArrayErase_Stable);
+        uint32_t array_literal[] = {0, 1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
+        DN_UT_Assert(&result, array.size == DN_ArrayCountU(array_literal));
+        DN_UT_Assert(&result, DN_Memcmp(array.data, array_literal, DN_ArrayCountU(array_literal) * sizeof(array_literal[0])) == 0);
+      }
+
+      for (DN_UT_Test(&result, "Test unstable erase, 1 item, the '1' value from the array")) {
+        DN_VArray_EraseRange(&array, 1 /*begin_index*/, 1 /*count*/, DN_ArrayErase_Unstable);
+        uint32_t array_literal[] = {0, 15, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14};
+        DN_UT_Assert(&result, array.size == DN_ArrayCountU(array_literal));
+        DN_UT_Assert(&result, DN_Memcmp(array.data, array_literal, DN_ArrayCountU(array_literal) * sizeof(array_literal[0])) == 0);
+      }
+
+      DN_ArrayErase erase_enums[] = {DN_ArrayErase_Stable, DN_ArrayErase_Unstable};
+      for (DN_UT_Test(&result, "Test un/stable erase, OOB")) {
+        for (DN_ArrayErase erase : erase_enums) {
+          uint32_t array_literal[] = {0, 15, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14};
+          DN_VArray_EraseRange(&array, DN_ArrayCountU(array_literal) /*begin_index*/, DN_ArrayCountU(array_literal) + 100 /*count*/, erase);
+          DN_UT_Assert(&result, array.size == DN_ArrayCountU(array_literal));
+          DN_UT_Assert(&result, DN_Memcmp(array.data, array_literal, DN_ArrayCountU(array_literal) * sizeof(array_literal[0])) == 0);
+        }
+      }
+
+      for (DN_UT_Test(&result, "Test flipped begin/end index stable erase, 2 items, the '15, 3' value from the array")) {
+        DN_VArray_EraseRange(&array, 2 /*begin_index*/, -2 /*count*/, DN_ArrayErase_Stable);
+        uint32_t array_literal[] = {0, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14};
+        DN_UT_Assert(&result, array.size == DN_ArrayCountU(array_literal));
+        DN_UT_Assert(&result, DN_Memcmp(array.data, array_literal, DN_ArrayCountU(array_literal) * sizeof(array_literal[0])) == 0);
+      }
+
+      for (DN_UT_Test(&result, "Test flipped begin/end index unstable erase, 2 items, the '4, 5' value from the array")) {
+        DN_VArray_EraseRange(&array, 2 /*begin_index*/, -2 /*count*/, DN_ArrayErase_Unstable);
+        uint32_t array_literal[] = {0, 13, 14, 6, 7, 8, 9, 10, 11, 12};
+        DN_UT_Assert(&result, array.size == DN_ArrayCountU(array_literal));
+        DN_UT_Assert(&result, DN_Memcmp(array.data, array_literal, DN_ArrayCountU(array_literal) * sizeof(array_literal[0])) == 0);
+      }
+
+      for (DN_UT_Test(&result, "Test stable erase range, 2+1 (oob) item, the '13, 14, +1 OOB' value from the array")) {
+        DN_VArray_EraseRange(&array, 8 /*begin_index*/, 3 /*count*/, DN_ArrayErase_Stable);
+        uint32_t array_literal[] = {0, 13, 14, 6, 7, 8, 9, 10};
+        DN_UT_Assert(&result, array.size == DN_ArrayCountU(array_literal));
+        DN_UT_Assert(&result, DN_Memcmp(array.data, array_literal, DN_ArrayCountU(array_literal) * sizeof(array_literal[0])) == 0);
+      }
+
+      for (DN_UT_Test(&result, "Test unstable erase range, 3+1 (oob) item, the '11, 12, +1 OOB' value from the array")) {
+        DN_VArray_EraseRange(&array, 6 /*begin_index*/, 3 /*count*/, DN_ArrayErase_Unstable);
+        uint32_t array_literal[] = {0, 13, 14, 6, 7, 8};
+        DN_UT_Assert(&result, array.size == DN_ArrayCountU(array_literal));
+        DN_UT_Assert(&result, DN_Memcmp(array.data, array_literal, DN_ArrayCountU(array_literal) * sizeof(array_literal[0])) == 0);
+      }
+
+      for (DN_UT_Test(&result, "Test stable erase -overflow OOB, erasing the '0, 13' value from the array")) {
+        DN_VArray_EraseRange(&array, 1 /*begin_index*/, -DN_ISIZE_MAX /*count*/, DN_ArrayErase_Stable);
+        uint32_t array_literal[] = {14, 6, 7, 8};
+        DN_UT_Assert(&result, array.size == DN_ArrayCountU(array_literal));
+        DN_UT_Assert(&result, DN_Memcmp(array.data, array_literal, DN_ArrayCountU(array_literal) * sizeof(array_literal[0])) == 0);
+      }
+
+      for (DN_UT_Test(&result, "Test unstable erase +overflow OOB, erasing the '7, 8' value from the array")) {
+        DN_VArray_EraseRange(&array, 2 /*begin_index*/, DN_ISIZE_MAX /*count*/, DN_ArrayErase_Unstable);
+        uint32_t array_literal[] = {14, 6};
+        DN_UT_Assert(&result, array.size == DN_ArrayCountU(array_literal));
+        DN_UT_Assert(&result, DN_Memcmp(array.data, array_literal, DN_ArrayCountU(array_literal) * sizeof(array_literal[0])) == 0);
+      }
+
+      for (DN_UT_Test(&result, "Test adding an array of items after erase")) {
+        uint32_t array_literal[] = {0, 1, 2, 3};
+        DN_VArray_AddArray<uint32_t>(&array, array_literal, DN_ArrayCountU(array_literal));
+
+        uint32_t expected_literal[] = {14, 6, 0, 1, 2, 3};
+        DN_UT_Assert(&result, array.size == DN_ArrayCountU(expected_literal));
+        DN_UT_Assert(&result, DN_Memcmp(array.data, expected_literal, DN_ArrayCountU(expected_literal) * sizeof(expected_literal[0])) == 0);
+      }
+    }
+
+    for (DN_UT_Test(&result, "Array of unaligned objects are contiguously laid out in memory")) {
+      // NOTE: Since we allocate from a virtual memory block, each time
+      // we request memory from the block we can demand some alignment
+      // on the returned pointer from the memory block. If there's
+      // additional alignment done in that function then we can no
+      // longer access the items in the array contiguously leading to
+      // confusing memory "corruption" errors.
+      //
+      // This result makes sure that the unaligned objects are allocated
+      // from the memory block (and hence the array) contiguously
+      // when the size of the object is not aligned with the required
+      // alignment of the object.
+      DN_MSVC_WARNING_PUSH
+      DN_MSVC_WARNING_DISABLE(4324) // warning C4324: 'TestVArray::UnalignedObject': structure was padded due to alignment specifier
+
+      struct alignas(8) UnalignedObject
+      {
+        char data[511];
+      };
+
+      DN_MSVC_WARNING_POP
+
+      DN_VArray<UnalignedObject> array = DN_VArray_InitByteSize<UnalignedObject>(DN_Kilobytes(64));
+      DN_DEFER
+      {
+        DN_VArray_Deinit(&array);
+      };
+
+      // NOTE: Verify that the items returned from the data array are
+      // contiguous in memory.
+      UnalignedObject *make_item_a = DN_VArray_MakeArray(&array, 1, DN_ZeroMem_Yes);
+      UnalignedObject *make_item_b = DN_VArray_MakeArray(&array, 1, DN_ZeroMem_Yes);
+      DN_Memset(make_item_a->data, 'a', sizeof(make_item_a->data));
+      DN_Memset(make_item_b->data, 'b', sizeof(make_item_b->data));
+      DN_UT_Assert(&result, (uintptr_t)make_item_b == (uintptr_t)(make_item_a + 1));
+
+      // NOTE: Verify that accessing the items from the data array yield
+      // the same object.
+      DN_UT_Assert(&result, array.size == 2);
+      UnalignedObject *data_item_a = array.data + 0;
+      UnalignedObject *data_item_b = array.data + 1;
+      DN_UT_Assert(&result, (uintptr_t)data_item_b == (uintptr_t)(data_item_a + 1));
+      DN_UT_Assert(&result, (uintptr_t)data_item_b == (uintptr_t)(make_item_a + 1));
+      DN_UT_Assert(&result, (uintptr_t)data_item_b == (uintptr_t)make_item_b);
+
+      for (DN_USize i = 0; i < sizeof(data_item_a->data); i++)
+        DN_UT_Assert(&result, data_item_a->data[i] == 'a');
+
+      for (DN_USize i = 0; i < sizeof(data_item_b->data); i++)
+        DN_UT_Assert(&result, data_item_b->data[i] == 'b');
+    }
+  }
+  return result;
+}
+
+static DN_UTCore DN_Tests_FStr8()
+{
+  DN_UTCore result = DN_UT_Init();
+  DN_UT_LogF(&result, "DN_FStr8\n");
+  {
+    for (DN_UT_Test(&result, "Append too much fails")) {
+      DN_FStr8<4> str = {};
+      DN_UT_Assert(&result, !DN_FStr8_Add(&str, DN_STR8("abcde")));
+    }
+
+    for (DN_UT_Test(&result, "Append format string too much fails")) {
+      DN_FStr8<4> str = {};
+      DN_UT_Assert(&result, !DN_FStr8_AddF(&str, "abcde"));
     }
   }
   return result;
@@ -1121,44 +1371,38 @@ static DN_UTCore DN_Tests_Intrinsics()
 
   DN_UT_LogF(&result, "DN_Atomic\n");
   {
-    DN_UT_Test(&result, "DN_Atomic_AddU32")
-    {
+    for (DN_UT_Test(&result, "DN_Atomic_AddU32")) {
       uint32_t val = 0;
       DN_Atomic_AddU32(&val, 1);
       DN_UT_AssertF(&result, val == 1, "val: %u", val);
     }
 
-    DN_UT_Test(&result, "DN_Atomic_AddU64")
-    {
+    for (DN_UT_Test(&result, "DN_Atomic_AddU64")) {
       uint64_t val = 0;
       DN_Atomic_AddU64(&val, 1);
       DN_UT_AssertF(&result, val == 1, "val: %" PRIu64, val);
     }
 
-    DN_UT_Test(&result, "DN_Atomic_SubU32")
-    {
+    for (DN_UT_Test(&result, "DN_Atomic_SubU32")) {
       uint32_t val = 1;
       DN_Atomic_SubU32(&val, 1);
       DN_UT_AssertF(&result, val == 0, "val: %u", val);
     }
 
-    DN_UT_Test(&result, "DN_Atomic_SubU64")
-    {
+    for (DN_UT_Test(&result, "DN_Atomic_SubU64")) {
       uint64_t val = 1;
       DN_Atomic_SubU64(&val, 1);
       DN_UT_AssertF(&result, val == 0, "val: %" PRIu64, val);
     }
 
-    DN_UT_Test(&result, "DN_Atomic_SetValue32")
-    {
+    for (DN_UT_Test(&result, "DN_Atomic_SetValue32")) {
       DN_U32 a = 0;
       DN_U32 b = 111;
       DN_Atomic_SetValue32(&a, b);
       DN_UT_AssertF(&result, a == b, "a: %ld, b: %ld", a, b);
     }
 
-    DN_UT_Test(&result, "DN_Atomic_SetValue64")
-    {
+    for (DN_UT_Test(&result, "DN_Atomic_SetValue64")) {
       int64_t a = 0;
       int64_t b = 111;
       DN_Atomic_SetValue64(DN_CAST(uint64_t *) & a, b);
@@ -1184,8 +1428,8 @@ static DN_UTCore DN_Tests_Intrinsics()
 
 #if defined(DN_UNIT_TESTS_WITH_KECCAK)
 DN_GCC_WARNING_PUSH
-DN_GCC_WARNING_DISABLE(-Wunused-parameter)
-DN_GCC_WARNING_DISABLE(-Wsign-compare)
+DN_GCC_WARNING_DISABLE(-Wunused - parameter)
+DN_GCC_WARNING_DISABLE(-Wsign - compare)
 
 DN_MSVC_WARNING_PUSH
 DN_MSVC_WARNING_DISABLE(4244)
@@ -1393,13 +1637,13 @@ void DN_Tests_KeccakDispatch_(DN_UTCore *test, int hash_type, DN_Str8 input)
       DN_KCBytes28 expect;
       DN_RefImpl_FIPS202_SHA3_224_(DN_CAST(uint8_t *) input.data, input.size, (uint8_t *)expect.data);
       DN_UT_AssertF(test,
-                       DN_KC_Bytes28Equals(&hash, &expect),
-                       "\ninput:  %.*s"
-                       "\nhash:   %.*s"
-                       "\nexpect: %.*s",
-                       DN_STR_FMT(input_hex),
-                       DN_KC_STRING56_FMT(DN_KC_Bytes28ToHex(&hash).data),
-                       DN_KC_STRING56_FMT(DN_KC_Bytes28ToHex(&expect).data));
+                    DN_KC_Bytes28Equals(&hash, &expect),
+                    "\ninput:  %.*s"
+                    "\nhash:   %.*s"
+                    "\nexpect: %.*s",
+                    DN_STR_FMT(input_hex),
+                    DN_KC_STRING56_FMT(DN_KC_Bytes28ToHex(&hash).data),
+                    DN_KC_STRING56_FMT(DN_KC_Bytes28ToHex(&expect).data));
     } break;
 
     case Hash_SHA3_256: {
@@ -1407,13 +1651,13 @@ void DN_Tests_KeccakDispatch_(DN_UTCore *test, int hash_type, DN_Str8 input)
       DN_KCBytes32 expect;
       DN_RefImpl_FIPS202_SHA3_256_(DN_CAST(uint8_t *) input.data, input.size, (uint8_t *)expect.data);
       DN_UT_AssertF(test,
-                       DN_KC_Bytes32Equals(&hash, &expect),
-                       "\ninput:  %.*s"
-                       "\nhash:   %.*s"
-                       "\nexpect: %.*s",
-                       DN_STR_FMT(input_hex),
-                       DN_KC_STRING64_FMT(DN_KC_Bytes32ToHex(&hash).data),
-                       DN_KC_STRING64_FMT(DN_KC_Bytes32ToHex(&expect).data));
+                    DN_KC_Bytes32Equals(&hash, &expect),
+                    "\ninput:  %.*s"
+                    "\nhash:   %.*s"
+                    "\nexpect: %.*s",
+                    DN_STR_FMT(input_hex),
+                    DN_KC_STRING64_FMT(DN_KC_Bytes32ToHex(&hash).data),
+                    DN_KC_STRING64_FMT(DN_KC_Bytes32ToHex(&expect).data));
     } break;
 
     case Hash_SHA3_384: {
@@ -1421,13 +1665,13 @@ void DN_Tests_KeccakDispatch_(DN_UTCore *test, int hash_type, DN_Str8 input)
       DN_KCBytes48 expect;
       DN_RefImpl_FIPS202_SHA3_384_(DN_CAST(uint8_t *) input.data, input.size, (uint8_t *)expect.data);
       DN_UT_AssertF(test,
-                       DN_KC_Bytes48Equals(&hash, &expect),
-                       "\ninput:  %.*s"
-                       "\nhash:   %.*s"
-                       "\nexpect: %.*s",
-                       DN_STR_FMT(input_hex),
-                       DN_KC_STRING96_FMT(DN_KC_Bytes48ToHex(&hash).data),
-                       DN_KC_STRING96_FMT(DN_KC_Bytes48ToHex(&expect).data));
+                    DN_KC_Bytes48Equals(&hash, &expect),
+                    "\ninput:  %.*s"
+                    "\nhash:   %.*s"
+                    "\nexpect: %.*s",
+                    DN_STR_FMT(input_hex),
+                    DN_KC_STRING96_FMT(DN_KC_Bytes48ToHex(&hash).data),
+                    DN_KC_STRING96_FMT(DN_KC_Bytes48ToHex(&expect).data));
     } break;
 
     case Hash_SHA3_512: {
@@ -1435,13 +1679,13 @@ void DN_Tests_KeccakDispatch_(DN_UTCore *test, int hash_type, DN_Str8 input)
       DN_KCBytes64 expect;
       DN_RefImpl_FIPS202_SHA3_512_(DN_CAST(uint8_t *) input.data, input.size, (uint8_t *)expect.data);
       DN_UT_AssertF(test,
-                       DN_KC_Bytes64Equals(&hash, &expect),
-                       "\ninput:  %.*s"
-                       "\nhash:   %.*s"
-                       "\nexpect: %.*s",
-                       DN_STR_FMT(input_hex),
-                       DN_KC_STRING128_FMT(DN_KC_Bytes64ToHex(&hash).data),
-                       DN_KC_STRING128_FMT(DN_KC_Bytes64ToHex(&expect).data));
+                    DN_KC_Bytes64Equals(&hash, &expect),
+                    "\ninput:  %.*s"
+                    "\nhash:   %.*s"
+                    "\nexpect: %.*s",
+                    DN_STR_FMT(input_hex),
+                    DN_KC_STRING128_FMT(DN_KC_Bytes64ToHex(&hash).data),
+                    DN_KC_STRING128_FMT(DN_KC_Bytes64ToHex(&expect).data));
     } break;
 
     case Hash_Keccak_224: {
@@ -1449,13 +1693,13 @@ void DN_Tests_KeccakDispatch_(DN_UTCore *test, int hash_type, DN_Str8 input)
       DN_KCBytes28 expect;
       DN_RefImpl_Keccak_(1152, 448, DN_CAST(uint8_t *) input.data, input.size, 0x01, (uint8_t *)expect.data, sizeof(expect));
       DN_UT_AssertF(test,
-                       DN_KC_Bytes28Equals(&hash, &expect),
-                       "\ninput:  %.*s"
-                       "\nhash:   %.*s"
-                       "\nexpect: %.*s",
-                       DN_STR_FMT(input_hex),
-                       DN_KC_STRING56_FMT(DN_KC_Bytes28ToHex(&hash).data),
-                       DN_KC_STRING56_FMT(DN_KC_Bytes28ToHex(&expect).data));
+                    DN_KC_Bytes28Equals(&hash, &expect),
+                    "\ninput:  %.*s"
+                    "\nhash:   %.*s"
+                    "\nexpect: %.*s",
+                    DN_STR_FMT(input_hex),
+                    DN_KC_STRING56_FMT(DN_KC_Bytes28ToHex(&hash).data),
+                    DN_KC_STRING56_FMT(DN_KC_Bytes28ToHex(&expect).data));
     } break;
 
     case Hash_Keccak_256: {
@@ -1463,13 +1707,13 @@ void DN_Tests_KeccakDispatch_(DN_UTCore *test, int hash_type, DN_Str8 input)
       DN_KCBytes32 expect;
       DN_RefImpl_Keccak_(1088, 512, DN_CAST(uint8_t *) input.data, input.size, 0x01, (uint8_t *)expect.data, sizeof(expect));
       DN_UT_AssertF(test,
-                       DN_KC_Bytes32Equals(&hash, &expect),
-                       "\ninput:  %.*s"
-                       "\nhash:   %.*s"
-                       "\nexpect: %.*s",
-                       DN_STR_FMT(input_hex),
-                       DN_KC_STRING64_FMT(DN_KC_Bytes32ToHex(&hash).data),
-                       DN_KC_STRING64_FMT(DN_KC_Bytes32ToHex(&expect).data));
+                    DN_KC_Bytes32Equals(&hash, &expect),
+                    "\ninput:  %.*s"
+                    "\nhash:   %.*s"
+                    "\nexpect: %.*s",
+                    DN_STR_FMT(input_hex),
+                    DN_KC_STRING64_FMT(DN_KC_Bytes32ToHex(&hash).data),
+                    DN_KC_STRING64_FMT(DN_KC_Bytes32ToHex(&expect).data));
     } break;
 
     case Hash_Keccak_384: {
@@ -1477,13 +1721,13 @@ void DN_Tests_KeccakDispatch_(DN_UTCore *test, int hash_type, DN_Str8 input)
       DN_KCBytes48 expect;
       DN_RefImpl_Keccak_(832, 768, DN_CAST(uint8_t *) input.data, input.size, 0x01, (uint8_t *)expect.data, sizeof(expect));
       DN_UT_AssertF(test,
-                       DN_KC_Bytes48Equals(&hash, &expect),
-                       "\ninput:  %.*s"
-                       "\nhash:   %.*s"
-                       "\nexpect: %.*s",
-                       DN_STR_FMT(input_hex),
-                       DN_KC_STRING96_FMT(DN_KC_Bytes48ToHex(&hash).data),
-                       DN_KC_STRING96_FMT(DN_KC_Bytes48ToHex(&expect).data));
+                    DN_KC_Bytes48Equals(&hash, &expect),
+                    "\ninput:  %.*s"
+                    "\nhash:   %.*s"
+                    "\nexpect: %.*s",
+                    DN_STR_FMT(input_hex),
+                    DN_KC_STRING96_FMT(DN_KC_Bytes48ToHex(&hash).data),
+                    DN_KC_STRING96_FMT(DN_KC_Bytes48ToHex(&expect).data));
     } break;
 
     case Hash_Keccak_512: {
@@ -1491,13 +1735,13 @@ void DN_Tests_KeccakDispatch_(DN_UTCore *test, int hash_type, DN_Str8 input)
       DN_KCBytes64 expect;
       DN_RefImpl_Keccak_(576, 1024, DN_CAST(uint8_t *) input.data, input.size, 0x01, (uint8_t *)expect.data, sizeof(expect));
       DN_UT_AssertF(test,
-                       DN_KC_Bytes64Equals(&hash, &expect),
-                       "\ninput:  %.*s"
-                       "\nhash:   %.*s"
-                       "\nexpect: %.*s",
-                       DN_STR_FMT(input_hex),
-                       DN_KC_STRING128_FMT(DN_KC_Bytes64ToHex(&hash).data),
-                       DN_KC_STRING128_FMT(DN_KC_Bytes64ToHex(&expect).data));
+                    DN_KC_Bytes64Equals(&hash, &expect),
+                    "\ninput:  %.*s"
+                    "\nhash:   %.*s"
+                    "\nexpect: %.*s",
+                    DN_STR_FMT(input_hex),
+                    DN_KC_STRING128_FMT(DN_KC_Bytes64ToHex(&hash).data),
+                    DN_KC_STRING128_FMT(DN_KC_Bytes64ToHex(&expect).data));
     } break;
   }
 }
@@ -1546,8 +1790,7 @@ static DN_UTCore DN_Tests_M4()
   DN_UTCore result = DN_UT_Init();
   DN_UT_LogF(&result, "DN_M4\n");
   {
-    DN_UT_Test(&result, "Simple translate and scale matrix")
-    {
+    for (DN_UT_Test(&result, "Simple translate and scale matrix")) {
       DN_M4 translate  = DN_M4_TranslateF(1, 2, 3);
       DN_M4 scale      = DN_M4_ScaleF(2, 2, 2);
       DN_M4 mul_result = DN_M4_Mul(translate, scale);
@@ -1575,17 +1818,15 @@ static DN_UTCore DN_Tests_OS()
 {
   DN_UTCore result = DN_UT_Init();
 
-  #if defined(DN_OS_INC_CPP) || 1
+#if defined(DN_OS_INC_CPP) || 1
   DN_UT_LogF(&result, "DN_OS\n");
   {
-    DN_UT_Test(&result, "Generate secure RNG bytes with nullptr")
-    {
+    for (DN_UT_Test(&result, "Generate secure RNG bytes with nullptr")) {
       DN_B32 os_result = DN_OS_SecureRNGBytes(nullptr, 1);
       DN_UT_Assert(&result, os_result == false);
     }
 
-    DN_UT_Test(&result, "Generate secure RNG 32 bytes")
-    {
+    for (DN_UT_Test(&result, "Generate secure RNG 32 bytes")) {
       char const ZERO[32]  = {};
       char       buf[32]   = {};
       bool       os_result = DN_OS_SecureRNGBytes(buf, DN_ArrayCountU(buf));
@@ -1593,8 +1834,7 @@ static DN_UTCore DN_Tests_OS()
       DN_UT_Assert(&result, DN_Memcmp(buf, ZERO, DN_ArrayCountU(buf)) != 0);
     }
 
-    DN_UT_Test(&result, "Generate secure RNG 0 bytes")
-    {
+    for (DN_UT_Test(&result, "Generate secure RNG 0 bytes")) {
       char buf[32]     = {};
       buf[0]           = 'Z';
       DN_B32 os_result = DN_OS_SecureRNGBytes(buf, 0);
@@ -1602,29 +1842,25 @@ static DN_UTCore DN_Tests_OS()
       DN_UT_Assert(&result, buf[0] == 'Z');
     }
 
-    DN_UT_Test(&result, "Query executable directory")
-    {
+    for (DN_UT_Test(&result, "Query executable directory")) {
       DN_OSTLSTMem tmem      = DN_OS_TLSTMem(nullptr);
-      DN_Str8    os_result = DN_OS_EXEDir(tmem.arena);
+      DN_Str8      os_result = DN_OS_EXEDir(tmem.arena);
       DN_UT_Assert(&result, DN_Str8_HasData(os_result));
       DN_UT_AssertF(&result, DN_OS_DirExists(os_result), "result(%zu): %.*s", os_result.size, DN_STR_FMT(os_result));
     }
 
-    DN_UT_Test(&result, "DN_OS_PerfCounterNow")
-    {
+    for (DN_UT_Test(&result, "DN_OS_PerfCounterNow")) {
       uint64_t os_result = DN_OS_PerfCounterNow();
       DN_UT_Assert(&result, os_result != 0);
     }
 
-    DN_UT_Test(&result, "Consecutive ticks are ordered")
-    {
+    for (DN_UT_Test(&result, "Consecutive ticks are ordered")) {
       uint64_t a = DN_OS_PerfCounterNow();
       uint64_t b = DN_OS_PerfCounterNow();
       DN_UT_AssertF(&result, b >= a, "a: %" PRIu64 ", b: %" PRIu64, a, b);
     }
 
-    DN_UT_Test(&result, "Ticks to time are a correct order of magnitude")
-    {
+    for (DN_UT_Test(&result, "Ticks to time are a correct order of magnitude")) {
       uint64_t a  = DN_OS_PerfCounterNow();
       uint64_t b  = DN_OS_PerfCounterNow();
       DN_F64   s  = DN_OS_PerfCounterS(a, b);
@@ -1639,8 +1875,7 @@ static DN_UTCore DN_Tests_OS()
 
   DN_UT_LogF(&result, "\nDN_OS Filesystem\n");
   {
-    DN_UT_Test(&result, "Make directory recursive \"abcd/efgh\"")
-    {
+    for (DN_UT_Test(&result, "Make directory recursive \"abcd/efgh\"")) {
       DN_UT_AssertF(&result, DN_OS_MakeDir(DN_STR8("abcd/efgh")), "Failed to make directory");
       DN_UT_AssertF(&result, DN_OS_DirExists(DN_STR8("abcd")), "Directory was not made");
       DN_UT_AssertF(&result, DN_OS_DirExists(DN_STR8("abcd/efgh")), "Subdirectory was not made");
@@ -1650,8 +1885,7 @@ static DN_UTCore DN_Tests_OS()
       DN_UT_AssertF(&result, DN_OS_PathDelete(DN_STR8("abcd")), "Failed to cleanup directory");
     }
 
-    DN_UT_Test(&result, "File write, read, copy, move and delete")
-    {
+    for (DN_UT_Test(&result, "File write, read, copy, move and delete")) {
       // NOTE: Write step
       DN_Str8 const SRC_FILE     = DN_STR8("dn_result_file");
       DN_B32        write_result = DN_OS_WriteAll(SRC_FILE, DN_STR8("1234"), nullptr);
@@ -1660,7 +1894,7 @@ static DN_UTCore DN_Tests_OS()
 
       // NOTE: Read step
       DN_OSTLSTMem tmem      = DN_OS_TLSTMem(nullptr);
-      DN_Str8    read_file = DN_OS_ReadAll(tmem.arena, SRC_FILE, nullptr);
+      DN_Str8      read_file = DN_OS_ReadAll(tmem.arena, SRC_FILE, nullptr);
       DN_UT_AssertF(&result, DN_Str8_HasData(read_file), "Failed to load file");
       DN_UT_AssertF(&result, read_file.size == 4, "File read wrong amount of bytes (%zu)", read_file.size);
       DN_UT_AssertF(&result, DN_Str8_Eq(read_file, DN_STR8("1234")), "Read %zu bytes instead of the expected 4: '%.*s'", read_file.size, DN_STR_FMT(read_file));
@@ -1696,8 +1930,7 @@ static DN_UTCore DN_Tests_OS()
   {
     DN_OSSemaphore sem = DN_OS_SemaphoreInit(0);
 
-    DN_UT_Test(&result, "Wait timeout")
-    {
+    for (DN_UT_Test(&result, "Wait timeout")) {
       DN_U64                   begin       = DN_OS_PerfCounterNow();
       DN_OSSemaphoreWaitResult wait_result = DN_OS_SemaphoreWait(&sem, 100 /*timeout_ms*/);
       DN_U64                   end         = DN_OS_PerfCounterNow();
@@ -1706,8 +1939,7 @@ static DN_UTCore DN_Tests_OS()
       DN_UT_AssertF(&result, elapsed_ms >= 99 && elapsed_ms <= 120, "Expected to sleep for ~100ms, slept %f ms", elapsed_ms);
     }
 
-    DN_UT_Test(&result, "Wait success")
-    {
+    for (DN_UT_Test(&result, "Wait success")) {
       DN_OS_SemaphoreIncrement(&sem, 1);
       DN_OSSemaphoreWaitResult wait_result = DN_OS_SemaphoreWait(&sem, 0 /*timeout_ms*/);
       DN_UT_AssertF(&result, wait_result == DN_OSSemaphoreWaitResult_Success, "Received wait result %zu", wait_result);
@@ -1719,8 +1951,7 @@ static DN_UTCore DN_Tests_OS()
   DN_UT_LogF(&result, "\nMutex\n");
   {
     DN_OSMutex mutex = DN_OS_MutexInit();
-    DN_UT_Test(&result, "Lock")
-    {
+    for (DN_UT_Test(&result, "Lock")) {
       DN_OS_MutexLock(&mutex);
       DN_OS_MutexUnlock(&mutex);
     }
@@ -1731,8 +1962,7 @@ static DN_UTCore DN_Tests_OS()
   {
     DN_OSMutex             mutex = DN_OS_MutexInit();
     DN_OSConditionVariable cv    = DN_OS_ConditionVariableInit();
-    DN_UT_Test(&result, "Lock and timeout")
-    {
+    for (DN_UT_Test(&result, "Lock and timeout")) {
       DN_U64 begin = DN_OS_PerfCounterNow();
       DN_OS_ConditionVariableWait(&cv, &mutex, 100 /*sleep_ms*/);
       DN_U64 end        = DN_OS_PerfCounterNow();
@@ -1742,7 +1972,7 @@ static DN_UTCore DN_Tests_OS()
     DN_OS_MutexDeinit(&mutex);
     DN_OS_ConditionVariableDeinit(&cv);
   }
-  #endif
+#endif
 
   return result;
 }
@@ -1752,132 +1982,124 @@ static DN_UTCore DN_Tests_Rect()
   DN_UTCore result = DN_UT_Init();
   DN_UT_LogF(&result, "DN_Rect\n");
   {
-    DN_UT_Test(&result, "No intersection")
-    {
+    for (DN_UT_Test(&result, "No intersection")) {
       DN_Rect a  = DN_Rect_Init2V2(DN_V2F32_Init1N(0), DN_V2F32_Init2N(100, 100));
       DN_Rect b  = DN_Rect_Init2V2(DN_V2F32_Init2N(200, 0), DN_V2F32_Init2N(200, 200));
       DN_Rect ab = DN_Rect_Intersection(a, b);
 
       DN_V2F32 ab_max = ab.pos + ab.size;
       DN_UT_AssertF(&result,
-                       ab.pos.x == 0 && ab.pos.y == 0 && ab_max.x == 0 && ab_max.y == 0,
-                       "ab = { min.x = %.2f, min.y = %.2f, max.x = %.2f. max.y = %.2f }",
-                       ab.pos.x,
-                       ab.pos.y,
-                       ab_max.x,
-                       ab_max.y);
+                    ab.pos.x == 0 && ab.pos.y == 0 && ab_max.x == 0 && ab_max.y == 0,
+                    "ab = { min.x = %.2f, min.y = %.2f, max.x = %.2f. max.y = %.2f }",
+                    ab.pos.x,
+                    ab.pos.y,
+                    ab_max.x,
+                    ab_max.y);
     }
 
-    DN_UT_Test(&result, "A's min intersects B")
-    {
+    for (DN_UT_Test(&result, "A's min intersects B")) {
       DN_Rect a  = DN_Rect_Init2V2(DN_V2F32_Init2N(50, 50), DN_V2F32_Init2N(100, 100));
       DN_Rect b  = DN_Rect_Init2V2(DN_V2F32_Init2N(0, 0), DN_V2F32_Init2N(100, 100));
       DN_Rect ab = DN_Rect_Intersection(a, b);
 
       DN_V2F32 ab_max = ab.pos + ab.size;
       DN_UT_AssertF(&result,
-                       ab.pos.x == 50 && ab.pos.y == 50 && ab_max.x == 100 && ab_max.y == 100,
-                       "ab = { min.x = %.2f, min.y = %.2f, max.x = %.2f. max.y = %.2f }",
-                       ab.pos.x,
-                       ab.pos.y,
-                       ab_max.x,
-                       ab_max.y);
+                    ab.pos.x == 50 && ab.pos.y == 50 && ab_max.x == 100 && ab_max.y == 100,
+                    "ab = { min.x = %.2f, min.y = %.2f, max.x = %.2f. max.y = %.2f }",
+                    ab.pos.x,
+                    ab.pos.y,
+                    ab_max.x,
+                    ab_max.y);
     }
 
-    DN_UT_Test(&result, "B's min intersects A")
-    {
+    for (DN_UT_Test(&result, "B's min intersects A")) {
       DN_Rect a  = DN_Rect_Init2V2(DN_V2F32_Init2N(0, 0), DN_V2F32_Init2N(100, 100));
       DN_Rect b  = DN_Rect_Init2V2(DN_V2F32_Init2N(50, 50), DN_V2F32_Init2N(100, 100));
       DN_Rect ab = DN_Rect_Intersection(a, b);
 
       DN_V2F32 ab_max = ab.pos + ab.size;
       DN_UT_AssertF(&result,
-                       ab.pos.x == 50 && ab.pos.y == 50 && ab_max.x == 100 && ab_max.y == 100,
-                       "ab = { min.x = %.2f, min.y = %.2f, max.x = %.2f. max.y = %.2f }",
-                       ab.pos.x,
-                       ab.pos.y,
-                       ab_max.x,
-                       ab_max.y);
+                    ab.pos.x == 50 && ab.pos.y == 50 && ab_max.x == 100 && ab_max.y == 100,
+                    "ab = { min.x = %.2f, min.y = %.2f, max.x = %.2f. max.y = %.2f }",
+                    ab.pos.x,
+                    ab.pos.y,
+                    ab_max.x,
+                    ab_max.y);
     }
 
-    DN_UT_Test(&result, "A's max intersects B")
-    {
+    for (DN_UT_Test(&result, "A's max intersects B")) {
       DN_Rect a  = DN_Rect_Init2V2(DN_V2F32_Init2N(-50, -50), DN_V2F32_Init2N(100, 100));
       DN_Rect b  = DN_Rect_Init2V2(DN_V2F32_Init2N(0, 0), DN_V2F32_Init2N(100, 100));
       DN_Rect ab = DN_Rect_Intersection(a, b);
 
       DN_V2F32 ab_max = ab.pos + ab.size;
       DN_UT_AssertF(&result,
-                       ab.pos.x == 0 && ab.pos.y == 0 && ab_max.x == 50 && ab_max.y == 50,
-                       "ab = { min.x = %.2f, min.y = %.2f, max.x = %.2f. max.y = %.2f }",
-                       ab.pos.x,
-                       ab.pos.y,
-                       ab_max.x,
-                       ab_max.y);
+                    ab.pos.x == 0 && ab.pos.y == 0 && ab_max.x == 50 && ab_max.y == 50,
+                    "ab = { min.x = %.2f, min.y = %.2f, max.x = %.2f. max.y = %.2f }",
+                    ab.pos.x,
+                    ab.pos.y,
+                    ab_max.x,
+                    ab_max.y);
     }
 
-    DN_UT_Test(&result, "B's max intersects A")
-    {
+    for (DN_UT_Test(&result, "B's max intersects A")) {
       DN_Rect a  = DN_Rect_Init2V2(DN_V2F32_Init2N(0, 0), DN_V2F32_Init2N(100, 100));
       DN_Rect b  = DN_Rect_Init2V2(DN_V2F32_Init2N(-50, -50), DN_V2F32_Init2N(100, 100));
       DN_Rect ab = DN_Rect_Intersection(a, b);
 
       DN_V2F32 ab_max = ab.pos + ab.size;
       DN_UT_AssertF(&result,
-                       ab.pos.x == 0 && ab.pos.y == 0 && ab_max.x == 50 && ab_max.y == 50,
-                       "ab = { min.x = %.2f, min.y = %.2f, max.x = %.2f. max.y = %.2f }",
-                       ab.pos.x,
-                       ab.pos.y,
-                       ab_max.x,
-                       ab_max.y);
+                    ab.pos.x == 0 && ab.pos.y == 0 && ab_max.x == 50 && ab_max.y == 50,
+                    "ab = { min.x = %.2f, min.y = %.2f, max.x = %.2f. max.y = %.2f }",
+                    ab.pos.x,
+                    ab.pos.y,
+                    ab_max.x,
+                    ab_max.y);
     }
 
-    DN_UT_Test(&result, "B contains A")
-    {
+    for (DN_UT_Test(&result, "B contains A")) {
       DN_Rect a  = DN_Rect_Init2V2(DN_V2F32_Init2N(25, 25), DN_V2F32_Init2N(25, 25));
       DN_Rect b  = DN_Rect_Init2V2(DN_V2F32_Init2N(0, 0), DN_V2F32_Init2N(100, 100));
       DN_Rect ab = DN_Rect_Intersection(a, b);
 
       DN_V2F32 ab_max = ab.pos + ab.size;
       DN_UT_AssertF(&result,
-                       ab.pos.x == 25 && ab.pos.y == 25 && ab_max.x == 50 && ab_max.y == 50,
-                       "ab = { min.x = %.2f, min.y = %.2f, max.x = %.2f. max.y = %.2f }",
-                       ab.pos.x,
-                       ab.pos.y,
-                       ab_max.x,
-                       ab_max.y);
+                    ab.pos.x == 25 && ab.pos.y == 25 && ab_max.x == 50 && ab_max.y == 50,
+                    "ab = { min.x = %.2f, min.y = %.2f, max.x = %.2f. max.y = %.2f }",
+                    ab.pos.x,
+                    ab.pos.y,
+                    ab_max.x,
+                    ab_max.y);
     }
 
-    DN_UT_Test(&result, "A contains B")
-    {
+    for (DN_UT_Test(&result, "A contains B")) {
       DN_Rect a  = DN_Rect_Init2V2(DN_V2F32_Init2N(0, 0), DN_V2F32_Init2N(100, 100));
       DN_Rect b  = DN_Rect_Init2V2(DN_V2F32_Init2N(25, 25), DN_V2F32_Init2N(25, 25));
       DN_Rect ab = DN_Rect_Intersection(a, b);
 
       DN_V2F32 ab_max = ab.pos + ab.size;
       DN_UT_AssertF(&result,
-                       ab.pos.x == 25 && ab.pos.y == 25 && ab_max.x == 50 && ab_max.y == 50,
-                       "ab = { min.x = %.2f, min.y = %.2f, max.x = %.2f. max.y = %.2f }",
-                       ab.pos.x,
-                       ab.pos.y,
-                       ab_max.x,
-                       ab_max.y);
+                    ab.pos.x == 25 && ab.pos.y == 25 && ab_max.x == 50 && ab_max.y == 50,
+                    "ab = { min.x = %.2f, min.y = %.2f, max.x = %.2f. max.y = %.2f }",
+                    ab.pos.x,
+                    ab.pos.y,
+                    ab_max.x,
+                    ab_max.y);
     }
 
-    DN_UT_Test(&result, "A equals B")
-    {
+    for (DN_UT_Test(&result, "A equals B")) {
       DN_Rect a  = DN_Rect_Init2V2(DN_V2F32_Init2N(0, 0), DN_V2F32_Init2N(100, 100));
       DN_Rect b  = a;
       DN_Rect ab = DN_Rect_Intersection(a, b);
 
       DN_V2F32 ab_max = ab.pos + ab.size;
       DN_UT_AssertF(&result,
-                       ab.pos.x == 0 && ab.pos.y == 0 && ab_max.x == 100 && ab_max.y == 100,
-                       "ab = { min.x = %.2f, min.y = %.2f, max.x = %.2f. max.y = %.2f }",
-                       ab.pos.x,
-                       ab.pos.y,
-                       ab_max.x,
-                       ab_max.y);
+                    ab.pos.x == 0 && ab.pos.y == 0 && ab_max.x == 100 && ab_max.y == 100,
+                    "ab = { min.x = %.2f, min.y = %.2f, max.x = %.2f. max.y = %.2f }",
+                    ab.pos.x,
+                    ab.pos.y,
+                    ab_max.x,
+                    ab_max.y);
     }
   }
   return result;
@@ -1888,111 +2110,96 @@ static DN_UTCore DN_Tests_Str8()
   DN_UTCore result = DN_UT_Init();
   DN_UT_LogF(&result, "DN_Str8\n");
   {
-    DN_UT_Test(&result, "Initialise with string literal w/ macro")
-    {
+    for (DN_UT_Test(&result, "Initialise with string literal w/ macro")) {
       DN_Str8 string = DN_STR8("AB");
       DN_UT_AssertF(&result, string.size == 2, "size: %zu", string.size);
       DN_UT_AssertF(&result, string.data[0] == 'A', "string[0]: %c", string.data[0]);
       DN_UT_AssertF(&result, string.data[1] == 'B', "string[1]: %c", string.data[1]);
     }
 
-    DN_UT_Test(&result, "Initialise with format string")
-    {
+    for (DN_UT_Test(&result, "Initialise with format string")) {
       DN_OSTLSTMem tmem   = DN_OS_TLSTMem(nullptr);
-      DN_Str8    string = DN_Str8_InitF(tmem.arena, "%s", "AB");
+      DN_Str8      string = DN_Str8_InitF(tmem.arena, "%s", "AB");
       DN_UT_AssertF(&result, string.size == 2, "size: %zu", string.size);
       DN_UT_AssertF(&result, string.data[0] == 'A', "string[0]: %c", string.data[0]);
       DN_UT_AssertF(&result, string.data[1] == 'B', "string[1]: %c", string.data[1]);
       DN_UT_AssertF(&result, string.data[2] == 0, "string[2]: %c", string.data[2]);
     }
 
-    DN_UT_Test(&result, "Copy string")
-    {
+    for (DN_UT_Test(&result, "Copy string")) {
       DN_OSTLSTMem tmem   = DN_OS_TLSTMem(nullptr);
-      DN_Str8    string = DN_STR8("AB");
-      DN_Str8    copy   = DN_Str8_Copy(tmem.arena, string);
+      DN_Str8      string = DN_STR8("AB");
+      DN_Str8      copy   = DN_Str8_Copy(tmem.arena, string);
       DN_UT_AssertF(&result, copy.size == 2, "size: %zu", copy.size);
       DN_UT_AssertF(&result, copy.data[0] == 'A', "copy[0]: %c", copy.data[0]);
       DN_UT_AssertF(&result, copy.data[1] == 'B', "copy[1]: %c", copy.data[1]);
       DN_UT_AssertF(&result, copy.data[2] == 0, "copy[2]: %c", copy.data[2]);
     }
 
-    DN_UT_Test(&result, "Trim whitespace around string")
-    {
+    for (DN_UT_Test(&result, "Trim whitespace around string")) {
       DN_Str8 string = DN_Str8_TrimWhitespaceAround(DN_STR8(" AB "));
       DN_UT_AssertF(&result, DN_Str8_Eq(string, DN_STR8("AB")), "[string=%.*s]", DN_STR_FMT(string));
     }
 
-    DN_UT_Test(&result, "Allocate string from arena")
-    {
+    for (DN_UT_Test(&result, "Allocate string from arena")) {
       DN_OSTLSTMem tmem   = DN_OS_TLSTMem(nullptr);
-      DN_Str8    string = DN_Str8_Alloc(tmem.arena, 2, DN_ZeroMem_No);
+      DN_Str8      string = DN_Str8_Alloc(tmem.arena, 2, DN_ZeroMem_No);
       DN_UT_AssertF(&result, string.size == 2, "size: %zu", string.size);
     }
 
     // NOTE: TrimPrefix/Suffix /////////////////////////////////////////////////////////////////////
-    DN_UT_Test(&result, "Trim prefix with matching prefix")
-    {
+    for (DN_UT_Test(&result, "Trim prefix with matching prefix")) {
       DN_Str8 input      = DN_STR8("nft/abc");
       DN_Str8 str_result = DN_Str8_TrimPrefix(input, DN_STR8("nft/"));
       DN_UT_AssertF(&result, DN_Str8_Eq(str_result, DN_STR8("abc")), "%.*s", DN_STR_FMT(str_result));
     }
 
-    DN_UT_Test(&result, "Trim prefix with non matching prefix")
-    {
-      DN_Str8 input  = DN_STR8("nft/abc");
+    for (DN_UT_Test(&result, "Trim prefix with non matching prefix")) {
+      DN_Str8 input      = DN_STR8("nft/abc");
       DN_Str8 str_result = DN_Str8_TrimPrefix(input, DN_STR8(" ft/"));
       DN_UT_AssertF(&result, DN_Str8_Eq(str_result, input), "%.*s", DN_STR_FMT(str_result));
     }
 
-    DN_UT_Test(&result, "Trim suffix with matching suffix")
-    {
+    for (DN_UT_Test(&result, "Trim suffix with matching suffix")) {
       DN_Str8 input      = DN_STR8("nft/abc");
       DN_Str8 str_result = DN_Str8_TrimSuffix(input, DN_STR8("abc"));
       DN_UT_AssertF(&result, DN_Str8_Eq(str_result, DN_STR8("nft/")), "%.*s", DN_STR_FMT(str_result));
     }
 
-    DN_UT_Test(&result, "Trim suffix with non matching suffix")
-    {
+    for (DN_UT_Test(&result, "Trim suffix with non matching suffix")) {
       DN_Str8 input      = DN_STR8("nft/abc");
       DN_Str8 str_result = DN_Str8_TrimSuffix(input, DN_STR8("ab"));
       DN_UT_AssertF(&result, DN_Str8_Eq(str_result, input), "%.*s", DN_STR_FMT(str_result));
     }
 
     // NOTE: DN_Str8_IsAllDigits //////////////////////////////////////////////////////////////
-    DN_UT_Test(&result, "Is all digits fails on non-digit string")
-    {
+    for (DN_UT_Test(&result, "Is all digits fails on non-digit string")) {
       DN_B32 str_result = DN_Str8_IsAll(DN_STR8("@123string"), DN_Str8IsAll_Digits);
       DN_UT_Assert(&result, str_result == false);
     }
 
-    DN_UT_Test(&result, "Is all digits fails on nullptr")
-    {
+    for (DN_UT_Test(&result, "Is all digits fails on nullptr")) {
       DN_B32 str_result = DN_Str8_IsAll(DN_Str8_Init(nullptr, 0), DN_Str8IsAll_Digits);
       DN_UT_Assert(&result, str_result == false);
     }
 
-    DN_UT_Test(&result, "Is all digits fails on nullptr w/ size")
-    {
+    for (DN_UT_Test(&result, "Is all digits fails on nullptr w/ size")) {
       DN_B32 str_result = DN_Str8_IsAll(DN_Str8_Init(nullptr, 1), DN_Str8IsAll_Digits);
       DN_UT_Assert(&result, str_result == false);
     }
 
-    DN_UT_Test(&result, "Is all digits fails on string w/ 0 size")
-    {
-      char const buf[]  = "@123string";
+    for (DN_UT_Test(&result, "Is all digits fails on string w/ 0 size")) {
+      char const buf[]      = "@123string";
       DN_B32     str_result = DN_Str8_IsAll(DN_Str8_Init(buf, 0), DN_Str8IsAll_Digits);
       DN_UT_Assert(&result, !str_result);
     }
 
-    DN_UT_Test(&result, "Is all digits success")
-    {
+    for (DN_UT_Test(&result, "Is all digits success")) {
       DN_B32 str_result = DN_Str8_IsAll(DN_STR8("23"), DN_Str8IsAll_Digits);
       DN_UT_Assert(&result, DN_CAST(bool) str_result == true);
     }
 
-    DN_UT_Test(&result, "Is all digits fails on whitespace")
-    {
+    for (DN_UT_Test(&result, "Is all digits fails on whitespace")) {
       DN_B32 str_result = DN_Str8_IsAll(DN_STR8("23 "), DN_Str8IsAll_Digits);
       DN_UT_Assert(&result, DN_CAST(bool) str_result == false);
     }
@@ -2003,24 +2210,21 @@ static DN_UTCore DN_Tests_Str8()
         char const *TEST_FMT  = "Binary split \"%.*s\" with \"%.*s\"";
         DN_Str8     delimiter = DN_STR8("/");
         DN_Str8     input     = DN_STR8("abcdef");
-        DN_UT_Test(&result, TEST_FMT, DN_STR_FMT(input), DN_STR_FMT(delimiter))
-        {
+        for (DN_UT_Test(&result, TEST_FMT, DN_STR_FMT(input), DN_STR_FMT(delimiter))) {
           DN_Str8BinarySplitResult split = DN_Str8_BinarySplit(input, delimiter);
           DN_UT_AssertF(&result, DN_Str8_Eq(split.lhs, DN_STR8("abcdef")), "[lhs=%.*s]", DN_STR_FMT(split.lhs));
           DN_UT_AssertF(&result, DN_Str8_Eq(split.rhs, DN_STR8("")), "[rhs=%.*s]", DN_STR_FMT(split.rhs));
         }
 
         input = DN_STR8("abc/def");
-        DN_UT_Test(&result, TEST_FMT, DN_STR_FMT(input), DN_STR_FMT(delimiter))
-        {
+        for (DN_UT_Test(&result, TEST_FMT, DN_STR_FMT(input), DN_STR_FMT(delimiter))) {
           DN_Str8BinarySplitResult split = DN_Str8_BinarySplit(input, delimiter);
           DN_UT_AssertF(&result, DN_Str8_Eq(split.lhs, DN_STR8("abc")), "[lhs=%.*s]", DN_STR_FMT(split.lhs));
           DN_UT_AssertF(&result, DN_Str8_Eq(split.rhs, DN_STR8("def")), "[rhs=%.*s]", DN_STR_FMT(split.rhs));
         }
 
         input = DN_STR8("/abcdef");
-        DN_UT_Test(&result, TEST_FMT, DN_STR_FMT(input), DN_STR_FMT(delimiter))
-        {
+        for (DN_UT_Test(&result, TEST_FMT, DN_STR_FMT(input), DN_STR_FMT(delimiter))) {
           DN_Str8BinarySplitResult split = DN_Str8_BinarySplit(input, delimiter);
           DN_UT_AssertF(&result, DN_Str8_Eq(split.lhs, DN_STR8("")), "[lhs=%.*s]", DN_STR_FMT(split.lhs));
           DN_UT_AssertF(&result, DN_Str8_Eq(split.rhs, DN_STR8("abcdef")), "[rhs=%.*s]", DN_STR_FMT(split.rhs));
@@ -2030,8 +2234,7 @@ static DN_UTCore DN_Tests_Str8()
       {
         DN_Str8 delimiter = DN_STR8("-=-");
         DN_Str8 input     = DN_STR8("123-=-456");
-        DN_UT_Test(&result, "Binary split \"%.*s\" with \"%.*s\"", DN_STR_FMT(input), DN_STR_FMT(delimiter))
-        {
+        for (DN_UT_Test(&result, "Binary split \"%.*s\" with \"%.*s\"", DN_STR_FMT(input), DN_STR_FMT(delimiter))) {
           DN_Str8BinarySplitResult split = DN_Str8_BinarySplit(input, delimiter);
           DN_UT_AssertF(&result, DN_Str8_Eq(split.lhs, DN_STR8("123")), "[lhs=%.*s]", DN_STR_FMT(split.lhs));
           DN_UT_AssertF(&result, DN_Str8_Eq(split.rhs, DN_STR8("456")), "[rhs=%.*s]", DN_STR_FMT(split.rhs));
@@ -2040,138 +2243,119 @@ static DN_UTCore DN_Tests_Str8()
     }
 
     // NOTE: DN_Str8_ToI64 /////////////////////////////////////////////////////////////////////////
-    DN_UT_Test(&result, "To I64: Convert null string")
-    {
+    for (DN_UT_Test(&result, "To I64: Convert null string")) {
       DN_Str8ToI64Result str_result = DN_Str8_ToI64(DN_Str8_Init(nullptr, 5), 0);
       DN_UT_Assert(&result, str_result.success);
       DN_UT_Assert(&result, str_result.value == 0);
     }
 
-    DN_UT_Test(&result, "To I64: Convert empty string")
-    {
+    for (DN_UT_Test(&result, "To I64: Convert empty string")) {
       DN_Str8ToI64Result str_result = DN_Str8_ToI64(DN_STR8(""), 0);
       DN_UT_Assert(&result, str_result.success);
       DN_UT_Assert(&result, str_result.value == 0);
     }
 
-    DN_UT_Test(&result, "To I64: Convert \"1\"")
-    {
+    for (DN_UT_Test(&result, "To I64: Convert \"1\"")) {
       DN_Str8ToI64Result str_result = DN_Str8_ToI64(DN_STR8("1"), 0);
       DN_UT_Assert(&result, str_result.success);
       DN_UT_Assert(&result, str_result.value == 1);
     }
 
-    DN_UT_Test(&result, "To I64: Convert \"-0\"")
-    {
+    for (DN_UT_Test(&result, "To I64: Convert \"-0\"")) {
       DN_Str8ToI64Result str_result = DN_Str8_ToI64(DN_STR8("-0"), 0);
       DN_UT_Assert(&result, str_result.success);
       DN_UT_Assert(&result, str_result.value == 0);
     }
 
-    DN_UT_Test(&result, "To I64: Convert \"-1\"")
-    {
+    for (DN_UT_Test(&result, "To I64: Convert \"-1\"")) {
       DN_Str8ToI64Result str_result = DN_Str8_ToI64(DN_STR8("-1"), 0);
       DN_UT_Assert(&result, str_result.success);
       DN_UT_Assert(&result, str_result.value == -1);
     }
 
-    DN_UT_Test(&result, "To I64: Convert \"1.2\"")
-    {
+    for (DN_UT_Test(&result, "To I64: Convert \"1.2\"")) {
       DN_Str8ToI64Result str_result = DN_Str8_ToI64(DN_STR8("1.2"), 0);
       DN_UT_Assert(&result, !str_result.success);
       DN_UT_Assert(&result, str_result.value == 1);
     }
 
-    DN_UT_Test(&result, "To I64: Convert \"1,234\"")
-    {
+    for (DN_UT_Test(&result, "To I64: Convert \"1,234\"")) {
       DN_Str8ToI64Result str_result = DN_Str8_ToI64(DN_STR8("1,234"), ',');
       DN_UT_Assert(&result, str_result.success);
       DN_UT_Assert(&result, str_result.value == 1234);
     }
 
-    DN_UT_Test(&result, "To I64: Convert \"1,2\"")
-    {
+    for (DN_UT_Test(&result, "To I64: Convert \"1,2\"")) {
       DN_Str8ToI64Result str_result = DN_Str8_ToI64(DN_STR8("1,2"), ',');
       DN_UT_Assert(&result, str_result.success);
       DN_UT_Assert(&result, str_result.value == 12);
     }
 
-    DN_UT_Test(&result, "To I64: Convert \"12a3\"")
-    {
+    for (DN_UT_Test(&result, "To I64: Convert \"12a3\"")) {
       DN_Str8ToI64Result str_result = DN_Str8_ToI64(DN_STR8("12a3"), 0);
       DN_UT_Assert(&result, !str_result.success);
       DN_UT_Assert(&result, str_result.value == 12);
     }
 
     // NOTE: DN_Str8_ToU64 /////////////////////////////////////////////////////////////////////////
-    DN_UT_Test(&result, "To U64: Convert nullptr")
-    {
+    for (DN_UT_Test(&result, "To U64: Convert nullptr")) {
       DN_Str8ToU64Result str_result = DN_Str8_ToU64(DN_Str8_Init(nullptr, 5), 0);
       DN_UT_Assert(&result, str_result.success);
       DN_UT_AssertF(&result, str_result.value == 0, "result: %" PRIu64, str_result.value);
     }
 
-    DN_UT_Test(&result, "To U64: Convert empty string")
-    {
+    for (DN_UT_Test(&result, "To U64: Convert empty string")) {
       DN_Str8ToU64Result str_result = DN_Str8_ToU64(DN_STR8(""), 0);
       DN_UT_Assert(&result, str_result.success);
       DN_UT_AssertF(&result, str_result.value == 0, "result: %" PRIu64, str_result.value);
     }
 
-    DN_UT_Test(&result, "To U64: Convert \"1\"")
-    {
+    for (DN_UT_Test(&result, "To U64: Convert \"1\"")) {
       DN_Str8ToU64Result str_result = DN_Str8_ToU64(DN_STR8("1"), 0);
       DN_UT_Assert(&result, str_result.success);
       DN_UT_AssertF(&result, str_result.value == 1, "result: %" PRIu64, str_result.value);
     }
 
-    DN_UT_Test(&result, "To U64: Convert \"-0\"")
-    {
+    for (DN_UT_Test(&result, "To U64: Convert \"-0\"")) {
       DN_Str8ToU64Result str_result = DN_Str8_ToU64(DN_STR8("-0"), 0);
       DN_UT_Assert(&result, !str_result.success);
       DN_UT_AssertF(&result, str_result.value == 0, "result: %" PRIu64, str_result.value);
     }
 
-    DN_UT_Test(&result, "To U64: Convert \"-1\"")
-    {
+    for (DN_UT_Test(&result, "To U64: Convert \"-1\"")) {
       DN_Str8ToU64Result str_result = DN_Str8_ToU64(DN_STR8("-1"), 0);
       DN_UT_Assert(&result, !str_result.success);
       DN_UT_AssertF(&result, str_result.value == 0, "result: %" PRIu64, str_result.value);
     }
 
-    DN_UT_Test(&result, "To U64: Convert \"1.2\"")
-    {
+    for (DN_UT_Test(&result, "To U64: Convert \"1.2\"")) {
       DN_Str8ToU64Result str_result = DN_Str8_ToU64(DN_STR8("1.2"), 0);
       DN_UT_Assert(&result, !str_result.success);
       DN_UT_AssertF(&result, str_result.value == 1, "result: %" PRIu64, str_result.value);
     }
 
-    DN_UT_Test(&result, "To U64: Convert \"1,234\"")
-    {
+    for (DN_UT_Test(&result, "To U64: Convert \"1,234\"")) {
       DN_Str8ToU64Result str_result = DN_Str8_ToU64(DN_STR8("1,234"), ',');
       DN_UT_Assert(&result, str_result.success);
       DN_UT_AssertF(&result, str_result.value == 1234, "result: %" PRIu64, str_result.value);
     }
 
-    DN_UT_Test(&result, "To U64: Convert \"1,2\"")
-    {
+    for (DN_UT_Test(&result, "To U64: Convert \"1,2\"")) {
       DN_Str8ToU64Result str_result = DN_Str8_ToU64(DN_STR8("1,2"), ',');
       DN_UT_Assert(&result, str_result.success);
       DN_UT_AssertF(&result, str_result.value == 12, "result: %" PRIu64, str_result.value);
     }
 
-    DN_UT_Test(&result, "To U64: Convert \"12a3\"")
-    {
+    for (DN_UT_Test(&result, "To U64: Convert \"12a3\"")) {
       DN_Str8ToU64Result str_result = DN_Str8_ToU64(DN_STR8("12a3"), 0);
       DN_UT_Assert(&result, !str_result.success);
       DN_UT_AssertF(&result, str_result.value == 12, "result: %" PRIu64, str_result.value);
     }
 
     // NOTE: DN_Str8_Find /////////////////////////////////////////////////////////////////////
-    DN_UT_Test(&result, "Find: String (char) is not in buffer")
-    {
-      DN_Str8           buf    = DN_STR8("836a35becd4e74b66a0d6844d51f1a63018c7ebc44cf7e109e8e4bba57eefb55");
-      DN_Str8           find   = DN_STR8("2");
+    for (DN_UT_Test(&result, "Find: String (char) is not in buffer")) {
+      DN_Str8           buf        = DN_STR8("836a35becd4e74b66a0d6844d51f1a63018c7ebc44cf7e109e8e4bba57eefb55");
+      DN_Str8           find       = DN_STR8("2");
       DN_Str8FindResult str_result = DN_Str8_FindStr8(buf, find, DN_Str8EqCase_Sensitive);
       DN_UT_Assert(&result, !str_result.found);
       DN_UT_Assert(&result, str_result.index == 0);
@@ -2179,10 +2363,9 @@ static DN_UTCore DN_Tests_Str8()
       DN_UT_Assert(&result, str_result.match.size == 0);
     }
 
-    DN_UT_Test(&result, "Find: String (char) is in buffer")
-    {
-      DN_Str8           buf    = DN_STR8("836a35becd4e74b66a0d6844d51f1a63018c7ebc44cf7e109e8e4bba57eefb55");
-      DN_Str8           find   = DN_STR8("6");
+    for (DN_UT_Test(&result, "Find: String (char) is in buffer")) {
+      DN_Str8           buf        = DN_STR8("836a35becd4e74b66a0d6844d51f1a63018c7ebc44cf7e109e8e4bba57eefb55");
+      DN_Str8           find       = DN_STR8("6");
       DN_Str8FindResult str_result = DN_Str8_FindStr8(buf, find, DN_Str8EqCase_Sensitive);
       DN_UT_Assert(&result, str_result.found);
       DN_UT_Assert(&result, str_result.index == 2);
@@ -2190,25 +2373,22 @@ static DN_UTCore DN_Tests_Str8()
     }
 
     // NOTE: DN_Str8_FileNameFromPath //////////////////////////////////////////////////////////////
-    DN_UT_Test(&result, "File name from Windows path")
-    {
-      DN_Str8 buf    = DN_STR8("C:\\ABC\\str_result.exe");
+    for (DN_UT_Test(&result, "File name from Windows path")) {
+      DN_Str8 buf        = DN_STR8("C:\\ABC\\str_result.exe");
       DN_Str8 str_result = DN_Str8_FileNameFromPath(buf);
       DN_UT_AssertF(&result, str_result == DN_STR8("str_result.exe"), "%.*s", DN_STR_FMT(str_result));
     }
 
-    DN_UT_Test(&result, "File name from Linux path")
-    {
-      DN_Str8 buf    = DN_STR8("/ABC/str_result.exe");
+    for (DN_UT_Test(&result, "File name from Linux path")) {
+      DN_Str8 buf        = DN_STR8("/ABC/str_result.exe");
       DN_Str8 str_result = DN_Str8_FileNameFromPath(buf);
       DN_UT_AssertF(&result, str_result == DN_STR8("str_result.exe"), "%.*s", DN_STR_FMT(str_result));
     }
 
     // NOTE: DN_Str8_TrimPrefix ////////////////////////////////////////////////////////////////////
-    DN_UT_Test(&result, "Trim prefix")
-    {
-      DN_Str8 prefix = DN_STR8("@123");
-      DN_Str8 buf    = DN_STR8("@123string");
+    for (DN_UT_Test(&result, "Trim prefix")) {
+      DN_Str8 prefix     = DN_STR8("@123");
+      DN_Str8 buf        = DN_STR8("@123string");
       DN_Str8 str_result = DN_Str8_TrimPrefix(buf, prefix, DN_Str8EqCase_Sensitive);
       DN_UT_Assert(&result, str_result == DN_STR8("string"));
     }
@@ -2221,8 +2401,7 @@ static DN_UTCore DN_Tests_TicketMutex()
   DN_UTCore result = DN_UT_Init();
   DN_UT_LogF(&result, "DN_TicketMutex\n");
   {
-    DN_UT_Test(&result, "Ticket mutex start and stop")
-    {
+    for (DN_UT_Test(&result, "Ticket mutex start and stop")) {
       // TODO: We don't have a meaningful result but since atomics are
       // implemented with a macro this ensures that we result that they are
       // written correctly.
@@ -2232,8 +2411,7 @@ static DN_UTCore DN_Tests_TicketMutex()
       DN_UT_Assert(&result, mutex.ticket == mutex.serving);
     }
 
-    DN_UT_Test(&result, "Ticket mutex start and stop w/ advanced API")
-    {
+    for (DN_UT_Test(&result, "Ticket mutex start and stop w/ advanced API")) {
       DN_TicketMutex mutex    = {};
       unsigned int   ticket_a = DN_TicketMutex_MakeTicket(&mutex);
       unsigned int   ticket_b = DN_TicketMutex_MakeTicket(&mutex);
@@ -2252,168 +2430,6 @@ static DN_UTCore DN_Tests_TicketMutex()
   return result;
 }
 
-static DN_UTCore DN_Tests_VArray()
-{
-  DN_UTCore result = DN_UT_Init();
-  DN_UT_LogF(&result, "DN_VArray\n");
-  {
-    {
-      DN_VArray<uint32_t> array = DN_VArray_InitByteSize<uint32_t>(DN_Kilobytes(64));
-      DN_DEFER
-      {
-        DN_VArray_Deinit(&array);
-      };
-
-      DN_UT_Test(&result, "Test adding an array of items to the array")
-      {
-        uint32_t array_literal[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
-        DN_VArray_AddArray<uint32_t>(&array, array_literal, DN_ArrayCountU(array_literal));
-        DN_UT_Assert(&result, array.size == DN_ArrayCountU(array_literal));
-        DN_UT_Assert(&result, DN_Memcmp(array.data, array_literal, DN_ArrayCountU(array_literal) * sizeof(array_literal[0])) == 0);
-      }
-
-      DN_UT_Test(&result, "Test stable erase, 1 item, the '2' value from the array")
-      {
-        DN_VArray_EraseRange(&array, 2 /*begin_index*/, 1 /*count*/, DN_ArrayErase_Stable);
-        uint32_t array_literal[] = {0, 1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
-        DN_UT_Assert(&result, array.size == DN_ArrayCountU(array_literal));
-        DN_UT_Assert(&result, DN_Memcmp(array.data, array_literal, DN_ArrayCountU(array_literal) * sizeof(array_literal[0])) == 0);
-      }
-
-      DN_UT_Test(&result, "Test unstable erase, 1 item, the '1' value from the array")
-      {
-        DN_VArray_EraseRange(&array, 1 /*begin_index*/, 1 /*count*/, DN_ArrayErase_Unstable);
-        uint32_t array_literal[] = {0, 15, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14};
-        DN_UT_Assert(&result, array.size == DN_ArrayCountU(array_literal));
-        DN_UT_Assert(&result, DN_Memcmp(array.data, array_literal, DN_ArrayCountU(array_literal) * sizeof(array_literal[0])) == 0);
-      }
-
-      DN_ArrayErase erase_enums[] = {DN_ArrayErase_Stable, DN_ArrayErase_Unstable};
-      DN_UT_Test(&result, "Test un/stable erase, OOB")
-      {
-        for (DN_ArrayErase erase : erase_enums) {
-          uint32_t array_literal[] = {0, 15, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14};
-          DN_VArray_EraseRange(&array, DN_ArrayCountU(array_literal) /*begin_index*/, DN_ArrayCountU(array_literal) + 100 /*count*/, erase);
-          DN_UT_Assert(&result, array.size == DN_ArrayCountU(array_literal));
-          DN_UT_Assert(&result, DN_Memcmp(array.data, array_literal, DN_ArrayCountU(array_literal) * sizeof(array_literal[0])) == 0);
-        }
-      }
-
-      DN_UT_Test(&result, "Test flipped begin/end index stable erase, 2 items, the '15, 3' value from the array")
-      {
-        DN_VArray_EraseRange(&array, 2 /*begin_index*/, -2 /*count*/, DN_ArrayErase_Stable);
-        uint32_t array_literal[] = {0, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14};
-        DN_UT_Assert(&result, array.size == DN_ArrayCountU(array_literal));
-        DN_UT_Assert(&result, DN_Memcmp(array.data, array_literal, DN_ArrayCountU(array_literal) * sizeof(array_literal[0])) == 0);
-      }
-
-      DN_UT_Test(&result, "Test flipped begin/end index unstable erase, 2 items, the '4, 5' value from the array")
-      {
-        DN_VArray_EraseRange(&array, 2 /*begin_index*/, -2 /*count*/, DN_ArrayErase_Unstable);
-        uint32_t array_literal[] = {0, 13, 14, 6, 7, 8, 9, 10, 11, 12};
-        DN_UT_Assert(&result, array.size == DN_ArrayCountU(array_literal));
-        DN_UT_Assert(&result, DN_Memcmp(array.data, array_literal, DN_ArrayCountU(array_literal) * sizeof(array_literal[0])) == 0);
-      }
-
-      DN_UT_Test(&result, "Test stable erase range, 2+1 (oob) item, the '13, 14, +1 OOB' value from the array")
-      {
-        DN_VArray_EraseRange(&array, 8 /*begin_index*/, 3 /*count*/, DN_ArrayErase_Stable);
-        uint32_t array_literal[] = {0, 13, 14, 6, 7, 8, 9, 10};
-        DN_UT_Assert(&result, array.size == DN_ArrayCountU(array_literal));
-        DN_UT_Assert(&result, DN_Memcmp(array.data, array_literal, DN_ArrayCountU(array_literal) * sizeof(array_literal[0])) == 0);
-      }
-
-      DN_UT_Test(&result, "Test unstable erase range, 3+1 (oob) item, the '11, 12, +1 OOB' value from the array")
-      {
-        DN_VArray_EraseRange(&array, 6 /*begin_index*/, 3 /*count*/, DN_ArrayErase_Unstable);
-        uint32_t array_literal[] = {0, 13, 14, 6, 7, 8};
-        DN_UT_Assert(&result, array.size == DN_ArrayCountU(array_literal));
-        DN_UT_Assert(&result, DN_Memcmp(array.data, array_literal, DN_ArrayCountU(array_literal) * sizeof(array_literal[0])) == 0);
-      }
-
-      DN_UT_Test(&result, "Test stable erase -overflow OOB, erasing the '0, 13' value from the array")
-      {
-        DN_VArray_EraseRange(&array, 1 /*begin_index*/, -DN_ISIZE_MAX /*count*/, DN_ArrayErase_Stable);
-        uint32_t array_literal[] = {14, 6, 7, 8};
-        DN_UT_Assert(&result, array.size == DN_ArrayCountU(array_literal));
-        DN_UT_Assert(&result, DN_Memcmp(array.data, array_literal, DN_ArrayCountU(array_literal) * sizeof(array_literal[0])) == 0);
-      }
-
-      DN_UT_Test(&result, "Test unstable erase +overflow OOB, erasing the '7, 8' value from the array")
-      {
-        DN_VArray_EraseRange(&array, 2 /*begin_index*/, DN_ISIZE_MAX /*count*/, DN_ArrayErase_Unstable);
-        uint32_t array_literal[] = {14, 6};
-        DN_UT_Assert(&result, array.size == DN_ArrayCountU(array_literal));
-        DN_UT_Assert(&result, DN_Memcmp(array.data, array_literal, DN_ArrayCountU(array_literal) * sizeof(array_literal[0])) == 0);
-      }
-
-      DN_UT_Test(&result, "Test adding an array of items after erase")
-      {
-        uint32_t array_literal[] = {0, 1, 2, 3};
-        DN_VArray_AddArray<uint32_t>(&array, array_literal, DN_ArrayCountU(array_literal));
-
-        uint32_t expected_literal[] = {14, 6, 0, 1, 2, 3};
-        DN_UT_Assert(&result, array.size == DN_ArrayCountU(expected_literal));
-        DN_UT_Assert(&result, DN_Memcmp(array.data, expected_literal, DN_ArrayCountU(expected_literal) * sizeof(expected_literal[0])) == 0);
-      }
-    }
-
-    DN_UT_Test(&result, "Array of unaligned objects are contiguously laid out in memory")
-    {
-      // NOTE: Since we allocate from a virtual memory block, each time
-      // we request memory from the block we can demand some alignment
-      // on the returned pointer from the memory block. If there's
-      // additional alignment done in that function then we can no
-      // longer access the items in the array contiguously leading to
-      // confusing memory "corruption" errors.
-      //
-      // This result makes sure that the unaligned objects are allocated
-      // from the memory block (and hence the array) contiguously
-      // when the size of the object is not aligned with the required
-      // alignment of the object.
-      DN_MSVC_WARNING_PUSH
-      DN_MSVC_WARNING_DISABLE(4324) // warning C4324: 'TestVArray::UnalignedObject': structure was padded due to alignment specifier
-
-      struct alignas(8) UnalignedObject
-      {
-        char data[511];
-      };
-
-      DN_MSVC_WARNING_POP
-
-      DN_VArray<UnalignedObject> array = DN_VArray_InitByteSize<UnalignedObject>(DN_Kilobytes(64));
-      DN_DEFER
-      {
-        DN_VArray_Deinit(&array);
-      };
-
-      // NOTE: Verify that the items returned from the data array are
-      // contiguous in memory.
-      UnalignedObject *make_item_a = DN_VArray_MakeArray(&array, 1, DN_ZeroMem_Yes);
-      UnalignedObject *make_item_b = DN_VArray_MakeArray(&array, 1, DN_ZeroMem_Yes);
-      DN_Memset(make_item_a->data, 'a', sizeof(make_item_a->data));
-      DN_Memset(make_item_b->data, 'b', sizeof(make_item_b->data));
-      DN_UT_Assert(&result, (uintptr_t)make_item_b == (uintptr_t)(make_item_a + 1));
-
-      // NOTE: Verify that accessing the items from the data array yield
-      // the same object.
-      DN_UT_Assert(&result, array.size == 2);
-      UnalignedObject *data_item_a = array.data + 0;
-      UnalignedObject *data_item_b = array.data + 1;
-      DN_UT_Assert(&result, (uintptr_t)data_item_b == (uintptr_t)(data_item_a + 1));
-      DN_UT_Assert(&result, (uintptr_t)data_item_b == (uintptr_t)(make_item_a + 1));
-      DN_UT_Assert(&result, (uintptr_t)data_item_b == (uintptr_t)make_item_b);
-
-      for (DN_USize i = 0; i < sizeof(data_item_a->data); i++)
-        DN_UT_Assert(&result, data_item_a->data[i] == 'a');
-
-      for (DN_USize i = 0; i < sizeof(data_item_b->data); i++)
-        DN_UT_Assert(&result, data_item_b->data[i] == 'b');
-    }
-  }
-  return result;
-}
-
 #if defined(DN_PLATFORM_WIN32)
 static DN_UTCore DN_Tests_Win()
 {
@@ -2421,23 +2437,20 @@ static DN_UTCore DN_Tests_Win()
   DN_UT_LogF(&result, "OS Win32\n");
   {
     DN_OSTLSTMem tmem    = DN_OS_TLSTMem(nullptr);
-    DN_Str8    input8  = DN_STR8("String");
-    DN_Str16   input16 = DN_Str16{(wchar_t *)(L"String"), sizeof(L"String") / sizeof(L"String"[0]) - 1};
+    DN_Str8      input8  = DN_STR8("String");
+    DN_Str16     input16 = DN_Str16{(wchar_t *)(L"String"), sizeof(L"String") / sizeof(L"String"[0]) - 1};
 
-    DN_UT_Test(&result, "Str8 to Str16")
-    {
+    for (DN_UT_Test(&result, "Str8 to Str16")) {
       DN_Str16 str_result = DN_W32_Str8ToStr16(tmem.arena, input8);
       DN_UT_Assert(&result, str_result == input16);
     }
 
-    DN_UT_Test(&result, "Str16 to Str8")
-    {
+    for (DN_UT_Test(&result, "Str16 to Str8")) {
       DN_Str8 str_result = DN_W32_Str16ToStr8(tmem.arena, input16);
       DN_UT_Assert(&result, str_result == input8);
     }
 
-    DN_UT_Test(&result, "Str16 to Str8: Null terminates string")
-    {
+    for (DN_UT_Test(&result, "Str16 to Str8: Null terminates string")) {
       int   size_required = DN_W32_Str16ToStr8Buffer(input16, nullptr, 0);
       char *string        = DN_Arena_NewArray(tmem.arena, char, size_required + 1, DN_ZeroMem_No);
 
@@ -2452,8 +2465,7 @@ static DN_UTCore DN_Tests_Win()
       DN_UT_Assert(&result, DN_Memcmp(EXPECTED, string, sizeof(EXPECTED)) == 0);
     }
 
-    DN_UT_Test(&result, "Str16 to Str8: Arena null terminates string")
-    {
+    for (DN_UT_Test(&result, "Str16 to Str8: Arena null terminates string")) {
       DN_Str8    string8       = DN_W32_Str16ToStr8(tmem.arena, input16);
       int        size_returned = DN_W32_Str16ToStr8Buffer(input16, nullptr, 0);
       char const EXPECTED[]    = {'S', 't', 'r', 'i', 'n', 'g', 0};
@@ -2475,9 +2487,8 @@ DN_TestsResult DN_Tests_RunSuite(DN_TestsPrint print)
           DN_Tests_Arena(),
           DN_Tests_Bin(),
           DN_Tests_BinarySearch(),
-          DN_Tests_DSMap(),
+          DN_Tests_BaseContainers(),
           DN_Tests_FStr8(),
-          DN_Tests_FArray(),
           DN_Tests_Intrinsics(),
 #if defined(DN_UNIT_TESTS_WITH_KECCAK)
           DN_Tests_Keccak(),
@@ -2487,7 +2498,6 @@ DN_TestsResult DN_Tests_RunSuite(DN_TestsPrint print)
           DN_Tests_Rect(),
           DN_Tests_Str8(),
           DN_Tests_TicketMutex(),
-          DN_Tests_VArray(),
 #if defined(DN_PLATFORM_WIN32)
           DN_Tests_Win(),
 #endif

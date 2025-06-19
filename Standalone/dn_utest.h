@@ -79,10 +79,10 @@
 
 #define DN_UT_COLOR_RESET "\x1b[0m"
 
-#define DN_UT_Test(test, fmt, ...)                                 \
-  for (int dummy_ = (DN_UT_BeginF((test), fmt, ##__VA_ARGS__), 0); \
-       (void)dummy_, (test)->state == DN_UTState_TestBegun;        \
-       DN_UT_End(test))
+#define DN_UT_Test(test, fmt, ...)                            \
+  int dummy_ = (DN_UT_BeginF((test), fmt, ##__VA_ARGS__), 0); \
+  (void)dummy_, (test)->state == DN_UTState_TestBegun;        \
+  DN_UT_End(test)
 
 #define DN_UT_AssertF(test, expr, fmt, ...) \
   DN_UT_AssertAtF((test), __FILE__, __LINE__, (expr), fmt, ##__VA_ARGS__)
