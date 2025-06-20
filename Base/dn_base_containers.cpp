@@ -130,7 +130,6 @@ DN_API void DN_Ring_Read(DN_Ring *ring, void *dest, DN_U64 dest_size)
   DN_Memcpy((char *)dest + pre_split_bytes, ring->base,          post_split_bytes);
   ring->read_pos += dest_size;
 }
-#define DN_Ring_WriteStruct(ring, item) DN_Ring_Write((ring), (item), sizeof(*(item)))
 
 // NOTE: DN_CArray /////////////////////////////////////////////////////////////////////////////////
 template <typename T>

@@ -197,30 +197,31 @@ template <typename T> struct DN_List
 //   MyLinkItem *first_item = DN_ISLList_Detach(&my_link, MyLinkItem);
 //   ```
 
-#define DN_ISLList_Detach(list)                                  (decltype(list)) DN_CSLList_Detach((void **)&(list), (void **)&(list)->next)
+#define                      DN_ISLList_Detach(list)                                  (decltype(list)) DN_CSLList_Detach((void **)&(list), (void **)&(list)->next)
 
-#define DN_LArray_MakeArray(c_array, size, max, count, zero_mem) (decltype(&(c_array)[0])) DN_CArray2_MakeArray(c_array, size, max, sizeof(c_array[0]), count, zero_mem)
-#define DN_LArray_MakeArrayZ(c_array, size, max, count)          DN_LArray_MakeArray(c_array, size, max, count, DN_ZeroMem_Yes)
-#define DN_LArray_Make(c_array, size, max, zero_mem)             DN_LArray_MakeArray(c_array, size, max, 1, zero_mem)
-#define DN_LArray_MakeZ(c_array, size, max)                      DN_LArray_Make(c_array, size, max, DN_ZeroMem_Yes)
+#define                      DN_LArray_MakeArray(c_array, size, max, count, zero_mem) (decltype(&(c_array)[0])) DN_CArray2_MakeArray(c_array, size, max, sizeof(c_array[0]), count, zero_mem)
+#define                      DN_LArray_MakeArrayZ(c_array, size, max, count)          DN_LArray_MakeArray(c_array, size, max, count, DN_ZeroMem_Yes)
+#define                      DN_LArray_Make(c_array, size, max, zero_mem)             DN_LArray_MakeArray(c_array, size, max, 1, zero_mem)
+#define                      DN_LArray_MakeZ(c_array, size, max)                      DN_LArray_Make(c_array, size, max, DN_ZeroMem_Yes)
 
-#define DN_IArray_Front(array)                                   (array)->data
-#define DN_IArray_GrowIfNeededFromPool(array, pool)              DN_CArray2_GrowIfNeededFromPool((void **)(&(array)->data), (array)->size, &(array)->max, sizeof((array)->data[0]), pool)
-#define DN_IArray_MakeArray(array, count, zero_mem)              DN_LArray_MakeArray((array)->data, &(array)->size, (array)->max, count, zero_mem)
-#define DN_IArray_MakeArrayZ(array, count)                       DN_LArray_MakeArray(array, count, DN_ZeroMem_Yes)
-#define DN_IArray_Make(array, zero_mem)                          DN_IArray_MakeArray(array, 1, zero_mem)
-#define DN_IArray_MakeZ(array)                                   DN_IArray_Make(array, DN_ZeroMem_Yes)
+#define                      DN_IArray_Front(array)                                   (array)->data
+#define                      DN_IArray_GrowIfNeededFromPool(array, pool)              DN_CArray2_GrowIfNeededFromPool((void **)(&(array)->data), (array)->size, &(array)->max, sizeof((array)->data[0]), pool)
+#define                      DN_IArray_MakeArray(array, count, zero_mem)              DN_LArray_MakeArray((array)->data, &(array)->size, (array)->max, count, zero_mem)
+#define                      DN_IArray_MakeArrayZ(array, count)                       DN_LArray_MakeArray(array, count, DN_ZeroMem_Yes)
+#define                      DN_IArray_Make(array, zero_mem)                          DN_IArray_MakeArray(array, 1, zero_mem)
+#define                      DN_IArray_MakeZ(array)                                   DN_IArray_Make(array, DN_ZeroMem_Yes)
 
+DN_API  DN_ArrayEraseResult  DN_CArray2_EraseRange           (void *data, DN_USize *size, DN_USize elem_size, DN_USize begin_index, DN_ISize count, DN_ArrayErase erase);
+DN_API  void                *DN_CArray2_MakeArray            (void *data, DN_USize *size, DN_USize max, DN_USize data_size, DN_USize make_size, DN_ZeroMem zero_mem);
+DN_API  bool                 DN_CArray2_GrowIfNeededFromPool (void **data, DN_USize size, DN_USize *max, DN_USize data_size, DN_Pool *pool);
+DN_API  void                *DN_CSLList_Detach               (void **link, void **next);
 
-DN_API DN_ArrayEraseResult  DN_CArray2_EraseRange          (void *data, DN_USize *size, DN_USize elem_size, DN_USize begin_index, DN_ISize count, DN_ArrayErase erase);
-DN_API void                *DN_CArray2_MakeArray           (void *data, DN_USize *size, DN_USize max, DN_USize data_size, DN_USize make_size, DN_ZeroMem zero_mem);
-DN_API bool                 DN_CArray2_GrowIfNeededFromPool(void **data, DN_USize size, DN_USize *max, DN_USize data_size, DN_Pool *pool);
-DN_API void                *DN_CSLList_Detach              (void **link, void **next);
-
-DN_API                                          bool                  DN_Ring_HasSpace                  (DN_Ring const *ring, DN_U64 size);
-DN_API                                          bool                  DN_Ring_HasData                   (DN_Ring const *ring, DN_U64 size);
-DN_API                                          void                  DN_Ring_Write                     (DN_Ring *ring, void const *src, DN_U64 src_size);
-DN_API                                          void                  DN_Ring_Read                      (DN_Ring *ring, void *dest, DN_U64 dest_size);
+DN_API  bool                 DN_Ring_HasSpace                (DN_Ring const *ring, DN_U64 size);
+DN_API  bool                 DN_Ring_HasData                 (DN_Ring const *ring, DN_U64 size);
+DN_API  void                 DN_Ring_Write                   (DN_Ring *ring, void const *src, DN_U64 src_size);
+#define                      DN_Ring_WriteStruct(ring, item) DN_Ring_Write((ring), (item), sizeof(*(item)))
+DN_API  void                 DN_Ring_Read                    (DN_Ring *ring, void *dest, DN_U64 dest_size);
+#define                      DN_Ring_ReadStruct(ring, dest)  DN_Ring_Read((ring), (dest), sizeof(*(dest)))
 
 template <typename T>                           DN_ArrayEraseResult   DN_CArray_EraseRange              (T *data, DN_USize *size, DN_USize begin_index, DN_ISize count, DN_ArrayErase erase);
 template <typename T>                           T *                   DN_CArray_MakeArray               (T *data, DN_USize *size, DN_USize max, DN_USize count, DN_ZeroMem zero_mem);
