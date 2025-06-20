@@ -7,23 +7,23 @@ DN_MSVC_WARNING_DISABLE(4201) // warning C4201: nonstandard extension used: name
 // NOTE: DN_V2 /////////////////////////////////////////////////////////////////////////////////////
 union DN_V2I32
 {
-    struct { int32_t x, y; };
-    struct { int32_t w, h; };
-    int32_t data[2];
+  struct { int32_t x, y; };
+  struct { int32_t w, h; };
+  int32_t data[2];
 };
 
 union DN_V2U16
 {
-    struct { uint16_t x, y; };
-    struct { uint16_t w, h; };
-    uint16_t data[2];
+  struct { uint16_t x, y; };
+  struct { uint16_t w, h; };
+  uint16_t data[2];
 };
 
 union DN_V2F32
 {
-    struct { DN_F32 x, y; };
-    struct { DN_F32 w, h; };
-    DN_F32 data[2];
+  struct { DN_F32 x, y; };
+  struct { DN_F32 w, h; };
+  DN_F32 data[2];
 };
 #endif // !defined(DN_NO_V2)
 
@@ -31,9 +31,9 @@ union DN_V2F32
 // NOTE: DN_V3 /////////////////////////////////////////////////////////////////////////////////////
 union DN_V3F32
 {
-    struct { DN_F32 x, y, z; };
-    struct { DN_F32 r, g, b; };
-    DN_F32 data[3];
+  struct { DN_F32 x, y, z; };
+  struct { DN_F32 r, g, b; };
+  DN_F32 data[3];
 };
 
 #endif // !defined(DN_NO_V3)
@@ -42,13 +42,13 @@ union DN_V3F32
 // NOTE: DN_V4 /////////////////////////////////////////////////////////////////////////////////////
 union DN_V4F32
 {
-    struct { DN_F32 x, y, z, w; };
-    struct { DN_F32 r, g, b, a; };
-    #if !defined(DN_NO_V3)
-    DN_V3F32  rgb;
-    DN_V3F32  xyz;
-    #endif
-    DN_F32 data[4];
+  struct { DN_F32 x, y, z, w; };
+  struct { DN_F32 r, g, b, a; };
+  #if !defined(DN_NO_V3)
+  DN_V3F32  rgb;
+  DN_V3F32  xyz;
+  #endif
+  DN_F32 data[4];
 };
 #endif // !defined(DN_NO_V4)
 DN_MSVC_WARNING_POP
@@ -57,15 +57,15 @@ DN_MSVC_WARNING_POP
 // NOTE: DN_M4 /////////////////////////////////////////////////////////////////////////////////////
 struct DN_M4
 {
-    DN_F32 columns[4][4]; // Column major matrix
+  DN_F32 columns[4][4]; // Column major matrix
 };
 #endif // !defined(DN_M4)
 
 // NOTE: DN_M2x3 ///////////////////////////////////////////////////////////////////////////////////
 union DN_M2x3
 {
-    DN_F32 e[6];
-    DN_F32 row[2][3];
+  DN_F32 e[6];
+  DN_F32 row[2][3];
 };
 
 // NOTE: DN_Rect ///////////////////////////////////////////////////////////////////////////////////
@@ -75,32 +75,32 @@ union DN_M2x3
 #endif
 struct DN_Rect
 {
-    DN_V2F32 pos, size;
+  DN_V2F32 pos, size;
 };
 
 struct DN_RectMinMax
 {
-    DN_V2F32 min, max;
+  DN_V2F32 min, max;
 };
 
 enum DN_RectCutClip
 {
-    DN_RectCutClip_No,
-    DN_RectCutClip_Yes,
+  DN_RectCutClip_No,
+  DN_RectCutClip_Yes,
 };
 
 enum DN_RectCutSide
 {
-    DN_RectCutSide_Left,
-    DN_RectCutSide_Right,
-    DN_RectCutSide_Top,
-    DN_RectCutSide_Bottom,
+  DN_RectCutSide_Left,
+  DN_RectCutSide_Right,
+  DN_RectCutSide_Top,
+  DN_RectCutSide_Bottom,
 };
 
 struct DN_RectCut
 {
-    DN_Rect*       rect;
-    DN_RectCutSide side;
+  DN_Rect*       rect;
+  DN_RectCutSide side;
 };
 #endif // !defined(DN_NO_RECT)
 
