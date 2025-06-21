@@ -16,6 +16,22 @@ DN_API void *DN_CArray2_MakeArray(void *data, DN_USize *size, DN_USize max, DN_U
   return result;
 }
 
+DN_API void *DN_CArray2_AddArray(void *data, DN_USize *size, DN_USize max, DN_USize data_size, void *elems, DN_USize elems_count, DN_ArrayAdd add)
+{
+  void *result = DN_CArray2_MakeArray(data, size, max, data_size, elems_count, DN_ZeroMem_No);
+  if (result) {
+    if (add == DN_ArrayAdd_Append) {
+      DN_Memcpy(result, elems, elems_count * data_size);
+    } else {
+      char *move_dest = DN_CAST(char *)data + (elems_count * data_size); // Shift elements forward
+      char *move_src  = DN_CAST(char *)data;
+      DN_Memmove(move_dest, move_src, data_size * size[0]);
+      DN_Memcpy(data, elems, data_size * elems_count);
+    }
+  }
+  return result;
+}
+
 DN_API bool DN_CArray2_GrowIfNeededFromPool(void **data, DN_USize size, DN_USize *max, DN_USize data_size, DN_Pool *pool)
 {
   bool result = true;
