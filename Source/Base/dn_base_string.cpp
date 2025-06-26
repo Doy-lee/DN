@@ -499,6 +499,14 @@ DN_API DN_Str8 DN_Str8_FileExtension(DN_Str8 path)
   return result;
 }
 
+DN_API DN_Str8 DN_Str8_FileDirectoryFromPath(DN_Str8 path)
+{
+  DN_Str8                  separators[] = {DN_STR8("/"), DN_STR8("\\")};
+  DN_Str8BinarySplitResult split        = DN_Str8_BinarySplitLastArray(path, separators, DN_ArrayCountU(separators));
+  DN_Str8                  result       = split.lhs;
+  return result;
+}
+
 DN_API DN_Str8ToU64Result DN_Str8_ToU64(DN_Str8 string, char separator)
 {
   // NOTE: Argument check

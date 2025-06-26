@@ -204,6 +204,7 @@ DN_API                             DN_Str8                  DN_Str8_FileNameFrom
 DN_API                             DN_Str8                  DN_Str8_FileNameNoExtension     (DN_Str8 path);
 DN_API                             DN_Str8                  DN_Str8_FilePathNoExtension     (DN_Str8 path);
 DN_API                             DN_Str8                  DN_Str8_FileExtension           (DN_Str8 path);
+DN_API                             DN_Str8                  DN_Str8_FileDirectoryFromPath   (DN_Str8 path);
 
 DN_API                             DN_Str8ToU64Result       DN_Str8_ToU64                   (DN_Str8 string, char separator);
 DN_API                             DN_Str8ToI64Result       DN_Str8_ToI64                   (DN_Str8 string, char separator);

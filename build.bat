@@ -13,7 +13,7 @@ pushd Build
     REM O2   Optimisation Level 2
     REM Oi   Use CPU Intrinsics
     REM Z7   Combine multi-debug files to one debug file
-    set common_flags=-D DN_UNIT_TESTS_WITH_KECCAK %script_dir%\Extra\dn_tests_main.cpp
+    set common_flags=-D DN_UNIT_TESTS_WITH_KECCAK %script_dir%\Source\Extra\dn_tests_main.cpp
 
     set msvc_driver_flags=%common_flags%        -MT -EHa -GR- -Od -Oi -Z7 -wd4201 -W4 -nologo
 
@@ -33,7 +33,11 @@ pushd Build
         echo [BUILD] MSVC's cl detected, compiling ...
         set msvc_cmd=cl %msvc_compile_flags% %msvc_link_flags%
         powershell -Command "$time = Measure-Command { !msvc_cmd! | Out-Default }; Write-Host '[BUILD] msvc:'$time.TotalSeconds's'; exit $LASTEXITCODE" || exit /b 1
+
+        call cl %script_dir%\single_header_generator.cpp -nologo -link
+        call single_header_generator.exe %script_dir%\Source %script_dir%\Single_Header
     )
+
 
     REM REM clang-cl ===================================================================================
     set has_clang_cl=1

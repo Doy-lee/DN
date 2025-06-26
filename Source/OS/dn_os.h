@@ -3,16 +3,6 @@
 
 #include <new> // operator new
 
-#if defined(DN_PLATFORM_EMSCRIPTEN) || defined(DN_PLATFORM_POSIX) || defined(DN_PLATFORM_ARM64)
-  #include "dn_os_posix.h"
-#elif defined(DN_PLATFORM_WIN32)
-  #include "dn_os_windows.h"
-  #include "dn_os_w32.h"
-#else
-  #error Please define a platform e.g. 'DN_PLATFORM_WIN32' to enable the correct implementation for platform APIs
-#endif
-
-
 #if !defined(DN_OS_WIN32) || defined(DN_OS_WIN32_USE_PTHREADS)
   #include <pthread.h>
   #include <semaphore.h>
