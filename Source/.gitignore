@@ -1,0 +1,6 @@
+tags
+*.swp
+*.swo
+Build
+.vs/
+*.db

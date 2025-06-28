@@ -1,4 +1,4 @@
-#define USE_SINGLE_HEADER 1
+#define USE_SINGLE_HEADER 0
 
 #if USE_SINGLE_HEADER
 #include "Single_Header/dn_single_header.h"
@@ -157,14 +157,13 @@ int main(int argc, char **argv)
         DN_STR8("Extra/dn_math"),
         DN_STR8("Extra/dn_async"),
         DN_STR8("Extra/dn_bin_pack"),
-        DN_STR8("Extra/dn_cgen"),
         DN_STR8("Extra/dn_csv"),
         DN_STR8("Extra/dn_hash"),
         DN_STR8("Extra/dn_helpers"),
     };
     DN_Str8 suffix = type == FileType_Header ? DN_STR8("h") : DN_STR8("cpp");
     for (DN_ForItCArray(extra_it, DN_Str8, extra_files)) {
-      DN_Str8 extra_path = DN_OS_PathFFromTLS("%S/%S.%S", dn_root_dir, extra_files, suffix);
+      DN_Str8 extra_path = DN_OS_PathFFromTLS("%S/%S.%S", dn_root_dir, *extra_it.data, suffix);
       AppendCppFileLineByLine(&builder, extra_path);
     }
 
