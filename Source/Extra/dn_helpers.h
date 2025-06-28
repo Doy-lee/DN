@@ -192,7 +192,7 @@ template <typename T> DN_BinarySearchResult DN_BinarySearch                (T co
                                                                               DN_BinarySearchLessThanProc<T> less_than = DN_BinarySearch_DefaultLessThan);
 
 // NOTE: DN_QSort //////////////////////////////////////////////////////////////////////////////////
-template <typename T> bool DN_QSort_DefaultLessThan(T const &lhs, T const &rhs);
+template <typename T> bool DN_QSort_DefaultLessThan(T const &lhs, T const &rhs, void *user_context);
 template <typename T> void DN_QSort                (T *array,
                                                      DN_USize array_size,
                                                      void *user_context,
