@@ -23,7 +23,13 @@ struct DN_ASYNCCore
   DN_U32                 join_threads;
 };
 
-typedef void(DN_ASYNCWorkFunc)(void *input);
+struct DN_ASYNCWorkArgs
+{
+  DN_OSThread *thread;
+  void        *input;
+};
+
+typedef void(DN_ASYNCWorkFunc)(DN_ASYNCWorkArgs work_args);
 
 struct DN_ASYNCWork
 {

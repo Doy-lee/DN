@@ -16,17 +16,19 @@ static DN_I32 DN_ASYNC_ThreadEntryPoint_(DN_OSThread *thread)
 
     DN_ASYNCJob job = {};
     for (DN_OS_MutexScope(&async->ring_mutex)) {
-      if (DN_Ring_HasData(ring, sizeof(job))) {
+      if (DN_Ring_HasData(ring, sizeof(job)))
         DN_Ring_Read(ring, &job, sizeof(job));
-        break;
-      }
     }
 
     if (job.work.func) {
       DN_OS_ConditionVariableBroadcast(&async->ring_write_cv); // Resume any blocked ring write(s)
 
+      DN_ASYNCWorkArgs args = {};
+      args.input            = job.work.input;
+      args.thread           = thread;
+
       DN_Atomic_AddU32(&async->busy_threads, 1);
-      job.work.func(job.work.input);
+      job.work.func(args);
       DN_Atomic_SubU32(&async->busy_threads, 1);
 
       if (job.completion_sem.handle != 0)
