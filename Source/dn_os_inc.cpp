@@ -7,7 +7,7 @@
 #include "OS/dn_os_print.cpp"
 #include "OS/dn_os_string.cpp"
 
-#if defined(DN_PLATFORM_POSIX)
+#if defined(DN_PLATFORM_POSIX) || defined(DN_PLATFORM_EMSCRIPTEN)
   #include "OS/dn_os_posix.cpp"
 #elif defined(DN_PLATFORM_WIN32)
   #include "OS/dn_os_w32.cpp"

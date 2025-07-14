@@ -1007,14 +1007,14 @@ static DN_POSIXCore *DN_OS_GetPOSIXCore_()
 static DN_POSIXSyncPrimitive *DN_OS_U64ToPOSIXSyncPrimitive_(DN_U64 u64)
 {
   DN_POSIXSyncPrimitive *result = nullptr;
-  DN_Memcpy(&result, &u64, sizeof(u64));
+  DN_Memcpy(&result, &u64, sizeof(result));
   return result;
 }
 
 static DN_U64 DN_POSIX_SyncPrimitiveToU64(DN_POSIXSyncPrimitive *primitive)
 {
   DN_U64 result = 0;
-  static_assert(sizeof(result) == sizeof(primitive), "Pointer size mis-match");
+  static_assert(sizeof(result) >= sizeof(primitive), "Pointer size mis-match");
   DN_Memcpy(&result, &primitive, sizeof(result));
   return result;
 }
@@ -1292,10 +1292,14 @@ DN_API DN_U32 DN_OS_ThreadID()
 
 DN_API void DN_Posix_ThreadSetName(DN_Str8 name)
 {
+#if defined(DN_PLATFORM_EMSCRIPTEN)
+  (void)name;
+#else
   DN_OSTLSTMem tmem   = DN_OS_TLSPushTMem(nullptr);
-  DN_Str8    copy   = DN_Str8_Copy(tmem.arena, name);
-  pthread_t  thread = pthread_self();
+  DN_Str8      copy   = DN_Str8_Copy(tmem.arena, name);
+  pthread_t    thread = pthread_self();
   pthread_setname_np(thread, (char *)copy.data);
+#endif
 }
 
 DN_API DN_POSIXProcSelfStatus DN_Posix_ProcSelfStatus()
@@ -1487,7 +1491,7 @@ DN_API void DN_OS_HttpRequestAsync(DN_OSHttpResponse     *response,
   fetch_attribs.onerror         = DN_OS_HttpRequestEMFetchOnErrorCallback;
   fetch_attribs.userData        = response;
 
-  DN_Str8 url = DN_Str8_InitF(scratch_arena, "%.*s%.*s", DN_STR_FMT(host), DN_STR_FMT(path));
+  DN_Str8 url = DN_Str8_InitF(tmem, "%.*s%.*s", DN_STR_FMT(host), DN_STR_FMT(path));
   DN_LOG_InfoF("Initiating HTTP '%s' request to '%.*s' with payload '%.*s'",
                fetch_attribs.requestMethod,
                DN_STR_FMT(url),

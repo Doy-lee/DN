@@ -96,7 +96,11 @@ DN_API void DN_OS_Init(DN_OSCore *os, DN_OSInitArgs *args)
     os->page_size               = system_info.dwPageSize;
     os->alloc_granularity       = system_info.dwAllocationGranularity;
     #else
-    os->logical_processor_count = get_nprocs();
+      #if defined(DN_PLATFORM_EMSCRIPTEN)
+      os->logical_processor_count = 1;
+      #else
+      os->logical_processor_count = get_nprocs();
+      #endif
     os->page_size               = getpagesize();
     os->alloc_granularity       = os->page_size;
     #endif
@@ -106,10 +110,15 @@ DN_API void DN_OS_Init(DN_OSCore *os, DN_OSInitArgs *args)
   DN_OS_EmitLogsWithOSPrintFunctions(os);
 
   {
+    #if defined(DN_PLATFORM_EMSCRIPTEN)
     os->arena = DN_Arena_InitFromOSVMem(DN_Megabytes(1), DN_Kilobytes(4), DN_ArenaFlags_NoAllocTrack);
+    #else
+    os->arena = DN_Arena_InitFromOSHeap(DN_Megabytes(1), DN_ArenaFlags_NoAllocTrack);
+    #endif
+
     #if defined(DN_PLATFORM_WIN32)
     os->platform_context = DN_Arena_New(&os->arena, DN_W32Core, DN_ZeroMem_Yes);
-    #elif defined(DN_PLATFORM_POSIX)
+    #elif defined(DN_PLATFORM_POSIX) || defined(DN_PLATFORM_EMSCRIPTEN)
     os->platform_context = DN_Arena_New(&os->arena, DN_POSIXCore, DN_ZeroMem_Yes);
     #endif
 

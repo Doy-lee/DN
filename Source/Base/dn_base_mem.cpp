@@ -421,11 +421,11 @@ DN_API void *DN_Pool_Alloc(DN_Pool *pool, DN_USize size)
   DN_USize       slot_index          = 0;
   if (required_size > 32) {
     // NOTE: Round up if not PoT as the low bits are set.
-    DN_USize dist_to_next_msb = DN_CountLeadingZerosU64(required_size) + 1;
+    DN_USize dist_to_next_msb = DN_CountLeadingZerosUSize(required_size) + 1;
     dist_to_next_msb -= DN_CAST(DN_USize)(!DN_IsPowerOfTwo(required_size));
 
     DN_USize const register_size = sizeof(DN_USize) * 8;
-    DN_Assert(register_size >= dist_to_next_msb + size_to_slot_offset);
+    DN_AssertF(register_size >= (dist_to_next_msb - size_to_slot_offset), "lhs=%zu, rhs=%zu");
     slot_index = register_size - dist_to_next_msb - size_to_slot_offset;
   }
 
@@ -433,8 +433,8 @@ DN_API void *DN_Pool_Alloc(DN_Pool *pool, DN_USize size)
     return result;
 
   DN_USize slot_size_in_bytes = 1ULL << (slot_index + size_to_slot_offset);
-  DN_Assert(required_size <= (slot_size_in_bytes << 0));
-  DN_Assert(required_size >= (slot_size_in_bytes >> 1));
+  DN_AssertF(required_size <= (slot_size_in_bytes << 0), "slot_index=%zu, lhs=%zu, rhs=%zu", slot_index, required_size, (slot_size_in_bytes << 0));
+  DN_AssertF(required_size >= (slot_size_in_bytes >> 1), "slot_index=%zu, lhs=%zu, rhs=%zu", slot_index, required_size, (slot_size_in_bytes >> 1));
 
   DN_PoolSlot *slot = nullptr;
   if (pool->slots[slot_index]) {

@@ -4,7 +4,7 @@
 #if defined(DN_PLATFORM_WIN32)
   #include "OS/dn_os_windows.h"
   #include "OS/dn_os_w32.h"
-#elif defined(DN_PLATFORM_POSIX)
+#elif defined(DN_PLATFORM_POSIX) || defined(DN_PLATFORM_EMSCRIPTEN)
   #include "OS/dn_os_posix.h"
 #else
   #error Please define a platform e.g. 'DN_PLATFORM_WIN32' to enable the correct implementation for platform APIs

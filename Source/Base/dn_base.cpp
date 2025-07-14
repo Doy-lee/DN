@@ -3,17 +3,24 @@
 #include "../dn_clangd.h"
 
 // NOTE: [$INTR] Intrinsics ////////////////////////////////////////////////////////////////////////
+DN_CPUFeatureDecl g_dn_cpu_feature_decl[DN_CPUFeature_Count];
+
 #if !defined(DN_PLATFORM_ARM64) && !defined(DN_PLATFORM_EMSCRIPTEN)
+  #define DN_SUPPORTS_CPU_ID
+#endif
+
+#if defined(DN_SUPPORTS_CPU_ID)
   #if defined(DN_COMPILER_GCC) || defined(DN_COMPILER_CLANG)
     #include <cpuid.h>
   #endif
-
-DN_CPUFeatureDecl g_dn_cpu_feature_decl[DN_CPUFeature_Count];
+#endif // defined(DN_SUPPORTS_CPU_ID)
 
 DN_API DN_CPUIDResult DN_CPU_ID(DN_CPUIDArgs args)
 {
   DN_CPUIDResult result = {};
+#if defined(DN_SUPPORTS_CPU_ID)
   __cpuidex(result.values, args.eax, args.ecx);
+#endif
   return result;
 }
 
@@ -61,6 +68,7 @@ DN_API void DN_CPU_SetFeature(DN_CPUReport *report, DN_CPUFeature feature)
 DN_API DN_CPUReport DN_CPU_Report()
 {
   DN_CPUReport   result                 = {};
+#if defined(DN_SUPPORTS_CPU_ID)
   DN_CPUIDResult fn_0000_[500]          = {};
   DN_CPUIDResult fn_8000_[500]          = {};
   int const      EXTENDED_FUNC_BASE_EAX = 0x8000'0000;
@@ -201,10 +209,9 @@ DN_API DN_CPUReport DN_CPU_Report()
     if (available)
       DN_CPU_SetFeature(&result, DN_CAST(DN_CPUFeature) ext_index);
   }
-
+#endif // DN_SUPPORTS_CPU_ID
   return result;
 }
-#endif // !defined(DN_PLATFORM_ARM64) && !defined(DN_PLATFORM_EMSCRIPTEN)
 
 // NOTE: DN_TicketMutex ////////////////////////////////////////////////////////////////////////////
 DN_API void DN_TicketMutex_Begin(DN_TicketMutex *mutex)
