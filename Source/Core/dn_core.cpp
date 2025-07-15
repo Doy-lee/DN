@@ -23,10 +23,14 @@ DN_API void DN_Core_Init(DN_Core *core, DN_CoreOnInit on_init)
   if (on_init & DN_CoreOnInit_LogLibFeatures) {
     DN_Str8Builder_AppendRef(&builder, DN_STR8("DN initialised:\n"));
 
-    DN_F64 page_size_kib         = g_dn_os_core_->page_size / 1024.0;
-    DN_F64 alloc_granularity_kib = g_dn_os_core_->alloc_granularity / 1024.0;
-    DN_Str8Builder_AppendF(
-        &builder, "  OS Page Size/Alloc Granularity: %.1f/%.1fKiB\n", page_size_kib, alloc_granularity_kib);
+    DN_F32 page_size_kib         = g_dn_os_core_->page_size / 1024.0f;
+    DN_F32 alloc_granularity_kib = g_dn_os_core_->alloc_granularity / 1024.0f;
+    DN_Str8Builder_AppendF(&builder,
+                           "  OS Page Size/Alloc Granularity: %.1f/%.1fKiB\n"
+                           "  Logical Processor Count: %u\n",
+                           page_size_kib,
+                           alloc_granularity_kib,
+                           g_dn_os_core_->logical_processor_count);
 
     #if DN_HAS_FEATURE(address_sanitizer) || defined(__SANITIZE_ADDRESS__)
     if (DN_ASAN_POISON) {
@@ -42,6 +46,11 @@ DN_API void DN_Core_Init(DN_Core *core, DN_CoreOnInit on_init)
 
     #if !defined(DN_NO_PROFILER)
     DN_Str8Builder_AppendRef(&builder, DN_STR8("  TSC profiler available\n"));
+    #endif
+
+    #if defined(DN_PLATFORM_EMSCRIPTEN) || defined(DN_PLATFORM_POSIX)
+    DN_POSIXCore *posix = DN_CAST(DN_POSIXCore *)g_dn_os_core_->platform_context;
+    DN_Str8Builder_AppendF(&builder, "  Clock GetTime: %S\n", posix->clock_monotonic_raw ? DN_STR8("CLOCK_MONOTONIC_RAW") : DN_STR8("CLOCK_MONOTONIC"));
     #endif
     // TODO(doyle): Add stacktrace feature log
   }

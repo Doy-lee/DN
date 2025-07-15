@@ -70,7 +70,9 @@ struct DN_POSIXCore
 {
   DN_POSIXSyncPrimitive *sync_primitive_free_list;
   pthread_mutex_t        sync_primitive_free_list_mutex;
+  bool                   clock_monotonic_raw;
 };
 
+DN_API void                   DN_Posix_Init(DN_POSIXCore *posix);
 DN_API void                   DN_Posix_ThreadSetName(DN_Str8 name);
 DN_API DN_POSIXProcSelfStatus DN_Posix_ProcSelfStatus();

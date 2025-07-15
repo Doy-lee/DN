@@ -111,9 +111,9 @@ DN_API void DN_OS_Init(DN_OSCore *os, DN_OSInitArgs *args)
 
   {
     #if defined(DN_PLATFORM_EMSCRIPTEN)
-    os->arena = DN_Arena_InitFromOSVMem(DN_Megabytes(1), DN_Kilobytes(4), DN_ArenaFlags_NoAllocTrack);
-    #else
     os->arena = DN_Arena_InitFromOSHeap(DN_Megabytes(1), DN_ArenaFlags_NoAllocTrack);
+    #else
+    os->arena = DN_Arena_InitFromOSVMem(DN_Megabytes(1), DN_Kilobytes(4), DN_ArenaFlags_NoAllocTrack);
     #endif
 
     #if defined(DN_PLATFORM_WIN32)
@@ -139,9 +139,7 @@ DN_API void DN_OS_Init(DN_OSCore *os, DN_OSInitArgs *args)
     else
       DN_LOG_ErrorF("Failed to initialise Windows secure random number generator, error: %d", init_status);
     #else
-    DN_POSIXCore *posix = DN_CAST(DN_POSIXCore *) os->platform_context;
-    int mutex_init = pthread_mutex_init(&posix->sync_primitive_free_list_mutex, nullptr);
-    DN_Assert(mutex_init == 0);
+    DN_Posix_Init(DN_CAST(DN_POSIXCore *)os->platform_context);
     #endif
   }
 

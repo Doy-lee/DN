@@ -281,19 +281,27 @@ DN_API void DN_OS_SleepMs(DN_UInt milliseconds)
     ;
 }
 
-DN_API uint64_t DN_OS_PerfCounterFrequency()
+DN_API DN_U64 DN_OS_PerfCounterFrequency()
 {
-  // NOTE: On Linux we use clock_gettime(CLOCK_MONOTONIC_RAW) which
+  // NOTE: On Linux we use clock_gettime(CLOCK_MONOTONIC_RAW) (or CLOCK_MONOTONIC) which
   // increments at nanosecond granularity.
-  uint64_t result = 1'000'000'000;
+  DN_U64 result = 1'000'000'000;
   return result;
 }
 
-DN_API uint64_t DN_OS_PerfCounterNow()
+static DN_POSIXCore *DN_OS_GetPOSIXCore_()
 {
+  DN_Assert(g_dn_os_core_ && g_dn_os_core_->platform_context);
+  DN_POSIXCore *result = DN_CAST(DN_POSIXCore *)g_dn_os_core_->platform_context;
+  return result;
+}
+
+DN_API DN_U64 DN_OS_PerfCounterNow()
+{
+  DN_POSIXCore *posix = DN_OS_GetPOSIXCore_();
   struct timespec ts;
-  clock_gettime(CLOCK_MONOTONIC_RAW, &ts);
-  uint64_t result = DN_CAST(uint64_t) ts.tv_sec * 1'000'000'000 + DN_CAST(uint64_t) ts.tv_nsec;
+  clock_gettime(posix->clock_monotonic_raw ? CLOCK_MONOTONIC_RAW : CLOCK_MONOTONIC, &ts);
+  DN_U64 result = DN_CAST(DN_U64) ts.tv_sec * 1'000'000'000 + DN_CAST(DN_U64) ts.tv_nsec;
   return result;
 }
 
@@ -997,13 +1005,6 @@ DN_API DN_OSExecResult DN_OS_ExecPump(DN_OSExecAsyncHandle handle,
   return result;
 }
 
-static DN_POSIXCore *DN_OS_GetPOSIXCore_()
-{
-  DN_Assert(g_dn_os_core_ && g_dn_os_core_->platform_context);
-  DN_POSIXCore *result = DN_CAST(DN_POSIXCore *)g_dn_os_core_->platform_context;
-  return result;
-}
-
 static DN_POSIXSyncPrimitive *DN_OS_U64ToPOSIXSyncPrimitive_(DN_U64 u64)
 {
   DN_POSIXSyncPrimitive *result = nullptr;
@@ -1288,6 +1289,19 @@ DN_API DN_U32 DN_OS_ThreadID()
   pid_t result = gettid();
   DN_Assert(gettid() >= 0);
   return DN_CAST(DN_U32) result;
+}
+
+DN_API void DN_Posix_Init(DN_POSIXCore *posix)
+{
+  int mutex_init = pthread_mutex_init(&posix->sync_primitive_free_list_mutex, nullptr);
+  DN_Assert(mutex_init == 0);
+
+  struct timespec ts;
+  posix->clock_monotonic_raw = clock_gettime(CLOCK_MONOTONIC_RAW, &ts) != -1;
+  if (!posix->clock_monotonic_raw) {
+    int get_result = clock_gettime(CLOCK_MONOTONIC, &ts);
+    DN_AssertF(get_result != -1, "CLOCK_MONOTONIC_RAW and CLOCK_MONOTONIC are not supported by this platform");
+  }
 }
 
 DN_API void DN_Posix_ThreadSetName(DN_Str8 name)
