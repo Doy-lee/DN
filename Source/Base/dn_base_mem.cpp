@@ -425,7 +425,7 @@ DN_API void *DN_Pool_Alloc(DN_Pool *pool, DN_USize size)
     dist_to_next_msb -= DN_CAST(DN_USize)(!DN_IsPowerOfTwo(required_size));
 
     DN_USize const register_size = sizeof(DN_USize) * 8;
-    DN_AssertF(register_size >= (dist_to_next_msb - size_to_slot_offset), "lhs=%zu, rhs=%zu");
+    DN_AssertF(register_size >= (dist_to_next_msb - size_to_slot_offset), "lhs=%zu, rhs=%zu", register_size, (dist_to_next_msb - size_to_slot_offset));
     slot_index = register_size - dist_to_next_msb - size_to_slot_offset;
   }
 
