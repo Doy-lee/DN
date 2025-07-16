@@ -217,6 +217,8 @@ template <typename T> struct DN_List
 #define                      DN_LArray_Prepend(c_array, size, max, item)                        (decltype(&(c_array)[0])) DN_CArray2_AddArray (c_array, size, max, sizeof((c_array)[0]), &item, 1,     DN_ArrayAdd_Prepend)
 #define                      DN_LArray_EraseRange(c_array, size, begin_index, count, erase)     DN_CArray2_EraseRange(c_array, size, sizeof((c_array)[0]), begin_index, count, erase)
 #define                      DN_LArray_Erase(c_array, size, index, erase)                       DN_CArray2_EraseRange(c_array, size, sizeof((c_array)[0]), index,       1,     erase)
+#define                      DN_LArray_InsertArray(c_array, size, max, index, items, count)     (decltype(&(c_array)[0])) DN_CArray2_InsertArray(c_array, size, max, sizeof((c_array)[0]), index, items, count)
+#define                      DN_LArray_Insert(c_array, size, max, index, item)                  (decltype(&(c_array)[0])) DN_CArray2_InsertArray(c_array, size, max, sizeof((c_array)[0]), index, &item, 1)
 
 #define                      DN_IArray_Front(array)                                             (array)->data
 #define                      DN_IArray_GrowIfNeededFromPool(array, pool)                        DN_CArray2_GrowIfNeededFromPool((void **)(&(array)->data), (array)->size, &(array)->max, sizeof((array)->data[0]), pool)
@@ -232,6 +234,8 @@ template <typename T> struct DN_List
 #define                      DN_IArray_Prepend(array, item)                                     (decltype(&((array)->data)[0])) DN_CArray2_AddArray ((array)->data, &(array)->size, (array)->max, sizeof(((array)->data)[0]), &item, 1,     DN_ArrayAdd_Prepend)
 #define                      DN_IArray_EraseRange(array, size, begin_index, count, erase)       DN_CArray2_EraseRange((array)->data, &(array)->size, sizeof(((array)->data)[0]), begin_index, count, erase)
 #define                      DN_IArray_Erase(array, size, index, erase)                         DN_CArray2_EraseRange((array)->data, &(array)->size, sizeof(((array)->data)[0]), index,           1, erase)
+#define                      DN_IArray_InsertArray(array, index, items, count)                  (decltype(&((array)->data)[0])) DN_CArray2_InsertArray((array)->data, &(array)->size, (array)->max, sizeof(((array)->data)[0]), index, items, count)
+#define                      DN_IArray_Insert(array, index, item, count)                        (decltype(&((array)->data)[0])) DN_CArray2_InsertArray((array)->data, &(array)->size, (array)->max, sizeof(((array)->data)[0]), index, &item, 1)
 
 DN_API  DN_ArrayEraseResult  DN_CArray2_EraseRange           (void *data, DN_USize *size, DN_USize elem_size, DN_USize begin_index, DN_ISize count, DN_ArrayErase erase);
 DN_API  void                *DN_CArray2_MakeArray            (void *data, DN_USize *size, DN_USize max, DN_USize data_size, DN_USize make_size, DN_ZeroMem zero_mem);

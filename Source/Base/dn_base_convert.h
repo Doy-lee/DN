@@ -67,11 +67,13 @@ DN_API DN_CVTU64HexStr8    DN_CVT_U64ToHexStr8                         (DN_U64 n
 DN_API bool                DN_CVT_BytesToHexPtr                        (void const *src, DN_USize src_size, char *dest, DN_USize dest_size);
 DN_API DN_Str8             DN_CVT_BytesToHex                           (DN_Arena *arena, void const *src, DN_USize size);
 #define                    DN_CVT_BytesToHexFromTLS(...)               DN_CVT_BytesToHex(DN_OS_TLSTopArena(), __VA_ARGS__)
+#define                    DN_CVT_BytesToHexFromFrame(...)             DN_CVT_BytesToHex(DN_OS_TLSFrameArena(), __VA_ARGS__)
 
 DN_API DN_USize            DN_CVT_HexToBytesPtrUnchecked               (DN_Str8 hex, void *dest, DN_USize dest_size);
 DN_API DN_USize            DN_CVT_HexToBytesPtr                        (DN_Str8 hex, void *dest, DN_USize dest_size);
 DN_API DN_Str8             DN_CVT_HexToBytesUnchecked                  (DN_Arena *arena, DN_Str8 hex);
 #define                    DN_CVT_HexToBytesUncheckedFromTLS(...)      DN_CVT_HexToBytesUnchecked(DN_OS_TLSTopArena(), __VA_ARGS__)
 DN_API DN_Str8             DN_CVT_HexToBytes                           (DN_Arena *arena, DN_Str8 hex);
+#define                    DN_CVT_HexToBytesFromFrame(...)             DN_CVT_HexToBytes(DN_OS_TLSFrameArena(), __VA_ARGS__)
 #define                    DN_CVT_HexToBytesFromTLS(...)               DN_CVT_HexToBytes(DN_OS_TLSTopArena(), __VA_ARGS__)
 #endif // defined(DN_BASE_CONVERT_H)

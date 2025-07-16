@@ -2,6 +2,70 @@
 
 #include "../dn_base_inc.h"
 
+DN_API void *DN_CArray2_InsertArray(void *data, DN_USize *size, DN_USize max, DN_USize elem_size, DN_USize index, void const *items, DN_USize count)
+{
+  void *result = nullptr;
+  if (!data || !size || !items || count <= 0 || ((*size + count) > max))
+    return result;
+
+  DN_USize clamped_index = DN_Min(index, *size);
+  if (clamped_index != *size) {
+    char const *src           = DN_CAST(char *)data + (clamped_index * elem_size);
+    char const *dest          = DN_CAST(char *)data + ((clamped_index + count) * elem_size);
+    char const *end           = DN_CAST(char *)data + (size[0] * elem_size);
+    DN_USize    bytes_to_move = end - src;
+    DN_Memmove(DN_CAST(void *) dest, src, bytes_to_move);
+  }
+
+  result = DN_CAST(char *)data + (clamped_index * elem_size);
+  DN_Memcpy(result, items, elem_size * count);
+  *size += count;
+  return result;
+}
+
+DN_API DN_ArrayEraseResult DN_CArray2_EraseRange(void *data, DN_USize *size, DN_USize elem_size, DN_USize begin_index, DN_ISize count, DN_ArrayErase erase)
+{
+  DN_ArrayEraseResult result = {};
+  if (!data || !size || *size == 0 || count == 0)
+    return result;
+
+  // Compute the range to erase
+  DN_USize start = 0, end = 0;
+  if (count < 0) {
+    DN_USize abs_count = DN_Abs(count);
+    start = begin_index >= abs_count ? begin_index - abs_count + 1 : 0;
+    end   = begin_index >= abs_count ? begin_index + 1             : 0;
+  } else {
+    start = begin_index;
+    end   = begin_index + count;
+  }
+
+  // Clamp indices to valid bounds
+  start = DN_Min(start, *size);
+  end   = DN_Min(end,   *size);
+
+  // Erase the range [start, end)
+  DN_USize erase_count = end > start ? end - start : 0;
+  if (erase_count) {
+    char    *dest      = (char *)data + (elem_size * start);
+    char    *array_end = (char *)data + (elem_size * *size);
+    char    *src       = dest + (elem_size * erase_count);
+    if (erase == DN_ArrayErase_Stable) {
+      DN_USize move_size = array_end - src;
+      DN_Memmove(dest, src, move_size);
+    } else {
+      char    *unstable_src = array_end - (elem_size * erase_count);
+      DN_USize move_size    = array_end - unstable_src;
+      DN_Memcpy(dest, unstable_src, move_size);
+    }
+    *size -= erase_count;
+  }
+
+  result.items_erased = erase_count;
+  result.it_index     = start;
+  return result;
+}
+
 DN_API void *DN_CArray2_MakeArray(void *data, DN_USize *size, DN_USize max, DN_USize data_size, DN_USize make_size, DN_ZeroMem zero_mem)
 {
   void *result = nullptr;
@@ -50,49 +114,6 @@ DN_API bool DN_CArray2_GrowIfNeededFromPool(void **data, DN_USize size, DN_USize
     }
   }
 
-  return result;
-}
-
-DN_API DN_ArrayEraseResult DN_CArray2_EraseRange(void *data, DN_USize *size, DN_USize elem_size, DN_USize begin_index, DN_ISize count, DN_ArrayErase erase)
-{
-  DN_ArrayEraseResult result = {};
-  if (!data || !size || *size == 0 || count == 0)
-    return result;
-
-  // Compute the range to erase
-  DN_USize start = 0, end = 0;
-  if (count < 0) {
-    DN_USize abs_count = DN_Abs(count);
-    start = begin_index >= abs_count ? begin_index - abs_count + 1 : 0;
-    end   = begin_index >= abs_count ? begin_index + 1             : 0;
-  } else {
-    start = begin_index;
-    end   = begin_index + count;
-  }
-
-  // Clamp indices to valid bounds
-  start = DN_Min(start, *size);
-  end   = DN_Min(end,   *size);
-
-  // Erase the range [start, end)
-  DN_USize erase_count = end > start ? end - start : 0;
-  if (erase_count) {
-    char    *dest      = (char *)data + (elem_size * start);
-    char    *array_end = (char *)data + (elem_size * *size);
-    char    *src       = dest + (elem_size * erase_count);
-    if (erase == DN_ArrayErase_Stable) {
-      DN_USize move_size = array_end - src;
-      DN_Memmove(dest, src, move_size);
-    } else {
-      char    *unstable_src = array_end - (elem_size * erase_count);
-      DN_USize move_size    = array_end - unstable_src;
-      DN_Memcpy(dest, unstable_src, move_size);
-    }
-    *size -= erase_count;
-  }
-
-  result.items_erased = erase_count;
-  result.it_index     = start;
   return result;
 }
 
