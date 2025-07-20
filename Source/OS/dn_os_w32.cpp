@@ -604,7 +604,7 @@ DN_API DN_OSFileRead DN_OS_FileRead(DN_OSFile *file, void *buffer, DN_USize size
 
   DN_OSTLSTMem tmem = DN_OS_TLSTMem(nullptr);
   if (!DN_Check(size <= (unsigned long)-1)) {
-    DN_Str8 buffer_size_str8 = DN_CVT_U64ToByteSizeStr8(tmem.arena, size, DN_CVTU64ByteSizeType_Auto);
+    DN_Str8 buffer_size_str8 = DN_CVT_U64ToBytesStr8AutoFromTLS(size);
     DN_OS_ErrSinkAppendF(
         err,
         1 /*error_code*/,
@@ -658,9 +658,9 @@ DN_API bool DN_OS_FileWritePtr(DN_OSFile *file, void const *buffer, DN_USize siz
   }
 
   if (!result) {
-    DN_OSTLSTMem  tmem             = DN_OS_TLSTMem(nullptr);
-    DN_W32Error win_error        = DN_W32_LastError(tmem.arena);
-    DN_Str8     buffer_size_str8 = DN_CVT_U64ToByteSizeStr8(tmem.arena, size, DN_CVTU64ByteSizeType_Auto);
+    DN_OSTLSTMem tmem             = DN_OS_TLSTMem(nullptr);
+    DN_W32Error  win_error        = DN_W32_LastError(tmem.arena);
+    DN_Str8      buffer_size_str8 = DN_CVT_U64ToBytesStr8AutoFromTLS(size);
     DN_OS_ErrSinkAppendF(err, win_error.code, "Failed to write buffer (%.*s) to file handle: %.*s", DN_STR_FMT(buffer_size_str8), DN_STR_FMT(win_error.msg));
   }
   return result;

@@ -463,7 +463,7 @@ DN_API DN_Str8 DN_OS_ReadAll(DN_Arena *arena, DN_Str8 path, DN_OSErrSink *error)
   result                   = DN_Str8_Alloc(arena, path_info.size, DN_ZeroMem_No);
   if (!DN_Str8_HasData(result)) {
     DN_OSTLSTMem tmem             = DN_OS_TLSTMem(nullptr);
-    DN_Str8    buffer_size_str8 = DN_CVT_U64ToByteSizeStr8(tmem.arena, path_info.size, DN_CVTU64ByteSizeType_Auto);
+    DN_Str8      buffer_size_str8 = DN_CVT_U64ToBytesStr8AutoFromTLS(path_info.size);
     DN_OS_ErrSinkAppendF(error, 1 /*error_code*/, "Failed to allocate %.*s for reading file '%.*s'", DN_STR_FMT(buffer_size_str8), DN_STR_FMT(path));
     DN_Arena_TempMemEnd(temp_mem);
     result = {};

@@ -222,11 +222,11 @@ struct DN_Pool
 {
   DN_Arena    *arena;
   DN_PoolSlot *slots[DN_PoolSlotSize_Count];
-  uint8_t      align;
+  DN_U8        align;
 };
 
 // NOTE: DN_Pool ///////////////////////////////////////////////////////////////////////////////////
-DN_API DN_Pool              DN_Pool_Init                                 (DN_Arena *arena, uint8_t align);
+DN_API DN_Pool              DN_Pool_Init                                 (DN_Arena *arena, DN_U8 align);
 DN_API bool                 DN_Pool_IsValid                              (DN_Pool const *pool);
 DN_API void *               DN_Pool_Alloc                                (DN_Pool *pool, DN_USize size);
 DN_API DN_Str8              DN_Pool_AllocStr8FV                          (DN_Pool *pool, DN_FMT_ATTRIB char const *fmt, va_list args);

@@ -14,7 +14,7 @@ DN_API int DN_CVT_FmtBuffer3DotTruncate(char *buffer, int size, DN_FMT_ATTRIB ch
   return result;
 }
 
-DN_API DN_CVTU64Str8 DN_CVT_U64ToStr8(uint64_t val, char separator)
+DN_API DN_CVTU64Str8 DN_CVT_U64ToStr8(DN_U64 val, char separator)
 {
   DN_CVTU64Str8 result = {};
   if (val == 0) {
@@ -47,44 +47,41 @@ DN_API DN_CVTU64Str8 DN_CVT_U64ToStr8(uint64_t val, char separator)
   return result;
 }
 
-DN_API DN_CVTU64ByteSize DN_CVT_U64ToByteSize(uint64_t bytes, DN_CVTU64ByteSizeType desired_type)
+DN_API DN_CVTU64Bytes DN_CVT_U64ToBytes(DN_U64 bytes, DN_CVTBytesType type)
 {
-  DN_CVTU64ByteSize result = {};
+  DN_Assert(type != DN_CVTBytesType_Count);
+  DN_CVTU64Bytes result = {};
   result.bytes          = DN_CAST(DN_F64) bytes;
-  if (!DN_Check(desired_type != DN_CVTU64ByteSizeType_Count)) {
-    result.suffix = DN_CVT_U64ByteSizeTypeString(result.type);
-    return result;
-  }
 
-  if (desired_type == DN_CVTU64ByteSizeType_Auto)
-    for (; result.type < DN_CVTU64ByteSizeType_Count && result.bytes >= 1024.0; result.type = DN_CAST(DN_CVTU64ByteSizeType)(DN_CAST(DN_USize) result.type + 1))
+  if (type == DN_CVTBytesType_Auto)
+    for (; result.type < DN_CVTBytesType_Count && result.bytes >= 1024.0; result.type = DN_CAST(DN_CVTBytesType)(DN_CAST(DN_USize) result.type + 1))
       result.bytes /= 1024.0;
   else
-    for (; result.type < desired_type; result.type = DN_CAST(DN_CVTU64ByteSizeType)(DN_CAST(DN_USize) result.type + 1))
+    for (; result.type < type; result.type = DN_CAST(DN_CVTBytesType)(DN_CAST(DN_USize) result.type + 1))
       result.bytes /= 1024.0;
 
-  result.suffix = DN_CVT_U64ByteSizeTypeString(result.type);
+  result.suffix = DN_CVT_BytesTypeToStr8(result.type);
   return result;
 }
 
-DN_API DN_Str8 DN_CVT_U64ToByteSizeStr8(DN_Arena *arena, uint64_t bytes, DN_CVTU64ByteSizeType desired_type)
+DN_API DN_Str8 DN_CVT_U64ToBytesStr8(DN_Arena *arena, DN_U64 bytes, DN_CVTBytesType desired_type)
 {
-  DN_CVTU64ByteSize byte_size = DN_CVT_U64ToByteSize(bytes, desired_type);
-  DN_Str8        result       = DN_Str8_InitF(arena, "%.2f%.*s", byte_size.bytes, DN_STR_FMT(byte_size.suffix));
+  DN_CVTU64Bytes byte_size = DN_CVT_U64ToBytes(bytes, desired_type);
+  DN_Str8        result    = DN_Str8_InitF(arena, "%.2f%.*s", byte_size.bytes, DN_STR_FMT(byte_size.suffix));
   return result;
 }
 
-DN_API DN_Str8 DN_CVT_U64ByteSizeTypeString(DN_CVTU64ByteSizeType type)
+DN_API DN_Str8 DN_CVT_BytesTypeToStr8(DN_CVTBytesType type)
 {
   DN_Str8 result = DN_STR8("");
   switch (type) {
-    case DN_CVTU64ByteSizeType_B: result = DN_STR8("B"); break;
-    case DN_CVTU64ByteSizeType_KiB: result = DN_STR8("KiB"); break;
-    case DN_CVTU64ByteSizeType_MiB: result = DN_STR8("MiB"); break;
-    case DN_CVTU64ByteSizeType_GiB: result = DN_STR8("GiB"); break;
-    case DN_CVTU64ByteSizeType_TiB: result = DN_STR8("TiB"); break;
-    case DN_CVTU64ByteSizeType_Count: result = DN_STR8(""); break;
-    case DN_CVTU64ByteSizeType_Auto: result = DN_STR8(""); break;
+    case DN_CVTBytesType_B:     result = DN_STR8("B"); break;
+    case DN_CVTBytesType_KiB:   result = DN_STR8("KiB"); break;
+    case DN_CVTBytesType_MiB:   result = DN_STR8("MiB"); break;
+    case DN_CVTBytesType_GiB:   result = DN_STR8("GiB"); break;
+    case DN_CVTBytesType_TiB:   result = DN_STR8("TiB"); break;
+    case DN_CVTBytesType_Count: result = DN_STR8(""); break;
+    case DN_CVTBytesType_Auto:  result = DN_STR8(""); break;
   }
   return result;
 }
@@ -205,14 +202,14 @@ DN_API DN_Str8 DN_CVT_F64ToAge(DN_Arena *arena, DN_F64 age_s, DN_CVTU64AgeUnit u
   return result;
 }
 
-DN_API uint64_t DN_CVT_HexToU64(DN_Str8 hex)
+DN_API DN_U64 DN_CVT_HexToU64(DN_Str8 hex)
 {
   DN_Str8  real_hex     = DN_Str8_TrimPrefix(DN_Str8_TrimPrefix(hex, DN_STR8("0x")), DN_STR8("0X"));
-  DN_USize max_hex_size = sizeof(uint64_t) * 2 /*hex chars per byte*/;
+  DN_USize max_hex_size = sizeof(DN_U64) * 2 /*hex chars per byte*/;
   DN_Assert(real_hex.size <= max_hex_size);
 
   DN_USize size   = DN_Min(max_hex_size, real_hex.size);
-  uint64_t result = 0;
+  DN_U64 result = 0;
   for (DN_USize index = 0; index < size; index++) {
     char           ch  = real_hex.data[index];
     DN_CharHexToU8 val = DN_Char_HexToU8(ch);
@@ -223,13 +220,13 @@ DN_API uint64_t DN_CVT_HexToU64(DN_Str8 hex)
   return result;
 }
 
-DN_API DN_Str8 DN_CVT_U64ToHex(DN_Arena *arena, uint64_t number, uint32_t flags)
+DN_API DN_Str8 DN_CVT_U64ToHex(DN_Arena *arena, DN_U64 number, uint32_t flags)
 {
   DN_Str8 prefix = {};
-  if ((flags & DN_CVTHexU64Str8Flags_0xPrefix))
+  if ((flags & DN_CVTU64HexStrFlags_0xPrefix))
     prefix = DN_STR8("0x");
 
-  char const *fmt           = (flags & DN_CVTHexU64Str8Flags_UppercaseHex) ? "%I64X" : "%I64x";
+  char const *fmt           = (flags & DN_CVTU64HexStrFlags_UppercaseHex) ? "%I64X" : "%I64x";
   DN_USize    required_size = DN_CStr8_FSize(fmt, number) + prefix.size;
   DN_Str8     result        = DN_Str8_Alloc(arena, required_size, DN_ZeroMem_No);
 
@@ -241,17 +238,17 @@ DN_API DN_Str8 DN_CVT_U64ToHex(DN_Arena *arena, uint64_t number, uint32_t flags)
   return result;
 }
 
-DN_API DN_CVTU64HexStr8 DN_CVT_U64ToHexStr8(uint64_t number, DN_CVTHexU64Str8Flags flags)
+DN_API DN_CVTU64HexStr DN_CVT_U64ToHexStr8(DN_U64 number, DN_CVTU64HexStrFlags flags)
 {
   DN_Str8 prefix = {};
-  if (flags & DN_CVTHexU64Str8Flags_0xPrefix)
+  if (flags & DN_CVTU64HexStrFlags_0xPrefix)
     prefix = DN_STR8("0x");
 
-  DN_CVTU64HexStr8 result = {};
+  DN_CVTU64HexStr result = {};
   DN_Memcpy(result.data, prefix.data, prefix.size);
   result.size += DN_CAST(int8_t) prefix.size;
 
-  char const *fmt  = (flags & DN_CVTHexU64Str8Flags_UppercaseHex) ? "%I64X" : "%I64x";
+  char const *fmt  = (flags & DN_CVTU64HexStrFlags_UppercaseHex) ? "%I64X" : "%I64x";
   int         size = DN_SNPrintF(result.data + result.size, DN_ArrayCountU(result.data) - result.size, fmt, number);
   result.size += DN_CAST(uint8_t) size;
   DN_Assert(result.size < DN_ArrayCountU(result.data));

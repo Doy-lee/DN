@@ -737,9 +737,9 @@ DN_U32 DN_DSMap_Hash(DN_DSMap<T> const *map, DN_DSMapKey key)
     DN_U32      len     = 0;
     DN_U32      h       = seed;
     switch (key.type) {
-      case DN_DSMapKeyType_BufferAsU64NoHash:               /*FALLTHRU*/
-      case DN_DSMapKeyType_U64NoHash: DN_InvalidCodePath; /*FALLTHRU*/
-      case DN_DSMapKeyType_Invalid: break;
+      case DN_DSMapKeyType_BufferAsU64NoHash: /*FALLTHRU*/
+      case DN_DSMapKeyType_U64NoHash:         DN_InvalidCodePath; /*FALLTHRU*/
+      case DN_DSMapKeyType_Invalid:           break;
 
       case DN_DSMapKeyType_Buffer:
         key_ptr = DN_CAST(char const *) key.buffer_data;
