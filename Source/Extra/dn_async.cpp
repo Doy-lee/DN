@@ -14,25 +14,25 @@ static DN_I32 DN_ASYNC_ThreadEntryPoint_(DN_OSThread *thread)
     if (async->join_threads)
         break;
 
-    DN_ASYNCJob job = {};
+    DN_ASYNCTask task = {};
     for (DN_OS_MutexScope(&async->ring_mutex)) {
-      if (DN_Ring_HasData(ring, sizeof(job)))
-        DN_Ring_Read(ring, &job, sizeof(job));
+      if (DN_Ring_HasData(ring, sizeof(task)))
+        DN_Ring_Read(ring, &task, sizeof(task));
     }
 
-    if (job.work.func) {
+    if (task.work.func) {
       DN_OS_ConditionVariableBroadcast(&async->ring_write_cv); // Resume any blocked ring write(s)
 
       DN_ASYNCWorkArgs args = {};
-      args.input            = job.work.input;
+      args.input            = task.work.input;
       args.thread           = thread;
 
       DN_Atomic_AddU32(&async->busy_threads, 1);
-      job.work.func(args);
+      task.work.func(args);
       DN_Atomic_SubU32(&async->busy_threads, 1);
 
-      if (job.completion_sem.handle != 0)
-        DN_OS_SemaphoreIncrement(&job.completion_sem, 1);
+      if (task.completion_sem.handle != 0)
+        DN_OS_SemaphoreIncrement(&task.completion_sem, 1);
     }
   }
 
@@ -65,14 +65,13 @@ DN_API void DN_ASYNC_Deinit(DN_ASYNCCore *async)
     DN_OS_ThreadDeinit(it.data);
 }
 
-
-static bool DN_ASYNC_QueueJob_(DN_ASYNCCore *async, DN_ASYNCJob const *job, DN_U64 wait_time_ms) {
+static bool DN_ASYNC_QueueTask_(DN_ASYNCCore *async, DN_ASYNCTask const *task, DN_U64 wait_time_ms) {
   DN_U64 end_time_ms = DN_OS_DateUnixTimeMs() + wait_time_ms;
   bool result = false;
   for (DN_OS_MutexScope(&async->ring_mutex)) {
     for (;;) {
-      if (DN_Ring_HasSpace(&async->ring, sizeof(*job))) {
-        DN_Ring_WriteStruct(&async->ring, job);
+      if (DN_Ring_HasSpace(&async->ring, sizeof(*task))) {
+        DN_Ring_WriteStruct(&async->ring, task);
         result = true;
         break;
       }
@@ -90,27 +89,35 @@ static bool DN_ASYNC_QueueJob_(DN_ASYNCCore *async, DN_ASYNCJob const *job, DN_U
 
 DN_API bool DN_ASYNC_QueueWork(DN_ASYNCCore *async, DN_ASYNCWorkFunc *func, void *input, DN_U64 wait_time_ms)
 {
-  DN_ASYNCJob job = {};
-  job.work.func   = func;
-  job.work.input  = input;
-  bool result     = DN_ASYNC_QueueJob_(async, &job, wait_time_ms);
+  DN_ASYNCTask task = {};
+  task.work.func    = func;
+  task.work.input   = input;
+  bool result       = DN_ASYNC_QueueTask_(async, &task, wait_time_ms);
   return result;
 }
 
-DN_API DN_OSSemaphore DN_ASYNC_QueueTask(DN_ASYNCCore *async, DN_ASYNCWorkFunc *func, void *input, DN_U64 wait_time_ms)
+DN_API DN_ASYNCTask DN_ASYNC_QueueTask(DN_ASYNCCore *async, DN_ASYNCWorkFunc *func, void *input, DN_U64 wait_time_ms)
 {
-  DN_OSSemaphore result = DN_OS_SemaphoreInit(0);
-  DN_ASYNCJob    job    = {};
-  job.work.func         = func;
-  job.work.input        = input;
-  job.completion_sem    = result;
-  DN_ASYNC_QueueJob_(async, &job, wait_time_ms);
+  DN_ASYNCTask result   = {};
+  result.work.func      = func;
+  result.work.input     = input;
+  result.completion_sem = DN_OS_SemaphoreInit(0);
+  result.queued         = DN_ASYNC_QueueTask_(async, &result, wait_time_ms);
+  if (!result.queued)
+      DN_OS_SemaphoreDeinit(&result.completion_sem);
   return result;
 }
 
-DN_API void DN_ASYNC_WaitTask(DN_OSSemaphore *sem, DN_U32 timeout_ms)
+DN_API bool DN_ASYNC_WaitTask(DN_ASYNCTask *task, DN_U32 timeout_ms)
 {
-  DN_OS_SemaphoreWait(sem, timeout_ms);
-  DN_OS_SemaphoreDeinit(sem);
+  bool result = true;
+  if (!task->queued)
+    return result;
+
+  DN_OSSemaphoreWaitResult wait = DN_OS_SemaphoreWait(&task->completion_sem, timeout_ms);
+  result                        = wait == DN_OSSemaphoreWaitResult_Success;
+  if (result)
+    DN_OS_SemaphoreDeinit(&task->completion_sem);
+  return result;
 }
 

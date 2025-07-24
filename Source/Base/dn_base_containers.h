@@ -203,43 +203,49 @@ template <typename T> struct DN_List
 //   MyLinkItem *first_item = DN_ISLList_Detach(&my_link, MyLinkItem);
 //   ```
 
-#define                      DN_ISLList_Detach(list)                                            (decltype(list)) DN_CSLList_Detach((void **)&(list), (void **)&(list)->next)
+#define                      DN_ISLList_Detach(list)                                             (decltype(list)) DN_CSLList_Detach((void **)&(list), (void **)&(list)->next)
 
-#define                      DN_LArray_MakeArray(c_array, size, max, count, zero_mem)           (decltype(&(c_array)[0])) DN_CArray2_MakeArray(c_array, size, max, sizeof((c_array)[0]), count, zero_mem)
-#define                      DN_LArray_MakeArrayZ(c_array, size, max, count)                    (decltype(&(c_array)[0])) DN_CArray2_MakeArray(c_array, size, max, sizeof((c_array)[0]), count, DN_ZeroMem_Yes)
-#define                      DN_LArray_Make(c_array, size, max, zero_mem)                       (decltype(&(c_array)[0])) DN_CArray2_MakeArray(c_array, size, max, sizeof((c_array)[0]), 1,     zero_mem)
-#define                      DN_LArray_MakeZ(c_array, size, max)                                (decltype(&(c_array)[0])) DN_CArray2_MakeArray(c_array, size, max, sizeof((c_array)[0]), 1,     DN_ZeroMem_Yes)
-#define                      DN_LArray_AddArray(c_array, size, max, items, count, add)          (decltype(&(c_array)[0])) DN_CArray2_AddArray (c_array, size, max, sizeof((c_array)[0]), items, count, add)
-#define                      DN_LArray_Add(c_array, size, max, item, add)                       (decltype(&(c_array)[0])) DN_CArray2_AddArray (c_array, size, max, sizeof((c_array)[0]), &item, 1,     add)
-#define                      DN_LArray_AppendArray(c_array, size, max, items, count)            (decltype(&(c_array)[0])) DN_CArray2_AddArray (c_array, size, max, sizeof((c_array)[0]), items, count, DN_ArrayAdd_Append)
-#define                      DN_LArray_Append(c_array, size, max, item)                         (decltype(&(c_array)[0])) DN_CArray2_AddArray (c_array, size, max, sizeof((c_array)[0]), &item, 1,     DN_ArrayAdd_Append)
-#define                      DN_LArray_PrependArray(c_array, size, max, items, count)           (decltype(&(c_array)[0])) DN_CArray2_AddArray (c_array, size, max, sizeof((c_array)[0]), items, count, DN_ArrayAdd_Prepend)
-#define                      DN_LArray_Prepend(c_array, size, max, item)                        (decltype(&(c_array)[0])) DN_CArray2_AddArray (c_array, size, max, sizeof((c_array)[0]), &item, 1,     DN_ArrayAdd_Prepend)
-#define                      DN_LArray_EraseRange(c_array, size, begin_index, count, erase)     DN_CArray2_EraseRange(c_array, size, sizeof((c_array)[0]), begin_index, count, erase)
-#define                      DN_LArray_Erase(c_array, size, index, erase)                       DN_CArray2_EraseRange(c_array, size, sizeof((c_array)[0]), index,       1,     erase)
-#define                      DN_LArray_InsertArray(c_array, size, max, index, items, count)     (decltype(&(c_array)[0])) DN_CArray2_InsertArray(c_array, size, max, sizeof((c_array)[0]), index, items, count)
-#define                      DN_LArray_Insert(c_array, size, max, index, item)                  (decltype(&(c_array)[0])) DN_CArray2_InsertArray(c_array, size, max, sizeof((c_array)[0]), index, &item, 1)
+#define                      DN_LArray_ResizeFromPool(c_array, size, max, pool, new_max)         DN_CArray2_ResizeFromPool((void **)&(c_array), size, max, sizeof((c_array)[0]), pool, new_max)
+#define                      DN_LArray_GrowFromPool(c_array, size, max, pool, new_max)           DN_CArray2_GrowFromPool((void **)&(c_array), size, max, sizeof((c_array)[0]), pool, new_max)
+#define                      DN_LArray_GrowIfNeededFromPool(c_array, size, max, pool, add_count) DN_CArray2_GrowIfNeededFromPool((void **)(c_array), size, max, sizeof((c_array)[0]), pool, add_count)
+#define                      DN_LArray_MakeArray(c_array, size, max, count, zero_mem)            (decltype(&(c_array)[0])) DN_CArray2_MakeArray(c_array, size, max, sizeof((c_array)[0]), count, zero_mem)
+#define                      DN_LArray_MakeArrayZ(c_array, size, max, count)                     (decltype(&(c_array)[0])) DN_CArray2_MakeArray(c_array, size, max, sizeof((c_array)[0]), count, DN_ZeroMem_Yes)
+#define                      DN_LArray_Make(c_array, size, max, zero_mem)                        (decltype(&(c_array)[0])) DN_CArray2_MakeArray(c_array, size, max, sizeof((c_array)[0]), 1,     zero_mem)
+#define                      DN_LArray_MakeZ(c_array, size, max)                                 (decltype(&(c_array)[0])) DN_CArray2_MakeArray(c_array, size, max, sizeof((c_array)[0]), 1,     DN_ZeroMem_Yes)
+#define                      DN_LArray_AddArray(c_array, size, max, items, count, add)           (decltype(&(c_array)[0])) DN_CArray2_AddArray (c_array, size, max, sizeof((c_array)[0]), items, count, add)
+#define                      DN_LArray_Add(c_array, size, max, item, add)                        (decltype(&(c_array)[0])) DN_CArray2_AddArray (c_array, size, max, sizeof((c_array)[0]), &item, 1,     add)
+#define                      DN_LArray_AppendArray(c_array, size, max, items, count)             (decltype(&(c_array)[0])) DN_CArray2_AddArray (c_array, size, max, sizeof((c_array)[0]), items, count, DN_ArrayAdd_Append)
+#define                      DN_LArray_Append(c_array, size, max, item)                          (decltype(&(c_array)[0])) DN_CArray2_AddArray (c_array, size, max, sizeof((c_array)[0]), &item, 1,     DN_ArrayAdd_Append)
+#define                      DN_LArray_PrependArray(c_array, size, max, items, count)            (decltype(&(c_array)[0])) DN_CArray2_AddArray (c_array, size, max, sizeof((c_array)[0]), items, count, DN_ArrayAdd_Prepend)
+#define                      DN_LArray_Prepend(c_array, size, max, item)                         (decltype(&(c_array)[0])) DN_CArray2_AddArray (c_array, size, max, sizeof((c_array)[0]), &item, 1,     DN_ArrayAdd_Prepend)
+#define                      DN_LArray_EraseRange(c_array, size, begin_index, count, erase)      DN_CArray2_EraseRange(c_array, size, sizeof((c_array)[0]), begin_index, count, erase)
+#define                      DN_LArray_Erase(c_array, size, index, erase)                        DN_CArray2_EraseRange(c_array, size, sizeof((c_array)[0]), index,       1,     erase)
+#define                      DN_LArray_InsertArray(c_array, size, max, index, items, count)      (decltype(&(c_array)[0])) DN_CArray2_InsertArray(c_array, size, max, sizeof((c_array)[0]), index, items, count)
+#define                      DN_LArray_Insert(c_array, size, max, index, item)                   (decltype(&(c_array)[0])) DN_CArray2_InsertArray(c_array, size, max, sizeof((c_array)[0]), index, &item, 1)
 
-#define                      DN_IArray_Front(array)                                             (array)->data
-#define                      DN_IArray_GrowIfNeededFromPool(array, pool)                        DN_CArray2_GrowIfNeededFromPool((void **)(&(array)->data), (array)->size, &(array)->max, sizeof((array)->data[0]), pool)
-#define                      DN_IArray_MakeArray(array, count, zero_mem)                        (decltype(&((array)->data)[0])) DN_CArray2_MakeArray((array)->data, &(array)->size, (array)->max, sizeof(((array)->data)[0]), count, zero_mem)
-#define                      DN_IArray_MakeArrayZ(array, count)                                 (decltype(&((array)->data)[0])) DN_CArray2_MakeArray((array)->data, &(array)->size, (array)->max, sizeof(((array)->data)[0]), count, DN_ZeroMem_Yes)
-#define                      DN_IArray_Make(array, zero_mem)                                    (decltype(&((array)->data)[0])) DN_CArray2_MakeArray((array)->data, &(array)->size, (array)->max, sizeof(((array)->data)[0]), 1,     zero_mem)
-#define                      DN_IArray_MakeZ(array)                                             (decltype(&((array)->data)[0])) DN_CArray2_MakeArray((array)->data, &(array)->size, (array)->max, sizeof(((array)->data)[0]), 1,     DN_ZeroMem_Yes)
-#define                      DN_IArray_AddArray(array, items, count, add)                       (decltype(&((array)->data)[0])) DN_CArray2_AddArray ((array)->data, &(array)->size, (array)->max, sizeof(((array)->data)[0]), items, count, add)
-#define                      DN_IArray_Add(array, item, add)                                    (decltype(&((array)->data)[0])) DN_CArray2_AddArray ((array)->data, &(array)->size, (array)->max, sizeof(((array)->data)[0]), &item, 1,     add)
-#define                      DN_IArray_AppendArray(array, items, count)                         (decltype(&((array)->data)[0])) DN_CArray2_AddArray ((array)->data, &(array)->size, (array)->max, sizeof(((array)->data)[0]), items, count, DN_ArrayAdd_Append)
-#define                      DN_IArray_Append(array, item)                                      (decltype(&((array)->data)[0])) DN_CArray2_AddArray ((array)->data, &(array)->size, (array)->max, sizeof(((array)->data)[0]), &item, 1,     DN_ArrayAdd_Append)
-#define                      DN_IArray_PrependArray(array, items, count)                        (decltype(&((array)->data)[0])) DN_CArray2_AddArray ((array)->data, &(array)->size, (array)->max, sizeof(((array)->data)[0]), items, count, DN_ArrayAdd_Prepend)
-#define                      DN_IArray_Prepend(array, item)                                     (decltype(&((array)->data)[0])) DN_CArray2_AddArray ((array)->data, &(array)->size, (array)->max, sizeof(((array)->data)[0]), &item, 1,     DN_ArrayAdd_Prepend)
-#define                      DN_IArray_EraseRange(array, size, begin_index, count, erase)       DN_CArray2_EraseRange((array)->data, &(array)->size, sizeof(((array)->data)[0]), begin_index, count, erase)
-#define                      DN_IArray_Erase(array, size, index, erase)                         DN_CArray2_EraseRange((array)->data, &(array)->size, sizeof(((array)->data)[0]), index,           1, erase)
-#define                      DN_IArray_InsertArray(array, index, items, count)                  (decltype(&((array)->data)[0])) DN_CArray2_InsertArray((array)->data, &(array)->size, (array)->max, sizeof(((array)->data)[0]), index, items, count)
-#define                      DN_IArray_Insert(array, index, item, count)                        (decltype(&((array)->data)[0])) DN_CArray2_InsertArray((array)->data, &(array)->size, (array)->max, sizeof(((array)->data)[0]), index, &item, 1)
+#define                      DN_IArray_ResizeFromPool(array, pool, new_max)                      DN_CArray2_ResizeFromPool((void **)(&(array)->data), &(array)->size, &(array)->max, sizeof((array)->data[0]), pool, new_max)
+#define                      DN_IArray_GrowFromPool(array, pool, new_max)                        DN_CArray2_GrowFromPool((void **)(&(array)->data), &(array)->size, &(array)->max, sizeof((array)->data[0]), pool, new_max)
+#define                      DN_IArray_GrowIfNeededFromPool(array, pool, add_count)              DN_CArray2_GrowIfNeededFromPool((void **)(&(array)->data), (array)->size, &(array)->max, sizeof((array)->data[0]), pool, add_count)
+#define                      DN_IArray_MakeArray(array, count, zero_mem)                         (decltype(&((array)->data)[0])) DN_CArray2_MakeArray((array)->data, &(array)->size, (array)->max, sizeof(((array)->data)[0]), count, zero_mem)
+#define                      DN_IArray_MakeArrayZ(array, count)                                  (decltype(&((array)->data)[0])) DN_CArray2_MakeArray((array)->data, &(array)->size, (array)->max, sizeof(((array)->data)[0]), count, DN_ZeroMem_Yes)
+#define                      DN_IArray_Make(array, zero_mem)                                     (decltype(&((array)->data)[0])) DN_CArray2_MakeArray((array)->data, &(array)->size, (array)->max, sizeof(((array)->data)[0]), 1,     zero_mem)
+#define                      DN_IArray_MakeZ(array)                                              (decltype(&((array)->data)[0])) DN_CArray2_MakeArray((array)->data, &(array)->size, (array)->max, sizeof(((array)->data)[0]), 1,     DN_ZeroMem_Yes)
+#define                      DN_IArray_AddArray(array, items, count, add)                        (decltype(&((array)->data)[0])) DN_CArray2_AddArray ((array)->data, &(array)->size, (array)->max, sizeof(((array)->data)[0]), items, count, add)
+#define                      DN_IArray_Add(array, item, add)                                     (decltype(&((array)->data)[0])) DN_CArray2_AddArray ((array)->data, &(array)->size, (array)->max, sizeof(((array)->data)[0]), &item, 1,     add)
+#define                      DN_IArray_AppendArray(array, items, count)                          (decltype(&((array)->data)[0])) DN_CArray2_AddArray ((array)->data, &(array)->size, (array)->max, sizeof(((array)->data)[0]), items, count, DN_ArrayAdd_Append)
+#define                      DN_IArray_Append(array, item)                                       (decltype(&((array)->data)[0])) DN_CArray2_AddArray ((array)->data, &(array)->size, (array)->max, sizeof(((array)->data)[0]), &item, 1,     DN_ArrayAdd_Append)
+#define                      DN_IArray_PrependArray(array, items, count)                         (decltype(&((array)->data)[0])) DN_CArray2_AddArray ((array)->data, &(array)->size, (array)->max, sizeof(((array)->data)[0]), items, count, DN_ArrayAdd_Prepend)
+#define                      DN_IArray_Prepend(array, item)                                      (decltype(&((array)->data)[0])) DN_CArray2_AddArray ((array)->data, &(array)->size, (array)->max, sizeof(((array)->data)[0]), &item, 1,     DN_ArrayAdd_Prepend)
+#define                      DN_IArray_EraseRange(array, begin_index, count, erase)              DN_CArray2_EraseRange((array)->data, &(array)->size, sizeof(((array)->data)[0]), begin_index, count, erase)
+#define                      DN_IArray_Erase(array, index, erase)                                DN_CArray2_EraseRange((array)->data, &(array)->size, sizeof(((array)->data)[0]), index,           1, erase)
+#define                      DN_IArray_InsertArray(array, index, items, count)                   (decltype(&((array)->data)[0])) DN_CArray2_InsertArray((array)->data, &(array)->size, (array)->max, sizeof(((array)->data)[0]), index, items, count)
+#define                      DN_IArray_Insert(array, index, item, count)                         (decltype(&((array)->data)[0])) DN_CArray2_InsertArray((array)->data, &(array)->size, (array)->max, sizeof(((array)->data)[0]), index, &item, 1)
 
 DN_API  DN_ArrayEraseResult  DN_CArray2_EraseRange           (void *data, DN_USize *size, DN_USize elem_size, DN_USize begin_index, DN_ISize count, DN_ArrayErase erase);
 DN_API  void                *DN_CArray2_MakeArray            (void *data, DN_USize *size, DN_USize max, DN_USize data_size, DN_USize make_size, DN_ZeroMem zero_mem);
 DN_API  void                *DN_CArray2_AddArray             (void *data, DN_USize *size, DN_USize max, DN_USize data_size, void *elems, DN_USize elems_count, DN_ArrayAdd add);
+DN_API  bool                 DN_CArray2_Resize               (void **data, DN_USize *size, DN_USize *max, DN_USize data_size, DN_Pool *pool, DN_USize new_max);
+DN_API  bool                 DN_CArray2_Grow                 (void **data, DN_USize *size, DN_USize *max, DN_USize data_size, DN_Pool *pool, DN_USize new_max);
 DN_API  bool                 DN_CArray2_GrowIfNeededFromPool (void **data, DN_USize size, DN_USize *max, DN_USize data_size, DN_Pool *pool);
 DN_API  void                *DN_CSLList_Detach               (void **link, void **next);
 

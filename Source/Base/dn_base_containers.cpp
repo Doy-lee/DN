@@ -96,24 +96,43 @@ DN_API void *DN_CArray2_AddArray(void *data, DN_USize *size, DN_USize max, DN_US
   return result;
 }
 
-DN_API bool DN_CArray2_GrowIfNeededFromPool(void **data, DN_USize size, DN_USize *max, DN_USize data_size, DN_Pool *pool)
+DN_API bool DN_CArray2_ResizeFromPool(void **data, DN_USize *size, DN_USize *max, DN_USize data_size, DN_Pool *pool, DN_USize new_max)
 {
   bool result = true;
-  if (size >= *max) {
-    DN_USize new_max        = DN_Max(*max * 2, 8);
+  if (new_max != *max) {
     DN_USize bytes_to_alloc = data_size * new_max;
     void    *buffer         = DN_Pool_NewArray(pool, DN_U8, bytes_to_alloc);
     if (buffer) {
-      DN_USize bytes_to_copy = data_size * size;
+      DN_USize bytes_to_copy = data_size * DN_Min(*size, new_max);
       DN_Memcpy(buffer, *data, bytes_to_copy);
       DN_Pool_Dealloc(pool, *data);
       *data = buffer;
       *max  = new_max;
+      *size = DN_Min(*size, new_max);
     } else {
       result = false;
     }
   }
 
+  return result;
+}
+
+DN_API bool DN_CArray2_GrowFromPool(void **data, DN_USize size, DN_USize *max, DN_USize data_size, DN_Pool *pool, DN_USize new_max)
+{
+  bool result = true;
+  if (new_max > *max)
+    result = DN_CArray2_ResizeFromPool(data, &size, max, data_size, pool, new_max);
+  return result;
+}
+
+DN_API bool DN_CArray2_GrowIfNeededFromPool(void **data, DN_USize size, DN_USize *max, DN_USize data_size, DN_Pool *pool, DN_USize add_count)
+{
+  bool     result   = true;
+  DN_USize new_size = size + add_count;
+  if (new_size > *max) {
+    DN_USize new_max = DN_Max(DN_Max(*max * 2, new_size), 8);
+    result           = DN_CArray2_ResizeFromPool(data, &size, max, data_size, pool, new_max);
+  }
   return result;
 }
 

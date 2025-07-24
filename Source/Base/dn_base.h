@@ -18,9 +18,9 @@
 
 #define DN_ForIndexU(index, size)        DN_USize index = 0; index < size; index++
 #define DN_ForIndexI(index, size)        DN_ISize index = 0; index < size; index++
-#define DN_ForItSize(it, T, array, size) struct { DN_USize index; T *data; } it = {0, &(array)[0]};       it.index < (size);                it.index++, it.data++
-#define DN_ForIt(it, T, array)           struct { DN_USize index; T *data; } it = {0, &(array)->data[0]}; it.index < (array)->size;         it.index++, it.data++
-#define DN_ForItCArray(it, T, array)     struct { DN_USize index; T *data; } it = {0, &(array)[0]};       it.index < DN_ArrayCountU(array); it.index++, it.data++
+#define DN_ForItSize(it, T, array, size) struct { DN_USize index; T *data; } it = {0, &(array)[0]};       it.index < (size);                it.index++, it.data = (array)         + it.index
+#define DN_ForIt(it, T, array)           struct { DN_USize index; T *data; } it = {0, &(array)->data[0]}; it.index < (array)->size;         it.index++, it.data = ((array)->data) + it.index
+#define DN_ForItCArray(it, T, array)     struct { DN_USize index; T *data; } it = {0, &(array)[0]};       it.index < DN_ArrayCountU(array); it.index++, it.data = (array)         + it.index
 
 #define DN_AlignUpPowerOfTwo(value, pot)   (((uintptr_t)(value) + ((uintptr_t)(pot) - 1)) & ~((uintptr_t)(pot) - 1))
 #define DN_AlignDownPowerOfTwo(value, pot) ((uintptr_t)(value) & ~((uintptr_t)(pot) - 1))
