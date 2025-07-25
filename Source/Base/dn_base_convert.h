@@ -78,11 +78,11 @@ DN_API DN_Str8           DN_CVT_BytesToHex                            (DN_Arena 
 #define                  DN_CVT_BytesToHexFromTLS(...)                DN_CVT_BytesToHex(DN_OS_TLSTopArena(), __VA_ARGS__)
 #define                  DN_CVT_BytesToHexFromFrame(...)              DN_CVT_BytesToHex(DN_OS_TLSFrameArena(), __VA_ARGS__)
 
-DN_API DN_USize          DN_CVT_HexToBytesPtrUnchecked              (DN_Str8 hex, void *dest, DN_USize dest_size);
-DN_API DN_USize          DN_CVT_HexToBytesPtr                       (DN_Str8 hex, void *dest, DN_USize dest_size);
-DN_API DN_Str8           DN_CVT_HexToBytesUnchecked                 (DN_Arena *arena, DN_Str8 hex);
-#define                  DN_CVT_HexToBytesUncheckedFromTLS(...)     DN_CVT_HexToBytesUnchecked(DN_OS_TLSTopArena(), __VA_ARGS__)
-DN_API DN_Str8           DN_CVT_HexToBytes                          (DN_Arena *arena, DN_Str8 hex);
-#define                  DN_CVT_HexToBytesFromFrame(...)            DN_CVT_HexToBytes(DN_OS_TLSFrameArena(), __VA_ARGS__)
-#define                  DN_CVT_HexToBytesFromTLS(...)              DN_CVT_HexToBytes(DN_OS_TLSTopArena(), __VA_ARGS__)
+DN_API DN_USize          DN_CVT_HexToBytesPtrUnchecked                (DN_Str8 hex, void *dest, DN_USize dest_size);
+DN_API DN_USize          DN_CVT_HexToBytesPtr                         (DN_Str8 hex, void *dest, DN_USize dest_size);
+DN_API DN_Str8           DN_CVT_HexToBytesUnchecked                   (DN_Arena *arena, DN_Str8 hex);
+#define                  DN_CVT_HexToBytesUncheckedFromTLS(...)       DN_CVT_HexToBytesUnchecked(DN_OS_TLSTopArena(), __VA_ARGS__)
+DN_API DN_Str8           DN_CVT_HexToBytes                            (DN_Arena *arena, DN_Str8 hex);
+#define                  DN_CVT_HexToBytesFromFrame(...)              DN_CVT_HexToBytes(DN_OS_TLSFrameArena(), __VA_ARGS__)
+#define                  DN_CVT_HexToBytesFromTLS(...)                DN_CVT_HexToBytes(DN_OS_TLSTopArena(), __VA_ARGS__)
 #endif // defined(DN_BASE_CONVERT_H)

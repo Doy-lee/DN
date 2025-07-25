@@ -542,9 +542,9 @@ DN_API DN_Str8ToU64Result DN_Str8_ToU64(DN_Str8 string, char separator)
     if (!DN_Char_IsDigit(ch))
       return result;
 
-    result.value   = DN_Safe_MulU64(result.value, 10);
+    result.value   = DN_SafeMulU64(result.value, 10);
     uint64_t digit = ch - '0';
-    result.value   = DN_Safe_AddU64(result.value, digit);
+    result.value   = DN_SafeAddU64(result.value, digit);
   }
 
   result.success = true;
@@ -587,9 +587,9 @@ DN_API DN_Str8ToI64Result DN_Str8_ToI64(DN_Str8 string, char separator)
     if (!DN_Char_IsDigit(ch))
       return result;
 
-    result.value   = DN_Safe_MulU64(result.value, 10);
+    result.value   = DN_SafeMulU64(result.value, 10);
     uint64_t digit = ch - '0';
-    result.value   = DN_Safe_AddU64(result.value, digit);
+    result.value   = DN_SafeAddU64(result.value, digit);
   }
 
   if (negative)

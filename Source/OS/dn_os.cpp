@@ -158,7 +158,7 @@ DN_API void DN_OS_Init(DN_OSCore *os, DN_OSInitArgs *args)
 
   DN_OS_TLSInit(&os->tls, tls_init_args);
   DN_OS_TLSSetCurrentThreadTLS(&os->tls);
-  os->cpu_report = DN_CPU_Report();
+  os->cpu_report = DN_CPUGetReport();
 
   #define DN_CPU_FEAT_XENTRY(label) g_dn_cpu_feature_decl[DN_CPUFeature_##label] = {DN_CPUFeature_##label, DN_STR8(#label)};
   DN_CPU_FEAT_XMACRO
@@ -376,13 +376,13 @@ DN_API uint64_t DN_OS_EstimateTSCPerSecond(uint64_t duration_ms_to_gauge_tsc_fre
 {
   uint64_t os_frequency      = DN_OS_PerfCounterFrequency();
   uint64_t os_target_elapsed = duration_ms_to_gauge_tsc_frequency * os_frequency / 1000ULL;
-  uint64_t tsc_begin         = DN_CPU_TSC();
+  uint64_t tsc_begin         = DN_CPUGetTSC();
   uint64_t result            = 0;
   if (tsc_begin) {
     uint64_t os_elapsed = 0;
     for (uint64_t os_begin = DN_OS_PerfCounterNow(); os_elapsed < os_target_elapsed;)
       os_elapsed = DN_OS_PerfCounterNow() - os_begin;
-    uint64_t tsc_end     = DN_CPU_TSC();
+    uint64_t tsc_end     = DN_CPUGetTSC();
     uint64_t tsc_elapsed = tsc_end - tsc_begin;
     result               = tsc_elapsed / os_elapsed * os_frequency;
   }

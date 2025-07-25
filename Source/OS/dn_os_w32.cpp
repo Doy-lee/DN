@@ -52,8 +52,8 @@ DN_API void *DN_OS_MemReserve(DN_USize size, DN_MemCommit commit, DN_U32 page_fl
   void *result = VirtualAlloc(nullptr, size, flags, os_page_flags);
   if (flags & MEM_COMMIT) {
     DN_Assert(g_dn_os_core_);
-    DN_Atomic_AddU64(&g_dn_os_core_->vmem_allocs_total, 1);
-    DN_Atomic_AddU64(&g_dn_os_core_->vmem_allocs_frame, 1);
+    DN_AtomicAddU64(&g_dn_os_core_->vmem_allocs_total, 1);
+    DN_AtomicAddU64(&g_dn_os_core_->vmem_allocs_frame, 1);
   }
   return result;
 }
@@ -66,8 +66,8 @@ DN_API bool DN_OS_MemCommit(void *ptr, DN_USize size, DN_U32 page_flags)
   unsigned long os_page_flags = DN_OS_MemConvertPageToOSFlags_(page_flags);
   result                      = VirtualAlloc(ptr, size, MEM_COMMIT, os_page_flags) != nullptr;
   DN_Assert(g_dn_os_core_);
-  DN_Atomic_AddU64(&g_dn_os_core_->vmem_allocs_total, 1);
-  DN_Atomic_AddU64(&g_dn_os_core_->vmem_allocs_frame, 1);
+  DN_AtomicAddU64(&g_dn_os_core_->vmem_allocs_total, 1);
+  DN_AtomicAddU64(&g_dn_os_core_->vmem_allocs_frame, 1);
   return result;
 }
 
@@ -114,8 +114,8 @@ DN_API void *DN_OS_MemAlloc(DN_USize size, DN_ZeroMem zero_mem)
   DN_Assert(size <= DN_CAST(DWORD)(-1));
   void *result = HeapAlloc(GetProcessHeap(), flags, DN_CAST(DWORD) size);
   DN_Assert(g_dn_os_core_);
-  DN_Atomic_AddU64(&g_dn_os_core_->mem_allocs_total, 1);
-  DN_Atomic_AddU64(&g_dn_os_core_->mem_allocs_frame, 1);
+  DN_AtomicAddU64(&g_dn_os_core_->mem_allocs_total, 1);
+  DN_AtomicAddU64(&g_dn_os_core_->mem_allocs_frame, 1);
   return result;
 }
 
@@ -889,7 +889,7 @@ DN_API DN_OSExecAsyncHandle DN_OS_ExecAsync(DN_Slice<DN_Str8> cmd_line, DN_OSExe
     }
   };
 
-  if (DN_Bit_IsSet(args->flags, DN_OSExecFlags_SaveStdout)) {
+  if (DN_BitIsSet(args->flags, DN_OSExecFlags_SaveStdout)) {
     if (!CreatePipe(&stdout_read, &stdout_write, &save_std_security_attribs, /*nSize*/ 0)) {
       DN_W32Error win_error = DN_W32_LastError(tmem.arena);
       result.os_error_code  = win_error.code;
@@ -926,8 +926,8 @@ DN_API DN_OSExecAsyncHandle DN_OS_ExecAsync(DN_Slice<DN_Str8> cmd_line, DN_OSExe
     }
   };
 
-  if (DN_Bit_IsSet(args->flags, DN_OSExecFlags_SaveStderr)) {
-    if (DN_Bit_IsSet(args->flags, DN_OSExecFlags_MergeStderrToStdout)) {
+  if (DN_BitIsSet(args->flags, DN_OSExecFlags_SaveStderr)) {
+    if (DN_BitIsSet(args->flags, DN_OSExecFlags_MergeStderrToStdout)) {
       stderr_read  = stdout_read;
       stderr_write = stdout_write;
     } else {
@@ -991,7 +991,7 @@ DN_API DN_OSExecAsyncHandle DN_OS_ExecAsync(DN_Slice<DN_Str8> cmd_line, DN_OSExe
   result.process      = proc_info.hProcess;
   result.stdout_read  = stdout_read;
   result.stdout_write = stdout_write;
-  if (DN_Bit_IsSet(args->flags, DN_OSExecFlags_SaveStderr) && DN_Bit_IsNotSet(args->flags, DN_OSExecFlags_MergeStderrToStdout)) {
+  if (DN_BitIsSet(args->flags, DN_OSExecFlags_SaveStderr) && DN_BitIsNotSet(args->flags, DN_OSExecFlags_MergeStderrToStdout)) {
     result.stderr_read  = stderr_read;
     result.stderr_write = stderr_write;
   }
@@ -1389,7 +1389,7 @@ void DN_OS_HttpRequestWin32Callback(HINTERNET session, DWORD *dwContext, DWORD d
 
     if (read_complete || dwInternetStatus == WINHTTP_CALLBACK_STATUS_REQUEST_ERROR || error.code) {
       DN_OS_SemaphoreIncrement(&response->on_complete_semaphore, 1);
-      DN_Atomic_AddU32(&response->done, 1);
+      DN_AtomicAddU32(&response->done, 1);
     }
 
     if (error.code) {
@@ -1428,7 +1428,7 @@ DN_API void DN_OS_HttpRequestAsync(DN_OSHttpResponse     *response,
       // NOTE: 'Wait' handles failures gracefully, skipping the wait and
       // cleans up the request
       DN_OS_HttpRequestWait(response);
-      DN_Atomic_AddU32(&response->done, 1);
+      DN_AtomicAddU32(&response->done, 1);
     }
   };
 

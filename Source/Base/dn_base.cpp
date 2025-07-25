@@ -1,21 +1,50 @@
 #define DN_BASE_CPP
 
-#include "../dn_clangd.h"
-
-// NOTE: [$INTR] Intrinsics ////////////////////////////////////////////////////////////////////////
-DN_CPUFeatureDecl g_dn_cpu_feature_decl[DN_CPUFeature_Count];
+#include "../dn_base_inc.h"
 
 #if !defined(DN_PLATFORM_ARM64) && !defined(DN_PLATFORM_EMSCRIPTEN)
   #define DN_SUPPORTS_CPU_ID
 #endif
 
-#if defined(DN_SUPPORTS_CPU_ID)
-  #if defined(DN_COMPILER_GCC) || defined(DN_COMPILER_CLANG)
-    #include <cpuid.h>
-  #endif
-#endif // defined(DN_SUPPORTS_CPU_ID)
+#if defined(DN_SUPPORTS_CPU_ID) && (defined(DN_COMPILER_GCC) || defined(DN_COMPILER_CLANG))
+  #include <cpuid.h>
+#endif
 
-DN_API DN_CPUIDResult DN_CPU_ID(DN_CPUIDArgs args)
+static DN_CPUFeatureDecl g_dn_cpu_feature_decl[DN_CPUFeature_Count];
+
+DN_API DN_U64 DN_AtomicSetValue64(DN_U64 volatile *target, DN_U64 value)
+{
+#if defined(DN_COMPILER_MSVC) || defined(DN_COMPILER_CLANG_CL)
+  __int64 result;
+  do {
+    result = *target;
+  } while (DN_AtomicCompareExchange64(target, value, result) != result);
+  return DN_CAST(DN_U64) result;
+#elif defined(DN_COMPILER_GCC) || defined(DN_COMPILER_CLANG)
+  DN_U64 result = __sync_lock_test_and_set(target, value);
+  return result;
+#else
+  #error Unsupported compiler
+#endif
+}
+
+DN_API DN_U32 DN_AtomicSetValue32(DN_U32 volatile *target, DN_U32 value)
+{
+#if defined(DN_COMPILER_MSVC) || defined(DN_COMPILER_CLANG_CL)
+  long result;
+  do {
+    result = *target;
+  } while (DN_AtomicCompareExchange32(target, value, result) != result);
+  return result;
+#elif defined(DN_COMPILER_GCC) || defined(DN_COMPILER_CLANG)
+  long result = __sync_lock_test_and_set(target, value);
+  return result;
+#else
+  #error Unsupported compiler
+#endif
+}
+
+DN_API DN_CPUIDResult DN_CPUID(DN_CPUIDArgs args)
 {
   DN_CPUIDResult result = {};
 #if defined(DN_SUPPORTS_CPU_ID)
@@ -24,7 +53,7 @@ DN_API DN_CPUIDResult DN_CPU_ID(DN_CPUIDArgs args)
   return result;
 }
 
-DN_API DN_USize DN_CPU_HasFeatureArray(DN_CPUReport const *report, DN_CPUFeatureQuery *features, DN_USize features_size)
+DN_API DN_USize DN_CPUHasFeatureArray(DN_CPUReport const *report, DN_CPUFeatureQuery *features, DN_USize features_size)
 {
   DN_USize       result = 0;
   DN_USize const BITS   = sizeof(report->features[0]) * 8;
@@ -40,23 +69,23 @@ DN_API DN_USize DN_CPU_HasFeatureArray(DN_CPUReport const *report, DN_CPUFeature
   return result;
 }
 
-DN_API bool DN_CPU_HasFeature(DN_CPUReport const *report, DN_CPUFeature feature)
+DN_API bool DN_CPUHasFeature(DN_CPUReport const *report, DN_CPUFeature feature)
 {
   DN_CPUFeatureQuery query = {};
   query.feature            = feature;
-  bool result              = DN_CPU_HasFeatureArray(report, &query, 1) == 1;
+  bool result              = DN_CPUHasFeatureArray(report, &query, 1) == 1;
   return result;
 }
 
-DN_API bool DN_CPU_HasAllFeatures(DN_CPUReport const *report, DN_CPUFeature const *features, DN_USize features_size)
+DN_API bool DN_CPUHasAllFeatures(DN_CPUReport const *report, DN_CPUFeature const *features, DN_USize features_size)
 {
   bool result = true;
   for (DN_USize index = 0; result && index < features_size; index++)
-    result &= DN_CPU_HasFeature(report, features[index]);
+    result &= DN_CPUHasFeature(report, features[index]);
   return result;
 }
 
-DN_API void DN_CPU_SetFeature(DN_CPUReport *report, DN_CPUFeature feature)
+DN_API void DN_CPUSetFeature(DN_CPUReport *report, DN_CPUFeature feature)
 {
   DN_Assert(feature < DN_CPUFeature_Count);
   DN_USize const BITS        = sizeof(report->features[0]) * 8;
@@ -65,7 +94,7 @@ DN_API void DN_CPU_SetFeature(DN_CPUReport *report, DN_CPUFeature feature)
   report->features[chunk_index] |= (1ULL << chunk_bit);
 }
 
-DN_API DN_CPUReport DN_CPU_Report()
+DN_API DN_CPUReport DN_CPUGetReport()
 {
   DN_CPUReport   result                 = {};
 #if defined(DN_SUPPORTS_CPU_ID)
@@ -80,12 +109,12 @@ DN_API DN_CPUReport DN_CPU_Report()
 
     // NOTE: Query standard function (e.g. eax = 0x0)         for function count + cpu vendor
     args        = {};
-    fn_0000_[0] = DN_CPU_ID(args);
+    fn_0000_[0] = DN_CPUID(args);
 
     // NOTE: Query extended function (e.g. eax = 0x8000'0000) for function count + cpu vendor
     args        = {};
     args.eax    = DN_CAST(int) EXTENDED_FUNC_BASE_EAX;
-    fn_8000_[0] = DN_CPU_ID(args);
+    fn_8000_[0] = DN_CPUID(args);
   }
 
   // NOTE: Extract function count ////////////////////////////////////////////////////////////////
@@ -104,13 +133,13 @@ DN_API DN_CPUReport DN_CPU_Report()
     for (int eax = 1; eax <= STANDARD_FUNC_MAX_EAX; eax++) {
       DN_CPUIDArgs args = {};
       args.eax          = eax;
-      fn_0000_[eax]     = DN_CPU_ID(args);
+      fn_0000_[eax]     = DN_CPUID(args);
     }
 
     for (int eax = EXTENDED_FUNC_BASE_EAX + 1, index = 1; eax <= EXTENDED_FUNC_MAX_EAX; eax++, index++) {
       DN_CPUIDArgs args = {};
       args.eax          = eax;
-      fn_8000_[index]   = DN_CPU_ID(args);
+      fn_8000_[index]   = DN_CPUID(args);
     }
   }
 
@@ -207,7 +236,7 @@ DN_API DN_CPUReport DN_CPU_Report()
     }
 
     if (available)
-      DN_CPU_SetFeature(&result, DN_CAST(DN_CPUFeature) ext_index);
+      DN_CPUSetFeature(&result, DN_CAST(DN_CPUFeature) ext_index);
   }
 #endif // DN_SUPPORTS_CPU_ID
   return result;
@@ -216,18 +245,18 @@ DN_API DN_CPUReport DN_CPU_Report()
 // NOTE: DN_TicketMutex ////////////////////////////////////////////////////////////////////////////
 DN_API void DN_TicketMutex_Begin(DN_TicketMutex *mutex)
 {
-  unsigned int ticket = DN_Atomic_AddU32(&mutex->ticket, 1);
+  unsigned int ticket = DN_AtomicAddU32(&mutex->ticket, 1);
   DN_TicketMutex_BeginTicket(mutex, ticket);
 }
 
 DN_API void DN_TicketMutex_End(DN_TicketMutex *mutex)
 {
-  DN_Atomic_AddU32(&mutex->serving, 1);
+  DN_AtomicAddU32(&mutex->serving, 1);
 }
 
 DN_API DN_UInt DN_TicketMutex_MakeTicket(DN_TicketMutex *mutex)
 {
-  DN_UInt result = DN_Atomic_AddU32(&mutex->ticket, 1);
+  DN_UInt result = DN_AtomicAddU32(&mutex->ticket, 1);
   return result;
 }
 
@@ -257,60 +286,60 @@ DN_API bool DN_TicketMutex_CanLock(DN_TicketMutex const *mutex, DN_UInt ticket)
 #endif
 
 // NOTE: DN_Bit ////////////////////////////////////////////////////////////////////////////////////
-DN_API void DN_Bit_UnsetInplace(DN_USize *flags, DN_USize bitfield)
+DN_API void DN_BitUnsetInplace(DN_USize *flags, DN_USize bitfield)
 {
   *flags = (*flags & ~bitfield);
 }
 
-DN_API void DN_Bit_SetInplace(DN_USize *flags, DN_USize bitfield)
+DN_API void DN_BitSetInplace(DN_USize *flags, DN_USize bitfield)
 {
   *flags = (*flags | bitfield);
 }
 
-DN_API bool DN_Bit_IsSet(DN_USize bits, DN_USize bits_to_set)
+DN_API bool DN_BitIsSet(DN_USize bits, DN_USize bits_to_set)
 {
   auto result = DN_CAST(bool)((bits & bits_to_set) == bits_to_set);
   return result;
 }
 
-DN_API bool DN_Bit_IsNotSet(DN_USize bits, DN_USize bits_to_check)
+DN_API bool DN_BitIsNotSet(DN_USize bits, DN_USize bits_to_check)
 {
-  auto result = !DN_Bit_IsSet(bits, bits_to_check);
+  auto result = !DN_BitIsSet(bits, bits_to_check);
   return result;
 }
 
 // NOTE: DN_Safe ///////////////////////////////////////////////////////////////////////////////////
-DN_API DN_I64 DN_Safe_AddI64(int64_t a, int64_t b)
+DN_API DN_I64 DN_SafeAddI64(int64_t a, int64_t b)
 {
   DN_I64 result = DN_CheckF(a <= INT64_MAX - b, "a=%zd, b=%zd", a, b) ? (a + b) : INT64_MAX;
   return result;
 }
 
-DN_API DN_I64 DN_Safe_MulI64(int64_t a, int64_t b)
+DN_API DN_I64 DN_SafeMulI64(int64_t a, int64_t b)
 {
   DN_I64 result = DN_CheckF(a <= INT64_MAX / b, "a=%zd, b=%zd", a, b) ? (a * b) : INT64_MAX;
   return result;
 }
 
-DN_API DN_U64 DN_Safe_AddU64(DN_U64 a, DN_U64 b)
+DN_API DN_U64 DN_SafeAddU64(DN_U64 a, DN_U64 b)
 {
   DN_U64 result = DN_CheckF(a <= UINT64_MAX - b, "a=%zu, b=%zu", a, b) ? (a + b) : UINT64_MAX;
   return result;
 }
 
-DN_API DN_U64 DN_Safe_SubU64(DN_U64 a, DN_U64 b)
+DN_API DN_U64 DN_SafeSubU64(DN_U64 a, DN_U64 b)
 {
   DN_U64 result = DN_CheckF(a >= b, "a=%zu, b=%zu", a, b) ? (a - b) : 0;
   return result;
 }
 
-DN_API DN_U64 DN_Safe_MulU64(DN_U64 a, DN_U64 b)
+DN_API DN_U64 DN_SafeMulU64(DN_U64 a, DN_U64 b)
 {
   DN_U64 result = DN_CheckF(a <= UINT64_MAX / b, "a=%zu, b=%zu", a, b) ? (a * b) : UINT64_MAX;
   return result;
 }
 
-DN_API DN_U32 DN_Safe_SubU32(DN_U32 a, DN_U32 b)
+DN_API DN_U32 DN_SafeSubU32(DN_U32 a, DN_U32 b)
 {
   DN_U32 result = DN_CheckF(a >= b, "a=%u, b=%u", a, b) ? (a - b) : 0;
   return result;
@@ -699,7 +728,7 @@ static_assert(DN_IsPowerOfTwoAligned(DN_ASAN_POISON_GUARD_SIZE, DN_ASAN_POISON_A
               "ASAN poison guard size must be a power-of-two and aligned to ASAN's alignment"
               "requirement (8 bytes)");
 
-DN_API void DN_ASAN_PoisonMemoryRegion(void const volatile *ptr, DN_USize size)
+DN_API void DN_ASanPoisonMemoryRegion(void const volatile *ptr, DN_USize size)
 {
   if (!ptr || !size)
     return;
@@ -719,7 +748,7 @@ DN_API void DN_ASAN_PoisonMemoryRegion(void const volatile *ptr, DN_USize size)
 #endif
 }
 
-DN_API void DN_ASAN_UnpoisonMemoryRegion(void const volatile *ptr, DN_USize size)
+DN_API void DN_ASanUnpoisonMemoryRegion(void const volatile *ptr, DN_USize size)
 {
   if (!ptr || !size)
     return;

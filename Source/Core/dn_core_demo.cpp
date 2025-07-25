@@ -39,15 +39,15 @@ void DN_Docs_Demo()
   DN_Core_Init(&core, DN_CoreOnInit_Nil);
 #endif
 
-  // NOTE: DN_Atomic_SetValue64 /////////////////////////////////////////////////////////////////
-  // NOTE: DN_Atomic_SetValue32 /////////////////////////////////////////////////////////////////
+  // NOTE: DN_AtomicSetValue64 /////////////////////////////////////////////////////////////////
+  // NOTE: DN_AtomicSetValue32 /////////////////////////////////////////////////////////////////
   // Atomically set the value into the target using an atomic compare and swap
   // idiom. The return value of the function is the value that was last stored
   // in the target.
   {
     uint64_t target       = 8;
     uint64_t value_to_set = 0xCAFE;
-    if (DN_Atomic_SetValue64(&target, value_to_set) == 8) {
+    if (DN_AtomicSetValue64(&target, value_to_set) == 8) {
       // Atomic swap was successful, e.g. the last value that this thread
       // observed was '8' which is the value we initialised with e.g. no
       // other thread has modified the value.

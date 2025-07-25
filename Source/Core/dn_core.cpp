@@ -71,7 +71,7 @@ DN_API void DN_Core_Init(DN_Core *core, DN_CoreOnInit on_init)
 
     for (DN_ForIndexU(feature_index, DN_CPUFeature_Count)) {
       DN_CPUFeatureDecl feature_decl = g_dn_cpu_feature_decl[feature_index];
-      bool              has_feature  = DN_CPU_HasFeature(report, feature_decl.value);
+      bool              has_feature  = DN_CPUHasFeature(report, feature_decl.value);
       DN_Str8Builder_AppendF(&builder,
                              "    %.*s:%*s%s\n",
                              DN_STR_FMT(feature_decl.label),
@@ -88,7 +88,7 @@ DN_API void DN_Core_Init(DN_Core *core, DN_CoreOnInit on_init)
 
 DN_API void DN_Core_BeginFrame()
 {
-  DN_Atomic_SetValue64(&g_dn_os_core_->mem_allocs_frame, 0);
+  DN_AtomicSetValue64(&g_dn_os_core_->mem_allocs_frame, 0);
 }
 
 #if !defined(DN_NO_PROFILER)

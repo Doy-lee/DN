@@ -46,7 +46,7 @@ static DN_ArenaBlock *DN_Arena_BlockInitFromMemFuncs_(DN_U64 reserve, DN_U64 com
   }
 
   if (track_alloc && result)
-    DN_Debug_TrackAlloc(result, result->reserve, alloc_can_leak);
+    DN_DBGTrackAlloc(result, result->reserve, alloc_can_leak);
 
   return result;
 }
@@ -57,7 +57,7 @@ static DN_ArenaBlock *DN_Arena_BlockInitFlagsFromMemFuncs_(DN_U64 reserve, DN_U6
   bool           alloc_can_leak = flags & DN_ArenaFlags_AllocCanLeak;
   DN_ArenaBlock *result         = DN_Arena_BlockInitFromMemFuncs_(reserve, commit, track_alloc, alloc_can_leak, mem_funcs);
   if (result && ((flags & DN_ArenaFlags_NoPoison) == 0))
-    DN_ASAN_PoisonMemoryRegion(DN_CAST(char *) result + DN_ARENA_HEADER_SIZE, result->commit - DN_ARENA_HEADER_SIZE);
+    DN_ASanPoisonMemoryRegion(DN_CAST(char *) result + DN_ARENA_HEADER_SIZE, result->commit - DN_ARENA_HEADER_SIZE);
   return result;
 }
 
@@ -89,7 +89,7 @@ DN_API DN_Arena DN_Arena_InitFromBuffer(void *buffer, DN_USize size, DN_ArenaFla
   block->reserve       = size;
   block->used          = DN_ARENA_HEADER_SIZE;
   if (block && ((flags & DN_ArenaFlags_NoPoison) == 0))
-    DN_ASAN_PoisonMemoryRegion(DN_CAST(char *) block + DN_ARENA_HEADER_SIZE, block->commit - DN_ARENA_HEADER_SIZE);
+    DN_ASanPoisonMemoryRegion(DN_CAST(char *) block + DN_ARENA_HEADER_SIZE, block->commit - DN_ARENA_HEADER_SIZE);
 
   DN_Arena result = {};
   result.flags    = flags | DN_ArenaFlags_NoGrow | DN_ArenaFlags_NoAllocTrack | DN_ArenaFlags_AllocCanLeak | DN_ArenaFlags_UserBuffer;
@@ -112,9 +112,9 @@ DN_API DN_Arena DN_Arena_InitFromMemFuncs(DN_U64 reserve, DN_U64 commit, DN_Aren
 static void DN_Arena_BlockDeinit_(DN_Arena const *arena, DN_ArenaBlock *block)
 {
   DN_USize release_size = block->reserve;
-  if (DN_Bit_IsNotSet(arena->flags, DN_ArenaFlags_NoAllocTrack))
-    DN_Debug_TrackDealloc(block);
-  DN_ASAN_UnpoisonMemoryRegion(block, block->commit);
+  if (DN_BitIsNotSet(arena->flags, DN_ArenaFlags_NoAllocTrack))
+    DN_DBGTrackDealloc(block);
+  DN_ASanUnpoisonMemoryRegion(block, block->commit);
   if (arena->flags & DN_ArenaFlags_MemFuncs) {
     if (arena->mem_funcs.type == DN_ArenaMemFuncType_Basic)
       arena->mem_funcs.basic_dealloc(block);
@@ -156,7 +156,7 @@ DN_API bool DN_Arena_CommitTo(DN_Arena *arena, DN_U64 pos)
 
   bool poison = DN_ASAN_POISON && ((arena->flags & DN_ArenaFlags_NoPoison) == 0);
   if (poison)
-    DN_ASAN_PoisonMemoryRegion(commit_ptr, commit_size);
+    DN_ASanPoisonMemoryRegion(commit_ptr, commit_size);
 
   curr->commit = end_commit;
   return true;
@@ -230,7 +230,7 @@ DN_API void *DN_Arena_Alloc(DN_Arena *arena, DN_U64 size, uint8_t align, DN_Zero
     if (!arena->mem_funcs.vmem_commit(commit_ptr, commit_size, DN_MemPage_ReadWrite))
       return nullptr;
     if (poison)
-      DN_ASAN_PoisonMemoryRegion(commit_ptr, commit_size);
+      DN_ASanPoisonMemoryRegion(commit_ptr, commit_size);
     curr->commit              = end_commit;
     arena->stats.info.commit += commit_size;
     arena->stats.hwm.commit   = DN_Max(arena->stats.hwm.commit, arena->stats.info.commit);
@@ -240,7 +240,7 @@ DN_API void *DN_Arena_Alloc(DN_Arena *arena, DN_U64 size, uint8_t align, DN_Zero
   curr->used             += alloc_size;
   arena->stats.info.used += alloc_size;
   arena->stats.hwm.used   = DN_Max(arena->stats.hwm.used, arena->stats.info.used);
-  DN_ASAN_UnpoisonMemoryRegion(result, size);
+  DN_ASanUnpoisonMemoryRegion(result, size);
 
   if (zero_mem == DN_ZeroMem_Yes) {
     DN_USize reused_bytes = DN_Min(prev_arena_commit - offset_pos, size);
@@ -296,7 +296,7 @@ DN_API void DN_Arena_PopTo(DN_Arena *arena, DN_U64 init_used)
   curr->used           = used - curr->reserve_sum;
   char    *poison_ptr  = (char *)curr + DN_AlignUpPowerOfTwo(curr->used, DN_ASAN_POISON_ALIGNMENT);
   DN_USize poison_size = ((char *)curr + curr->commit) - poison_ptr;
-  DN_ASAN_PoisonMemoryRegion(poison_ptr, poison_size);
+  DN_ASanPoisonMemoryRegion(poison_ptr, poison_size);
   arena->stats.info.used += curr->used;
 }
 

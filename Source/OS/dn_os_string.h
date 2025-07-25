@@ -62,7 +62,7 @@ DN_API  DN_Str8Builder          DN_Str8Builder_CopyFromFrame          (DN_Str8Bu
 DN_API  DN_Str8Builder          DN_Str8Builder_CopyFromTLS            (DN_Str8Builder const *builder)                    { return DN_Str8Builder_Copy(DN_OS_TLSTopArena(), builder); }
 
 DN_API  DN_Str8                 DN_Str8Builder_BuildFromFrame         (DN_Str8Builder const *builder)                    { return DN_Str8Builder_Build(builder, DN_OS_TLSGet()->frame_arena); }
-DN_API  DN_Slice<DN_Str8>       DN_Str8Builder_BuildFromOSHeap        (DN_Str8Builder const *builder, DN_Arena *arena);
+DN_API  DN_Str8                 DN_Str8Builder_BuildFromOSHeap        (DN_Str8Builder const *builder, DN_Arena *arena);
 DN_API  DN_Str8                 DN_Str8Builder_BuildFromTLS           (DN_Str8Builder const *builder)                    { return DN_Str8Builder_Build(builder, DN_OS_TLSTopArena()); }
 
 DN_API  DN_Str8                 DN_Str8Builder_BuildDelimitedFromFrame(DN_Str8Builder const *builder, DN_Str8 delimiter) { return DN_Str8Builder_BuildDelimited(builder, delimiter, DN_OS_TLSGet()->frame_arena); }

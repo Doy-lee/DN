@@ -43,6 +43,14 @@
 //    To instead use <Windows.h>. DN automatically detects if <Windows.h> is included in an earlier
 //    translation unit and will automatically disable the in-built replacement header in which case
 //    this does not need to be defined.
+//
+//  Freestanding
+//    The base layer can be used without an OS implementation by defining DN_FREESTANDING like:
+//
+//      #define DN_FREESTANDING
+//
+//    This means functionality that relies on the OS like printing, memory allocation, stack traces
+//    and so forth are disabled.
 
 #include "Base/dn_base_compiler.h"
 #include "Base/dn_base.h"

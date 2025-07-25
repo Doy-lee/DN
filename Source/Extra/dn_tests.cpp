@@ -244,63 +244,63 @@ static DN_UTCore DN_Tests_Base()
   DN_UT_LogF(&result, "DN_Base\n");
   {
     for (DN_UT_Test(&result, "Query CPUID")) {
-      DN_CPUReport cpu_report = DN_CPU_Report();
+      DN_CPUReport cpu_report = DN_CPUGetReport();
 
       // NOTE: Sanity check our report against MSDN's example ////////////////////////////////////////
-      DN_UT_Assert(&result, DN_CPU_HasFeature(&cpu_report, DN_CPUFeature_3DNow) == ref_cpu_report._3DNOW());
-      DN_UT_Assert(&result, DN_CPU_HasFeature(&cpu_report, DN_CPUFeature_3DNowExt) == ref_cpu_report._3DNOWEXT());
-      DN_UT_Assert(&result, DN_CPU_HasFeature(&cpu_report, DN_CPUFeature_ABM) == ref_cpu_report.ABM());
-      DN_UT_Assert(&result, DN_CPU_HasFeature(&cpu_report, DN_CPUFeature_AES) == ref_cpu_report.AES());
-      DN_UT_Assert(&result, DN_CPU_HasFeature(&cpu_report, DN_CPUFeature_AVX) == ref_cpu_report.AVX());
-      DN_UT_Assert(&result, DN_CPU_HasFeature(&cpu_report, DN_CPUFeature_AVX2) == ref_cpu_report.AVX2());
-      DN_UT_Assert(&result, DN_CPU_HasFeature(&cpu_report, DN_CPUFeature_AVX512CD) == ref_cpu_report.AVX512CD());
-      DN_UT_Assert(&result, DN_CPU_HasFeature(&cpu_report, DN_CPUFeature_AVX512ER) == ref_cpu_report.AVX512ER());
-      DN_UT_Assert(&result, DN_CPU_HasFeature(&cpu_report, DN_CPUFeature_AVX512F) == ref_cpu_report.AVX512F());
-      DN_UT_Assert(&result, DN_CPU_HasFeature(&cpu_report, DN_CPUFeature_AVX512PF) == ref_cpu_report.AVX512PF());
-      DN_UT_Assert(&result, DN_CPU_HasFeature(&cpu_report, DN_CPUFeature_CMPXCHG16B) == ref_cpu_report.CMPXCHG16B());
-      DN_UT_Assert(&result, DN_CPU_HasFeature(&cpu_report, DN_CPUFeature_F16C) == ref_cpu_report.F16C());
-      DN_UT_Assert(&result, DN_CPU_HasFeature(&cpu_report, DN_CPUFeature_FMA) == ref_cpu_report.FMA());
-      DN_UT_Assert(&result, DN_CPU_HasFeature(&cpu_report, DN_CPUFeature_MMX) == ref_cpu_report.MMX());
-      DN_UT_Assert(&result, DN_CPU_HasFeature(&cpu_report, DN_CPUFeature_MmxExt) == ref_cpu_report.MMXEXT());
-      DN_UT_Assert(&result, DN_CPU_HasFeature(&cpu_report, DN_CPUFeature_MONITOR) == ref_cpu_report.MONITOR());
-      DN_UT_Assert(&result, DN_CPU_HasFeature(&cpu_report, DN_CPUFeature_MOVBE) == ref_cpu_report.MOVBE());
-      DN_UT_Assert(&result, DN_CPU_HasFeature(&cpu_report, DN_CPUFeature_PCLMULQDQ) == ref_cpu_report.PCLMULQDQ());
-      DN_UT_Assert(&result, DN_CPU_HasFeature(&cpu_report, DN_CPUFeature_POPCNT) == ref_cpu_report.POPCNT());
-      DN_UT_Assert(&result, DN_CPU_HasFeature(&cpu_report, DN_CPUFeature_RDRAND) == ref_cpu_report.RDRAND());
-      DN_UT_Assert(&result, DN_CPU_HasFeature(&cpu_report, DN_CPUFeature_RDSEED) == ref_cpu_report.RDSEED());
-      DN_UT_Assert(&result, DN_CPU_HasFeature(&cpu_report, DN_CPUFeature_RDTSCP) == ref_cpu_report.RDTSCP());
-      DN_UT_Assert(&result, DN_CPU_HasFeature(&cpu_report, DN_CPUFeature_SHA) == ref_cpu_report.SHA());
-      DN_UT_Assert(&result, DN_CPU_HasFeature(&cpu_report, DN_CPUFeature_SSE) == ref_cpu_report.SSE());
-      DN_UT_Assert(&result, DN_CPU_HasFeature(&cpu_report, DN_CPUFeature_SSE2) == ref_cpu_report.SSE2());
-      DN_UT_Assert(&result, DN_CPU_HasFeature(&cpu_report, DN_CPUFeature_SSE3) == ref_cpu_report.SSE3());
-      DN_UT_Assert(&result, DN_CPU_HasFeature(&cpu_report, DN_CPUFeature_SSE41) == ref_cpu_report.SSE41());
-      DN_UT_Assert(&result, DN_CPU_HasFeature(&cpu_report, DN_CPUFeature_SSE42) == ref_cpu_report.SSE42());
-      DN_UT_Assert(&result, DN_CPU_HasFeature(&cpu_report, DN_CPUFeature_SSE4A) == ref_cpu_report.SSE4a());
-      DN_UT_Assert(&result, DN_CPU_HasFeature(&cpu_report, DN_CPUFeature_SSSE3) == ref_cpu_report.SSSE3());
+      DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_3DNow) == ref_cpu_report._3DNOW());
+      DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_3DNowExt) == ref_cpu_report._3DNOWEXT());
+      DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_ABM) == ref_cpu_report.ABM());
+      DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_AES) == ref_cpu_report.AES());
+      DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_AVX) == ref_cpu_report.AVX());
+      DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_AVX2) == ref_cpu_report.AVX2());
+      DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_AVX512CD) == ref_cpu_report.AVX512CD());
+      DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_AVX512ER) == ref_cpu_report.AVX512ER());
+      DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_AVX512F) == ref_cpu_report.AVX512F());
+      DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_AVX512PF) == ref_cpu_report.AVX512PF());
+      DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_CMPXCHG16B) == ref_cpu_report.CMPXCHG16B());
+      DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_F16C) == ref_cpu_report.F16C());
+      DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_FMA) == ref_cpu_report.FMA());
+      DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_MMX) == ref_cpu_report.MMX());
+      DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_MmxExt) == ref_cpu_report.MMXEXT());
+      DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_MONITOR) == ref_cpu_report.MONITOR());
+      DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_MOVBE) == ref_cpu_report.MOVBE());
+      DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_PCLMULQDQ) == ref_cpu_report.PCLMULQDQ());
+      DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_POPCNT) == ref_cpu_report.POPCNT());
+      DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_RDRAND) == ref_cpu_report.RDRAND());
+      DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_RDSEED) == ref_cpu_report.RDSEED());
+      DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_RDTSCP) == ref_cpu_report.RDTSCP());
+      DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_SHA) == ref_cpu_report.SHA());
+      DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_SSE) == ref_cpu_report.SSE());
+      DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_SSE2) == ref_cpu_report.SSE2());
+      DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_SSE3) == ref_cpu_report.SSE3());
+      DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_SSE41) == ref_cpu_report.SSE41());
+      DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_SSE42) == ref_cpu_report.SSE42());
+      DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_SSE4A) == ref_cpu_report.SSE4a());
+      DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_SSSE3) == ref_cpu_report.SSSE3());
 
   // NOTE: Feature flags we haven't bothered detecting yet but are in MSDN's example /////////////
   #if 0
-            DN_UT_Assert(&result, DN_CPU_HasFeature(&cpu_report, DN_CPUFeature_ADX)         == DN_RefImplCPUReport::ADX());
-            DN_UT_Assert(&result, DN_CPU_HasFeature(&cpu_report, DN_CPUFeature_BMI1)        == DN_RefImplCPUReport::BMI1());
-            DN_UT_Assert(&result, DN_CPU_HasFeature(&cpu_report, DN_CPUFeature_BMI2)        == DN_RefImplCPUReport::BMI2());
-            DN_UT_Assert(&result, DN_CPU_HasFeature(&cpu_report, DN_CPUFeature_CLFSH)       == DN_RefImplCPUReport::CLFSH());
-            DN_UT_Assert(&result, DN_CPU_HasFeature(&cpu_report, DN_CPUFeature_CX8)         == DN_RefImplCPUReport::CX8());
-            DN_UT_Assert(&result, DN_CPU_HasFeature(&cpu_report, DN_CPUFeature_ERMS)        == DN_RefImplCPUReport::ERMS());
-            DN_UT_Assert(&result, DN_CPU_HasFeature(&cpu_report, DN_CPUFeature_FSGSBASE)    == DN_RefImplCPUReport::FSGSBASE());
-            DN_UT_Assert(&result, DN_CPU_HasFeature(&cpu_report, DN_CPUFeature_FXSR)        == DN_RefImplCPUReport::FXSR());
-            DN_UT_Assert(&result, DN_CPU_HasFeature(&cpu_report, DN_CPUFeature_HLE)         == DN_RefImplCPUReport::HLE());
-            DN_UT_Assert(&result, DN_CPU_HasFeature(&cpu_report, DN_CPUFeature_INVPCID)     == DN_RefImplCPUReport::INVPCID());
-            DN_UT_Assert(&result, DN_CPU_HasFeature(&cpu_report, DN_CPUFeature_LAHF)        == DN_RefImplCPUReport::LAHF());
-            DN_UT_Assert(&result, DN_CPU_HasFeature(&cpu_report, DN_CPUFeature_LZCNT)       == DN_RefImplCPUReport::LZCNT());
-            DN_UT_Assert(&result, DN_CPU_HasFeature(&cpu_report, DN_CPUFeature_MSR)         == DN_RefImplCPUReport::MSR());
-            DN_UT_Assert(&result, DN_CPU_HasFeature(&cpu_report, DN_CPUFeature_OSXSAVE)     == DN_RefImplCPUReport::OSXSAVE());
-            DN_UT_Assert(&result, DN_CPU_HasFeature(&cpu_report, DN_CPUFeature_PREFETCHWT1) == DN_RefImplCPUReport::PREFETCHWT1());
-            DN_UT_Assert(&result, DN_CPU_HasFeature(&cpu_report, DN_CPUFeature_RTM)         == DN_RefImplCPUReport::RTM());
-            DN_UT_Assert(&result, DN_CPU_HasFeature(&cpu_report, DN_CPUFeature_SEP)         == DN_RefImplCPUReport::SEP());
-            DN_UT_Assert(&result, DN_CPU_HasFeature(&cpu_report, DN_CPUFeature_SYSCALL)     == DN_RefImplCPUReport::SYSCALL());
-            DN_UT_Assert(&result, DN_CPU_HasFeature(&cpu_report, DN_CPUFeature_TBM)         == DN_RefImplCPUReport::TBM());
-            DN_UT_Assert(&result, DN_CPU_HasFeature(&cpu_report, DN_CPUFeature_XOP)         == DN_RefImplCPUReport::XOP());
-            DN_UT_Assert(&result, DN_CPU_HasFeature(&cpu_report, DN_CPUFeature_XSAVE)       == DN_RefImplCPUReport::XSAVE());
+            DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_ADX)         == DN_RefImplCPUReport::ADX());
+            DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_BMI1)        == DN_RefImplCPUReport::BMI1());
+            DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_BMI2)        == DN_RefImplCPUReport::BMI2());
+            DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_CLFSH)       == DN_RefImplCPUReport::CLFSH());
+            DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_CX8)         == DN_RefImplCPUReport::CX8());
+            DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_ERMS)        == DN_RefImplCPUReport::ERMS());
+            DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_FSGSBASE)    == DN_RefImplCPUReport::FSGSBASE());
+            DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_FXSR)        == DN_RefImplCPUReport::FXSR());
+            DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_HLE)         == DN_RefImplCPUReport::HLE());
+            DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_INVPCID)     == DN_RefImplCPUReport::INVPCID());
+            DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_LAHF)        == DN_RefImplCPUReport::LAHF());
+            DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_LZCNT)       == DN_RefImplCPUReport::LZCNT());
+            DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_MSR)         == DN_RefImplCPUReport::MSR());
+            DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_OSXSAVE)     == DN_RefImplCPUReport::OSXSAVE());
+            DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_PREFETCHWT1) == DN_RefImplCPUReport::PREFETCHWT1());
+            DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_RTM)         == DN_RefImplCPUReport::RTM());
+            DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_SEP)         == DN_RefImplCPUReport::SEP());
+            DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_SYSCALL)     == DN_RefImplCPUReport::SYSCALL());
+            DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_TBM)         == DN_RefImplCPUReport::TBM());
+            DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_XOP)         == DN_RefImplCPUReport::XOP());
+            DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_XSAVE)       == DN_RefImplCPUReport::XSAVE());
   #endif
     }
   }
@@ -1371,46 +1371,46 @@ static DN_UTCore DN_Tests_Intrinsics()
 
   DN_UT_LogF(&result, "DN_Atomic\n");
   {
-    for (DN_UT_Test(&result, "DN_Atomic_AddU32")) {
+    for (DN_UT_Test(&result, "DN_AtomicAddU32")) {
       uint32_t val = 0;
-      DN_Atomic_AddU32(&val, 1);
+      DN_AtomicAddU32(&val, 1);
       DN_UT_AssertF(&result, val == 1, "val: %u", val);
     }
 
-    for (DN_UT_Test(&result, "DN_Atomic_AddU64")) {
+    for (DN_UT_Test(&result, "DN_AtomicAddU64")) {
       uint64_t val = 0;
-      DN_Atomic_AddU64(&val, 1);
+      DN_AtomicAddU64(&val, 1);
       DN_UT_AssertF(&result, val == 1, "val: %" PRIu64, val);
     }
 
-    for (DN_UT_Test(&result, "DN_Atomic_SubU32")) {
+    for (DN_UT_Test(&result, "DN_AtomicSubU32")) {
       uint32_t val = 1;
-      DN_Atomic_SubU32(&val, 1);
+      DN_AtomicSubU32(&val, 1);
       DN_UT_AssertF(&result, val == 0, "val: %u", val);
     }
 
-    for (DN_UT_Test(&result, "DN_Atomic_SubU64")) {
+    for (DN_UT_Test(&result, "DN_AtomicSubU64")) {
       uint64_t val = 1;
-      DN_Atomic_SubU64(&val, 1);
+      DN_AtomicSubU64(&val, 1);
       DN_UT_AssertF(&result, val == 0, "val: %" PRIu64, val);
     }
 
-    for (DN_UT_Test(&result, "DN_Atomic_SetValue32")) {
+    for (DN_UT_Test(&result, "DN_AtomicSetValue32")) {
       DN_U32 a = 0;
       DN_U32 b = 111;
-      DN_Atomic_SetValue32(&a, b);
+      DN_AtomicSetValue32(&a, b);
       DN_UT_AssertF(&result, a == b, "a: %ld, b: %ld", a, b);
     }
 
-    for (DN_UT_Test(&result, "DN_Atomic_SetValue64")) {
+    for (DN_UT_Test(&result, "DN_AtomicSetValue64")) {
       int64_t a = 0;
       int64_t b = 111;
-      DN_Atomic_SetValue64(DN_CAST(uint64_t *) & a, b);
+      DN_AtomicSetValue64(DN_CAST(uint64_t *) & a, b);
       DN_UT_AssertF(&result, a == b, "a: %" PRId64 ", b: %" PRId64, a, b);
     }
 
-    DN_UT_BeginF(&result, "DN_CPU_TSC");
-    DN_CPU_TSC();
+    DN_UT_BeginF(&result, "DN_CPUGetTSC");
+    DN_CPUGetTSC();
     DN_UT_End(&result);
 
     DN_UT_BeginF(&result, "DN_CompilerReadBarrierAndCPUReadFence");

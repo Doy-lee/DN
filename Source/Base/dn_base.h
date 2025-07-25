@@ -1,6 +1,8 @@
 #if !defined(DN_BASE_H)
 #define DN_BASE_H
 
+#include "../dn_base_inc.h"
+
 // NOTE: Macros ////////////////////////////////////////////////////////////////////////////////////
 #define DN_Stringify(x) #x
 #define DN_TokenCombine2(x, y) x ## y
@@ -149,7 +151,7 @@ struct DN_DeferHelper
 };
 
 #define DN_UniqueName(prefix) DN_TokenCombine(prefix, __LINE__)
-#define DN_DEFER               const auto DN_UniqueName(defer_lambda_) = DN_DeferHelper() + [&]()
+#define DN_DEFER              const auto DN_UniqueName(defer_lambda_) = DN_DeferHelper() + [&]()
 #endif // defined(__cplusplus)
 
 #define DN_DeferLoop(begin, end)            \
@@ -233,30 +235,25 @@ struct DN_CallSite
   DN_Str8 function;
   DN_U32  line;
 };
-
-#define DN_CALL_SITE                               \
-  DN_CallSite                                      \
-  {                                                \
-    DN_STR8(__FILE__), DN_STR8(__func__), __LINE__ \
-  }
+#define DN_CALL_SITE DN_CallSite { DN_STR8(__FILE__), DN_STR8(__func__), __LINE__ }
 
 // NOTE: Intrinsics ////////////////////////////////////////////////////////////////////////////////
-// NOTE: DN_Atomic_Add/Exchange return the previous value store in the target
+// NOTE: DN_AtomicAdd/Exchange return the previous value store in the target
 #if defined(DN_COMPILER_MSVC) || defined(DN_COMPILER_CLANG_CL)
   #include <intrin.h>
-  #define DN_Atomic_CompareExchange64(dest, desired_val, prev_val) _InterlockedCompareExchange64((__int64 volatile *)dest, desired_val, prev_val)
-  #define DN_Atomic_CompareExchange32(dest, desired_val, prev_val) _InterlockedCompareExchange((long volatile *)dest, desired_val, prev_val)
+  #define DN_AtomicCompareExchange64(dest, desired_val, prev_val) _InterlockedCompareExchange64((__int64 volatile *)dest, desired_val, prev_val)
+  #define DN_AtomicCompareExchange32(dest, desired_val, prev_val) _InterlockedCompareExchange((long volatile *)dest, desired_val, prev_val)
 
-  #define DN_Atomic_LoadU64(target)                                *(target)
-  #define DN_Atomic_LoadU32(target)                                *(target)
-  #define DN_Atomic_AddU32(target, value)                          _InterlockedExchangeAdd((long volatile *)target, value)
-  #define DN_Atomic_AddU64(target, value)                          _InterlockedExchangeAdd64((__int64 volatile *)target, value)
-  #define DN_Atomic_SubU32(target, value)                          DN_Atomic_AddU32(DN_CAST(long volatile *) target, (long)-value)
-  #define DN_Atomic_SubU64(target, value)                          DN_Atomic_AddU64(target, (DN_U64) - value)
+  #define DN_AtomicLoadU64(target)                                *(target)
+  #define DN_AtomicLoadU32(target)                                *(target)
+  #define DN_AtomicAddU32(target, value)                          _InterlockedExchangeAdd((long volatile *)target, value)
+  #define DN_AtomicAddU64(target, value)                          _InterlockedExchangeAdd64((__int64 volatile *)target, value)
+  #define DN_AtomicSubU32(target, value)                          DN_AtomicAddU32(DN_CAST(long volatile *) target, (long)-value)
+  #define DN_AtomicSubU64(target, value)                          DN_AtomicAddU64(target, (DN_U64) - value)
 
   #define DN_CountLeadingZerosU64(value)                           __lzcnt64(value)
   #define DN_CountLeadingZerosU32(value)                           __lzcnt(value)
-  #define DN_CPU_TSC()                                             __rdtsc()
+  #define DN_CPUGetTSC()                                           __rdtsc()
   #define DN_CompilerReadBarrierAndCPUReadFence                    _ReadBarrier();  _mm_lfence()
   #define DN_CompilerWriteBarrierAndCPUWriteFence                  _WriteBarrier(); _mm_sfence()
 #elif defined(DN_COMPILER_GCC) || defined(DN_COMPILER_CLANG)
@@ -270,20 +267,20 @@ struct DN_CallSite
     #include <x86intrin.h>
   #endif
 
-  #define DN_Atomic_LoadU64(target)                                __atomic_load_n(x, __ATOMIC_SEQ_CST)
-  #define DN_Atomic_LoadU32(target)                                __atomic_load_n(x, __ATOMIC_SEQ_CST)
-  #define DN_Atomic_AddU32(target, value)                          __atomic_fetch_add(target, value, __ATOMIC_ACQ_REL)
-  #define DN_Atomic_AddU64(target, value)                          __atomic_fetch_add(target, value, __ATOMIC_ACQ_REL)
-  #define DN_Atomic_SubU32(target, value)                          __atomic_fetch_sub(target, value, __ATOMIC_ACQ_REL)
-  #define DN_Atomic_SubU64(target, value)                          __atomic_fetch_sub(target, value, __ATOMIC_ACQ_REL)
+  #define DN_AtomicLoadU64(target)                                __atomic_load_n(x, __ATOMIC_SEQ_CST)
+  #define DN_AtomicLoadU32(target)                                __atomic_load_n(x, __ATOMIC_SEQ_CST)
+  #define DN_AtomicAddU32(target, value)                          __atomic_fetch_add(target, value, __ATOMIC_ACQ_REL)
+  #define DN_AtomicAddU64(target, value)                          __atomic_fetch_add(target, value, __ATOMIC_ACQ_REL)
+  #define DN_AtomicSubU32(target, value)                          __atomic_fetch_sub(target, value, __ATOMIC_ACQ_REL)
+  #define DN_AtomicSubU64(target, value)                          __atomic_fetch_sub(target, value, __ATOMIC_ACQ_REL)
 
   #define DN_CountLeadingZerosU64(value)                           __builtin_clzll(value)
   #define DN_CountLeadingZerosU32(value)                           __builtin_clzl(value)
 
   #if defined(DN_COMPILER_GCC)
-    #define DN_CPU_TSC() __rdtsc()
+    #define DN_CPUTSC() __rdtsc()
   #else
-    #define DN_CPU_TSC() __builtin_readcyclecounter()
+    #define DN_CPUTSC() __builtin_readcyclecounter()
   #endif
 
   #if defined(DN_PLATFORM_EMSCRIPTEN)
@@ -303,7 +300,6 @@ struct DN_CallSite
   #define DN_CountLeadingZerosUSize(value) DN_CountLeadingZerosU32(value)
 #endif
 
-#if !defined(DN_PLATFORM_ARM64)
 struct DN_CPURegisters
 {
   int eax;
@@ -318,67 +314,63 @@ union DN_CPUIDResult
   int             values[4];
 };
 
-struct DN_CPUIDArgs
-{
-  int eax;
-  int ecx;
-};
+struct DN_CPUIDArgs { int eax; int ecx; };
 
-  #define DN_CPU_FEAT_XMACRO               \
-    DN_CPU_FEAT_XENTRY(3DNow)              \
-    DN_CPU_FEAT_XENTRY(3DNowExt)           \
-    DN_CPU_FEAT_XENTRY(ABM)                \
-    DN_CPU_FEAT_XENTRY(AES)                \
-    DN_CPU_FEAT_XENTRY(AVX)                \
-    DN_CPU_FEAT_XENTRY(AVX2)               \
-    DN_CPU_FEAT_XENTRY(AVX512F)            \
-    DN_CPU_FEAT_XENTRY(AVX512DQ)           \
-    DN_CPU_FEAT_XENTRY(AVX512IFMA)         \
-    DN_CPU_FEAT_XENTRY(AVX512PF)           \
-    DN_CPU_FEAT_XENTRY(AVX512ER)           \
-    DN_CPU_FEAT_XENTRY(AVX512CD)           \
-    DN_CPU_FEAT_XENTRY(AVX512BW)           \
-    DN_CPU_FEAT_XENTRY(AVX512VL)           \
-    DN_CPU_FEAT_XENTRY(AVX512VBMI)         \
-    DN_CPU_FEAT_XENTRY(AVX512VBMI2)        \
-    DN_CPU_FEAT_XENTRY(AVX512VNNI)         \
-    DN_CPU_FEAT_XENTRY(AVX512BITALG)       \
-    DN_CPU_FEAT_XENTRY(AVX512VPOPCNTDQ)    \
-    DN_CPU_FEAT_XENTRY(AVX5124VNNIW)       \
-    DN_CPU_FEAT_XENTRY(AVX5124FMAPS)       \
-    DN_CPU_FEAT_XENTRY(AVX512VP2INTERSECT) \
-    DN_CPU_FEAT_XENTRY(AVX512FP16)         \
-    DN_CPU_FEAT_XENTRY(CLZERO)             \
-    DN_CPU_FEAT_XENTRY(CMPXCHG8B)          \
-    DN_CPU_FEAT_XENTRY(CMPXCHG16B)         \
-    DN_CPU_FEAT_XENTRY(F16C)               \
-    DN_CPU_FEAT_XENTRY(FMA)                \
-    DN_CPU_FEAT_XENTRY(FMA4)               \
-    DN_CPU_FEAT_XENTRY(FP128)              \
-    DN_CPU_FEAT_XENTRY(FP256)              \
-    DN_CPU_FEAT_XENTRY(FPU)                \
-    DN_CPU_FEAT_XENTRY(MMX)                \
-    DN_CPU_FEAT_XENTRY(MONITOR)            \
-    DN_CPU_FEAT_XENTRY(MOVBE)              \
-    DN_CPU_FEAT_XENTRY(MOVU)               \
-    DN_CPU_FEAT_XENTRY(MmxExt)             \
-    DN_CPU_FEAT_XENTRY(PCLMULQDQ)          \
-    DN_CPU_FEAT_XENTRY(POPCNT)             \
-    DN_CPU_FEAT_XENTRY(RDRAND)             \
-    DN_CPU_FEAT_XENTRY(RDSEED)             \
-    DN_CPU_FEAT_XENTRY(RDTSCP)             \
-    DN_CPU_FEAT_XENTRY(SHA)                \
-    DN_CPU_FEAT_XENTRY(SSE)                \
-    DN_CPU_FEAT_XENTRY(SSE2)               \
-    DN_CPU_FEAT_XENTRY(SSE3)               \
-    DN_CPU_FEAT_XENTRY(SSE41)              \
-    DN_CPU_FEAT_XENTRY(SSE42)              \
-    DN_CPU_FEAT_XENTRY(SSE4A)              \
-    DN_CPU_FEAT_XENTRY(SSSE3)              \
-    DN_CPU_FEAT_XENTRY(TSC)                \
-    DN_CPU_FEAT_XENTRY(TscInvariant)       \
-    DN_CPU_FEAT_XENTRY(VAES)               \
-    DN_CPU_FEAT_XENTRY(VPCMULQDQ)
+#define DN_CPU_FEAT_XMACRO               \
+  DN_CPU_FEAT_XENTRY(3DNow)              \
+  DN_CPU_FEAT_XENTRY(3DNowExt)           \
+  DN_CPU_FEAT_XENTRY(ABM)                \
+  DN_CPU_FEAT_XENTRY(AES)                \
+  DN_CPU_FEAT_XENTRY(AVX)                \
+  DN_CPU_FEAT_XENTRY(AVX2)               \
+  DN_CPU_FEAT_XENTRY(AVX512F)            \
+  DN_CPU_FEAT_XENTRY(AVX512DQ)           \
+  DN_CPU_FEAT_XENTRY(AVX512IFMA)         \
+  DN_CPU_FEAT_XENTRY(AVX512PF)           \
+  DN_CPU_FEAT_XENTRY(AVX512ER)           \
+  DN_CPU_FEAT_XENTRY(AVX512CD)           \
+  DN_CPU_FEAT_XENTRY(AVX512BW)           \
+  DN_CPU_FEAT_XENTRY(AVX512VL)           \
+  DN_CPU_FEAT_XENTRY(AVX512VBMI)         \
+  DN_CPU_FEAT_XENTRY(AVX512VBMI2)        \
+  DN_CPU_FEAT_XENTRY(AVX512VNNI)         \
+  DN_CPU_FEAT_XENTRY(AVX512BITALG)       \
+  DN_CPU_FEAT_XENTRY(AVX512VPOPCNTDQ)    \
+  DN_CPU_FEAT_XENTRY(AVX5124VNNIW)       \
+  DN_CPU_FEAT_XENTRY(AVX5124FMAPS)       \
+  DN_CPU_FEAT_XENTRY(AVX512VP2INTERSECT) \
+  DN_CPU_FEAT_XENTRY(AVX512FP16)         \
+  DN_CPU_FEAT_XENTRY(CLZERO)             \
+  DN_CPU_FEAT_XENTRY(CMPXCHG8B)          \
+  DN_CPU_FEAT_XENTRY(CMPXCHG16B)         \
+  DN_CPU_FEAT_XENTRY(F16C)               \
+  DN_CPU_FEAT_XENTRY(FMA)                \
+  DN_CPU_FEAT_XENTRY(FMA4)               \
+  DN_CPU_FEAT_XENTRY(FP128)              \
+  DN_CPU_FEAT_XENTRY(FP256)              \
+  DN_CPU_FEAT_XENTRY(FPU)                \
+  DN_CPU_FEAT_XENTRY(MMX)                \
+  DN_CPU_FEAT_XENTRY(MONITOR)            \
+  DN_CPU_FEAT_XENTRY(MOVBE)              \
+  DN_CPU_FEAT_XENTRY(MOVU)               \
+  DN_CPU_FEAT_XENTRY(MmxExt)             \
+  DN_CPU_FEAT_XENTRY(PCLMULQDQ)          \
+  DN_CPU_FEAT_XENTRY(POPCNT)             \
+  DN_CPU_FEAT_XENTRY(RDRAND)             \
+  DN_CPU_FEAT_XENTRY(RDSEED)             \
+  DN_CPU_FEAT_XENTRY(RDTSCP)             \
+  DN_CPU_FEAT_XENTRY(SHA)                \
+  DN_CPU_FEAT_XENTRY(SSE)                \
+  DN_CPU_FEAT_XENTRY(SSE2)               \
+  DN_CPU_FEAT_XENTRY(SSE3)               \
+  DN_CPU_FEAT_XENTRY(SSE41)              \
+  DN_CPU_FEAT_XENTRY(SSE42)              \
+  DN_CPU_FEAT_XENTRY(SSE4A)              \
+  DN_CPU_FEAT_XENTRY(SSSE3)              \
+  DN_CPU_FEAT_XENTRY(TSC)                \
+  DN_CPU_FEAT_XENTRY(TscInvariant)       \
+  DN_CPU_FEAT_XENTRY(VAES)               \
+  DN_CPU_FEAT_XENTRY(VPCMULQDQ)
 
 enum DN_CPUFeature
 {
@@ -407,218 +399,95 @@ struct DN_CPUReport
   DN_U64 features[(DN_CPUFeature_Count / (sizeof(DN_U64) * 8)) + 1];
 };
 
-extern DN_CPUFeatureDecl g_dn_cpu_feature_decl[DN_CPUFeature_Count];
-#endif // DN_PLATFORM_ARM64
-
-// NOTE: DN_TicketMutex ////////////////////////////////////////////////////////////////////////////
 struct DN_TicketMutex
 {
   unsigned int volatile ticket;  // The next ticket to give out to the thread taking the mutex
   unsigned int volatile serving; // The ticket ID to block the mutex on until it is returned
 };
 
-// NOTE: Intrinsics ////////////////////////////////////////////////////////////////////////////////
-DN_FORCE_INLINE DN_U64 DN_Atomic_SetValue64       (DN_U64 volatile *target, DN_U64 value);
-DN_FORCE_INLINE DN_U32 DN_Atomic_SetValue32       (DN_U32 volatile *target, DN_U32 value);
+DN_API DN_U64          DN_AtomicSetValue64       (DN_U64 volatile *target, DN_U64 value);
+DN_API DN_U32          DN_AtomicSetValue32       (DN_U32 volatile *target, DN_U32 value);
 
-#if !defined (DN_PLATFORM_ARM64)
-DN_API DN_CPUIDResult  DN_CPU_ID                  (DN_CPUIDArgs args);
-DN_API DN_USize        DN_CPU_HasFeatureArray     (DN_CPUReport const *report, DN_CPUFeatureQuery *features, DN_USize features_size);
-DN_API bool            DN_CPU_HasFeature          (DN_CPUReport const *report, DN_CPUFeature feature);
-DN_API bool            DN_CPU_HasAllFeatures      (DN_CPUReport const *report, DN_CPUFeature const *features, DN_USize features_size);
-template <DN_USize N>
-bool                   DN_CPU_HasAllFeaturesCArray(DN_CPUReport const *report, DN_CPUFeature const (&features)[N]);
-DN_API void            DN_CPU_SetFeature          (DN_CPUReport *report, DN_CPUFeature feature);
-DN_API DN_CPUReport    DN_CPU_Report              ();
-#endif
+DN_API DN_CPUIDResult  DN_CPUID                  (DN_CPUIDArgs args);
+DN_API DN_USize        DN_CPUHasFeatureArray     (DN_CPUReport const *report, DN_CPUFeatureQuery *features, DN_USize features_size);
+DN_API bool            DN_CPUHasFeature          (DN_CPUReport const *report, DN_CPUFeature feature);
+DN_API bool            DN_CPUHasAllFeatures      (DN_CPUReport const *report, DN_CPUFeature const *features, DN_USize features_size);
+DN_API void            DN_CPUSetFeature          (DN_CPUReport *report, DN_CPUFeature feature);
+DN_API DN_CPUReport    DN_CPUGetReport           ();
 
-// NOTE: DN_TicketMutex ////////////////////////////////////////////////////////////////////////////
-DN_API void    DN_TicketMutex_Begin      (DN_TicketMutex *mutex);
-DN_API void    DN_TicketMutex_End        (DN_TicketMutex *mutex);
-DN_API DN_UInt DN_TicketMutex_MakeTicket (DN_TicketMutex *mutex);
-DN_API void    DN_TicketMutex_BeginTicket(DN_TicketMutex const *mutex, DN_UInt ticket);
-DN_API bool    DN_TicketMutex_CanLock    (DN_TicketMutex const *mutex, DN_UInt ticket);
+DN_API void            DN_TicketMutex_Begin       (DN_TicketMutex *mutex);
+DN_API void            DN_TicketMutex_End         (DN_TicketMutex *mutex);
+DN_API DN_UInt         DN_TicketMutex_MakeTicket  (DN_TicketMutex *mutex);
+DN_API void            DN_TicketMutex_BeginTicket (DN_TicketMutex const *mutex, DN_UInt ticket);
+DN_API bool            DN_TicketMutex_CanLock     (DN_TicketMutex const *mutex, DN_UInt ticket);
 
-// NOTE: DN_DLList /////////////////////////////////////////////////////////////////////////////////
-#define DN_DLList_Init(list) \
-  (list)->next = (list)->prev = (list)
+DN_API void            DN_BitUnsetInplace         (DN_USize *flags, DN_USize bitfield);
+DN_API void            DN_BitSetInplace           (DN_USize *flags, DN_USize bitfield);
+DN_API bool            DN_BitIsSet                (DN_USize bits, DN_USize bits_to_set);
+DN_API bool            DN_BitIsNotSet             (DN_USize bits, DN_USize bits_to_check);
+#define                DN_BitClearNextLSB(value)  (value) & ((value) - 1)
 
-#define DN_DLList_IsSentinel(list, item) ((list) == (item))
+DN_API DN_I64          DN_SafeAddI64              (DN_I64 a,  DN_I64 b);
+DN_API DN_I64          DN_SafeMulI64              (DN_I64 a,  DN_I64 b);
 
-#define DN_DLList_InitArena(list, T, arena)          \
-  do {                                               \
-    (list) = DN_Arena_New(arena, T, DN_ZeroMem_Yes); \
-    DN_DLList_Init(list);                            \
-  } while (0)
+DN_API DN_U64          DN_SafeAddU64              (DN_U64 a, DN_U64 b);
+DN_API DN_U64          DN_SafeMulU64              (DN_U64 a, DN_U64 b);
 
-#define DN_DLList_InitPool(list, T, pool) \
-  do {                                    \
-    (list) = DN_Pool_New(pool, T);        \
-    DN_DLList_Init(list);                 \
-  } while (0)
+DN_API DN_U64          DN_SafeSubU64              (DN_U64 a, DN_U64 b);
+DN_API DN_U32          DN_SafeSubU32              (DN_U32 a, DN_U32 b);
 
-#define DN_DLList_Detach(item)      \
-  do {                                   \
-    if (item) {                          \
-      (item)->prev->next = (item)->next; \
-      (item)->next->prev = (item)->prev; \
-      (item)->next       = nullptr;      \
-      (item)->prev       = nullptr;      \
-    }                                    \
-  } while (0)
+DN_API int             DN_SaturateCastUSizeToInt  (DN_USize val);
+DN_API DN_I8           DN_SaturateCastUSizeToI8   (DN_USize val);
+DN_API DN_I16          DN_SaturateCastUSizeToI16  (DN_USize val);
+DN_API DN_I32          DN_SaturateCastUSizeToI32  (DN_USize val);
+DN_API DN_I64          DN_SaturateCastUSizeToI64  (DN_USize val);
 
-#define DN_DLList_Dequeue(list, dest_ptr) \
-  if (DN_DLList_HasItems(list)) {         \
-    dest_ptr = (list)->next;              \
-    DN_DLList_Detach(dest_ptr);           \
-  }
+DN_API int             DN_SaturateCastU64ToInt    (DN_U64 val);
+DN_API DN_I8           DN_SaturateCastU8ToI8      (DN_U64 val);
+DN_API DN_I16          DN_SaturateCastU16ToI16    (DN_U64 val);
+DN_API DN_I32          DN_SaturateCastU32ToI32    (DN_U64 val);
+DN_API DN_I64          DN_SaturateCastU64ToI64    (DN_U64 val);
+DN_API DN_UInt         DN_SaturateCastU64ToUInt   (DN_U64 val);
+DN_API DN_U8           DN_SaturateCastU64ToU8     (DN_U64 val);
+DN_API DN_U16          DN_SaturateCastU64ToU16    (DN_U64 val);
+DN_API DN_U32          DN_SaturateCastU64ToU32    (DN_U64 val);
 
-#define DN_DLList_Append(list, item) \
-  do {                                    \
-    if (item) {                           \
-      if ((item)->next)                   \
-        DN_DLList_Detach(item);           \
-      (item)->next       = (list)->next;  \
-      (item)->prev       = (list);        \
-      (item)->next->prev = (item);        \
-      (item)->prev->next = (item);        \
-    }                                     \
-  } while (0)
+DN_API DN_U8           DN_SaturateCastUSizeToU8   (DN_USize val);
+DN_API DN_U16          DN_SaturateCastUSizeToU16  (DN_USize val);
+DN_API DN_U32          DN_SaturateCastUSizeToU32  (DN_USize val);
+DN_API DN_U64          DN_SaturateCastUSizeToU64  (DN_USize val);
 
-#define DN_DLList_Prepend(list, item) \
-  do {                                     \
-    if (item) {                            \
-      if ((item)->next)                    \
-        DN_DLList_Detach(item);            \
-      (item)->next       = (list);         \
-      (item)->prev       = (list)->prev;   \
-      (item)->next->prev = (item);         \
-      (item)->prev->next = (item);         \
-    }                                      \
-  } while (0)
+DN_API int             DN_SaturateCastISizeToInt  (DN_ISize val);
+DN_API DN_I8           DN_SaturateCastISizeToI8   (DN_ISize val);
+DN_API DN_I16          DN_SaturateCastISizeToI16  (DN_ISize val);
+DN_API DN_I32          DN_SaturateCastISizeToI32  (DN_ISize val);
+DN_API DN_I64          DN_SaturateCastISizeToI64  (DN_ISize val);
 
-#define DN_DLList_IsEmpty(list) \
-  (!(list) || ((list) == (list)->next))
+DN_API DN_UInt         DN_SaturateCastISizeToUInt (DN_ISize val);
+DN_API DN_U8           DN_SaturateCastISizeToU8   (DN_ISize val);
+DN_API DN_U16          DN_SaturateCastISizeToU16  (DN_ISize val);
+DN_API DN_U32          DN_SaturateCastISizeToU32  (DN_ISize val);
+DN_API DN_U64          DN_SaturateCastISizeToU64  (DN_ISize val);
 
-#define DN_DLList_IsInit(list) \
-  ((list)->next && (list)->prev)
+DN_API DN_ISize        DN_SaturateCastI64ToISize  (DN_I64 val);
+DN_API DN_I8           DN_SaturateCastI64ToI8     (DN_I64 val);
+DN_API DN_I16          DN_SaturateCastI64ToI16    (DN_I64 val);
+DN_API DN_I32          DN_SaturateCastI64ToI32    (DN_I64 val);
 
-#define DN_DLList_HasItems(list) \
-  ((list) && ((list) != (list)->next))
+DN_API DN_UInt         DN_SaturateCastI64ToUInt   (DN_I64 val);
+DN_API DN_ISize        DN_SaturateCastI64ToUSize  (DN_I64 val);
+DN_API DN_U8           DN_SaturateCastI64ToU8     (DN_I64 val);
+DN_API DN_U16          DN_SaturateCastI64ToU16    (DN_I64 val);
+DN_API DN_U32          DN_SaturateCastI64ToU32    (DN_I64 val);
+DN_API DN_U64          DN_SaturateCastI64ToU64    (DN_I64 val);
 
-#define DN_DLList_ForEach(it, list) \
-  auto *it = (list)->next; (it) != (list); (it) = (it)->next
+DN_API DN_I8           DN_SaturateCastIntToI8     (int val);
+DN_API DN_I16          DN_SaturateCastIntToI16    (int val);
+DN_API DN_U8           DN_SaturateCastIntToU8     (int val);
+DN_API DN_U16          DN_SaturateCastIntToU16    (int val);
+DN_API DN_U32          DN_SaturateCastIntToU32    (int val);
+DN_API DN_U64          DN_SaturateCastIntToU64    (int val);
 
-// NOTE: Intrinsics ////////////////////////////////////////////////////////////////////////////////
-DN_FORCE_INLINE DN_U64 DN_Atomic_SetValue64(DN_U64 volatile *target, DN_U64 value)
-{
-#if defined(DN_COMPILER_MSVC) || defined(DN_COMPILER_CLANG_CL)
-  __int64 result;
-  do {
-    result = *target;
-  } while (DN_Atomic_CompareExchange64(target, value, result) != result);
-  return DN_CAST(DN_U64) result;
-#elif defined(DN_COMPILER_GCC) || defined(DN_COMPILER_CLANG)
-  DN_U64 result = __sync_lock_test_and_set(target, value);
-  return result;
-#else
-  #error Unsupported compiler
-#endif
-}
-
-DN_FORCE_INLINE DN_U32 DN_Atomic_SetValue32(DN_U32 volatile *target, DN_U32 value)
-{
-#if defined(DN_COMPILER_MSVC) || defined(DN_COMPILER_CLANG_CL)
-  long result;
-  do {
-    result = *target;
-  } while (DN_Atomic_CompareExchange32(target, value, result) != result);
-  return result;
-#elif defined(DN_COMPILER_GCC) || defined(DN_COMPILER_CLANG)
-  long result = __sync_lock_test_and_set(target, value);
-  return result;
-#else
-  #error Unsupported compiler
-#endif
-}
-
-template <DN_USize N>
-bool DN_CPU_HasAllFeaturesCArray(DN_CPUReport const *report, DN_CPUFeature const (&features)[N])
-{
-  bool result = DN_CPU_HasAllFeatures(report, features, N);
-  return result;
-}
-
-// NOTE: DN_Bit ////////////////////////////////////////////////////////////////////////////////////
-DN_API void                DN_Bit_UnsetInplace                     (DN_USize *flags, DN_USize bitfield);
-DN_API void                DN_Bit_SetInplace                       (DN_USize *flags, DN_USize bitfield);
-DN_API bool                DN_Bit_IsSet                            (DN_USize bits, DN_USize bits_to_set);
-DN_API bool                DN_Bit_IsNotSet                         (DN_USize bits, DN_USize bits_to_check);
-#define                    DN_Bit_ClearNextLSB(value)              (value) & ((value) - 1)
-
-// NOTE: DN_Safe ///////////////////////////////////////////////////////////////////////////////////
-DN_API DN_I64              DN_Safe_AddI64                          (DN_I64 a,  DN_I64 b);
-DN_API DN_I64              DN_Safe_MulI64                          (DN_I64 a,  DN_I64 b);
-
-DN_API DN_U64              DN_Safe_AddU64                          (DN_U64 a, DN_U64 b);
-DN_API DN_U64              DN_Safe_MulU64                          (DN_U64 a, DN_U64 b);
-
-DN_API DN_U64              DN_Safe_SubU64                          (DN_U64 a, DN_U64 b);
-DN_API DN_U32              DN_Safe_SubU32                          (DN_U32 a, DN_U32 b);
-
-DN_API int                 DN_SaturateCastUSizeToInt               (DN_USize val);
-DN_API DN_I8               DN_SaturateCastUSizeToI8                (DN_USize val);
-DN_API DN_I16              DN_SaturateCastUSizeToI16               (DN_USize val);
-DN_API DN_I32              DN_SaturateCastUSizeToI32               (DN_USize val);
-DN_API DN_I64              DN_SaturateCastUSizeToI64               (DN_USize val);
-
-DN_API int                 DN_SaturateCastU64ToInt                 (DN_U64 val);
-DN_API DN_I8               DN_SaturateCastU8ToI8                   (DN_U64 val);
-DN_API DN_I16              DN_SaturateCastU16ToI16                 (DN_U64 val);
-DN_API DN_I32              DN_SaturateCastU32ToI32                 (DN_U64 val);
-DN_API DN_I64              DN_SaturateCastU64ToI64                 (DN_U64 val);
-DN_API DN_UInt             DN_SaturateCastU64ToUInt                (DN_U64 val);
-DN_API DN_U8               DN_SaturateCastU64ToU8                  (DN_U64 val);
-DN_API DN_U16              DN_SaturateCastU64ToU16                 (DN_U64 val);
-DN_API DN_U32              DN_SaturateCastU64ToU32                 (DN_U64 val);
-
-DN_API DN_U8               DN_SaturateCastUSizeToU8                (DN_USize val);
-DN_API DN_U16              DN_SaturateCastUSizeToU16               (DN_USize val);
-DN_API DN_U32              DN_SaturateCastUSizeToU32               (DN_USize val);
-DN_API DN_U64              DN_SaturateCastUSizeToU64               (DN_USize val);
-
-DN_API int                 DN_SaturateCastISizeToInt               (DN_ISize val);
-DN_API DN_I8               DN_SaturateCastISizeToI8                (DN_ISize val);
-DN_API DN_I16              DN_SaturateCastISizeToI16               (DN_ISize val);
-DN_API DN_I32              DN_SaturateCastISizeToI32               (DN_ISize val);
-DN_API DN_I64              DN_SaturateCastISizeToI64               (DN_ISize val);
-
-DN_API DN_UInt             DN_SaturateCastISizeToUInt              (DN_ISize val);
-DN_API DN_U8               DN_SaturateCastISizeToU8                (DN_ISize val);
-DN_API DN_U16              DN_SaturateCastISizeToU16               (DN_ISize val);
-DN_API DN_U32              DN_SaturateCastISizeToU32               (DN_ISize val);
-DN_API DN_U64              DN_SaturateCastISizeToU64               (DN_ISize val);
-
-DN_API DN_ISize            DN_SaturateCastI64ToISize               (DN_I64 val);
-DN_API DN_I8               DN_SaturateCastI64ToI8                  (DN_I64 val);
-DN_API DN_I16              DN_SaturateCastI64ToI16                 (DN_I64 val);
-DN_API DN_I32              DN_SaturateCastI64ToI32                 (DN_I64 val);
-
-DN_API DN_UInt             DN_SaturateCastI64ToUInt                (DN_I64 val);
-DN_API DN_ISize            DN_SaturateCastI64ToUSize               (DN_I64 val);
-DN_API DN_U8               DN_SaturateCastI64ToU8                  (DN_I64 val);
-DN_API DN_U16              DN_SaturateCastI64ToU16                 (DN_I64 val);
-DN_API DN_U32              DN_SaturateCastI64ToU32                 (DN_I64 val);
-DN_API DN_U64              DN_SaturateCastI64ToU64                 (DN_I64 val);
-
-DN_API DN_I8               DN_SaturateCastIntToI8                  (int val);
-DN_API DN_I16              DN_SaturateCastIntToI16                 (int val);
-DN_API DN_U8               DN_SaturateCastIntToU8                  (int val);
-DN_API DN_U16              DN_SaturateCastIntToU16                 (int val);
-DN_API DN_U32              DN_SaturateCastIntToU32                 (int val);
-DN_API DN_U64              DN_SaturateCastIntToU64                 (int val);
-
-// NOTE: DN_Asan ///////////////////////////////////////////////////////////////////////////////////
-DN_API void                DN_ASAN_PoisonMemoryRegion     (void const volatile *ptr, DN_USize size);
-DN_API void                DN_ASAN_UnpoisonMemoryRegion   (void const volatile *ptr, DN_USize size);
+DN_API void            DN_ASanPoisonMemoryRegion  (void const volatile *ptr, DN_USize size);
+DN_API void            DN_ASanUnpoisonMemoryRegion(void const volatile *ptr, DN_USize size);
 #endif // !defined(DN_BASE_H)

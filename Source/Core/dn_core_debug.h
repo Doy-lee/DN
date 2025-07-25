@@ -1,6 +1,8 @@
 #if !defined(DN_CORE_DEBUG_H)
 #define DN_CORE_DEBUG_H
 
+#include "../dn_base_inc.h"
+
 // NOTE: DN_StackTrace /////////////////////////////////////////////////////////////////////////////
 // NOTE: DN_Debug //////////////////////////////////////////////////////////////////////////////////
 enum DN_DebugAllocFlag
@@ -93,6 +95,16 @@ DN_API void                DN_Profiler_EndZone                     (DN_ProfilerZ
 DN_API DN_ProfilerAnchor * DN_Profiler_AnchorBuffer                (DN_ProfilerAnchorBuffer buffer);
 DN_API void                DN_Profiler_SwapAnchorBuffer            ();
 DN_API void                DN_Profiler_Dump                        (DN_U64 tsc_per_second);
-
 #endif // !defined(DN_NO_PROFILER)
+
+
+#if defined(DN_LEAK_TRACKING)
+DN_API void            DN_DBGTrackAlloc                            (void *ptr, DN_USize size, bool alloc_can_leak);
+DN_API void            DN_DBGTrackDealloc                          (void *ptr);
+DN_API void            DN_DBGDumpLeaks                             ();
+#else
+#define                DN_DBGTrackAlloc(ptr, size, alloc_can_leak) do { (void)ptr; (void)size; (void)alloc_can_leak; } while (0)
+#define                DN_DBGTrackDealloc(ptr)                     do { (void)ptr;                                   } while (0)
+#define                DN_DBGDumpLeaks()                           do {                                              } while (0)
+#endif
 #endif // DN_CORE_DEBUG_H

@@ -203,6 +203,76 @@ template <typename T> struct DN_List
 //   MyLinkItem *first_item = DN_ISLList_Detach(&my_link, MyLinkItem);
 //   ```
 
+#define DN_DLList_Init(list) \
+  (list)->next = (list)->prev = (list)
+
+#define DN_DLList_IsSentinel(list, item) ((list) == (item))
+
+#define DN_DLList_InitArena(list, T, arena)          \
+  do {                                               \
+    (list) = DN_Arena_New(arena, T, DN_ZeroMem_Yes); \
+    DN_DLList_Init(list);                            \
+  } while (0)
+
+#define DN_DLList_InitPool(list, T, pool) \
+  do {                                    \
+    (list) = DN_Pool_New(pool, T);        \
+    DN_DLList_Init(list);                 \
+  } while (0)
+
+#define DN_DLList_Detach(item)      \
+  do {                                   \
+    if (item) {                          \
+      (item)->prev->next = (item)->next; \
+      (item)->next->prev = (item)->prev; \
+      (item)->next       = nullptr;      \
+      (item)->prev       = nullptr;      \
+    }                                    \
+  } while (0)
+
+#define DN_DLList_Dequeue(list, dest_ptr) \
+  if (DN_DLList_HasItems(list)) {         \
+    dest_ptr = (list)->next;              \
+    DN_DLList_Detach(dest_ptr);           \
+  }
+
+#define DN_DLList_Append(list, item) \
+  do {                                    \
+    if (item) {                           \
+      if ((item)->next)                   \
+        DN_DLList_Detach(item);           \
+      (item)->next       = (list)->next;  \
+      (item)->prev       = (list);        \
+      (item)->next->prev = (item);        \
+      (item)->prev->next = (item);        \
+    }                                     \
+  } while (0)
+
+#define DN_DLList_Prepend(list, item) \
+  do {                                     \
+    if (item) {                            \
+      if ((item)->next)                    \
+        DN_DLList_Detach(item);            \
+      (item)->next       = (list);         \
+      (item)->prev       = (list)->prev;   \
+      (item)->next->prev = (item);         \
+      (item)->prev->next = (item);         \
+    }                                      \
+  } while (0)
+
+#define DN_DLList_IsEmpty(list) \
+  (!(list) || ((list) == (list)->next))
+
+#define DN_DLList_IsInit(list) \
+  ((list)->next && (list)->prev)
+
+#define DN_DLList_HasItems(list) \
+  ((list) && ((list) != (list)->next))
+
+#define DN_DLList_ForEach(it, list) \
+  auto *it = (list)->next; (it) != (list); (it) = (it)->next
+
+
 #define                      DN_ISLList_Detach(list)                                             (decltype(list)) DN_CSLList_Detach((void **)&(list), (void **)&(list)->next)
 
 #define                      DN_LArray_ResizeFromPool(c_array, size, max, pool, new_max)         DN_CArray2_ResizeFromPool((void **)&(c_array), size, max, sizeof((c_array)[0]), pool, new_max)

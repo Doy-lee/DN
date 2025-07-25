@@ -1,6 +1,8 @@
 #if !defined(DN_BASE_LOG_H)
 #define DN_BASE_LOG_H
 
+#include "../dn_base_inc.h"
+
 enum DN_LOGType
 {
   DN_LOGType_Debug,
@@ -67,6 +69,4 @@ DN_API DN_LOGTypeParam  DN_LOG_MakeU32LogTypeParam        (DN_LOGType type);
 #define                 DN_LOG_InfoF(fmt, ...)            DN_LOG_EmitFromType(DN_LOG_MakeU32LogTypeParam(DN_LOGType_Info), DN_CALL_SITE, fmt, ##__VA_ARGS__)
 #define                 DN_LOG_WarningF(fmt, ...)         DN_LOG_EmitFromType(DN_LOG_MakeU32LogTypeParam(DN_LOGType_Warning), DN_CALL_SITE, fmt, ##__VA_ARGS__)
 #define                 DN_LOG_ErrorF(fmt, ...)           DN_LOG_EmitFromType(DN_LOG_MakeU32LogTypeParam(DN_LOGType_Error), DN_CALL_SITE, fmt, ##__VA_ARGS__)
-
-
 #endif // !defined(DN_BASE_LOG_H)

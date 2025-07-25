@@ -27,9 +27,9 @@ static DN_I32 DN_ASYNC_ThreadEntryPoint_(DN_OSThread *thread)
       args.input            = task.work.input;
       args.thread           = thread;
 
-      DN_Atomic_AddU32(&async->busy_threads, 1);
+      DN_AtomicAddU32(&async->busy_threads, 1);
       task.work.func(args);
-      DN_Atomic_SubU32(&async->busy_threads, 1);
+      DN_AtomicSubU32(&async->busy_threads, 1);
 
       if (task.completion_sem.handle != 0)
         DN_OS_SemaphoreIncrement(&task.completion_sem, 1);
@@ -59,7 +59,7 @@ DN_API void DN_ASYNC_Init(DN_ASYNCCore *async, char *base, DN_USize base_size, D
 DN_API void DN_ASYNC_Deinit(DN_ASYNCCore *async)
 {
   DN_Assert(async);
-  DN_Atomic_SetValue32(&async->join_threads, true);
+  DN_AtomicSetValue32(&async->join_threads, true);
   DN_OS_SemaphoreIncrement(&async->worker_sem, async->thread_count);
   for (DN_ForItSize(it, DN_OSThread, async->threads, async->thread_count))
     DN_OS_ThreadDeinit(it.data);

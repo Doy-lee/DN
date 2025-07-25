@@ -314,9 +314,9 @@ DN_API int32_t DN_OS_JobQueueSPMCThread(DN_OSThread *thread)
     queue->read_index += 1;
     DN_OS_MutexUnlock(&queue->mutex);
 
-    job.elapsed_tsc -= DN_CPU_TSC();
+    job.elapsed_tsc -= DN_CPUGetTSC();
     job.func(thread, job.user_context);
-    job.elapsed_tsc += DN_CPU_TSC();
+    job.elapsed_tsc += DN_CPUGetTSC();
 
     if (job.add_to_completion_queue) {
       DN_OS_SemaphoreWait(&queue->complete_queue_write_semaphore, DN_OS_SEMAPHORE_INFINITE_TIMEOUT);

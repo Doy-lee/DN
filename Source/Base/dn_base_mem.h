@@ -1,7 +1,7 @@
 #if !defined(DN_BASE_MEM_H)
 #define DN_BASE_MEM_H
 
-#include "../dn_clangd.h"
+#include "../dn_base_inc.h"
 
 enum DN_MemCommit
 {
@@ -146,32 +146,6 @@ struct DN_ArenaTempMemScope
 
 DN_USize const DN_ARENA_HEADER_SIZE = DN_AlignUpPowerOfTwo(sizeof(DN_Arena), 64);
 
-// NOTE: DN_Arena //////////////////////////////////////////////////////////////////////////////////
-DN_API DN_Arena             DN_Arena_InitFromBuffer                      (void *buffer, DN_USize size, DN_ArenaFlags flags);
-DN_API DN_Arena             DN_Arena_InitFromMemFuncs                    (DN_U64 reserve, DN_U64 commit, DN_ArenaFlags flags, DN_ArenaMemFuncs mem_funcs);
-DN_API void                 DN_Arena_Deinit                              (DN_Arena *arena);
-DN_API bool                 DN_Arena_Commit                              (DN_Arena *arena, DN_U64 size);
-DN_API bool                 DN_Arena_CommitTo                            (DN_Arena *arena, DN_U64 pos);
-DN_API bool                 DN_Arena_Grow                                (DN_Arena *arena, DN_U64 reserve, DN_U64 commit);
-DN_API void *               DN_Arena_Alloc                               (DN_Arena *arena, DN_U64 size, uint8_t align, DN_ZeroMem zero_mem);
-DN_API void *               DN_Arena_AllocContiguous                     (DN_Arena *arena, DN_U64 size, uint8_t align, DN_ZeroMem zero_mem);
-DN_API void *               DN_Arena_Copy                                (DN_Arena *arena, void const *data, DN_U64 size, uint8_t align);
-DN_API void                 DN_Arena_PopTo                               (DN_Arena *arena, DN_U64 init_used);
-DN_API void                 DN_Arena_Pop                                 (DN_Arena *arena, DN_U64 amount);
-DN_API DN_U64               DN_Arena_Pos                                 (DN_Arena const *arena);
-DN_API void                 DN_Arena_Clear                               (DN_Arena *arena);
-DN_API bool                 DN_Arena_OwnsPtr                             (DN_Arena const *arena, void *ptr);
-DN_API DN_ArenaStats        DN_Arena_SumStatsArray                       (DN_ArenaStats const *array, DN_USize size);
-DN_API DN_ArenaStats        DN_Arena_SumStats                            (DN_ArenaStats lhs, DN_ArenaStats rhs);
-DN_API DN_ArenaStats        DN_Arena_SumArenaArrayToStats                (DN_Arena const *array, DN_USize size);
-DN_API DN_ArenaTempMem      DN_Arena_TempMemBegin                        (DN_Arena *arena);
-DN_API void                 DN_Arena_TempMemEnd                          (DN_ArenaTempMem mem);
-#define                     DN_Arena_New_Frame(T, zero_mem)              (T *)DN_Arena_Alloc(DN_OS_TLSGet()->frame_arena, sizeof(T), alignof(T), zero_mem)
-#define                     DN_Arena_New(arena, T, zero_mem)             (T *)DN_Arena_Alloc(arena,                      sizeof(T),            alignof(T), zero_mem)
-#define                     DN_Arena_NewArray(arena, T, count, zero_mem) (T *)DN_Arena_Alloc(arena,                      sizeof(T)  * (count), alignof(T), zero_mem)
-#define                     DN_Arena_NewCopy(arena, T, src)              (T *)DN_Arena_Copy (arena, (src),               sizeof(T),            alignof(T))
-#define                     DN_Arena_NewArrayCopy(arena, T, src, count)  (T *)DN_Arena_Copy (arena, (src),               sizeof(T)  * (count), alignof(T))
-
 #if !defined(DN_POOL_DEFAULT_ALIGN)
     #define DN_POOL_DEFAULT_ALIGN 16
 #endif
@@ -225,29 +199,42 @@ struct DN_Pool
   DN_U8        align;
 };
 
-// NOTE: DN_Pool ///////////////////////////////////////////////////////////////////////////////////
-DN_API DN_Pool              DN_Pool_Init                                 (DN_Arena *arena, DN_U8 align);
-DN_API bool                 DN_Pool_IsValid                              (DN_Pool const *pool);
-DN_API void *               DN_Pool_Alloc                                (DN_Pool *pool, DN_USize size);
-DN_API DN_Str8              DN_Pool_AllocStr8FV                          (DN_Pool *pool, DN_FMT_ATTRIB char const *fmt, va_list args);
-DN_API DN_Str8              DN_Pool_AllocStr8F                           (DN_Pool *pool, DN_FMT_ATTRIB char const *fmt, ...);
-DN_API DN_Str8              DN_Pool_AllocStr8Copy                        (DN_Pool *pool, DN_Str8 string);
-DN_API void                 DN_Pool_Dealloc                              (DN_Pool *pool, void *ptr);
-DN_API void *               DN_Pool_Copy                                 (DN_Pool *pool, void const *data, DN_U64 size, uint8_t align);
+DN_API DN_Arena        DN_Arena_InitFromBuffer                      (void *buffer, DN_USize size, DN_ArenaFlags flags);
+DN_API DN_Arena        DN_Arena_InitFromMemFuncs                    (DN_U64 reserve, DN_U64 commit, DN_ArenaFlags flags, DN_ArenaMemFuncs mem_funcs);
+DN_API void            DN_Arena_Deinit                              (DN_Arena *arena);
+DN_API bool            DN_Arena_Commit                              (DN_Arena *arena, DN_U64 size);
+DN_API bool            DN_Arena_CommitTo                            (DN_Arena *arena, DN_U64 pos);
+DN_API bool            DN_Arena_Grow                                (DN_Arena *arena, DN_U64 reserve, DN_U64 commit);
+DN_API void *          DN_Arena_Alloc                               (DN_Arena *arena, DN_U64 size, uint8_t align, DN_ZeroMem zero_mem);
+DN_API void *          DN_Arena_AllocContiguous                     (DN_Arena *arena, DN_U64 size, uint8_t align, DN_ZeroMem zero_mem);
+DN_API void *          DN_Arena_Copy                                (DN_Arena *arena, void const *data, DN_U64 size, uint8_t align);
+DN_API void            DN_Arena_PopTo                               (DN_Arena *arena, DN_U64 init_used);
+DN_API void            DN_Arena_Pop                                 (DN_Arena *arena, DN_U64 amount);
+DN_API DN_U64          DN_Arena_Pos                                 (DN_Arena const *arena);
+DN_API void            DN_Arena_Clear                               (DN_Arena *arena);
+DN_API bool            DN_Arena_OwnsPtr                             (DN_Arena const *arena, void *ptr);
+DN_API DN_ArenaStats   DN_Arena_SumStatsArray                       (DN_ArenaStats const *array, DN_USize size);
+DN_API DN_ArenaStats   DN_Arena_SumStats                            (DN_ArenaStats lhs, DN_ArenaStats rhs);
+DN_API DN_ArenaStats   DN_Arena_SumArenaArrayToStats                (DN_Arena const *array, DN_USize size);
+DN_API DN_ArenaTempMem DN_Arena_TempMemBegin                        (DN_Arena *arena);
+DN_API void            DN_Arena_TempMemEnd                          (DN_ArenaTempMem mem);
+#define                DN_Arena_New_Frame(T, zero_mem)              (T *)DN_Arena_Alloc(DN_OS_TLSGet()->frame_arena, sizeof(T), alignof(T), zero_mem)
+#define                DN_Arena_New(arena, T, zero_mem)             (T *)DN_Arena_Alloc(arena,                       sizeof(T),            alignof(T), zero_mem)
+#define                DN_Arena_NewArray(arena, T, count, zero_mem) (T *)DN_Arena_Alloc(arena,                       sizeof(T)  * (count), alignof(T), zero_mem)
+#define                DN_Arena_NewCopy(arena, T, src)              (T *)DN_Arena_Copy (arena, (src),                sizeof(T),            alignof(T))
+#define                DN_Arena_NewArrayCopy(arena, T, src, count)  (T *)DN_Arena_Copy (arena, (src),                sizeof(T)  * (count), alignof(T))
 
-#define                     DN_Pool_New(pool, T)                         (T *)DN_Pool_Alloc(pool, sizeof(T))
-#define                     DN_Pool_NewArray(pool, T, count)             (T *)DN_Pool_Alloc(pool, count * sizeof(T))
-#define                     DN_Pool_NewCopy(arena, T, src)               (T *)DN_Pool_Copy (arena, (src), sizeof(T),            alignof(T))
-#define                     DN_Pool_NewArrayCopy(arena, T, src, count)   (T *)DN_Pool_Copy (arena, (src), sizeof(T)  * (count), alignof(T))
+DN_API DN_Pool         DN_Pool_Init                                 (DN_Arena *arena, DN_U8 align);
+DN_API bool            DN_Pool_IsValid                              (DN_Pool const *pool);
+DN_API void *          DN_Pool_Alloc                                (DN_Pool *pool, DN_USize size);
+DN_API DN_Str8         DN_Pool_AllocStr8FV                          (DN_Pool *pool, DN_FMT_ATTRIB char const *fmt, va_list args);
+DN_API DN_Str8         DN_Pool_AllocStr8F                           (DN_Pool *pool, DN_FMT_ATTRIB char const *fmt, ...);
+DN_API DN_Str8         DN_Pool_AllocStr8Copy                        (DN_Pool *pool, DN_Str8 string);
+DN_API void            DN_Pool_Dealloc                              (DN_Pool *pool, void *ptr);
+DN_API void *          DN_Pool_Copy                                 (DN_Pool *pool, void const *data, DN_U64 size, uint8_t align);
 
-// NOTE: DN_Debug //////////////////////////////////////////////////////////////////////////////////
-#if defined(DN_LEAK_TRACKING) && !defined(DN_FREESTANDING)
-DN_API void                 DN_Debug_TrackAlloc  (void *ptr, DN_USize size, bool alloc_can_leak);
-DN_API void                 DN_Debug_TrackDealloc(void *ptr);
-DN_API void                 DN_Debug_DumpLeaks   ();
-#else
-#define                     DN_Debug_TrackAlloc(ptr, size, alloc_can_leak) do { (void)ptr; (void)size; (void)alloc_can_leak; } while (0)
-#define                     DN_Debug_TrackDealloc(ptr)                     do { (void)ptr;                                   } while (0)
-#define                     DN_Debug_DumpLeaks()                           do {                                              } while (0)
-#endif
+#define                DN_Pool_New(pool, T)                         (T *)DN_Pool_Alloc(pool, sizeof(T))
+#define                DN_Pool_NewArray(pool, T, count)             (T *)DN_Pool_Alloc(pool, count * sizeof(T))
+#define                DN_Pool_NewCopy(arena, T, src)               (T *)DN_Pool_Copy (arena, (src), sizeof(T),            alignof(T))
+#define                DN_Pool_NewArrayCopy(arena, T, src, count)   (T *)DN_Pool_Copy (arena, (src), sizeof(T)  * (count), alignof(T))
 #endif // !defined(DN_BASE_MEM_H)

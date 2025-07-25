@@ -1,6 +1,8 @@
 #if !defined(DN_BASE_OS_H)
 #define DN_BASE_OS_H
 
+#include "../dn_base_inc.h"
+
 // NOTE: OS primitives that the OS layer can provide for the base layer but is optional.
 
 struct DN_StackTraceFrame
@@ -30,7 +32,19 @@ struct DN_StackTraceWalkResultIterator
   DN_U16                index;
 };
 
-DN_API DN_Str8                      DN_StackTrace_WalkStr8FromHeap (DN_U16 limit, DN_U16 skip);
+
+#if defined(DN_FREESTANDING)
+#define                             DN_StackTrace_WalkStr8FromHeap(...) DN_STR8("N/A")
+#define                             DN_StackTrace_Walk(...)
+#define                             DN_StackTrace_WalkResultIterate(...)
+#define                             DN_StackTrace_WalkResultToStr8(...) DN_STR8("N/A")
+#define                             DN_StackTrace_WalkStr8(...) DN_STR8("N/A")
+#define                             DN_StackTrace_WalkStr8FromHeap(...) DN_STR8("N/A")
+#define                             DN_StackTrace_GetFrames(...)
+#define                             DN_StackTrace_RawFrameToFrame(...)
+#define                             DN_StackTrace_Print(...)
+#define                             DN_StackTrace_ReloadSymbols(...)
+#else
 DN_API DN_StackTraceWalkResult      DN_StackTrace_Walk             (struct DN_Arena *arena, DN_U16 limit);
 DN_API bool                         DN_StackTrace_WalkResultIterate(DN_StackTraceWalkResultIterator *it, DN_StackTraceWalkResult const *walk);
 DN_API DN_Str8                      DN_StackTrace_WalkResultToStr8 (struct DN_Arena *arena, DN_StackTraceWalkResult const *walk, DN_U16 skip);
@@ -40,7 +54,5 @@ DN_API DN_Slice<DN_StackTraceFrame> DN_StackTrace_GetFrames        (struct DN_Ar
 DN_API DN_StackTraceFrame           DN_StackTrace_RawFrameToFrame  (struct DN_Arena *arena, DN_StackTraceRawFrame raw_frame);
 DN_API void                         DN_StackTrace_Print            (DN_U16 limit);
 DN_API void                         DN_StackTrace_ReloadSymbols    ();
-
-
 #endif
-
+#endif // !defined(DN_BASE_OS_H)

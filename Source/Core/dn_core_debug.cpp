@@ -1,5 +1,8 @@
 #define DN_CORE_DEBUG_CPP
 
+#include "../dn_base_inc.h"
+#include "../dn_os_inc.h"
+
 DN_API DN_StackTraceWalkResult DN_StackTrace_Walk(DN_Arena *arena, uint16_t limit)
 {
   DN_StackTraceWalkResult result = {};
@@ -209,7 +212,7 @@ DN_API void DN_StackTrace_ReloadSymbols()
 
 // NOTE: DN_Debug //////////////////////////////////////////////////////////////////////////////////
 #if defined(DN_LEAK_TRACKING)
-DN_API void DN_Debug_TrackAlloc(void *ptr, DN_USize size, bool leak_permitted)
+DN_API void DN_DBGTrackAlloc(void *ptr, DN_USize size, bool leak_permitted)
 {
   if (!ptr)
     return;
@@ -236,7 +239,7 @@ DN_API void DN_Debug_TrackAlloc(void *ptr, DN_USize size, bool leak_permitted)
           "This pointer is already in the leak tracker, however it has not been freed yet. This "
           "same pointer is being ask to be tracked twice in the allocation table, e.g. one if its "
           "previous free calls has not being marked freed with an equivalent call to "
-          "DN_Debug_TrackDealloc()\n"
+          "DN_DBGTrackDealloc()\n"
           "\n"
           "The pointer (0x%p) originally allocated %.*s at:\n"
           "\n"
@@ -268,7 +271,7 @@ DN_API void DN_Debug_TrackAlloc(void *ptr, DN_USize size, bool leak_permitted)
   g_dn_core->alloc_table_bytes_allocated_for_stack_traces += alloc->stack_trace.size;
 }
 
-DN_API void DN_Debug_TrackDealloc(void *ptr)
+DN_API void DN_DBGTrackDealloc(void *ptr)
 {
     if (!ptr)
         return;
@@ -317,7 +320,7 @@ DN_API void DN_Debug_TrackDealloc(void *ptr)
     g_dn_core->alloc_table_bytes_allocated_for_stack_traces += alloc->freed_stack_trace.size;
 }
 
-DN_API void DN_Debug_DumpLeaks()
+DN_API void DN_DBGDumpLeaks()
 {
     uint64_t leak_count   = 0;
     uint64_t leaked_bytes = 0;
@@ -383,7 +386,7 @@ DN_API DN_ProfilerZone DN_Profiler_BeginZoneAtIndex(DN_Str8 name, uint16_t ancho
   #endif
   anchor->name                     = name;
   DN_ProfilerZone result           = {};
-  result.begin_tsc                 = DN_CPU_TSC();
+  result.begin_tsc                 = DN_CPUGetTSC();
   result.anchor_index              = anchor_index;
   result.parent_zone               = g_dn_core->profiler->parent_zone;
   result.elapsed_tsc_at_zone_start = anchor->tsc_inclusive;
@@ -393,7 +396,7 @@ DN_API DN_ProfilerZone DN_Profiler_BeginZoneAtIndex(DN_Str8 name, uint16_t ancho
 
 DN_API void DN_Profiler_EndZone(DN_ProfilerZone zone)
 {
-  uint64_t           elapsed_tsc   = DN_CPU_TSC() - zone.begin_tsc;
+  uint64_t           elapsed_tsc   = DN_CPUGetTSC() - zone.begin_tsc;
   DN_ProfilerAnchor *anchor_buffer = DN_Profiler_WriteBuffer();
   DN_ProfilerAnchor *anchor        = anchor_buffer + zone.anchor_index;
 
