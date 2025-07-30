@@ -1294,7 +1294,7 @@ DN_API DN_M2x3 DN_M2x3_Mul(DN_M2x3 m1, DN_M2x3 m2)
 
   DN_M2x3 result = {
       {
-       m1.e[0] * m2.e[0] + m1.e[1] * m2.e[3],           // a*g + b*j + c*0[omitted],
+          m1.e[0] * m2.e[0] + m1.e[1] * m2.e[3],           // a*g + b*j + c*0[omitted],
           m1.e[0] * m2.e[1] + m1.e[1] * m2.e[4],           // a*h + b*k + c*0[omitted],
           m1.e[0] * m2.e[2] + m1.e[1] * m2.e[5] + m1.e[2], // a*i + b*l + c*1,
 
@@ -1381,12 +1381,15 @@ DN_API DN_Rect DN_Rect_ExpandV2(DN_Rect a, DN_V2F32 amount)
 
 DN_API bool DN_Rect_Intersects(DN_Rect a, DN_Rect b)
 {
-  DN_V2F32 a_min  = a.pos;
-  DN_V2F32 a_max  = a.pos + a.size;
-  DN_V2F32 b_min  = b.pos;
-  DN_V2F32 b_max  = b.pos + b.size;
-  bool     result = (a_min.x <= b_max.x && a_max.x >= b_min.x) &&
-                (a_min.y <= b_max.y && a_max.y >= b_min.y);
+  DN_V2F32 a_min    = a.pos;
+  DN_V2F32 a_max    = a.pos + a.size;
+  DN_V2F32 b_min    = b.pos;
+  DN_V2F32 b_max    = b.pos + b.size;
+  bool     has_size = a.size.x && a.size.y && b.size.x && b.size.y;
+  bool     result   = false;
+  if (has_size)
+    result = (a_min.x <= b_max.x && a_max.x >= b_min.x) &&
+             (a_min.y <= b_max.y && a_max.y >= b_min.y);
   return result;
 }
 

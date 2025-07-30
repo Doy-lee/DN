@@ -48,9 +48,9 @@ struct DN_W32Core
 
 DN_API void        DN_W32_ThreadSetName      (DN_Str8 name);
 
-DN_API DN_Str16    DN_W32_ErrorCodeToMsg16Alloc(uint32_t error_code);
-DN_API DN_W32Error DN_W32_ErrorCodeToMsg       (DN_Arena *arena, uint32_t error_code);
-DN_API DN_W32Error DN_W32_ErrorCodeToMsgAlloc  (uint32_t error_code);
+DN_API DN_Str16    DN_W32_ErrorCodeToMsg16Alloc(DN_U32 error_code);
+DN_API DN_W32Error DN_W32_ErrorCodeToMsg       (DN_Arena *arena, DN_U32 error_code);
+DN_API DN_W32Error DN_W32_ErrorCodeToMsgAlloc  (DN_U32 error_code);
 DN_API DN_W32Error DN_W32_LastError            (DN_Arena *arena);
 DN_API DN_W32Error DN_W32_LastErrorAlloc       ();
 DN_API void        DN_W32_MakeProcessDPIAware  ();

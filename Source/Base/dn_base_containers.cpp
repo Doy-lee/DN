@@ -80,7 +80,7 @@ DN_API void *DN_CArray2_MakeArray(void *data, DN_USize *size, DN_USize max, DN_U
   return result;
 }
 
-DN_API void *DN_CArray2_AddArray(void *data, DN_USize *size, DN_USize max, DN_USize data_size, void *elems, DN_USize elems_count, DN_ArrayAdd add)
+DN_API void *DN_CArray2_AddArray(void *data, DN_USize *size, DN_USize max, DN_USize data_size, void const *elems, DN_USize elems_count, DN_ArrayAdd add)
 {
   void *result = DN_CArray2_MakeArray(data, size, max, data_size, elems_count, DN_ZeroMem_No);
   if (result) {

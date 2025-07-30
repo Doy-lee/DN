@@ -313,7 +313,7 @@ template <typename T> struct DN_List
 
 DN_API  DN_ArrayEraseResult  DN_CArray2_EraseRange           (void *data, DN_USize *size, DN_USize elem_size, DN_USize begin_index, DN_ISize count, DN_ArrayErase erase);
 DN_API  void                *DN_CArray2_MakeArray            (void *data, DN_USize *size, DN_USize max, DN_USize data_size, DN_USize make_size, DN_ZeroMem zero_mem);
-DN_API  void                *DN_CArray2_AddArray             (void *data, DN_USize *size, DN_USize max, DN_USize data_size, void *elems, DN_USize elems_count, DN_ArrayAdd add);
+DN_API  void                *DN_CArray2_AddArray             (void *data, DN_USize *size, DN_USize max, DN_USize data_size, void const *elems, DN_USize elems_count, DN_ArrayAdd add);
 DN_API  bool                 DN_CArray2_Resize               (void **data, DN_USize *size, DN_USize *max, DN_USize data_size, DN_Pool *pool, DN_USize new_max);
 DN_API  bool                 DN_CArray2_Grow                 (void **data, DN_USize *size, DN_USize *max, DN_USize data_size, DN_Pool *pool, DN_USize new_max);
 DN_API  bool                 DN_CArray2_GrowIfNeededFromPool (void **data, DN_USize size, DN_USize *max, DN_USize data_size, DN_Pool *pool);

@@ -1521,7 +1521,9 @@ DN_API DN_Str16 DN_W32_ErrorCodeToMsg16Alloc(DN_U32 error_code)
                               /*DWORD    nSize       */ 0,
                               /*va_list *Arguments   */ nullptr);
 
-  DN_Str16 result = {result16, size};
+  DN_Str16 result = {};
+  result.data     = result16;
+  result.size     = size;
   return result;
 }
 

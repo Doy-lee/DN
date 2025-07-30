@@ -29,8 +29,8 @@ DN_API void *DN_OS_MemReserve(DN_USize size, DN_MemCommit commit, DN_U32 page_fl
     os_page_flags |= (PROT_READ | PROT_WRITE);
 
   void *result = mmap(nullptr, size, os_page_flags, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-  DN_Atomic_AddU64(&g_dn_os_core_->mem_allocs_total, 1);
-  DN_Atomic_AddU64(&g_dn_os_core_->mem_allocs_frame, 1);
+  DN_AtomicAddU64(&g_dn_os_core_->mem_allocs_total, 1);
+  DN_AtomicAddU64(&g_dn_os_core_->mem_allocs_frame, 1);
   if (result == MAP_FAILED)
     result = nullptr;
   return result;
@@ -44,8 +44,8 @@ DN_API bool DN_OS_MemCommit(void *ptr, DN_USize size, DN_U32 page_flags)
 
   unsigned long os_page_flags = DN_OS_MemConvertPageToOSFlags_(page_flags);
   result                      = mprotect(ptr, size, os_page_flags) == 0;
-  DN_Atomic_AddU64(&g_dn_os_core_->mem_allocs_total, 1);
-  DN_Atomic_AddU64(&g_dn_os_core_->mem_allocs_frame, 1);
+  DN_AtomicAddU64(&g_dn_os_core_->mem_allocs_total, 1);
+  DN_AtomicAddU64(&g_dn_os_core_->mem_allocs_frame, 1);
   return result;
 }
 
@@ -406,11 +406,9 @@ DN_API bool DN_OS_CopyFile(DN_Str8 src, DN_Str8 dest, bool overwrite, DN_OSErrSi
   result                = (bytes_written == stat_existing.st_size);
   if (!result) {
     int        error_code = errno;
-    DN_OSTLSTMem tmem       = DN_OS_TLSTMem(nullptr);
-    DN_Str8    file_size_str8 =
-        DN_CVT_U64ToByteSizeStr8(tmem.arena, stat_existing.st_size, DN_CVTU64ByteSizeType_Auto);
-    DN_Str8 bytes_written_str8 =
-        DN_CVT_U64ToByteSizeStr8(tmem.arena, bytes_written, DN_CVTU64ByteSizeType_Auto);
+    DN_OSTLSTMem tmem               = DN_OS_TLSTMem(nullptr);
+    DN_Str8      file_size_str8     = DN_CVT_U64ToBytesStr8(tmem.arena, stat_existing.st_size, DN_CVTBytesType_Auto);
+    DN_Str8      bytes_written_str8 = DN_CVT_U64ToBytesStr8(tmem.arena, bytes_written, DN_CVTBytesType_Auto);
     DN_OS_ErrSinkAppendF(error,
                        error_code,
                        "Failed to copy file '%.*s' to '%.*s', we copied %.*s but the file "
@@ -640,7 +638,7 @@ DN_API DN_OSFileRead DN_OS_FileRead(DN_OSFile *file, void *buffer, DN_USize size
   result.bytes_read = fread(buffer, 1, size, DN_CAST(FILE *) file->handle);
   if (feof(DN_CAST(FILE*)file->handle)) {
     DN_OSTLSTMem tmem             = DN_OS_TLSTMem(nullptr);
-    DN_Str8      buffer_size_str8 = DN_CVT_U64ToByteSizeStr8(tmem.arena, size, DN_CVTU64ByteSizeType_Auto);
+    DN_Str8      buffer_size_str8 = DN_CVT_U64ToBytesStr8AutoFromTLS(size);
     DN_OS_ErrSinkAppendF(err, 1, "Failed to read %S from file", buffer_size_str8);
     return result;
   }
@@ -657,11 +655,9 @@ DN_API bool DN_OS_FileWritePtr(DN_OSFile *file, void const *buffer, DN_USize siz
       fwrite(buffer, DN_CAST(DN_USize) size, 1 /*count*/, DN_CAST(FILE *) file->handle) ==
       1 /*count*/;
   if (!result) {
-    DN_OSTLSTMem tmem = DN_OS_TLSTMem(nullptr);
-    DN_Str8    buffer_size_str8 =
-        DN_CVT_U64ToByteSizeStr8(tmem.arena, size, DN_CVTU64ByteSizeType_Auto);
-    DN_OS_ErrSinkAppendF(
-        err, 1, "Failed to write buffer (%s) to file handle", DN_STR_FMT(buffer_size_str8));
+    DN_OSTLSTMem tmem             = DN_OS_TLSTMem(nullptr);
+    DN_Str8      buffer_size_str8 = DN_CVT_U64ToBytesStr8AutoFromTLS(size);
+    DN_OS_ErrSinkAppendF(err, 1, "Failed to write buffer (%s) to file handle", DN_STR_FMT(buffer_size_str8));
   }
   return result;
 }
@@ -824,7 +820,7 @@ DN_API DN_OSExecAsyncHandle DN_OS_ExecAsync(DN_Slice<DN_Str8> cmd_line,
   int        stderr_pipe[DN_OSPipeType__Count] = {};
 
   // NOTE: Open stdout pipe //////////////////////////////////////////////////////////////////////
-  if (DN_Bit_IsSet(args->flags, DN_OSExecFlags_SaveStdout)) {
+  if (DN_BitIsSet(args->flags, DN_OSExecFlags_SaveStdout)) {
     if (pipe(stdout_pipe) == -1) {
       result.os_error_code = errno;
       DN_OS_ErrSinkAppendF(
@@ -848,8 +844,8 @@ DN_API DN_OSExecAsyncHandle DN_OS_ExecAsync(DN_Slice<DN_Str8> cmd_line,
   };
 
   // NOTE: Open stderr pipe //////////////////////////////////////////////////////////////////////
-  if (DN_Bit_IsSet(args->flags, DN_OSExecFlags_SaveStderr)) {
-    if (DN_Bit_IsSet(args->flags, DN_OSExecFlags_MergeStderrToStdout)) {
+  if (DN_BitIsSet(args->flags, DN_OSExecFlags_SaveStderr)) {
+    if (DN_BitIsSet(args->flags, DN_OSExecFlags_MergeStderrToStdout)) {
       stderr_pipe[DN_OSPipeType__Read]  = stdout_pipe[DN_OSPipeType__Read];
       stderr_pipe[DN_OSPipeType__Write] = stdout_pipe[DN_OSPipeType__Write];
     } else if (pipe(stderr_pipe) == -1) {
@@ -887,7 +883,7 @@ DN_API DN_OSExecAsyncHandle DN_OS_ExecAsync(DN_Slice<DN_Str8> cmd_line,
   }
 
   if (child_pid == 0) { // Child process
-    if (DN_Bit_IsSet(args->flags, DN_OSExecFlags_SaveStdout) &&
+    if (DN_BitIsSet(args->flags, DN_OSExecFlags_SaveStdout) &&
         (dup2(stdout_pipe[DN_OSPipeType__Write], STDOUT_FILENO) == -1)) {
       result.os_error_code = errno;
       DN_OS_ErrSinkAppendF(
@@ -899,7 +895,7 @@ DN_API DN_OSExecAsyncHandle DN_OS_ExecAsync(DN_Slice<DN_Str8> cmd_line,
       return result;
     }
 
-    if (DN_Bit_IsSet(args->flags, DN_OSExecFlags_SaveStderr) &&
+    if (DN_BitIsSet(args->flags, DN_OSExecFlags_SaveStderr) &&
         (dup2(stderr_pipe[DN_OSPipeType__Write], STDERR_FILENO) == -1)) {
       result.os_error_code = errno;
       DN_OS_ErrSinkAppendF(
@@ -979,7 +975,7 @@ DN_API DN_OSExecAsyncHandle DN_OS_ExecAsync(DN_Slice<DN_Str8> cmd_line,
             &stdout_pipe[DN_OSPipeType__Write],
             sizeof(stdout_pipe[DN_OSPipeType__Write]));
 
-  if (DN_Bit_IsSet(args->flags, DN_OSExecFlags_SaveStderr) && DN_Bit_IsNotSet(args->flags, DN_OSExecFlags_MergeStderrToStdout)) {
+  if (DN_BitIsSet(args->flags, DN_OSExecFlags_SaveStderr) && DN_BitIsNotSet(args->flags, DN_OSExecFlags_MergeStderrToStdout)) {
     DN_Memcpy(&result.stderr_read,
               &stderr_pipe[DN_OSPipeType__Read],
               sizeof(stderr_pipe[DN_OSPipeType__Read]));
@@ -1437,7 +1433,7 @@ static void DN_OS_HttpRequestEMFetchOnSuccessCallback(emscripten_fetch_t *fetch)
     DN_Memcpy(response->body.data, fetch->data, fetch->numBytes);
 
   DN_OS_SemaphoreIncrement(&response->on_complete_semaphore, 1);
-  DN_Atomic_AddU32(&response->done, 1);
+  DN_AtomicAddU32(&response->done, 1);
 }
 
 static void DN_OS_HttpRequestEMFetchOnErrorCallback(emscripten_fetch_t *fetch)
@@ -1452,7 +1448,7 @@ static void DN_OS_HttpRequestEMFetchOnErrorCallback(emscripten_fetch_t *fetch)
     DN_Memcpy(response->body.data, fetch->data, fetch->numBytes);
 
   DN_OS_SemaphoreIncrement(&response->on_complete_semaphore, 1);
-  DN_Atomic_AddU32(&response->done, 1);
+  DN_AtomicAddU32(&response->done, 1);
 }
 #endif
 
@@ -1492,7 +1488,7 @@ DN_API void DN_OS_HttpRequestAsync(DN_OSHttpResponse     *response,
               "%.*s",
               DN_STR_FMT(response->error_msg));
     response->error_code = DN_CAST(DN_U32) - 1;
-    DN_Atomic_AddU32(&response->done, 1);
+    DN_AtomicAddU32(&response->done, 1);
     return;
   }
 

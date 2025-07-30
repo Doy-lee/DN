@@ -278,9 +278,9 @@ struct DN_CallSite
   #define DN_CountLeadingZerosU32(value)                           __builtin_clzl(value)
 
   #if defined(DN_COMPILER_GCC)
-    #define DN_CPUTSC() __rdtsc()
+    #define DN_CPUGetTSC() __rdtsc()
   #else
-    #define DN_CPUTSC() __builtin_readcyclecounter()
+    #define DN_CPUGetTSC() __builtin_readcyclecounter()
   #endif
 
   #if defined(DN_PLATFORM_EMSCRIPTEN)
