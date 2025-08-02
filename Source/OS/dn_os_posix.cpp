@@ -162,32 +162,24 @@ DN_API DN_OSDateTime DN_OS_DateUnixTimeSToDate(uint64_t time)
   return result;
 }
 
-DN_API bool DN_OS_SecureRNGBytes(void *buffer, DN_U32 size)
+DN_API void DN_OS_GenBytesSecure(void *buffer, DN_U32 size)
 {
 #if defined(DN_PLATFORM_EMSCRIPTEN)
+  DN_InvalidCodePath;
   (void)buffer;
   (void)size;
-  return false;
 #else
-  if (!buffer || size < 0)
-    return false;
-
-  if (size == 0)
-    return true;
-
-  DN_AssertF(size <= 32,
-             "We can increase this by chunking the buffer and filling 32 bytes at a time. *Nix "
-             "guarantees 32 "
-             "bytes can always be fulfilled by this system at a time");
-  // TODO(doyle):
-  // https://github.com/jedisct1/libsodium/blob/master/src/libsodium/randombytes/sysrandom/randombytes_sysrandom.c
-  // TODO(doyle): https://man7.org/linux/man-pages/man2/getrandom.2.html
-  DN_U32 read_bytes = 0;
-  do {
-    read_bytes =
-        getrandom(buffer, size, 0); // NOTE: EINTR can not be triggered if size <= 32 bytes
-  } while (read_bytes != size || errno == EAGAIN);
-  return true;
+  DN_Assert(buffer && size);
+  DN_USize bytes_written = 0;
+  while (bytes_written < size) {
+    DN_USize bytes_remaining = size - bytes_written;
+    DN_USize need_amount     = DN_Min(bytes_remaining, 32);
+    DN_USize bytes_read      = 0;
+    do {
+      bytes_read = getrandom((DN_U8 *)buffer + bytes_written, need_amount, 0);
+    } while (bytes_read != need_amount || errno == EAGAIN || errno == EINTR);
+    bytes_written += bytes_read;
+  }
 #endif
 }
 

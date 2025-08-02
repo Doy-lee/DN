@@ -1821,25 +1821,11 @@ static DN_UTCore DN_Tests_OS()
 #if defined(DN_OS_INC_CPP) || 1
   DN_UT_LogF(&result, "DN_OS\n");
   {
-    for (DN_UT_Test(&result, "Generate secure RNG bytes with nullptr")) {
-      DN_B32 os_result = DN_OS_SecureRNGBytes(nullptr, 1);
-      DN_UT_Assert(&result, os_result == false);
-    }
-
     for (DN_UT_Test(&result, "Generate secure RNG 32 bytes")) {
       char const ZERO[32]  = {};
       char       buf[32]   = {};
-      bool       os_result = DN_OS_SecureRNGBytes(buf, DN_ArrayCountU(buf));
-      DN_UT_Assert(&result, os_result);
+      DN_OS_GenBytesSecure(buf, DN_ArrayCountU(buf));
       DN_UT_Assert(&result, DN_Memcmp(buf, ZERO, DN_ArrayCountU(buf)) != 0);
-    }
-
-    for (DN_UT_Test(&result, "Generate secure RNG 0 bytes")) {
-      char buf[32]     = {};
-      buf[0]           = 'Z';
-      DN_B32 os_result = DN_OS_SecureRNGBytes(buf, 0);
-      DN_UT_Assert(&result, os_result);
-      DN_UT_Assert(&result, buf[0] == 'Z');
     }
 
     for (DN_UT_Test(&result, "Query executable directory")) {

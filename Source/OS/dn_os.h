@@ -331,7 +331,7 @@ DN_API DN_U64                    DN_OS_DateToUnixTimeS     (DN_OSDateTime date);
 DN_API bool                      DN_OS_DateIsValid         (DN_OSDateTime date);
 
 // NOTE: Other /////////////////////////////////////////////////////////////////////////////////////
-DN_API bool                      DN_OS_SecureRNGBytes      (void *buffer, DN_U32 size);
+DN_API void                      DN_OS_GenBytesSecure      (void *buffer, DN_U32 size);
 DN_API bool                      DN_OS_SetEnvVar           (DN_Str8 name, DN_Str8 value);
 DN_API DN_OSDiskSpace            DN_OS_DiskSpace           (DN_Str8 path);
 DN_API DN_Str8                   DN_OS_EXEPath             (DN_Arena *arena);

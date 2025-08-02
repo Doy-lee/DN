@@ -223,24 +223,16 @@ DN_API DN_OSDateTime DN_OS_DateUnixTimeSToDate(DN_U64 time)
   return result;
 }
 
-DN_API bool DN_OS_SecureRNGBytes(void *buffer, DN_U32 size)
+DN_API void DN_OS_GenBytesSecure(void *buffer, DN_U32 size)
 {
   DN_Assert(g_dn_os_core_);
   DN_W32Core *w32 = DN_CAST(DN_W32Core *) g_dn_os_core_->platform_context;
-
-  if (!buffer || size < 0 || !w32->bcrypt_init_success)
-    return false;
-
-  if (size == 0)
-    return true;
+  DN_Assert(w32->bcrypt_init_success);
 
   long gen_status = BCryptGenRandom(w32->bcrypt_rng_handle, DN_CAST(unsigned char *) buffer, size, 0 /*flags*/);
-  if (gen_status != 0) {
-    DN_LOG_ErrorF("Failed to generate random bytes: %d", gen_status);
-    return false;
-  }
-
-  return true;
+  // NOTE: This can only fail if the handle is invalid or one or more parameters are invalid. We
+  // validate our parameters so this shouldn't be the case.
+  DN_Assert(gen_status == 0);
 }
 
 DN_API DN_OSDiskSpace DN_OS_DiskSpace(DN_Str8 path)
