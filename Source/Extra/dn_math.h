@@ -117,8 +117,8 @@ struct DN_RaycastLineIntersectV2Result
 // NOTE: DN_V2 /////////////////////////////////////////////////////////////////////////////////////
 #define              DN_V2I32_Zero                               DN_LITERAL(DN_V2I32){{(int32_t)(0),    (int32_t)(0)}}
 #define              DN_V2I32_One                                DN_LITERAL(DN_V2I32){{(int32_t)(1),    (int32_t)(1)}}
-#define              DN_V2I32_Init1N(x)                          DN_LITERAL(DN_V2I32){{(int32_t)(x),    (int32_t)(x)}}
-#define              DN_V2I32_Init2N(x, y)                       DN_LITERAL(DN_V2I32){{(int32_t)(x),    (int32_t)(y)}}
+#define              DN_V2I32_From1N(x)                          DN_LITERAL(DN_V2I32){{(int32_t)(x),    (int32_t)(x)}}
+#define              DN_V2I32_From2N(x, y)                       DN_LITERAL(DN_V2I32){{(int32_t)(x),    (int32_t)(y)}}
 #define              DN_V2I32_InitV2(xy)                         DN_LITERAL(DN_V2I32){{(int32_t)(xy).x, (int32_t)(xy).y}}
 
 DN_API bool          operator!=                                  (DN_V2I32  lhs, DN_V2I32 rhs);
@@ -151,8 +151,8 @@ DN_API DN_V2I32      DN_V2I32_Abs                                (DN_V2I32 a);
 
 #define              DN_V2U16_Zero                               DN_LITERAL(DN_V2U16){{(uint16_t)(0), (uint16_t)(0)}}
 #define              DN_V2U16_One                                DN_LITERAL(DN_V2U16){{(uint16_t)(1), (uint16_t)(1)}}
-#define              DN_V2U16_Init1N(x)                          DN_LITERAL(DN_V2U16){{(uint16_t)(x), (uint16_t)(x)}}
-#define              DN_V2U16_Init2N(x, y)                       DN_LITERAL(DN_V2U16){{(uint16_t)(x), (uint16_t)(y)}}
+#define              DN_V2U16_From1N(x)                          DN_LITERAL(DN_V2U16){{(uint16_t)(x), (uint16_t)(x)}}
+#define              DN_V2U16_From2N(x, y)                       DN_LITERAL(DN_V2U16){{(uint16_t)(x), (uint16_t)(y)}}
 
 DN_API bool          operator!=                                  (DN_V2U16  lhs, DN_V2U16 rhs);
 DN_API bool          operator==                                  (DN_V2U16  lhs, DN_V2U16 rhs);
@@ -179,9 +179,9 @@ DN_API DN_V2U16 &    operator+=                                  (DN_V2U16& lhs,
 
 #define              DN_V2F32_Zero                               DN_LITERAL(DN_V2F32){{(DN_F32)(0),    (DN_F32)(0)}}
 #define              DN_V2F32_One                                DN_LITERAL(DN_V2F32){{(DN_F32)(1),    (DN_F32)(1)}}
-#define              DN_V2F32_Init1N(x)                          DN_LITERAL(DN_V2F32){{(DN_F32)(x),    (DN_F32)(x)}}
-#define              DN_V2F32_Init2N(x, y)                       DN_LITERAL(DN_V2F32){{(DN_F32)(x),    (DN_F32)(y)}}
-#define              DN_V2F32_InitV2I32(xy)                      DN_LITERAL(DN_V2F32){{(DN_F32)(xy).x, (DN_F32)(xy).y}}
+#define              DN_V2F32_From1N(x)                          DN_LITERAL(DN_V2F32){{(DN_F32)(x),    (DN_F32)(x)}}
+#define              DN_V2F32_From2N(x, y)                       DN_LITERAL(DN_V2F32){{(DN_F32)(x),    (DN_F32)(y)}}
+#define              DN_V2F32_FromV2I32(xy)                      DN_LITERAL(DN_V2F32){{(DN_F32)(xy).x, (DN_F32)(xy).y}}
 
 DN_API bool          operator!=                                  (DN_V2F32  lhs, DN_V2F32  rhs);
 DN_API bool          operator==                                  (DN_V2F32  lhs, DN_V2F32  rhs);
@@ -235,8 +235,9 @@ DN_API DN_V2F32      DN_V2F32_Min                                (DN_V2F32 a, DN
 DN_API DN_V2F32      DN_V2F32_Max                                (DN_V2F32 a, DN_V2F32 b);
 DN_API DN_V2F32      DN_V2F32_Abs                                (DN_V2F32 a);
 DN_API DN_F32        DN_V2F32_Dot                                (DN_V2F32 a, DN_V2F32 b);
-DN_API DN_F32        DN_V2F32_LengthSq_V2x2                      (DN_V2F32 lhs, DN_V2F32 rhs);
-DN_API DN_F32        DN_V2F32_Length_V2x2                        (DN_V2F32 lhs, DN_V2F32 rhs);
+DN_API DN_F32        DN_V2F32_LengthSq2V2                        (DN_V2F32 lhs, DN_V2F32 rhs);
+DN_API bool          DN_V2F32_LengthSqIsWithin2V2                (DN_V2F32 lhs, DN_V2F32 rhs, DN_F32 within_amount_sq);
+DN_API DN_F32        DN_V2F32_Length2V2                          (DN_V2F32 lhs, DN_V2F32 rhs);
 DN_API DN_F32        DN_V2F32_LengthSq                           (DN_V2F32 lhs);
 DN_API DN_F32        DN_V2F32_Length                             (DN_V2F32 lhs);
 DN_API DN_V2F32      DN_V2F32_Normalise                          (DN_V2F32 a);
@@ -246,9 +247,9 @@ DN_API DN_F32        DN_V2F32_Area                               (DN_V2F32 a);
 #endif // !defined(DN_NO_V2)
 #if !defined(DN_NO_V3)
 // NOTE: DN_V3 /////////////////////////////////////////////////////////////////////////////////////
-#define              DN_V3F32_Init1N(x)                          DN_LITERAL(DN_V3F32){{(DN_F32)(x),    (DN_F32)(x),    (DN_F32)(x)}}
-#define              DN_V3F32_Init3F32(x, y, z)                  DN_LITERAL(DN_V3F32){{(DN_F32)(x),    (DN_F32)(y),    (DN_F32)(z)}}
-#define              DN_V3F32_InitV2F32_1F32(xy, z)              DN_LITERAL(DN_V3F32){{(DN_F32)(xy.x), (DN_F32)(xy.y), (DN_F32)(z)}}
+#define              DN_V3F32_From1N(x)                          DN_LITERAL(DN_V3F32){{(DN_F32)(x),    (DN_F32)(x),    (DN_F32)(x)}}
+#define              DN_V3F32_From3N(x, y, z)                    DN_LITERAL(DN_V3F32){{(DN_F32)(x),    (DN_F32)(y),    (DN_F32)(z)}}
+#define              DN_V3F32_FromV2F32And1N(xy, z)              DN_LITERAL(DN_V3F32){{(DN_F32)(xy.x), (DN_F32)(xy.y), (DN_F32)(z)}}
 
 DN_API bool          operator==                                  (DN_V3F32  lhs, DN_V3F32  rhs);
 DN_API bool          operator!=                                  (DN_V3F32  lhs, DN_V3F32  rhs);
@@ -278,10 +279,20 @@ DN_API DN_F32        DN_V3F32_Length                             (DN_V3F32 a);
 DN_API DN_V3F32      DN_V3F32_Normalise                          (DN_V3F32 a);
 #endif // !defined(DN_NO_V3)
 #if !defined(DN_NO_V4)
+DN_U32 const DN_V4_R_MASK_U32 = 0xFF000000;
+DN_U32 const DN_V4_G_MASK_U32 = 0x00FF0000;
+DN_U32 const DN_V4_B_MASK_U32 = 0x0000FF00;
+DN_U32 const DN_V4_A_MASK_U32 = 0x000000FF;
+
 // NOTE: DN_V4 /////////////////////////////////////////////////////////////////////////////////////
-#define              DN_V4F32_Init1N(x)                          DN_LITERAL(DN_V4F32){{(DN_F32)(x), (DN_F32)(x), (DN_F32)(x), (DN_F32)(x)}}
-#define              DN_V4F32_Init4N(x, y, z, w)                 DN_LITERAL(DN_V4F32){{(DN_F32)(x), (DN_F32)(y), (DN_F32)(z), (DN_F32)(w)}}
-#define              DN_V4F32_InitV3_1N(xyz, w)                  DN_LITERAL(DN_V4F32){{xyz.x,        xyz.y,        xyz.z,        w}}
+#define              DN_V4F32_From1N(x)                          DN_LITERAL(DN_V4F32){{(DN_F32)(x), (DN_F32)(x), (DN_F32)(x), (DN_F32)(x)}}
+#define              DN_V4F32_From4N(x, y, z, w)                 DN_LITERAL(DN_V4F32){{(DN_F32)(x), (DN_F32)(y), (DN_F32)(z), (DN_F32)(w)}}
+#define              DN_V4F32_FromV3And1N(xyz, w)                DN_LITERAL(DN_V4F32){{xyz.x,        xyz.y,        xyz.z,        w}}
+#define              DN_V4F32_FromRGBAU8(r, g, b, a)             DN_LITERAL(DN_V4F32){r / 255.f, g / 255.f, b / 255.f, a / 255.f}
+#define              DN_V4F32_FromRGBU8(r, g, b)                 DN_LITERAL(DN_V4F32){r / 255.f, g / 255.f, b / 255.f,       1.f}
+DN_API DN_V4F32      DN_V4F32_FromRGBU32(DN_U32 u32);
+DN_API DN_V4F32      DN_V4F32_FromRGBAU32(DN_U32 u32);
+#define              DN_V4F32_FromV4Alpha(v4, alpha)             DN_V4F32_FromV3And1N(v4.xyz, alpha)
 DN_API bool          operator==                                  (DN_V4F32  lhs, DN_V4F32  rhs);
 DN_API bool          operator!=                                  (DN_V4F32  lhs, DN_V4F32  rhs);
 DN_API bool          operator<=                                  (DN_V4F32  lhs, DN_V4F32  rhs);
@@ -299,10 +310,10 @@ DN_API DN_V4F32 &    operator*=                                  (DN_V4F32 &lhs,
 DN_API DN_V4F32 &    operator*=                                  (DN_V4F32 &lhs, int32_t   rhs);
 DN_API DN_V4F32 &    operator-=                                  (DN_V4F32 &lhs, DN_V4F32 rhs);
 DN_API DN_V4F32 &    operator+=                                  (DN_V4F32 &lhs, DN_V4F32 rhs);
+DN_API DN_F32        DN_V4F32_Dot                                (DN_V4F32 a, DN_V4F32 b);
 #endif // !defined(DN_NO_V4)
 #if !defined(DN_NO_M4)
 // NOTE: DN_M4 /////////////////////////////////////////////////////////////////////////////////////
-DN_API DN_F32        DN_V4F32Dot                                 (DN_V4F32 a, DN_V4F32 b);
 DN_API DN_M4         DN_M4_Identity                              ();
 DN_API DN_M4         DN_M4_ScaleF                                (DN_F32 x, DN_F32 y, DN_F32 z);
 DN_API DN_M4         DN_M4_Scale                                 (DN_V3F32 xyz);
@@ -336,8 +347,8 @@ DN_API DN_V2F32      DN_M2x3_Mul2F32                             (DN_M2x3 m1, DN
 DN_API DN_V2F32      DN_M2x3_MulV2                               (DN_M2x3 m1, DN_V2F32 v2);
 #if !defined(DN_NO_RECT)
 // NOTE: DN_Rect ///////////////////////////////////////////////////////////////////////////////////
-#define              DN_Rect_Init2V2(pos, size)                  DN_LITERAL(DN_Rect){(pos), (size)}
-#define              DN_Rect_Init4N(x, y, w, h)                  DN_LITERAL(DN_Rect){DN_LITERAL(DN_V2F32){{x, y}}, DN_LITERAL(DN_V2F32){{w, h}}}
+#define              DN_Rect_From2V2(pos, size)                  DN_LITERAL(DN_Rect){(pos), (size)}
+#define              DN_Rect_From4N(x, y, w, h)                  DN_LITERAL(DN_Rect){DN_LITERAL(DN_V2F32){{x, y}}, DN_LITERAL(DN_V2F32){{w, h}}}
 
 DN_API bool          operator==                                  (const DN_Rect& lhs, const DN_Rect& rhs);
 DN_API DN_V2F32      DN_Rect_Center                              (DN_Rect rect);

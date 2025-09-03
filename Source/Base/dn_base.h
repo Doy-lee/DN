@@ -95,12 +95,12 @@
 #define DN_Gigabytes(val) ((DN_U64)1024 * DN_Megabytes(val))
 
 // NOTE: Time //////////////////////////////////////////////////////////////////////////////////////
-#define DN_SecondsToMs(val) ((val) * 1000)
-#define DN_MinutesToSec(val)  ((val) * 60ULL)
-#define DN_HoursToSec(val)    (DN_MinutesToSec(val)  * 60ULL)
-#define DN_DaysToSec(val)     (DN_HoursToSec(val)    * 24ULL)
-#define DN_WeeksToSec(val)    (DN_DaysToSec(val)     *  7ULL)
-#define DN_YearsToSec(val)    (DN_WeeksToSec(val)    * 52ULL)
+#define DN_SecondsToMs(val)  ((val) * 1000)
+#define DN_MinutesToSec(val) ((val) * 60ULL)
+#define DN_HoursToSec(val)   (DN_MinutesToSec(val)  * 60ULL)
+#define DN_DaysToSec(val)    (DN_HoursToSec(val)    * 24ULL)
+#define DN_WeeksToSec(val)   (DN_DaysToSec(val)     *  7ULL)
+#define DN_YearsToSec(val)   (DN_WeeksToSec(val)    * 52ULL)
 
 // NOTE: Debug Break ///////////////////////////////////////////////////////////////////////////////
 #if !defined(DN_DebugBreak)

@@ -1969,8 +1969,8 @@ static DN_UTCore DN_Tests_Rect()
   DN_UT_LogF(&result, "DN_Rect\n");
   {
     for (DN_UT_Test(&result, "No intersection")) {
-      DN_Rect a  = DN_Rect_Init2V2(DN_V2F32_Init1N(0), DN_V2F32_Init2N(100, 100));
-      DN_Rect b  = DN_Rect_Init2V2(DN_V2F32_Init2N(200, 0), DN_V2F32_Init2N(200, 200));
+      DN_Rect a  = DN_Rect_From2V2(DN_V2F32_From1N(0), DN_V2F32_From2N(100, 100));
+      DN_Rect b  = DN_Rect_From2V2(DN_V2F32_From2N(200, 0), DN_V2F32_From2N(200, 200));
       DN_Rect ab = DN_Rect_Intersection(a, b);
 
       DN_V2F32 ab_max = ab.pos + ab.size;
@@ -1984,8 +1984,8 @@ static DN_UTCore DN_Tests_Rect()
     }
 
     for (DN_UT_Test(&result, "A's min intersects B")) {
-      DN_Rect a  = DN_Rect_Init2V2(DN_V2F32_Init2N(50, 50), DN_V2F32_Init2N(100, 100));
-      DN_Rect b  = DN_Rect_Init2V2(DN_V2F32_Init2N(0, 0), DN_V2F32_Init2N(100, 100));
+      DN_Rect a  = DN_Rect_From2V2(DN_V2F32_From2N(50, 50), DN_V2F32_From2N(100, 100));
+      DN_Rect b  = DN_Rect_From2V2(DN_V2F32_From2N(0, 0), DN_V2F32_From2N(100, 100));
       DN_Rect ab = DN_Rect_Intersection(a, b);
 
       DN_V2F32 ab_max = ab.pos + ab.size;
@@ -1999,8 +1999,8 @@ static DN_UTCore DN_Tests_Rect()
     }
 
     for (DN_UT_Test(&result, "B's min intersects A")) {
-      DN_Rect a  = DN_Rect_Init2V2(DN_V2F32_Init2N(0, 0), DN_V2F32_Init2N(100, 100));
-      DN_Rect b  = DN_Rect_Init2V2(DN_V2F32_Init2N(50, 50), DN_V2F32_Init2N(100, 100));
+      DN_Rect a  = DN_Rect_From2V2(DN_V2F32_From2N(0, 0), DN_V2F32_From2N(100, 100));
+      DN_Rect b  = DN_Rect_From2V2(DN_V2F32_From2N(50, 50), DN_V2F32_From2N(100, 100));
       DN_Rect ab = DN_Rect_Intersection(a, b);
 
       DN_V2F32 ab_max = ab.pos + ab.size;
@@ -2014,8 +2014,8 @@ static DN_UTCore DN_Tests_Rect()
     }
 
     for (DN_UT_Test(&result, "A's max intersects B")) {
-      DN_Rect a  = DN_Rect_Init2V2(DN_V2F32_Init2N(-50, -50), DN_V2F32_Init2N(100, 100));
-      DN_Rect b  = DN_Rect_Init2V2(DN_V2F32_Init2N(0, 0), DN_V2F32_Init2N(100, 100));
+      DN_Rect a  = DN_Rect_From2V2(DN_V2F32_From2N(-50, -50), DN_V2F32_From2N(100, 100));
+      DN_Rect b  = DN_Rect_From2V2(DN_V2F32_From2N(0, 0), DN_V2F32_From2N(100, 100));
       DN_Rect ab = DN_Rect_Intersection(a, b);
 
       DN_V2F32 ab_max = ab.pos + ab.size;
@@ -2029,8 +2029,8 @@ static DN_UTCore DN_Tests_Rect()
     }
 
     for (DN_UT_Test(&result, "B's max intersects A")) {
-      DN_Rect a  = DN_Rect_Init2V2(DN_V2F32_Init2N(0, 0), DN_V2F32_Init2N(100, 100));
-      DN_Rect b  = DN_Rect_Init2V2(DN_V2F32_Init2N(-50, -50), DN_V2F32_Init2N(100, 100));
+      DN_Rect a  = DN_Rect_From2V2(DN_V2F32_From2N(0, 0), DN_V2F32_From2N(100, 100));
+      DN_Rect b  = DN_Rect_From2V2(DN_V2F32_From2N(-50, -50), DN_V2F32_From2N(100, 100));
       DN_Rect ab = DN_Rect_Intersection(a, b);
 
       DN_V2F32 ab_max = ab.pos + ab.size;
@@ -2044,8 +2044,8 @@ static DN_UTCore DN_Tests_Rect()
     }
 
     for (DN_UT_Test(&result, "B contains A")) {
-      DN_Rect a  = DN_Rect_Init2V2(DN_V2F32_Init2N(25, 25), DN_V2F32_Init2N(25, 25));
-      DN_Rect b  = DN_Rect_Init2V2(DN_V2F32_Init2N(0, 0), DN_V2F32_Init2N(100, 100));
+      DN_Rect a  = DN_Rect_From2V2(DN_V2F32_From2N(25, 25), DN_V2F32_From2N(25, 25));
+      DN_Rect b  = DN_Rect_From2V2(DN_V2F32_From2N(0, 0), DN_V2F32_From2N(100, 100));
       DN_Rect ab = DN_Rect_Intersection(a, b);
 
       DN_V2F32 ab_max = ab.pos + ab.size;
@@ -2059,8 +2059,8 @@ static DN_UTCore DN_Tests_Rect()
     }
 
     for (DN_UT_Test(&result, "A contains B")) {
-      DN_Rect a  = DN_Rect_Init2V2(DN_V2F32_Init2N(0, 0), DN_V2F32_Init2N(100, 100));
-      DN_Rect b  = DN_Rect_Init2V2(DN_V2F32_Init2N(25, 25), DN_V2F32_Init2N(25, 25));
+      DN_Rect a  = DN_Rect_From2V2(DN_V2F32_From2N(0, 0), DN_V2F32_From2N(100, 100));
+      DN_Rect b  = DN_Rect_From2V2(DN_V2F32_From2N(25, 25), DN_V2F32_From2N(25, 25));
       DN_Rect ab = DN_Rect_Intersection(a, b);
 
       DN_V2F32 ab_max = ab.pos + ab.size;
@@ -2074,7 +2074,7 @@ static DN_UTCore DN_Tests_Rect()
     }
 
     for (DN_UT_Test(&result, "A equals B")) {
-      DN_Rect a  = DN_Rect_Init2V2(DN_V2F32_Init2N(0, 0), DN_V2F32_Init2N(100, 100));
+      DN_Rect a  = DN_Rect_From2V2(DN_V2F32_From2N(0, 0), DN_V2F32_From2N(100, 100));
       DN_Rect b  = a;
       DN_Rect ab = DN_Rect_Intersection(a, b);
 

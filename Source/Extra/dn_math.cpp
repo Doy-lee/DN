@@ -41,55 +41,55 @@ DN_API bool operator>(DN_V2I32 lhs, DN_V2I32 rhs)
 
 DN_API DN_V2I32 operator-(DN_V2I32 lhs, DN_V2I32 rhs)
 {
-  DN_V2I32 result = DN_V2I32_Init2N(lhs.x - rhs.x, lhs.y - rhs.y);
+  DN_V2I32 result = DN_V2I32_From2N(lhs.x - rhs.x, lhs.y - rhs.y);
   return result;
 }
 
 DN_API DN_V2I32 operator-(DN_V2I32 lhs)
 {
-  DN_V2I32 result = DN_V2I32_Init2N(-lhs.x, -lhs.y);
+  DN_V2I32 result = DN_V2I32_From2N(-lhs.x, -lhs.y);
   return result;
 }
 
 DN_API DN_V2I32 operator+(DN_V2I32 lhs, DN_V2I32 rhs)
 {
-  DN_V2I32 result = DN_V2I32_Init2N(lhs.x + rhs.x, lhs.y + rhs.y);
+  DN_V2I32 result = DN_V2I32_From2N(lhs.x + rhs.x, lhs.y + rhs.y);
   return result;
 }
 
 DN_API DN_V2I32 operator*(DN_V2I32 lhs, DN_V2I32 rhs)
 {
-  DN_V2I32 result = DN_V2I32_Init2N(lhs.x * rhs.x, lhs.y * rhs.y);
+  DN_V2I32 result = DN_V2I32_From2N(lhs.x * rhs.x, lhs.y * rhs.y);
   return result;
 }
 
 DN_API DN_V2I32 operator*(DN_V2I32 lhs, DN_F32 rhs)
 {
-  DN_V2I32 result = DN_V2I32_Init2N(lhs.x * rhs, lhs.y * rhs);
+  DN_V2I32 result = DN_V2I32_From2N(lhs.x * rhs, lhs.y * rhs);
   return result;
 }
 
 DN_API DN_V2I32 operator*(DN_V2I32 lhs, int32_t rhs)
 {
-  DN_V2I32 result = DN_V2I32_Init2N(lhs.x * rhs, lhs.y * rhs);
+  DN_V2I32 result = DN_V2I32_From2N(lhs.x * rhs, lhs.y * rhs);
   return result;
 }
 
 DN_API DN_V2I32 operator/(DN_V2I32 lhs, DN_V2I32 rhs)
 {
-  DN_V2I32 result = DN_V2I32_Init2N(lhs.x / rhs.x, lhs.y / rhs.y);
+  DN_V2I32 result = DN_V2I32_From2N(lhs.x / rhs.x, lhs.y / rhs.y);
   return result;
 }
 
 DN_API DN_V2I32 operator/(DN_V2I32 lhs, DN_F32 rhs)
 {
-  DN_V2I32 result = DN_V2I32_Init2N(lhs.x / rhs, lhs.y / rhs);
+  DN_V2I32 result = DN_V2I32_From2N(lhs.x / rhs, lhs.y / rhs);
   return result;
 }
 
 DN_API DN_V2I32 operator/(DN_V2I32 lhs, int32_t rhs)
 {
-  DN_V2I32 result = DN_V2I32_Init2N(lhs.x / rhs, lhs.y / rhs);
+  DN_V2I32 result = DN_V2I32_From2N(lhs.x / rhs, lhs.y / rhs);
   return result;
 }
 
@@ -143,19 +143,19 @@ DN_API DN_V2I32 &operator+=(DN_V2I32 &lhs, DN_V2I32 rhs)
 
 DN_API DN_V2I32 DN_V2I32_Min(DN_V2I32 a, DN_V2I32 b)
 {
-  DN_V2I32 result = DN_V2I32_Init2N(DN_Min(a.x, b.x), DN_Min(a.y, b.y));
+  DN_V2I32 result = DN_V2I32_From2N(DN_Min(a.x, b.x), DN_Min(a.y, b.y));
   return result;
 }
 
 DN_API DN_V2I32 DN_V2I32_Max(DN_V2I32 a, DN_V2I32 b)
 {
-  DN_V2I32 result = DN_V2I32_Init2N(DN_Max(a.x, b.x), DN_Max(a.y, b.y));
+  DN_V2I32 result = DN_V2I32_From2N(DN_Max(a.x, b.x), DN_Max(a.y, b.y));
   return result;
 }
 
 DN_API DN_V2I32 DN_V2I32_Abs(DN_V2I32 a)
 {
-  DN_V2I32 result = DN_V2I32_Init2N(DN_Abs(a.x), DN_Abs(a.y));
+  DN_V2I32 result = DN_V2I32_From2N(DN_Abs(a.x), DN_Abs(a.y));
   return result;
 }
 
@@ -198,49 +198,49 @@ DN_API bool operator>(DN_V2U16 lhs, DN_V2U16 rhs)
 
 DN_API DN_V2U16 operator-(DN_V2U16 lhs, DN_V2U16 rhs)
 {
-  DN_V2U16 result = DN_V2U16_Init2N(lhs.x - rhs.x, lhs.y - rhs.y);
+  DN_V2U16 result = DN_V2U16_From2N(lhs.x - rhs.x, lhs.y - rhs.y);
   return result;
 }
 
 DN_API DN_V2U16 operator+(DN_V2U16 lhs, DN_V2U16 rhs)
 {
-  DN_V2U16 result = DN_V2U16_Init2N(lhs.x + rhs.x, lhs.y + rhs.y);
+  DN_V2U16 result = DN_V2U16_From2N(lhs.x + rhs.x, lhs.y + rhs.y);
   return result;
 }
 
 DN_API DN_V2U16 operator*(DN_V2U16 lhs, DN_V2U16 rhs)
 {
-  DN_V2U16 result = DN_V2U16_Init2N(lhs.x * rhs.x, lhs.y * rhs.y);
+  DN_V2U16 result = DN_V2U16_From2N(lhs.x * rhs.x, lhs.y * rhs.y);
   return result;
 }
 
 DN_API DN_V2U16 operator*(DN_V2U16 lhs, DN_F32 rhs)
 {
-  DN_V2U16 result = DN_V2U16_Init2N(lhs.x * rhs, lhs.y * rhs);
+  DN_V2U16 result = DN_V2U16_From2N(lhs.x * rhs, lhs.y * rhs);
   return result;
 }
 
 DN_API DN_V2U16 operator*(DN_V2U16 lhs, int32_t rhs)
 {
-  DN_V2U16 result = DN_V2U16_Init2N(lhs.x * rhs, lhs.y * rhs);
+  DN_V2U16 result = DN_V2U16_From2N(lhs.x * rhs, lhs.y * rhs);
   return result;
 }
 
 DN_API DN_V2U16 operator/(DN_V2U16 lhs, DN_V2U16 rhs)
 {
-  DN_V2U16 result = DN_V2U16_Init2N(lhs.x / rhs.x, lhs.y / rhs.y);
+  DN_V2U16 result = DN_V2U16_From2N(lhs.x / rhs.x, lhs.y / rhs.y);
   return result;
 }
 
 DN_API DN_V2U16 operator/(DN_V2U16 lhs, DN_F32 rhs)
 {
-  DN_V2U16 result = DN_V2U16_Init2N(lhs.x / rhs, lhs.y / rhs);
+  DN_V2U16 result = DN_V2U16_From2N(lhs.x / rhs, lhs.y / rhs);
   return result;
 }
 
 DN_API DN_V2U16 operator/(DN_V2U16 lhs, int32_t rhs)
 {
-  DN_V2U16 result = DN_V2U16_Init2N(lhs.x / rhs, lhs.y / rhs);
+  DN_V2U16 result = DN_V2U16_From2N(lhs.x / rhs, lhs.y / rhs);
   return result;
 }
 
@@ -332,106 +332,106 @@ DN_API bool operator>(DN_V2F32 lhs, DN_V2F32 rhs)
 // NOTE: DN_V2F32 operator- //////////////////////////////////////////////////////////////////////////
 DN_API DN_V2F32 operator-(DN_V2F32 lhs)
 {
-  DN_V2F32 result = DN_V2F32_Init2N(-lhs.x, -lhs.y);
+  DN_V2F32 result = DN_V2F32_From2N(-lhs.x, -lhs.y);
   return result;
 }
 
 DN_API DN_V2F32 operator-(DN_V2F32 lhs, DN_V2F32 rhs)
 {
-  DN_V2F32 result = DN_V2F32_Init2N(lhs.x - rhs.x, lhs.y - rhs.y);
+  DN_V2F32 result = DN_V2F32_From2N(lhs.x - rhs.x, lhs.y - rhs.y);
   return result;
 }
 
 DN_API DN_V2F32 operator-(DN_V2F32 lhs, DN_V2I32 rhs)
 {
-  DN_V2F32 result = DN_V2F32_Init2N(lhs.x - rhs.x, lhs.y - rhs.y);
+  DN_V2F32 result = DN_V2F32_From2N(lhs.x - rhs.x, lhs.y - rhs.y);
   return result;
 }
 
 DN_API DN_V2F32 operator-(DN_V2F32 lhs, DN_F32 rhs)
 {
-  DN_V2F32 result = DN_V2F32_Init2N(lhs.x - rhs, lhs.y - rhs);
+  DN_V2F32 result = DN_V2F32_From2N(lhs.x - rhs, lhs.y - rhs);
   return result;
 }
 
 DN_API DN_V2F32 operator-(DN_V2F32 lhs, int32_t rhs)
 {
-  DN_V2F32 result = DN_V2F32_Init2N(lhs.x - rhs, lhs.y - rhs);
+  DN_V2F32 result = DN_V2F32_From2N(lhs.x - rhs, lhs.y - rhs);
   return result;
 }
 
 // NOTE: DN_V2F32 operator+ //////////////////////////////////////////////////////////////////////////
 DN_API DN_V2F32 operator+(DN_V2F32 lhs, DN_V2F32 rhs)
 {
-  DN_V2F32 result = DN_V2F32_Init2N(lhs.x + rhs.x, lhs.y + rhs.y);
+  DN_V2F32 result = DN_V2F32_From2N(lhs.x + rhs.x, lhs.y + rhs.y);
   return result;
 }
 
 DN_API DN_V2F32 operator+(DN_V2F32 lhs, DN_V2I32 rhs)
 {
-  DN_V2F32 result = DN_V2F32_Init2N(lhs.x + rhs.x, lhs.y + rhs.y);
+  DN_V2F32 result = DN_V2F32_From2N(lhs.x + rhs.x, lhs.y + rhs.y);
   return result;
 }
 
 DN_API DN_V2F32 operator+(DN_V2F32 lhs, DN_F32 rhs)
 {
-  DN_V2F32 result = DN_V2F32_Init2N(lhs.x + rhs, lhs.y + rhs);
+  DN_V2F32 result = DN_V2F32_From2N(lhs.x + rhs, lhs.y + rhs);
   return result;
 }
 
 DN_API DN_V2F32 operator+(DN_V2F32 lhs, int32_t rhs)
 {
-  DN_V2F32 result = DN_V2F32_Init2N(lhs.x + rhs, lhs.y + rhs);
+  DN_V2F32 result = DN_V2F32_From2N(lhs.x + rhs, lhs.y + rhs);
   return result;
 }
 
 // NOTE: DN_V2F32 operator* //////////////////////////////////////////////////////////////////////////
 DN_API DN_V2F32 operator*(DN_V2F32 lhs, DN_V2F32 rhs)
 {
-  DN_V2F32 result = DN_V2F32_Init2N(lhs.x * rhs.x, lhs.y * rhs.y);
+  DN_V2F32 result = DN_V2F32_From2N(lhs.x * rhs.x, lhs.y * rhs.y);
   return result;
 }
 
 DN_API DN_V2F32 operator*(DN_V2F32 lhs, DN_V2I32 rhs)
 {
-  DN_V2F32 result = DN_V2F32_Init2N(lhs.x * rhs.x, lhs.y * rhs.y);
+  DN_V2F32 result = DN_V2F32_From2N(lhs.x * rhs.x, lhs.y * rhs.y);
   return result;
 }
 
 DN_API DN_V2F32 operator*(DN_V2F32 lhs, DN_F32 rhs)
 {
-  DN_V2F32 result = DN_V2F32_Init2N(lhs.x * rhs, lhs.y * rhs);
+  DN_V2F32 result = DN_V2F32_From2N(lhs.x * rhs, lhs.y * rhs);
   return result;
 }
 
 DN_API DN_V2F32 operator*(DN_V2F32 lhs, int32_t rhs)
 {
-  DN_V2F32 result = DN_V2F32_Init2N(lhs.x * rhs, lhs.y * rhs);
+  DN_V2F32 result = DN_V2F32_From2N(lhs.x * rhs, lhs.y * rhs);
   return result;
 }
 
 // NOTE: DN_V2F32 operator/ //////////////////////////////////////////////////////////////////////////
 DN_API DN_V2F32 operator/(DN_V2F32 lhs, DN_V2F32 rhs)
 {
-  DN_V2F32 result = DN_V2F32_Init2N(lhs.x / rhs.x, lhs.y / rhs.y);
+  DN_V2F32 result = DN_V2F32_From2N(lhs.x / rhs.x, lhs.y / rhs.y);
   return result;
 }
 
 DN_API DN_V2F32 operator/(DN_V2F32 lhs, DN_V2I32 rhs)
 {
-  DN_V2F32 result = DN_V2F32_Init2N(lhs.x / rhs.x, lhs.y / rhs.y);
+  DN_V2F32 result = DN_V2F32_From2N(lhs.x / rhs.x, lhs.y / rhs.y);
   return result;
 }
 
 DN_API DN_V2F32 operator/(DN_V2F32 lhs, DN_F32 rhs)
 {
-  DN_V2F32 result = DN_V2F32_Init2N(lhs.x / rhs, lhs.y / rhs);
+  DN_V2F32 result = DN_V2F32_From2N(lhs.x / rhs, lhs.y / rhs);
   return result;
 }
 
 DN_API DN_V2F32 operator/(DN_V2F32 lhs, int32_t rhs)
 {
-  DN_V2F32 result = DN_V2F32_Init2N(lhs.x / rhs, lhs.y / rhs);
+  DN_V2F32 result = DN_V2F32_From2N(lhs.x / rhs, lhs.y / rhs);
   return result;
 }
 
@@ -537,19 +537,19 @@ DN_API DN_V2F32 &operator+=(DN_V2F32 &lhs, int32_t rhs)
 
 DN_API DN_V2F32 DN_V2F32_Min(DN_V2F32 a, DN_V2F32 b)
 {
-  DN_V2F32 result = DN_V2F32_Init2N(DN_Min(a.x, b.x), DN_Min(a.y, b.y));
+  DN_V2F32 result = DN_V2F32_From2N(DN_Min(a.x, b.x), DN_Min(a.y, b.y));
   return result;
 }
 
 DN_API DN_V2F32 DN_V2F32_Max(DN_V2F32 a, DN_V2F32 b)
 {
-  DN_V2F32 result = DN_V2F32_Init2N(DN_Max(a.x, b.x), DN_Max(a.y, b.y));
+  DN_V2F32 result = DN_V2F32_From2N(DN_Max(a.x, b.x), DN_Max(a.y, b.y));
   return result;
 }
 
 DN_API DN_V2F32 DN_V2F32_Abs(DN_V2F32 a)
 {
-  DN_V2F32 result = DN_V2F32_Init2N(DN_Abs(a.x), DN_Abs(a.y));
+  DN_V2F32 result = DN_V2F32_From2N(DN_Abs(a.x), DN_Abs(a.y));
   return result;
 }
 
@@ -600,7 +600,7 @@ DN_API DN_F32 DN_V2F32_Dot(DN_V2F32 a, DN_V2F32 b)
   return result;
 }
 
-DN_API DN_F32 DN_V2F32_LengthSq_V2x2(DN_V2F32 lhs, DN_V2F32 rhs)
+DN_API DN_F32 DN_V2F32_LengthSq2V2(DN_V2F32 lhs, DN_V2F32 rhs)
 {
   // NOTE: Pythagoras's theorem (a^2 + b^2 = c^2) without the square root
   DN_F32 a         = rhs.x - lhs.x;
@@ -610,9 +610,16 @@ DN_API DN_F32 DN_V2F32_LengthSq_V2x2(DN_V2F32 lhs, DN_V2F32 rhs)
   return result;
 }
 
-DN_API DN_F32 DN_V2F32_Length_V2x2(DN_V2F32 lhs, DN_V2F32 rhs)
+DN_API bool DN_V2F32_LengthSqIsWithin2V2(DN_V2F32 lhs, DN_V2F32 rhs, DN_F32 within_amount_sq)
 {
-  DN_F32 result_squared = DN_V2F32_LengthSq_V2x2(lhs, rhs);
+  DN_F32 dist   = DN_V2F32_LengthSq2V2(lhs, rhs);
+  bool   result = dist <= within_amount_sq;
+  return result;
+}
+
+DN_API DN_F32 DN_V2F32_Length2V2(DN_V2F32 lhs, DN_V2F32 rhs)
+{
+  DN_F32 result_squared = DN_V2F32_LengthSq2V2(lhs, rhs);
   DN_F32 result         = DN_SqrtF32(result_squared);
   return result;
 }
@@ -657,7 +664,7 @@ DN_API DN_V2F32 DN_V2F32_Perpendicular(DN_V2F32 a)
   // x' = -y
   // y' = +x
 
-  DN_V2F32 result = DN_V2F32_Init2N(-a.y, a.x);
+  DN_V2F32 result = DN_V2F32_From2N(-a.y, a.x);
   return result;
 }
 
@@ -666,7 +673,7 @@ DN_API DN_V2F32 DN_V2F32_Reflect(DN_V2F32 in, DN_V2F32 surface)
   DN_V2F32 normal      = DN_V2F32_Perpendicular(surface);
   DN_V2F32 normal_norm = DN_V2F32_Normalise(normal);
   DN_F32   signed_dist = DN_V2F32_Dot(in, normal_norm);
-  DN_V2F32 result      = DN_V2F32_Init2N(in.x, in.y + (-signed_dist * 2.f));
+  DN_V2F32 result      = DN_V2F32_From2N(in.x, in.y + (-signed_dist * 2.f));
   return result;
 }
 
@@ -717,55 +724,55 @@ DN_API bool operator>(DN_V3F32 lhs, DN_V3F32 rhs)
 
 DN_API DN_V3F32 operator-(DN_V3F32 lhs, DN_V3F32 rhs)
 {
-  DN_V3F32 result = DN_V3F32_Init3F32(lhs.x - rhs.x, lhs.y - rhs.y, lhs.z - rhs.z);
+  DN_V3F32 result = DN_V3F32_From3N(lhs.x - rhs.x, lhs.y - rhs.y, lhs.z - rhs.z);
   return result;
 }
 
 DN_API DN_V3F32 operator-(DN_V3F32 lhs)
 {
-  DN_V3F32 result = DN_V3F32_Init3F32(-lhs.x, -lhs.y, -lhs.z);
+  DN_V3F32 result = DN_V3F32_From3N(-lhs.x, -lhs.y, -lhs.z);
   return result;
 }
 
 DN_API DN_V3F32 operator+(DN_V3F32 lhs, DN_V3F32 rhs)
 {
-  DN_V3F32 result = DN_V3F32_Init3F32(lhs.x + rhs.x, lhs.y + rhs.y, lhs.z + rhs.z);
+  DN_V3F32 result = DN_V3F32_From3N(lhs.x + rhs.x, lhs.y + rhs.y, lhs.z + rhs.z);
   return result;
 }
 
 DN_API DN_V3F32 operator*(DN_V3F32 lhs, DN_V3F32 rhs)
 {
-  DN_V3F32 result = DN_V3F32_Init3F32(lhs.x * rhs.x, lhs.y * rhs.y, lhs.z * rhs.z);
+  DN_V3F32 result = DN_V3F32_From3N(lhs.x * rhs.x, lhs.y * rhs.y, lhs.z * rhs.z);
   return result;
 }
 
 DN_API DN_V3F32 operator*(DN_V3F32 lhs, DN_F32 rhs)
 {
-  DN_V3F32 result = DN_V3F32_Init3F32(lhs.x * rhs, lhs.y * rhs, lhs.z * rhs);
+  DN_V3F32 result = DN_V3F32_From3N(lhs.x * rhs, lhs.y * rhs, lhs.z * rhs);
   return result;
 }
 
 DN_API DN_V3F32 operator*(DN_V3F32 lhs, int32_t rhs)
 {
-  DN_V3F32 result = DN_V3F32_Init3F32(lhs.x * rhs, lhs.y * rhs, lhs.z * rhs);
+  DN_V3F32 result = DN_V3F32_From3N(lhs.x * rhs, lhs.y * rhs, lhs.z * rhs);
   return result;
 }
 
 DN_API DN_V3F32 operator/(DN_V3F32 lhs, DN_V3F32 rhs)
 {
-  DN_V3F32 result = DN_V3F32_Init3F32(lhs.x / rhs.x, lhs.y / rhs.y, lhs.z / rhs.z);
+  DN_V3F32 result = DN_V3F32_From3N(lhs.x / rhs.x, lhs.y / rhs.y, lhs.z / rhs.z);
   return result;
 }
 
 DN_API DN_V3F32 operator/(DN_V3F32 lhs, DN_F32 rhs)
 {
-  DN_V3F32 result = DN_V3F32_Init3F32(lhs.x / rhs, lhs.y / rhs, lhs.z / rhs);
+  DN_V3F32 result = DN_V3F32_From3N(lhs.x / rhs, lhs.y / rhs, lhs.z / rhs);
   return result;
 }
 
 DN_API DN_V3F32 operator/(DN_V3F32 lhs, int32_t rhs)
 {
-  DN_V3F32 result = DN_V3F32_Init3F32(lhs.x / rhs, lhs.y / rhs, lhs.z / rhs);
+  DN_V3F32 result = DN_V3F32_From3N(lhs.x / rhs, lhs.y / rhs, lhs.z / rhs);
   return result;
 }
 
@@ -840,6 +847,25 @@ DN_API DN_V3F32 DN_V3_Normalise(DN_V3F32 a)
 
 #if !defined(DN_NO_V4)
 // NOTE: DN_V4 /////////////////////////////////////////////////////////////////////////////////////
+DN_API DN_V4F32 DN_V4F32_FromRGBU32(DN_U32 u32)
+{
+  DN_U8    r      = (DN_U8)(((u32 << 8) & DN_V4_R_MASK_U32) >> 24);
+  DN_U8    g      = (DN_U8)(((u32 << 8) & DN_V4_G_MASK_U32) >> 16);
+  DN_U8    b      = (DN_U8)(((u32 << 8) & DN_V4_B_MASK_U32) >> 8);
+  DN_V4F32 result = DN_V4F32_FromRGBU8(r, g, b);
+  return result;
+}
+
+DN_API DN_V4F32 DN_V4F32_FromRGBAU32(DN_U32 u32)
+{
+  DN_U8    r      = (DN_U8)((u32 & DN_V4_R_MASK_U32) >> 24);
+  DN_U8    g      = (DN_U8)((u32 & DN_V4_G_MASK_U32) >> 16);
+  DN_U8    b      = (DN_U8)((u32 & DN_V4_B_MASK_U32) >> 8);
+  DN_U8    a      = (DN_U8)((u32 & DN_V4_A_MASK_U32) >> 0);
+  DN_V4F32 result = DN_V4F32_FromRGBAU8(r, g, b, a);
+  return result;
+}
+
 DN_API bool operator==(DN_V4F32 lhs, DN_V4F32 rhs)
 {
   bool result = (lhs.x == rhs.x) && (lhs.y == rhs.y) && (lhs.z == rhs.z) && (lhs.w == rhs.w);
@@ -878,43 +904,43 @@ DN_API bool operator>(DN_V4F32 lhs, DN_V4F32 rhs)
 
 DN_API DN_V4F32 operator-(DN_V4F32 lhs, DN_V4F32 rhs)
 {
-  DN_V4F32 result = DN_V4F32_Init4N(lhs.x - rhs.x, lhs.y - rhs.y, lhs.z - rhs.z, lhs.w - rhs.w);
+  DN_V4F32 result = DN_V4F32_From4N(lhs.x - rhs.x, lhs.y - rhs.y, lhs.z - rhs.z, lhs.w - rhs.w);
   return result;
 }
 
 DN_API DN_V4F32 operator-(DN_V4F32 lhs)
 {
-  DN_V4F32 result = DN_V4F32_Init4N(-lhs.x, -lhs.y, -lhs.z, -lhs.w);
+  DN_V4F32 result = DN_V4F32_From4N(-lhs.x, -lhs.y, -lhs.z, -lhs.w);
   return result;
 }
 
 DN_API DN_V4F32 operator+(DN_V4F32 lhs, DN_V4F32 rhs)
 {
-  DN_V4F32 result = DN_V4F32_Init4N(lhs.x + rhs.x, lhs.y + rhs.y, lhs.z + rhs.z, lhs.w + rhs.w);
+  DN_V4F32 result = DN_V4F32_From4N(lhs.x + rhs.x, lhs.y + rhs.y, lhs.z + rhs.z, lhs.w + rhs.w);
   return result;
 }
 
 DN_API DN_V4F32 operator*(DN_V4F32 lhs, DN_V4F32 rhs)
 {
-  DN_V4F32 result = DN_V4F32_Init4N(lhs.x * rhs.x, lhs.y * rhs.y, lhs.z * rhs.z, lhs.w * rhs.w);
+  DN_V4F32 result = DN_V4F32_From4N(lhs.x * rhs.x, lhs.y * rhs.y, lhs.z * rhs.z, lhs.w * rhs.w);
   return result;
 }
 
 DN_API DN_V4F32 operator*(DN_V4F32 lhs, DN_F32 rhs)
 {
-  DN_V4F32 result = DN_V4F32_Init4N(lhs.x * rhs, lhs.y * rhs, lhs.z * rhs, lhs.w * rhs);
+  DN_V4F32 result = DN_V4F32_From4N(lhs.x * rhs, lhs.y * rhs, lhs.z * rhs, lhs.w * rhs);
   return result;
 }
 
 DN_API DN_V4F32 operator*(DN_V4F32 lhs, int32_t rhs)
 {
-  DN_V4F32 result = DN_V4F32_Init4N(lhs.x * rhs, lhs.y * rhs, lhs.z * rhs, lhs.w * rhs);
+  DN_V4F32 result = DN_V4F32_From4N(lhs.x * rhs, lhs.y * rhs, lhs.z * rhs, lhs.w * rhs);
   return result;
 }
 
 DN_API DN_V4F32 operator/(DN_V4F32 lhs, DN_F32 rhs)
 {
-  DN_V4F32 result = DN_V4F32_Init4N(lhs.x / rhs, lhs.y / rhs, lhs.z / rhs, lhs.w / rhs);
+  DN_V4F32 result = DN_V4F32_From4N(lhs.x / rhs, lhs.y / rhs, lhs.z / rhs, lhs.w / rhs);
   return result;
 }
 
@@ -1395,7 +1421,7 @@ DN_API bool DN_Rect_Intersects(DN_Rect a, DN_Rect b)
 
 DN_API DN_Rect DN_Rect_Intersection(DN_Rect a, DN_Rect b)
 {
-  DN_Rect result = DN_Rect_Init2V2(a.pos, DN_V2F32_Init1N(0));
+  DN_Rect result = DN_Rect_From2V2(a.pos, DN_V2F32_From1N(0));
   if (DN_Rect_Intersects(a, b)) {
     DN_V2F32 a_min = a.pos;
     DN_V2F32 a_max = a.pos + a.size;
@@ -1408,7 +1434,7 @@ DN_API DN_Rect DN_Rect_Intersection(DN_Rect a, DN_Rect b)
     min.y        = DN_Max(a_min.y, b_min.y);
     max.x        = DN_Min(a_max.x, b_max.x);
     max.y        = DN_Min(a_max.y, b_max.y);
-    result       = DN_Rect_Init2V2(min, max - min);
+    result       = DN_Rect_From2V2(min, max - min);
   }
   return result;
 }
@@ -1425,7 +1451,7 @@ DN_API DN_Rect DN_Rect_Union(DN_Rect a, DN_Rect b)
   min.y          = DN_Min(a_min.y, b_min.y);
   max.x          = DN_Max(a_max.x, b_max.x);
   max.y          = DN_Max(a_max.y, b_max.y);
-  DN_Rect result = DN_Rect_Init2V2(min, max - min);
+  DN_Rect result = DN_Rect_From2V2(min, max - min);
   return result;
 }
 
@@ -1450,7 +1476,7 @@ DN_API DN_Rect DN_Rect_CutLeftClip(DN_Rect *rect, DN_F32 amount, DN_RectCutClip 
   DN_F32 result_max_x = min_x + amount;
   if (clip)
     result_max_x = DN_Min(result_max_x, max_x);
-  DN_Rect result = DN_Rect_Init4N(min_x, rect->pos.y, result_max_x - min_x, rect->size.h);
+  DN_Rect result = DN_Rect_From4N(min_x, rect->pos.y, result_max_x - min_x, rect->size.h);
   rect->pos.x    = result_max_x;
   rect->size.w   = max_x - result_max_x;
   return result;
@@ -1463,7 +1489,7 @@ DN_API DN_Rect DN_Rect_CutRightClip(DN_Rect *rect, DN_F32 amount, DN_RectCutClip
   DN_F32 result_min_x = max_x - amount;
   if (clip)
     result_min_x = DN_Max(result_min_x, 0);
-  DN_Rect result = DN_Rect_Init4N(result_min_x, rect->pos.y, max_x - result_min_x, rect->size.h);
+  DN_Rect result = DN_Rect_From4N(result_min_x, rect->pos.y, max_x - result_min_x, rect->size.h);
   rect->size.w   = result_min_x - min_x;
   return result;
 }
@@ -1475,7 +1501,7 @@ DN_API DN_Rect DN_Rect_CutTopClip(DN_Rect *rect, DN_F32 amount, DN_RectCutClip c
   DN_F32 result_max_y = min_y + amount;
   if (clip)
     result_max_y = DN_Min(result_max_y, max_y);
-  DN_Rect result = DN_Rect_Init4N(rect->pos.x, min_y, rect->size.w, result_max_y - min_y);
+  DN_Rect result = DN_Rect_From4N(rect->pos.x, min_y, rect->size.w, result_max_y - min_y);
   rect->pos.y    = result_max_y;
   rect->size.h   = max_y - result_max_y;
   return result;
@@ -1488,7 +1514,7 @@ DN_API DN_Rect DN_Rect_CutBottomClip(DN_Rect *rect, DN_F32 amount, DN_RectCutCli
   DN_F32 result_min_y = max_y - amount;
   if (clip)
     result_min_y = DN_Max(result_min_y, 0);
-  DN_Rect result = DN_Rect_Init4N(rect->pos.x, result_min_y, rect->size.w, max_y - result_min_y);
+  DN_Rect result = DN_Rect_From4N(rect->pos.x, result_min_y, rect->size.w, max_y - result_min_y);
   rect->size.h   = result_min_y - min_y;
   return result;
 }
@@ -1509,32 +1535,32 @@ DN_API DN_Rect DN_RectCut_Cut(DN_RectCut rect_cut, DN_V2F32 size, DN_RectCutClip
 
 DN_API DN_V2F32 DN_Rect_InterpolatedPoint(DN_Rect rect, DN_V2F32 t01)
 {
-  DN_V2F32 result = DN_V2F32_Init2N(rect.pos.w + (rect.size.w * t01.x),
+  DN_V2F32 result = DN_V2F32_From2N(rect.pos.w + (rect.size.w * t01.x),
                                     rect.pos.h + (rect.size.h * t01.y));
   return result;
 }
 
 DN_API DN_V2F32 DN_Rect_TopLeft(DN_Rect rect)
 {
-  DN_V2F32 result = DN_Rect_InterpolatedPoint(rect, DN_V2F32_Init2N(0, 0));
+  DN_V2F32 result = DN_Rect_InterpolatedPoint(rect, DN_V2F32_From2N(0, 0));
   return result;
 }
 
 DN_API DN_V2F32 DN_Rect_TopRight(DN_Rect rect)
 {
-  DN_V2F32 result = DN_Rect_InterpolatedPoint(rect, DN_V2F32_Init2N(1, 0));
+  DN_V2F32 result = DN_Rect_InterpolatedPoint(rect, DN_V2F32_From2N(1, 0));
   return result;
 }
 
 DN_API DN_V2F32 DN_Rect_BottomLeft(DN_Rect rect)
 {
-  DN_V2F32 result = DN_Rect_InterpolatedPoint(rect, DN_V2F32_Init2N(0, 1));
+  DN_V2F32 result = DN_Rect_InterpolatedPoint(rect, DN_V2F32_From2N(0, 1));
   return result;
 }
 
 DN_API DN_V2F32 DN_Rect_BottomRight(DN_Rect rect)
 {
-  DN_V2F32 result = DN_Rect_InterpolatedPoint(rect, DN_V2F32_Init2N(1, 1));
+  DN_V2F32 result = DN_Rect_InterpolatedPoint(rect, DN_V2F32_From2N(1, 1));
   return result;
 }
 #endif // !defined(DN_NO_RECT)
