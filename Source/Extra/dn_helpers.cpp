@@ -164,7 +164,7 @@ DN_API void DN_JSONBuilder_KeyValue(DN_JSONBuilder *builder, DN_Str8 key, DN_Str
 DN_API void DN_JSONBuilder_KeyValueFV(DN_JSONBuilder *builder, DN_Str8 key, char const *value_fmt, va_list args)
 {
   DN_OSTLSTMem tmem  = DN_OS_TLSTMem(builder->string_builder.arena);
-  DN_Str8    value = DN_Str8_InitFV(tmem.arena, value_fmt, args);
+  DN_Str8    value = DN_Str8_FromFV(tmem.arena, value_fmt, args);
   DN_JSONBuilder_KeyValue(builder, key, value);
 }
 

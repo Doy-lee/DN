@@ -1214,25 +1214,23 @@ DN_API DN_M4 DN_M4_DivF(DN_M4 lhs, DN_F32 rhs)
   return result;
 }
 
-  #if !defined(DN_NO_FSTR8)
-DN_API DN_FStr8<256> DN_M4_ColumnMajorString(DN_M4 mat)
+DN_API DN_Str8x256 DN_M4_ColumnMajorString(DN_M4 mat)
 {
-  DN_FStr8<256> result = {};
+  DN_Str8x256 result = {};
   for (int row = 0; row < 4; row++) {
     for (int it = 0; it < 4; it++) {
       if (it == 0)
-        DN_FStr8_Add(&result, DN_STR8("|"));
-      DN_FStr8_AddF(&result, "%.5f", mat.columns[it][row]);
+        DN_IStr8_AppendF(&result, "|");
+      DN_IStr8_AppendF(&result, "%.5f", mat.columns[it][row]);
       if (it != 3)
-        DN_FStr8_Add(&result, DN_STR8(", "));
+        DN_IStr8_AppendF(&result, ", ");
       else
-        DN_FStr8_Add(&result, DN_STR8("|\n"));
+        DN_IStr8_AppendF(&result, "|\n");
     }
   }
 
   return result;
 }
-  #endif
 #endif // !defined(DN_M4)
 
 // NOTE: DN_M2x3 ///////////////////////////////////////////////////////////////////////////////////

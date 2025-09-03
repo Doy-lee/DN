@@ -1,5 +1,7 @@
 #define DN_STRING_CPP
 
+#include "../dn_base_inc.h"
+
 // NOTE: DN_CStr8 //////////////////////////////////////////////////////////////////////////////////
 DN_API DN_USize DN_CStr8_FSize(DN_FMT_ATTRIB char const *fmt, ...)
 {
@@ -56,10 +58,44 @@ DN_API bool operator!=(DN_Str16 const &lhs, DN_Str16 const &rhs)
 }
 
 // NOTE: DN_Str8 ///////////////////////////////////////////////////////////////////////////////////
-DN_API DN_Str8 DN_Str8_InitCStr8(char const *src)
+DN_API DN_Str8 DN_Str8_Alloc(DN_Arena *arena, DN_USize size, DN_ZeroMem zero_mem)
+{
+  DN_Str8 result = {};
+  result.data    = DN_Arena_NewArray(arena, char, size + 1, zero_mem);
+  if (result.data)
+    result.size = size;
+  result.data[result.size] = 0;
+  return result;
+}
+
+DN_API DN_Str8 DN_Str8_FromCStr8(char const *src)
 {
   DN_USize size   = DN_CStr8_Size(src);
   DN_Str8  result = DN_Str8_Init(src, size);
+  return result;
+}
+
+DN_API DN_Str8 DN_Str8_FromF(DN_Arena *arena, DN_FMT_ATTRIB char const *fmt, ...)
+{
+  va_list va;
+  va_start(va, fmt);
+  DN_Str8 result = DN_Str8_FromFV(arena, fmt, va);
+  va_end(va);
+  return result;
+}
+
+DN_API DN_Str8 DN_Str8_FromFV(DN_Arena *arena, DN_FMT_ATTRIB char const *fmt, va_list args)
+{
+  DN_Str8 result = {};
+  if (!fmt)
+    return result;
+
+  DN_USize size = DN_CStr8_FVSize(fmt, args);
+  if (size) {
+    result = DN_Str8_Alloc(arena, size, DN_ZeroMem_No);
+    if (DN_Str8_HasData(result))
+      DN_VSNPrintF(result.data, DN_SaturateCastISizeToInt(size + 1 /*null-terminator*/), fmt, args);
+  }
   return result;
 }
 
@@ -114,13 +150,13 @@ DN_API DN_Str8 DN_Str8_Advance(DN_Str8 string, DN_USize amount)
 
 DN_API DN_Str8 DN_Str8_NextLine(DN_Str8 string)
 {
-  DN_Str8 result = DN_Str8_BinarySplit(string, DN_STR8("\n")).rhs;
+  DN_Str8 result = DN_Str8_BSplit(string, DN_STR8("\n")).rhs;
   return result;
 }
 
-DN_API DN_Str8BinarySplitResult DN_Str8_BinarySplitArray(DN_Str8 string, DN_Str8 const *find, DN_USize find_size)
+DN_API DN_Str8BSplitResult DN_Str8_BSplitArray(DN_Str8 string, DN_Str8 const *find, DN_USize find_size)
 {
-  DN_Str8BinarySplitResult result = {};
+  DN_Str8BSplitResult result = {};
   if (!DN_Str8_HasData(string) || !find || find_size == 0)
     return result;
 
@@ -141,15 +177,15 @@ DN_API DN_Str8BinarySplitResult DN_Str8_BinarySplitArray(DN_Str8 string, DN_Str8
   return result;
 }
 
-DN_API DN_Str8BinarySplitResult DN_Str8_BinarySplit(DN_Str8 string, DN_Str8 find)
+DN_API DN_Str8BSplitResult DN_Str8_BSplit(DN_Str8 string, DN_Str8 find)
 {
-  DN_Str8BinarySplitResult result = DN_Str8_BinarySplitArray(string, &find, 1);
+  DN_Str8BSplitResult result = DN_Str8_BSplitArray(string, &find, 1);
   return result;
 }
 
-DN_API DN_Str8BinarySplitResult DN_Str8_BinarySplitLastArray(DN_Str8 string, DN_Str8 const *find, DN_USize find_size)
+DN_API DN_Str8BSplitResult DN_Str8_BSplitLastArray(DN_Str8 string, DN_Str8 const *find, DN_USize find_size)
 {
-  DN_Str8BinarySplitResult result = {};
+  DN_Str8BSplitResult result = {};
   if (!DN_Str8_HasData(string) || !find || find_size == 0)
     return result;
 
@@ -170,9 +206,9 @@ DN_API DN_Str8BinarySplitResult DN_Str8_BinarySplitLastArray(DN_Str8 string, DN_
   return result;
 }
 
-DN_API DN_Str8BinarySplitResult DN_Str8_BinarySplitLast(DN_Str8 string, DN_Str8 find)
+DN_API DN_Str8BSplitResult DN_Str8_BSplitLast(DN_Str8 string, DN_Str8 find)
 {
-  DN_Str8BinarySplitResult result = DN_Str8_BinarySplitLastArray(string, &find, 1);
+  DN_Str8BSplitResult result = DN_Str8_BSplitLastArray(string, &find, 1);
   return result;
 }
 
@@ -182,10 +218,10 @@ DN_API DN_USize DN_Str8_Split(DN_Str8 string, DN_Str8 delimiter, DN_Str8 *splits
   if (!DN_Str8_HasData(string) || !DN_Str8_HasData(delimiter) || delimiter.size <= 0)
     return result;
 
-  DN_Str8BinarySplitResult split = {};
+  DN_Str8BSplitResult split = {};
   DN_Str8                  first = string;
   do {
-    split = DN_Str8_BinarySplit(first, delimiter);
+    split = DN_Str8_BSplit(first, delimiter);
     if (split.lhs.size || mode == DN_Str8SplitIncludeEmptyStrings_Yes) {
       if (splits && result < splits_count)
         splits[result] = split.lhs;
@@ -212,9 +248,6 @@ DN_API DN_Slice<DN_Str8> DN_Str8_SplitAlloc(DN_Arena *arena, DN_Str8 string, DN_
 DN_API DN_Str8FindResult DN_Str8_FindStr8Array(DN_Str8 string, DN_Str8 const *find, DN_USize find_size, DN_Str8EqCase eq_case)
 {
   DN_Str8FindResult result = {};
-  if (!DN_Str8_HasData(string) || !find || find_size == 0)
-    return result;
-
   for (DN_USize index = 0; !result.found && index < string.size; index++) {
     for (DN_USize find_index = 0; find_index < find_size; find_index++) {
       DN_Str8 find_item    = find[find_index];
@@ -261,7 +294,7 @@ DN_API DN_Str8FindResult DN_Str8_Find(DN_Str8 string, uint32_t flags)
 DN_API DN_Str8 DN_Str8_Segment(DN_Arena *arena, DN_Str8 src, DN_USize segment_size, char segment_char)
 {
   if (!segment_size || !DN_Str8_HasData(src)) {
-    DN_Str8 result = DN_Str8_Copy(arena, src);
+    DN_Str8 result = DN_Str8_FromStr8(arena, src);
     return result;
   }
 
@@ -288,7 +321,7 @@ DN_API DN_Str8 DN_Str8_Segment(DN_Arena *arena, DN_Str8 src, DN_USize segment_si
 DN_API DN_Str8 DN_Str8_ReverseSegment(DN_Arena *arena, DN_Str8 src, DN_USize segment_size, char segment_char)
 {
   if (!segment_size || !DN_Str8_HasData(src)) {
-    DN_Str8 result = DN_Str8_Copy(arena, src);
+    DN_Str8 result = DN_Str8_FromStr8(arena, src);
     return result;
   }
 
@@ -473,7 +506,7 @@ DN_API DN_Str8 DN_Str8_TrimByteOrderMark(DN_Str8 string)
 DN_API DN_Str8 DN_Str8_FileNameFromPath(DN_Str8 path)
 {
   DN_Str8                  separators[] = {DN_STR8("/"), DN_STR8("\\")};
-  DN_Str8BinarySplitResult split        = DN_Str8_BinarySplitLastArray(path, separators, DN_ArrayCountU(separators));
+  DN_Str8BSplitResult split        = DN_Str8_BSplitLastArray(path, separators, DN_ArrayCountU(separators));
   DN_Str8                  result       = DN_Str8_HasData(split.rhs) ? split.rhs : split.lhs;
   return result;
 }
@@ -487,14 +520,14 @@ DN_API DN_Str8 DN_Str8_FileNameNoExtension(DN_Str8 path)
 
 DN_API DN_Str8 DN_Str8_FilePathNoExtension(DN_Str8 path)
 {
-  DN_Str8BinarySplitResult split  = DN_Str8_BinarySplitLast(path, DN_STR8("."));
+  DN_Str8BSplitResult split  = DN_Str8_BSplitLast(path, DN_STR8("."));
   DN_Str8                  result = split.lhs;
   return result;
 }
 
 DN_API DN_Str8 DN_Str8_FileExtension(DN_Str8 path)
 {
-  DN_Str8BinarySplitResult split  = DN_Str8_BinarySplitLast(path, DN_STR8("."));
+  DN_Str8BSplitResult split  = DN_Str8_BSplitLast(path, DN_STR8("."));
   DN_Str8                  result = split.rhs;
   return result;
 }
@@ -502,7 +535,7 @@ DN_API DN_Str8 DN_Str8_FileExtension(DN_Str8 path)
 DN_API DN_Str8 DN_Str8_FileDirectoryFromPath(DN_Str8 path)
 {
   DN_Str8                  separators[] = {DN_STR8("/"), DN_STR8("\\")};
-  DN_Str8BinarySplitResult split        = DN_Str8_BinarySplitLastArray(path, separators, DN_ArrayCountU(separators));
+  DN_Str8BSplitResult split        = DN_Str8_BSplitLastArray(path, separators, DN_ArrayCountU(separators));
   DN_Str8                  result       = split.lhs;
   return result;
 }
@@ -611,7 +644,7 @@ DN_API DN_Str8 DN_Str8_AppendF(DN_Arena *arena, DN_Str8 string, char const *fmt,
 DN_API DN_Str8 DN_Str8_AppendFV(DN_Arena *arena, DN_Str8 string, char const *fmt, va_list args)
 {
   // TODO: Calculate size and write into one buffer instead of 2 appends
-  DN_Str8 append = DN_Str8_InitFV(arena, fmt, args);
+  DN_Str8 append = DN_Str8_FromFV(arena, fmt, args);
   DN_Str8 result = DN_Str8_Alloc(arena, string.size + append.size, DN_ZeroMem_No);
   DN_Memcpy(result.data, string.data, string.size);
   DN_Memcpy(result.data + string.size, append.data, append.size);
@@ -629,7 +662,7 @@ DN_API DN_Str8 DN_Str8_FillF(DN_Arena *arena, DN_USize count, char const *fmt, .
 
 DN_API DN_Str8 DN_Str8_FillFV(DN_Arena *arena, DN_USize count, char const *fmt, va_list args)
 {
-  DN_Str8 fill = DN_Str8_InitFV(arena, fmt, args);
+  DN_Str8 fill = DN_Str8_FromFV(arena, fmt, args);
   DN_Str8 result = DN_Str8_Alloc(arena, count * fill.size, DN_ZeroMem_No);
   for (DN_USize index = 0; index < count; index++) {
     void *dest = result.data + (index * fill.size);
@@ -655,15 +688,15 @@ DN_API DN_Str8DotTruncateResult DN_Str8_DotTruncateMiddle(DN_Arena *arena, DN_St
 {
   DN_Str8DotTruncateResult result = {};
   if (str8.size <= (side_size * 2)) {
-    result.str8 = DN_Str8_Copy(arena, str8);
+    result.str8 = DN_Str8_FromStr8(arena, str8);
     return result;
   }
 
   DN_Str8 head     = DN_Str8_Slice(str8, 0, side_size);
   DN_Str8 tail     = DN_Str8_Slice(str8, str8.size - side_size, side_size);
   DN_MSVC_WARNING_PUSH
-  DN_MSVC_WARNING_DISABLE(6284) // Object passed as _Param_(3) when a string is required in call to 'DN_Str8_InitF' Actual type: 'struct DN_Str8'
-  result.str8      = DN_Str8_InitF(arena, "%S%S%S", head, truncator, tail);
+  DN_MSVC_WARNING_DISABLE(6284) // Object passed as _Param_(3) when a string is required in call to 'DN_Str8_FromF' Actual type: 'struct DN_Str8'
+  result.str8      = DN_Str8_FromF(arena, "%S%S%S", head, truncator, tail);
   DN_MSVC_WARNING_POP
   result.truncated = true;
   return result;
@@ -671,7 +704,7 @@ DN_API DN_Str8DotTruncateResult DN_Str8_DotTruncateMiddle(DN_Arena *arena, DN_St
 
 DN_API DN_Str8 DN_Str8_Lower(DN_Arena *arena, DN_Str8 string)
 {
-  DN_Str8 result = DN_Str8_Copy(arena, string);
+  DN_Str8 result = DN_Str8_FromStr8(arena, string);
   for (DN_ForIndexU(index, result.size))
     result.data[index] = DN_Char_ToLower(result.data[index]);
   return result;
@@ -679,7 +712,7 @@ DN_API DN_Str8 DN_Str8_Lower(DN_Arena *arena, DN_Str8 string)
 
 DN_API DN_Str8 DN_Str8_Upper(DN_Arena *arena, DN_Str8 string)
 {
-  DN_Str8 result = DN_Str8_Copy(arena, string);
+  DN_Str8 result = DN_Str8_FromStr8(arena, string);
   for (DN_ForIndexU(index, result.size))
     result.data[index] = DN_Char_ToUpper(result.data[index]);
   return result;
@@ -699,41 +732,7 @@ DN_API bool operator!=(DN_Str8 const &lhs, DN_Str8 const &rhs)
 }
 #endif
 
-DN_API DN_Str8 DN_Str8_InitF(DN_Arena *arena, DN_FMT_ATTRIB char const *fmt, ...)
-{
-  va_list va;
-  va_start(va, fmt);
-  DN_Str8 result = DN_Str8_InitFV(arena, fmt, va);
-  va_end(va);
-  return result;
-}
-
-DN_API DN_Str8 DN_Str8_InitFV(DN_Arena *arena, DN_FMT_ATTRIB char const *fmt, va_list args)
-{
-  DN_Str8 result = {};
-  if (!fmt)
-    return result;
-
-  DN_USize size = DN_CStr8_FVSize(fmt, args);
-  if (size) {
-    result = DN_Str8_Alloc(arena, size, DN_ZeroMem_No);
-    if (DN_Str8_HasData(result))
-      DN_VSNPrintF(result.data, DN_SaturateCastISizeToInt(size + 1 /*null-terminator*/), fmt, args);
-  }
-  return result;
-}
-
-DN_API DN_Str8 DN_Str8_Alloc(DN_Arena *arena, DN_USize size, DN_ZeroMem zero_mem)
-{
-  DN_Str8 result = {};
-  result.data    = DN_Arena_NewArray(arena, char, size + 1, zero_mem);
-  if (result.data)
-    result.size = size;
-  result.data[result.size] = 0;
-  return result;
-}
-
-DN_API DN_Str8 DN_Str8_Copy(DN_Arena *arena, DN_Str8 string)
+DN_API DN_Str8 DN_Str8_FromStr8(DN_Arena *arena, DN_Str8 string)
 {
   DN_Str8 result = DN_Str8_Alloc(arena, string.size, DN_ZeroMem_No);
   if (DN_Str8_HasData(result)) {
@@ -744,30 +743,34 @@ DN_API DN_Str8 DN_Str8_Copy(DN_Arena *arena, DN_Str8 string)
 }
 
 // NOTE: DN_Str8Builder ////////////////////////////////////////////////////////////////////////////
-DN_API DN_Str8Builder DN_Str8Builder_Init(DN_Arena *arena)
+DN_API DN_Str8Builder DN_Str8Builder_FromArena(DN_Arena *arena)
 {
   DN_Str8Builder result = {};
   result.arena          = arena;
   return result;
 }
 
-DN_API DN_Str8Builder DN_Str8Builder_InitArrayRef(DN_Arena      *arena,
-                                                  DN_Str8 const *strings,
-                                                  DN_USize       size)
+DN_API DN_Str8Builder DN_Str8Builder_FromStr8PtrRef(DN_Arena *arena, DN_Str8 const *strings, DN_USize size)
 {
-  DN_Str8Builder result = DN_Str8Builder_Init(arena);
+  DN_Str8Builder result = DN_Str8Builder_FromArena(arena);
   DN_Str8Builder_AppendArrayRef(&result, strings, size);
   return result;
 }
 
-DN_API DN_Str8Builder DN_Str8Builder_InitArrayCopy(DN_Arena      *arena,
-                                                   DN_Str8 const *strings,
-                                                   DN_USize       size)
+DN_API DN_Str8Builder DN_Str8Builder_FromStr8PtrCopy(DN_Arena *arena, DN_Str8 const *strings, DN_USize size)
 {
-  DN_Str8Builder result = DN_Str8Builder_Init(arena);
+  DN_Str8Builder result = DN_Str8Builder_FromArena(arena);
   DN_Str8Builder_AppendArrayCopy(&result, strings, size);
   return result;
 }
+
+DN_API DN_Str8Builder DN_Str8Builder_FromBuilder(DN_Arena *arena, DN_Str8Builder const *builder)
+{
+  DN_Str8Builder result = DN_Str8Builder_FromArena(arena);
+  DN_Str8Builder_AppendBuilderCopy(&result, builder);
+  return result;
+}
+
 
 DN_API bool DN_Str8Builder_AddArrayRef(DN_Str8Builder *builder, DN_Str8 const *strings, DN_USize size, DN_Str8BuilderAdd add)
 {
@@ -830,7 +833,7 @@ DN_API bool DN_Str8Builder_AddArrayCopy(DN_Str8Builder *builder, DN_Str8 const *
   bool            result       = true;
   DN_Str8        *strings_copy = DN_Arena_NewArray(builder->arena, DN_Str8, size, DN_ZeroMem_No);
   for (DN_ForIndexU(index, size)) {
-    strings_copy[index] = DN_Str8_Copy(builder->arena, strings[index]);
+    strings_copy[index] = DN_Str8_FromStr8(builder->arena, strings[index]);
     if (strings_copy[index].size != strings[index].size) {
       result = false;
       break;
@@ -848,7 +851,7 @@ DN_API bool DN_Str8Builder_AddArrayCopy(DN_Str8Builder *builder, DN_Str8 const *
 
 DN_API bool DN_Str8Builder_AddFV(DN_Str8Builder *builder, DN_Str8BuilderAdd add, DN_FMT_ATTRIB char const *fmt, va_list args)
 {
-  DN_Str8         string   = DN_Str8_InitFV(builder->arena, fmt, args);
+  DN_Str8         string   = DN_Str8_FromFV(builder->arena, fmt, args);
   DN_ArenaTempMem temp_mem = DN_Arena_TempMemBegin(builder->arena);
   bool            result   = DN_Str8Builder_AddArrayRef(builder, &string, 1, add);
   if (!result)
@@ -913,7 +916,7 @@ static bool DN_Str8Builder_AppendBuilder_(DN_Str8Builder *dest, DN_Str8Builder c
     link->string      = it->string;
 
     if (copy) {
-      link->string = DN_Str8_Copy(dest->arena, it->string);
+      link->string = DN_Str8_FromStr8(dest->arena, it->string);
       if (link->string.size != it->string.size) {
         result = false;
         break;
@@ -985,13 +988,6 @@ DN_API bool DN_Str8Builder_Erase(DN_Str8Builder *builder, DN_Str8 string)
   return false;
 }
 
-DN_API DN_Str8Builder DN_Str8Builder_Copy(DN_Arena *arena, DN_Str8Builder const *builder)
-{
-  DN_Str8Builder result = DN_Str8Builder_Init(arena);
-  DN_Str8Builder_AppendBuilderCopy(&result, builder);
-  return result;
-}
-
 DN_API DN_Str8 DN_Str8Builder_Build(DN_Str8Builder const *builder, DN_Arena *arena)
 {
   DN_Str8 result = DN_Str8Builder_BuildDelimited(builder, DN_STR8(""), arena);
@@ -1038,9 +1034,19 @@ DN_API DN_Slice<DN_Str8> DN_Str8Builder_BuildSlice(DN_Str8Builder const *builder
 
   DN_USize slice_index = 0;
   for (DN_Str8Link *link = builder->head; link; link = link->next)
-    result.data[slice_index++] = DN_Str8_Copy(arena, link->string);
+    result.data[slice_index++] = DN_Str8_FromStr8(arena, link->string);
 
   DN_Assert(slice_index == builder->count);
+  return result;
+}
+
+DN_API DN_Str8 DN_LStr8_AppendF(char *buf, DN_USize *buf_size, DN_USize buf_max, char const *fmt, ...)
+{
+  va_list args;
+  va_start(args, fmt);
+  *buf_size += DN_VSNPrintF(buf + *buf_size, DN_CAST(int)(buf_max - *buf_size), fmt, args);
+  va_end(args);
+  DN_Str8 result = DN_Str8_Init(buf, *buf_size);
   return result;
 }
 
@@ -1072,37 +1078,6 @@ DN_API bool DN_Char_IsWhitespace(char ch)
 DN_API bool DN_Char_IsHex(char ch)
 {
   bool result = ((ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F') || (ch >= '0' && ch <= '9'));
-  return result;
-}
-
-DN_API DN_CharHexToU8 DN_Char_HexToU8(char ch)
-{
-  DN_CharHexToU8 result = {};
-  result.success        = true;
-  if (ch >= 'a' && ch <= 'f')
-    result.value = ch - 'a' + 10;
-  else if (ch >= 'A' && ch <= 'F')
-    result.value = ch - 'A' + 10;
-  else if (ch >= '0' && ch <= '9')
-    result.value = ch - '0';
-  else
-    result.success = false;
-  return result;
-}
-
-static char constexpr DN_HEX_LUT[] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
-
-DN_API char DN_Char_ToHex(char ch)
-{
-  char result = DN_CAST(char) - 1;
-  if (ch < 16)
-    result = DN_HEX_LUT[DN_CAST(uint8_t) ch];
-  return result;
-}
-
-DN_API char DN_Char_ToHexUnchecked(char ch)
-{
-  char result = DN_HEX_LUT[DN_CAST(uint8_t) ch];
   return result;
 }
 

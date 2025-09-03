@@ -100,7 +100,7 @@ DN_API DN_Str8 DN_StackTrace_WalkResultToStr8(DN_Arena *arena, DN_StackTraceWalk
     return result;
 
   DN_OSTLSTMem     tmem    = DN_OS_TLSTMem(arena);
-  DN_Str8Builder builder = DN_Str8Builder_Init(tmem.arena);
+  DN_Str8Builder builder = DN_Str8Builder_FromArena(tmem.arena);
   DN_StackTrace_AddWalkToStr8Builder_(walk, &builder, skip);
   result = DN_Str8Builder_Build(&builder, arena);
   return result;
@@ -118,8 +118,8 @@ DN_API DN_Str8 DN_StackTrace_WalkStr8FromHeap(uint16_t limit, uint16_t skip)
 {
   // NOTE: We don't use WalkResultToStr8 because that uses the TLS arenas which
   // does not use the OS heap.
-  DN_Arena       arena         = DN_Arena_InitFromOSHeap(DN_Kilobytes(64), DN_ArenaFlags_NoAllocTrack);
-  DN_Str8Builder builder       = DN_Str8Builder_Init(&arena);
+  DN_Arena       arena         = DN_Arena_FromHeap(DN_Kilobytes(64), DN_ArenaFlags_NoAllocTrack);
+  DN_Str8Builder builder       = DN_Str8Builder_FromArena(&arena);
   DN_StackTraceWalkResult walk = DN_StackTrace_Walk(&arena, limit);
   DN_StackTrace_AddWalkToStr8Builder_(&walk, &builder, skip);
   DN_Str8 result               = DN_Str8Builder_BuildFromOSHeap(&builder);
@@ -232,8 +232,8 @@ DN_API void DN_DBGTrackAlloc(void *ptr, DN_USize size, bool leak_permitted)
   DN_DebugAlloc                *alloc       = alloc_entry.value;
   if (alloc_entry.found) {
     if ((alloc->flags & DN_DebugAllocFlag_Freed) == 0) {
-      DN_Str8 alloc_size     = DN_CVT_U64ToBytesStr8Auto(alloc_table->arena, alloc->size);
-      DN_Str8 new_alloc_size = DN_CVT_U64ToBytesStr8Auto(alloc_table->arena, size);
+      DN_Str8 alloc_size     = DN_CVT_BytesStr8FromU64Auto(alloc_table->arena, alloc->size);
+      DN_Str8 new_alloc_size = DN_CVT_BytesStr8FromU64Auto(alloc_table->arena, size);
       DN_HardAssertF(
           alloc->flags & DN_DebugAllocFlag_Freed,
           "This pointer is already in the leak tracker, however it has not been freed yet. This "
@@ -290,7 +290,7 @@ DN_API void DN_DBGTrackDealloc(void *ptr)
 
     DN_DebugAlloc *alloc = alloc_entry.value;
     if (alloc->flags & DN_DebugAllocFlag_Freed) {
-        DN_Str8 freed_size = DN_CVT_U64ToBytesStr8Auto(alloc_table->arena, alloc->freed_size);
+        DN_Str8 freed_size = DN_CVT_BytesStr8FromU64Auto(alloc_table->arena, alloc->freed_size);
         DN_HardAssertF((alloc->flags & DN_DebugAllocFlag_Freed) == 0,
                          "Double free detected, pointer to free was already marked "
                          "as freed. Either the pointer was reallocated but not "
@@ -332,7 +332,7 @@ DN_API void DN_DBGDumpLeaks()
         if (alloc_leaked && !leak_permitted) {
             leaked_bytes += alloc->size;
             leak_count++;
-            DN_Str8 alloc_size = DN_CVT_U64ToBytesStr8Auto(g_dn_core->alloc_table.arena, alloc->size);
+            DN_Str8 alloc_size = DN_CVT_BytesStr8FromU64Auto(g_dn_core->alloc_table.arena, alloc->size);
             DN_LOG_WarningF("Pointer (0x%p) leaked %.*s at:\n"
                              "%.*s",
                              alloc->ptr, DN_STR_FMT(alloc_size),
@@ -342,8 +342,8 @@ DN_API void DN_DBGDumpLeaks()
 
     if (leak_count) {
         char buffer[512];
-        DN_Arena arena    = DN_Arena_InitFromBuffer(buffer, sizeof(buffer), DN_ArenaFlags_Nil);
-        DN_Str8 leak_size = DN_CVT_U64ToBytesStr8Auto(&arena, leaked_bytes);
+        DN_Arena arena    = DN_Arena_FromBuffer(buffer, sizeof(buffer), DN_ArenaFlags_Nil);
+        DN_Str8 leak_size = DN_CVT_BytesStr8FromU64Auto(&arena, leaked_bytes);
         DN_LOG_WarningF("There were %I64u leaked allocations totalling %.*s", leak_count, DN_STR_FMT(leak_size));
     }
 }

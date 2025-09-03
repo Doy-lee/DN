@@ -399,8 +399,8 @@ DN_API bool DN_OS_CopyFile(DN_Str8 src, DN_Str8 dest, bool overwrite, DN_OSErrSi
   if (!result) {
     int        error_code = errno;
     DN_OSTLSTMem tmem               = DN_OS_TLSTMem(nullptr);
-    DN_Str8      file_size_str8     = DN_CVT_U64ToBytesStr8(tmem.arena, stat_existing.st_size, DN_CVTBytesType_Auto);
-    DN_Str8      bytes_written_str8 = DN_CVT_U64ToBytesStr8(tmem.arena, bytes_written, DN_CVTBytesType_Auto);
+    DN_Str8      file_size_str8     = DN_CVT_BytesStr8FromU64(tmem.arena, stat_existing.st_size, DN_CVTBytesType_Auto);
+    DN_Str8      bytes_written_str8 = DN_CVT_BytesStr8FromU64(tmem.arena, bytes_written, DN_CVTBytesType_Auto);
     DN_OS_ErrSinkAppendF(error,
                        error_code,
                        "Failed to copy file '%.*s' to '%.*s', we copied %.*s but the file "
@@ -630,7 +630,7 @@ DN_API DN_OSFileRead DN_OS_FileRead(DN_OSFile *file, void *buffer, DN_USize size
   result.bytes_read = fread(buffer, 1, size, DN_CAST(FILE *) file->handle);
   if (feof(DN_CAST(FILE*)file->handle)) {
     DN_OSTLSTMem tmem             = DN_OS_TLSTMem(nullptr);
-    DN_Str8      buffer_size_str8 = DN_CVT_U64ToBytesStr8AutoFromTLS(size);
+    DN_Str8      buffer_size_str8 = DN_CVT_BytesStr8FromU64AutoTLS(size);
     DN_OS_ErrSinkAppendF(err, 1, "Failed to read %S from file", buffer_size_str8);
     return result;
   }
@@ -648,7 +648,7 @@ DN_API bool DN_OS_FileWritePtr(DN_OSFile *file, void const *buffer, DN_USize siz
       1 /*count*/;
   if (!result) {
     DN_OSTLSTMem tmem             = DN_OS_TLSTMem(nullptr);
-    DN_Str8      buffer_size_str8 = DN_CVT_U64ToBytesStr8AutoFromTLS(size);
+    DN_Str8      buffer_size_str8 = DN_CVT_BytesStr8FromU64AutoTLS(size);
     DN_OS_ErrSinkAppendF(err, 1, "Failed to write buffer (%s) to file handle", DN_STR_FMT(buffer_size_str8));
   }
   return result;
@@ -761,7 +761,7 @@ DN_API DN_OSExecResult DN_OS_ExecWait(DN_OSExecAsyncHandle handle,
     DN_OSTLSTMem tmem = DN_OS_TLSTMem(arena);
     if (arena && handle.stdout_read) {
       char           buffer[4096];
-      DN_Str8Builder builder = DN_Str8Builder_Init(tmem.arena);
+      DN_Str8Builder builder = DN_Str8Builder_FromArena(tmem.arena);
       for (;;) {
         ssize_t bytes_read =
             read(stdout_pipe[DN_OSPipeType__Read], buffer, sizeof(buffer));
@@ -775,7 +775,7 @@ DN_API DN_OSExecResult DN_OS_ExecWait(DN_OSExecAsyncHandle handle,
 
     if (arena && handle.stderr_read) {
       char           buffer[4096];
-      DN_Str8Builder builder = DN_Str8Builder_Init(tmem.arena);
+      DN_Str8Builder builder = DN_Str8Builder_FromArena(tmem.arena);
       for (;;) {
         ssize_t bytes_read =
             read(stderr_pipe[DN_OSPipeType__Read], buffer, sizeof(buffer));
@@ -1335,7 +1335,7 @@ DN_API DN_POSIXProcSelfStatus DN_Posix_ProcSelfStatus()
     DN_Str8 const          VM_PEAK    = DN_STR8("VmPeak:");
     DN_Str8 const          VM_SIZE    = DN_STR8("VmSize:");
     DN_Str8                status_buf = DN_Str8Builder_BuildFromTLS(&builder);
-    DN_Slice<DN_Str8>      lines      = DN_Str8_SplitAllocFromTLS(status_buf, DN_STR8("\n"), DN_Str8SplitIncludeEmptyStrings_No);
+    DN_Slice<DN_Str8>      lines      = DN_Str8_SplitFromTLS(status_buf, DN_STR8("\n"), DN_Str8SplitIncludeEmptyStrings_No);
 
     for (DN_ForIt(line_it, DN_Str8, &lines)) {
       DN_Str8       line    = DN_Str8_TrimWhitespaceAround(*line_it.data);
@@ -1351,14 +1351,14 @@ DN_API DN_POSIXProcSelfStatus DN_Posix_ProcSelfStatus()
       } else if (DN_Str8_StartsWith(line, VM_SIZE, DN_Str8EqCase_Insensitive)) {
         DN_Str8 size_with_kb = DN_Str8_TrimWhitespaceAround(DN_Str8_Slice(line, VM_SIZE.size, line.size));
         DN_Assert(DN_Str8_EndsWith(size_with_kb, DN_STR8("kB")));
-        DN_Str8            vm_size = DN_Str8_BinarySplit(size_with_kb, DN_STR8(" ")).lhs;
+        DN_Str8            vm_size = DN_Str8_BSplit(size_with_kb, DN_STR8(" ")).lhs;
         DN_Str8ToU64Result to_u64  = DN_Str8_ToU64(vm_size, 0);
         result.vm_size             = DN_Kilobytes(to_u64.value);
         DN_Assert(to_u64.success);
       } else if (DN_Str8_StartsWith(line, VM_PEAK, DN_Str8EqCase_Insensitive)) {
         DN_Str8 size_with_kb = DN_Str8_TrimWhitespaceAround(DN_Str8_Slice(line, VM_PEAK.size, line.size));
         DN_Assert(DN_Str8_EndsWith(size_with_kb, DN_STR8("kB")));
-        DN_Str8            vm_size = DN_Str8_BinarySplit(size_with_kb, DN_STR8(" ")).lhs;
+        DN_Str8            vm_size = DN_Str8_BSplit(size_with_kb, DN_STR8(" ")).lhs;
         DN_Str8ToU64Result to_u64  = DN_Str8_ToU64(vm_size, 0);
         result.vm_peak             = DN_Kilobytes(to_u64.value);
         DN_Assert(to_u64.success);
@@ -1471,7 +1471,7 @@ DN_API void DN_OS_HttpRequestAsync(DN_OSHttpResponse     *response,
 
   if (method.size >= sizeof(fetch_attribs.requestMethod)) {
     response->error_msg =
-        DN_Str8_InitF(arena,
+        DN_Str8_FromF(arena,
                       "Request method in EM has a size limit of 31 characters, method was "
                       "'%.*s' which is %zu characters long",
                       DN_STR_FMT(method),
@@ -1493,7 +1493,7 @@ DN_API void DN_OS_HttpRequestAsync(DN_OSHttpResponse     *response,
   fetch_attribs.onerror         = DN_OS_HttpRequestEMFetchOnErrorCallback;
   fetch_attribs.userData        = response;
 
-  DN_Str8 url = DN_Str8_InitF(tmem, "%.*s%.*s", DN_STR_FMT(host), DN_STR_FMT(path));
+  DN_Str8 url = DN_Str8_FromF(tmem, "%.*s%.*s", DN_STR_FMT(host), DN_STR_FMT(path));
   DN_LOG_InfoF("Initiating HTTP '%s' request to '%.*s' with payload '%.*s'",
                fetch_attribs.requestMethod,
                DN_STR_FMT(url),

@@ -691,7 +691,7 @@ DN_DSMap<T> DN_DSMap_Init(DN_Arena *arena, DN_U32 size, DN_DSMapFlags flags)
   if (!DN_Check(arena))
     return result;
   result.arena        = arena;
-  result.pool         = DN_Pool_Init(arena, DN_POOL_DEFAULT_ALIGN);
+  result.pool         = DN_Pool_FromArena(arena, DN_POOL_DEFAULT_ALIGN);
   result.hash_to_slot = DN_Arena_NewArray(result.arena, DN_U32, size, DN_ZeroMem_Yes);
   result.slots        = DN_Arena_NewArray(result.arena, DN_DSMapSlot<T>, size, DN_ZeroMem_Yes);
   result.occupied     = 1; // For sentinel

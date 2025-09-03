@@ -35,7 +35,6 @@ DN_API                       void    DN_BinPack_V4            (DN_BinPack *pack,
 DN_API                       void    DN_BinPack_Bool          (DN_BinPack *pack,       DN_BinPackMode mode, bool *item);
 DN_API                       void    DN_BinPack_Str8FromArena (DN_BinPack *pack,       DN_Arena *arena,     DN_BinPackMode mode, DN_Str8 *string);
 DN_API                       void    DN_BinPack_Str8FromPool  (DN_BinPack *pack,       DN_Pool *pool,       DN_BinPackMode mode, DN_Str8 *string);
-template <DN_USize N> DN_API void    DN_BinPack_FStr8         (DN_BinPack *pack,       DN_BinPackMode mode, DN_FStr8<N> *string);
 DN_API                       void    DN_BinPack_BytesFromArena(DN_BinPack *pack,       DN_Arena *arena,     DN_BinPackMode mode, void **ptr, DN_USize *size);
 DN_API                       void    DN_BinPack_BytesFromPool (DN_BinPack *pack,       DN_Pool *pool,       DN_BinPackMode mode, void **ptr, DN_USize *size);
 DN_API                       void    DN_BinPack_CArray        (DN_BinPack *pack,       DN_BinPackMode mode, void *ptr,           DN_USize size);

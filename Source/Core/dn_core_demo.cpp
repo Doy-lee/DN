@@ -54,11 +54,11 @@ void DN_Docs_Demo()
     }
   }
 
-  // NOTE: DN_CVT_BytesToHex ////////////////////////////////////////////////////////////////////////
+  // NOTE: DN_CVT_HexFromBytes ////////////////////////////////////////////////////////////////////////
   {
     DN_OSTLSTMem    tmem     = DN_OS_TLSTMem(nullptr);
     unsigned char bytes[2] = {0xFA, 0xCE};
-    DN_Str8       hex      = DN_CVT_BytesToHex(tmem.arena, bytes, sizeof(bytes));
+    DN_Str8       hex      = DN_CVT_HexFromBytes(tmem.arena, bytes, sizeof(bytes));
     DN_Assert(hex == DN_STR8("face")); // NOTE: Guaranteed to be null-terminated
   }
 
@@ -154,7 +154,7 @@ void DN_Docs_Demo()
     //
     // A 'Deinit' of the map will similarly deallocate the passed in arena (as
     // the map takes ownership of the arena).
-    DN_Arena      arena = DN_Arena_InitFromOSVMem(0, 0, DN_ArenaFlags_Nil);
+    DN_Arena      arena = DN_Arena_FromVMem(0, 0, DN_ArenaFlags_Nil);
     DN_DSMap<int> map   = DN_DSMap_Init<int>(&arena, /*size*/ 1024, DN_DSMapFlags_Nil); // Size must be PoT!
     DN_Assert(DN_DSMap_IsValid(&map));                                                  // Valid if no initialisation failure (e.g. mem alloc failure)
 
@@ -331,21 +331,10 @@ void DN_Docs_Demo()
     }
   }
 
-  // NOTE: DN_FStr8_Max /////////////////////////////////////////////////////////////////////////
-  //
-  // Return the maximum capacity of the string, e.g. the 'N' template
-  // parameter of FStr8<N>
-
-  // NOTE: DN_FStr8_ToStr8 //////////////////////////////////////////////////////////////////////
-  //
-  // Create a slice of the string into a pointer and length string (DN_Str8).
-  // The lifetime of the slice is bound to the lifetime of the FStr8 and is
-  //  invalidated when the FStr8 is.
-
-  // NOTE: DN_CVT_HexToBytes ////////////////////////////////////////////////////////////////////////
+  // NOTE: DN_CVT_BytesFromHex ////////////////////////////////////////////////////////////////////////
   {
     unsigned char bytes[2];
-    DN_USize      bytes_written = DN_CVT_HexToBytesPtr(DN_STR8("0xFACE"), bytes, sizeof(bytes));
+    DN_USize      bytes_written = DN_CVT_BytesFromHexPtr(DN_STR8("0xFACE"), bytes, sizeof(bytes));
     DN_Assert(bytes_written == 2);
     DN_Assert(bytes[0] == 0xFA);
     DN_Assert(bytes[1] == 0xCE);
@@ -776,21 +765,21 @@ void DN_Docs_Demo()
     DN_Assert(string.data[string.size] == 0); // It is null-terminated!
   }
 
-  // NOTE: DN_Str8_BinarySplit //////////////////////////////////////////////////////////////////
+  // NOTE: DN_Str8_BSplit //////////////////////////////////////////////////////////////////
   //
   // Splits a string into 2 substrings occuring prior and after the first
   // occurence of the delimiter. Neither strings include the matched
   // delimiter. If no delimiter is found, the 'rhs' of the split will be
   // empty.
   {
-    DN_Str8BinarySplitResult dot_split   = DN_Str8_BinarySplit(/*string*/ DN_STR8("abc.def.ghi"), /*delimiter*/ DN_STR8("."));
-    DN_Str8BinarySplitResult slash_split = DN_Str8_BinarySplit(/*string*/ DN_STR8("abc.def.ghi"), /*delimiter*/ DN_STR8("/"));
+    DN_Str8BSplitResult dot_split   = DN_Str8_BSplit(/*string*/ DN_STR8("abc.def.ghi"), /*delimiter*/ DN_STR8("."));
+    DN_Str8BSplitResult slash_split = DN_Str8_BSplit(/*string*/ DN_STR8("abc.def.ghi"), /*delimiter*/ DN_STR8("/"));
     DN_Assert(dot_split.lhs == DN_STR8("abc") && dot_split.rhs == DN_STR8("def.ghi"));
     DN_Assert(slash_split.lhs == DN_STR8("abc.def.ghi") && slash_split.rhs == DN_STR8(""));
 
     // Loop that walks the string and produces ("abc", "def", "ghi")
     for (DN_Str8 it = DN_STR8("abc.def.ghi"); it.size;) {
-      DN_Str8BinarySplitResult split = DN_Str8_BinarySplit(it, DN_STR8("."));
+      DN_Str8BSplitResult split = DN_Str8_BSplit(it, DN_STR8("."));
       DN_Str8                  chunk = split.lhs; // "abc", "def", ...
       it                             = split.rhs;
       (void)chunk;
@@ -1052,17 +1041,17 @@ void DN_Docs_Demo()
   //   @param[in] conflict_arena A pointer to the arena currently being used in the
   //   function
 
-  // NOTE: DN_CVT_U64ToStr8 /////////////////////////////////////////////////////////////////////////
+  // NOTE: DN_CVT_Str8FromU64 /////////////////////////////////////////////////////////////////////////
   {
-    DN_CVTU64Str8 string = DN_CVT_U64ToStr8(123123, ',');
+    DN_CVTU64Str8 string = DN_CVT_Str8FromU64(123123, ',');
     if (0) // Prints "123,123"
       printf("%.*s", DN_STR_FMT(string));
   }
 
-  // NOTE: DN_CVT_U64ToAge //////////////////////////////////////////////////////////////////////////
+  // NOTE: DN_CVT_AgeFromU64 //////////////////////////////////////////////////////////////////////////
   {
     DN_OSTLSTMem tmem   = DN_OS_TLSTMem(nullptr);
-    DN_Str8      string = DN_CVT_U64ToAge(tmem.arena, DN_HoursToSec(2) + DN_MinutesToSec(30), DN_CVTU64AgeUnit_All);
+    DN_Str8      string = DN_CVT_AgeFromU64(tmem.arena, DN_HoursToSec(2) + DN_MinutesToSec(30), DN_CVTU64AgeUnit_All);
     DN_Assert(DN_Str8_Eq(string, DN_STR8("2h 30m")));
   }
 

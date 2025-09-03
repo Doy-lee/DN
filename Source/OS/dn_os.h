@@ -210,7 +210,7 @@ typedef DN_I32(DN_OSThreadFunc)(struct DN_OSThread *);
 
 struct DN_OSThread
 {
-  DN_FStr8<64>     name;
+  DN_Str8x64       name;
   DN_OSTLS         tls;
   DN_OSTLSInitArgs tls_init_args;
   void            *handle;

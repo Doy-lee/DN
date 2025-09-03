@@ -199,8 +199,8 @@ struct DN_Pool
   DN_U8        align;
 };
 
-DN_API DN_Arena        DN_Arena_InitFromBuffer                      (void *buffer, DN_USize size, DN_ArenaFlags flags);
-DN_API DN_Arena        DN_Arena_InitFromMemFuncs                    (DN_U64 reserve, DN_U64 commit, DN_ArenaFlags flags, DN_ArenaMemFuncs mem_funcs);
+DN_API DN_Arena        DN_Arena_FromBuffer                          (void *buffer, DN_USize size, DN_ArenaFlags flags);
+DN_API DN_Arena        DN_Arena_FromMemFuncs                        (DN_U64 reserve, DN_U64 commit, DN_ArenaFlags flags, DN_ArenaMemFuncs mem_funcs);
 DN_API void            DN_Arena_Deinit                              (DN_Arena *arena);
 DN_API bool            DN_Arena_Commit                              (DN_Arena *arena, DN_U64 size);
 DN_API bool            DN_Arena_CommitTo                            (DN_Arena *arena, DN_U64 pos);
@@ -224,7 +224,7 @@ DN_API void            DN_Arena_TempMemEnd                          (DN_ArenaTem
 #define                DN_Arena_NewCopy(arena, T, src)              (T *)DN_Arena_Copy (arena, (src),                sizeof(T),            alignof(T))
 #define                DN_Arena_NewArrayCopy(arena, T, src, count)  (T *)DN_Arena_Copy (arena, (src),                sizeof(T)  * (count), alignof(T))
 
-DN_API DN_Pool         DN_Pool_Init                                 (DN_Arena *arena, DN_U8 align);
+DN_API DN_Pool         DN_Pool_FromArena                            (DN_Arena *arena, DN_U8 align);
 DN_API bool            DN_Pool_IsValid                              (DN_Pool const *pool);
 DN_API void *          DN_Pool_Alloc                                (DN_Pool *pool, DN_USize size);
 DN_API DN_Str8         DN_Pool_AllocStr8FV                          (DN_Pool *pool, DN_FMT_ATTRIB char const *fmt, va_list args);

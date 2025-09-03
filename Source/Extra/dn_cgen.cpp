@@ -344,7 +344,7 @@ DN_API DN_CGenMapNodeToEnum DN_CGen_MapNodeToEnumOrExit(MD_Node const *node, DN_
     DN_OSTLSTMem tmem = DN_OS_TLSTMem(nullptr);
     va_list    args;
     va_start(args, fmt);
-    DN_Str8 user_msg = DN_Str8_InitFV(tmem.arena, fmt, args);
+    DN_Str8 user_msg = DN_Str8_FromFV(tmem.arena, fmt, args);
     va_end(args);
 
     DN_Str8Builder builder = {};
@@ -516,7 +516,7 @@ static void DN_CGen_EmitRowWhitespace_(DN_CGenTableRow const *row, DN_CppFile *c
           break;
 
         DN_OSTLSTMem tmem         = DN_OS_TLSTMem(nullptr);
-        DN_Str8    prefix       = DN_Str8_InitF(tmem.arena, "// NOTE: %.*s ", MD_S8VArg(tag->comment));
+        DN_Str8    prefix       = DN_Str8_FromF(tmem.arena, "// NOTE: %.*s ", MD_S8VArg(tag->comment));
         int        line_padding = DN_Max(100 - (DN_CAST(int) prefix.size + (DN_CppSpacePerIndent(cpp) * cpp->indent)), 0);
         DN_CppPrint(cpp, "%.*s", DN_STR_FMT(prefix));
         for (int index = 0; index < line_padding; index++)
@@ -610,7 +610,7 @@ DN_API void DN_CGen_EmitCodeForTables(DN_CGen *cgen, DN_CGenEmit emit, DN_CppFil
                 DN_OSTLSTMem tmem       = DN_OS_TLSTMem(nullptr);
                 DN_Str8    array_size = {};
                 if (cpp_array_size.column.string.size)
-                  array_size = DN_Str8_InitF(tmem.arena, "[%.*s]", DN_STR_FMT(cpp_array_size.column.string));
+                  array_size = DN_Str8_FromF(tmem.arena, "[%.*s]", DN_STR_FMT(cpp_array_size.column.string));
 
                 // NOTE: Check if we're referencing a code generated type. If we
                 // are, append the `emit_prefix`
@@ -618,7 +618,7 @@ DN_API void DN_CGen_EmitCodeForTables(DN_CGen *cgen, DN_CGenEmit emit, DN_CppFil
                 {
                   DN_Str8 find_name = DN_CGen_StripQualifiersOnCppType_(tmem.arena, emit_cpp_type);
                   if (DN_CGen_WillCodeGenTypeName(cgen, find_name))
-                    emit_cpp_type = DN_Str8_InitF(tmem.arena, "%.*s%.*s", DN_STR_FMT(emit_prefix), DN_STR_FMT(cpp_type.column.string));
+                    emit_cpp_type = DN_Str8_FromF(tmem.arena, "%.*s%.*s", DN_STR_FMT(emit_prefix), DN_STR_FMT(cpp_type.column.string));
                 }
 
                 int name_to_type_padding = 1 + longest_type_name - DN_CAST(int) emit_cpp_type.size;
@@ -814,7 +814,7 @@ DN_API void DN_CGen_EmitCodeForTables(DN_CGen *cgen, DN_CGenEmit emit, DN_CppFil
               // NOTE: CHeck the length of the string after turning it into emittable code
               DN_Str8 cpp_type_name = DN_CGen_StripQualifiersOnCppType_(tmem.arena, cpp_type.column.string);
               if (DN_CGen_WillCodeGenTypeName(cgen, cpp_type_name))
-                cpp_type_name = DN_Str8_InitFFromTLS("%.*s%.*s", DN_STR_FMT(emit_prefix), DN_STR_FMT(cpp_type_name));
+                cpp_type_name = DN_Str8_FromTLSF("%.*s%.*s", DN_STR_FMT(emit_prefix), DN_STR_FMT(cpp_type_name));
 
               DN_Str8 cpp_type_name_no_templates = DN_CGen_ConvertTemplatesToEmittableLiterals_(tmem.arena, cpp_type_name);
               longest_cpp_type_name              = DN_Max(longest_cpp_type_name, cpp_type_name_no_templates.size);
@@ -849,7 +849,7 @@ DN_API void DN_CGen_EmitCodeForTables(DN_CGen *cgen, DN_CGenEmit emit, DN_CppFil
                     index_the_field_references = sub_row_index;
                 }
                 cpp_array_size_field_str8 =
-                    DN_Str8_InitFFromTLS("&g_%.*s%.*s_type_fields[%zu]",
+                    DN_Str8_FromTLSF("&g_%.*s%.*s_type_fields[%zu]",
                                       DN_STR_FMT(emit_prefix),
                                       DN_STR_FMT(struct_name.string),
                                       index_the_field_references);
@@ -862,7 +862,7 @@ DN_API void DN_CGen_EmitCodeForTables(DN_CGen *cgen, DN_CGenEmit emit, DN_CppFil
               DN_USize cpp_name_padding = 1 + it.table->headers[cpp_name.index].longest_string - cpp_name.column.string.size;
               DN_USize cpp_type_padding = 1 + longest_cpp_type_name - cpp_type_name.size;
 
-              DN_Str8  cpp_type_enum         = DN_Str8_InitFFromTLS("%.*sType_%.*s", DN_STR_FMT(emit_prefix), DN_STR_FMT(orig_cpp_type_no_templates));
+              DN_Str8  cpp_type_enum         = DN_Str8_FromTLSF("%.*sType_%.*s", DN_STR_FMT(emit_prefix), DN_STR_FMT(orig_cpp_type_no_templates));
               DN_USize cpp_type_enum_padding = cpp_type_padding + (orig_cpp_type.size - cpp_type_name.size);
 
               DN_Str8  cpp_label_str8         = cpp_name.column.string;
@@ -872,7 +872,7 @@ DN_API void DN_CGen_EmitCodeForTables(DN_CGen *cgen, DN_CGenEmit emit, DN_CppFil
                 cpp_label_str8_padding = 1 + it.table->headers[cpp_label.index].longest_string - cpp_label.column.string.size;
               }
 
-              DN_Str8Builder builder = DN_Str8Builder_Init(tmem.arena);
+              DN_Str8Builder builder = DN_Str8Builder_FromArena(tmem.arena);
 
               // NOTE: row
               DN_Str8Builder_AppendF(&builder, "{%2d, ", row_index);
@@ -962,8 +962,8 @@ DN_API void DN_CGen_EmitCodeForTables(DN_CGen *cgen, DN_CGenEmit emit, DN_CppFil
 
               DN_OSTLSTMem tmem             = DN_OS_TLSPushTMem(nullptr);
               DN_USize   cpp_name_padding = 1 + it.table->headers[cpp_name.index].longest_string - cpp_name.column.string.size;
-              DN_Str8    cpp_value_str8   = DN_Str8_HasData(cpp_value.column.string) ? cpp_value.column.string : DN_Str8_InitFFromTLS("%zu", row_index);
-              DN_Str8    cpp_type_enum    = DN_Str8_InitFFromTLS("%.*sType_%.*s", DN_STR_FMT(emit_prefix), DN_STR_FMT(struct_or_enum_name));
+              DN_Str8    cpp_value_str8   = DN_Str8_HasData(cpp_value.column.string) ? cpp_value.column.string : DN_Str8_FromTLSF("%zu", row_index);
+              DN_Str8    cpp_type_enum    = DN_Str8_FromTLSF("%.*sType_%.*s", DN_STR_FMT(emit_prefix), DN_STR_FMT(struct_or_enum_name));
 
               DN_Str8  cpp_label_str8         = cpp_name.column.string;
               DN_USize cpp_label_str8_padding = cpp_name_padding;
@@ -1029,7 +1029,7 @@ DN_API void DN_CGen_EmitCodeForTables(DN_CGen *cgen, DN_CGenEmit emit, DN_CppFil
         DN_OSTLSTMem tmem      = DN_OS_TLSTMem(nullptr);
         DN_Str8    type_name = it.cgen_table_column[DN_CGenTableHeaderType_Name].string;
         if (DN_CGen_WillCodeGenTypeName(cgen, type_name))
-          type_name = DN_Str8_InitF(tmem.arena, "%.*s%.*s", DN_STR_FMT(emit_prefix), DN_STR_FMT(type_name));
+          type_name = DN_Str8_FromF(tmem.arena, "%.*s%.*s", DN_STR_FMT(emit_prefix), DN_STR_FMT(type_name));
 
         longest_name_across_all_tables = DN_Max(longest_name_across_all_tables, DN_CAST(int) type_name.size);
       }
@@ -1045,7 +1045,7 @@ DN_API void DN_CGen_EmitCodeForTables(DN_CGen *cgen, DN_CGenEmit emit, DN_CppFil
           DN_OSTLSTMem tmem      = DN_OS_TLSTMem(nullptr);
           DN_Str8    type_name = it.cgen_table_column[DN_CGenTableHeaderType_Name].string;
           if (DN_CGen_WillCodeGenTypeName(cgen, type_name))
-            type_name = DN_Str8_InitF(tmem.arena, "%.*s%.*s", DN_STR_FMT(emit_prefix), DN_STR_FMT(type_name));
+            type_name = DN_Str8_FromF(tmem.arena, "%.*s%.*s", DN_STR_FMT(emit_prefix), DN_STR_FMT(type_name));
           longest_type_name = DN_Max(longest_type_name, type_name.size);
         }
       }
@@ -1055,7 +1055,7 @@ DN_API void DN_CGen_EmitCodeForTables(DN_CGen *cgen, DN_CGenEmit emit, DN_CppFil
           DN_OSTLSTMem tmem      = DN_OS_TLSPushTMem(nullptr);
           DN_Str8    type_name = it.cgen_table_column[DN_CGenTableHeaderType_Name].string;
           if (DN_CGen_WillCodeGenTypeName(cgen, type_name))
-            type_name = DN_Str8_InitFFromTLS("%.*s%.*s", DN_STR_FMT(emit_prefix), DN_STR_FMT(type_name));
+            type_name = DN_Str8_FromTLSF("%.*s%.*s", DN_STR_FMT(emit_prefix), DN_STR_FMT(type_name));
 
           int         name_padding           = 1 + longest_name_across_all_tables - DN_CAST(int) type_name.size;
           DN_Str8     type_info_kind         = {};
@@ -1082,14 +1082,14 @@ DN_API void DN_CGen_EmitCodeForTables(DN_CGen *cgen, DN_CGenEmit emit, DN_CppFil
               DN_CGenLookupColumnAtHeader cpp_name = DN_CGen_LookupColumnAtHeader(it.table, it.cgen_table_column[DN_CGenTableHeaderType_CppName].string, row);
               fields_count_int += DN_Str8_HasData(cpp_name.column.string);
             }
-            fields_count = DN_Str8_InitFFromTLS("%d", fields_count_int);
+            fields_count = DN_Str8_FromTLSF("%d", fields_count_int);
           }
 
           DN_Str8 fields         = DN_STR8("NULL");
           int     fields_padding = 1;
           if (table->type != DN_CGenTableType_CodeGenBuiltinTypes) {
             fields_padding = name_padding;
-            fields         = DN_Str8_InitF(tmem.arena, "g_%.*s_type_fields", DN_STR_FMT(type_name));
+            fields         = DN_Str8_FromF(tmem.arena, "g_%.*s_type_fields", DN_STR_FMT(type_name));
           }
 
           DN_Str8Builder builder = DN_Str8Builder_InitFromTLS();
@@ -1130,10 +1130,10 @@ DN_API void DN_CGen_EmitCodeForTables(DN_CGen *cgen, DN_CGenEmit emit, DN_CppFil
         for (DN_CGenTable *table = cgen->first_table; table != 0; table = table->next) {
           for (DN_CGenLookupTableIterator it = {}; DN_CGen_LookupNextTableInCodeGenTable(cgen, table, &it);) {
             DN_Str8 enum_name          = DN_CGen_ConvertTemplatesToEmittableLiterals_(tmem.arena, it.cgen_table_column[DN_CGenTableHeaderType_Name].string);
-            DN_Str8 full_enum_name     = DN_Str8_InitF(tmem.arena, "%.*sType_%.*s", DN_STR_FMT(emit_prefix), DN_STR_FMT(enum_name));
+            DN_Str8 full_enum_name     = DN_Str8_FromF(tmem.arena, "%.*sType_%.*s", DN_STR_FMT(emit_prefix), DN_STR_FMT(enum_name));
 
             // NOTE: Builtin types don't have type info
-            DN_Str8 full_variable_name = DN_Str8_InitF(tmem.arena, "g_%.*s%.*s_type_fields", DN_STR_FMT(emit_prefix), DN_STR_FMT(enum_name));
+            DN_Str8 full_variable_name = DN_Str8_FromF(tmem.arena, "g_%.*s%.*s_type_fields", DN_STR_FMT(emit_prefix), DN_STR_FMT(enum_name));
             if (it.cgen_table->type == DN_CGenTableType_CodeGenBuiltinTypes)
               full_variable_name = DN_STR8("nullptr");
 

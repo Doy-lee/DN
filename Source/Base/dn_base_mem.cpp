@@ -1,6 +1,8 @@
 #define DN_BASE_MEM_CPP
 
-static DN_ArenaBlock *DN_Arena_BlockInitFromMemFuncs_(DN_U64 reserve, DN_U64 commit, bool track_alloc, bool alloc_can_leak, DN_ArenaMemFuncs mem_funcs)
+#include "../dn_base_inc.h"
+
+static DN_ArenaBlock *DN_Arena_BlockFromMemFuncs_(DN_U64 reserve, DN_U64 commit, bool track_alloc, bool alloc_can_leak, DN_ArenaMemFuncs mem_funcs)
 {
   DN_ArenaBlock *result = nullptr;
   switch (mem_funcs.type) {
@@ -51,11 +53,11 @@ static DN_ArenaBlock *DN_Arena_BlockInitFromMemFuncs_(DN_U64 reserve, DN_U64 com
   return result;
 }
 
-static DN_ArenaBlock *DN_Arena_BlockInitFlagsFromMemFuncs_(DN_U64 reserve, DN_U64 commit, DN_ArenaFlags flags, DN_ArenaMemFuncs mem_funcs)
+static DN_ArenaBlock *DN_Arena_BlockFlagsFromMemFuncs_(DN_U64 reserve, DN_U64 commit, DN_ArenaFlags flags, DN_ArenaMemFuncs mem_funcs)
 {
   bool           track_alloc    = (flags & DN_ArenaFlags_NoAllocTrack) == 0;
   bool           alloc_can_leak = flags & DN_ArenaFlags_AllocCanLeak;
-  DN_ArenaBlock *result         = DN_Arena_BlockInitFromMemFuncs_(reserve, commit, track_alloc, alloc_can_leak, mem_funcs);
+  DN_ArenaBlock *result         = DN_Arena_BlockFromMemFuncs_(reserve, commit, track_alloc, alloc_can_leak, mem_funcs);
   if (result && ((flags & DN_ArenaFlags_NoPoison) == 0))
     DN_ASanPoisonMemoryRegion(DN_CAST(char *) result + DN_ARENA_HEADER_SIZE, result->commit - DN_ARENA_HEADER_SIZE);
   return result;
@@ -77,7 +79,7 @@ static void DN_Arena_UpdateStatsOnNewBlock_(DN_Arena *arena, DN_ArenaBlock const
   }
 }
 
-DN_API DN_Arena DN_Arena_InitFromBuffer(void *buffer, DN_USize size, DN_ArenaFlags flags)
+DN_API DN_Arena DN_Arena_FromBuffer(void *buffer, DN_USize size, DN_ArenaFlags flags)
 {
   DN_Assert(buffer);
   DN_AssertF(DN_ARENA_HEADER_SIZE < size, "Buffer (%zu bytes) too small, need atleast %zu bytes to store arena metadata", size, DN_ARENA_HEADER_SIZE);
@@ -98,13 +100,13 @@ DN_API DN_Arena DN_Arena_InitFromBuffer(void *buffer, DN_USize size, DN_ArenaFla
   return result;
 }
 
-DN_API DN_Arena DN_Arena_InitFromMemFuncs(DN_U64 reserve, DN_U64 commit, DN_ArenaFlags flags, DN_ArenaMemFuncs mem_funcs)
+DN_API DN_Arena DN_Arena_FromMemFuncs(DN_U64 reserve, DN_U64 commit, DN_ArenaFlags flags, DN_ArenaMemFuncs mem_funcs)
 {
   DN_Arena result   = {};
   result.flags      = flags;
   result.mem_funcs  = mem_funcs;
   result.flags     |= DN_ArenaFlags_MemFuncs;
-  result.curr       = DN_Arena_BlockInitFlagsFromMemFuncs_(reserve, commit, flags, mem_funcs);
+  result.curr       = DN_Arena_BlockFlagsFromMemFuncs_(reserve, commit, flags, mem_funcs);
   DN_Arena_UpdateStatsOnNewBlock_(&result, result.curr);
   return result;
 }
@@ -177,7 +179,7 @@ DN_API bool DN_Arena_Grow(DN_Arena *arena, DN_U64 reserve, DN_U64 commit)
     return false;
 
   bool result = false;
-  DN_ArenaBlock *new_block = DN_Arena_BlockInitFlagsFromMemFuncs_(reserve, commit, arena->flags, arena->mem_funcs);
+  DN_ArenaBlock *new_block = DN_Arena_BlockFlagsFromMemFuncs_(reserve, commit, arena->flags, arena->mem_funcs);
   if (new_block) {
     result                      = true;
     new_block->prev             = arena->curr;
@@ -194,7 +196,7 @@ DN_API void *DN_Arena_Alloc(DN_Arena *arena, DN_U64 size, uint8_t align, DN_Zero
     return nullptr;
 
   if (!arena->curr) {
-    arena->curr = DN_Arena_BlockInitFlagsFromMemFuncs_(DN_ARENA_RESERVE_SIZE, DN_ARENA_COMMIT_SIZE, arena->flags, arena->mem_funcs);
+    arena->curr = DN_Arena_BlockFlagsFromMemFuncs_(DN_ARENA_RESERVE_SIZE, DN_ARENA_COMMIT_SIZE, arena->flags, arena->mem_funcs);
     DN_Arena_UpdateStatsOnNewBlock_(arena, arena->curr);
   }
 
@@ -394,7 +396,7 @@ DN_ArenaTempMemScope::~DN_ArenaTempMemScope()
 }
 
 // NOTE: DN_Pool ///////////////////////////////////////////////////////////////////////////////////
-DN_API DN_Pool DN_Pool_Init(DN_Arena *arena, uint8_t align)
+DN_API DN_Pool DN_Pool_FromArena(DN_Arena *arena, uint8_t align)
 {
   DN_Pool result = {};
   if (arena) {

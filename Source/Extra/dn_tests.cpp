@@ -316,7 +316,7 @@ static DN_UTCore DN_Tests_Arena()
     for (DN_UT_Test(&result, "Reused memory is zeroed out")) {
       uint8_t  alignment  = 1;
       DN_USize alloc_size = DN_Kilobytes(128);
-      DN_Arena arena      = DN_Arena_InitFromOSVMem(0, 0, DN_ArenaFlags_Nil);
+      DN_Arena arena      = DN_Arena_FromVMem(0, 0, DN_ArenaFlags_Nil);
       DN_DEFER
       {
         DN_Arena_Deinit(&arena);
@@ -345,7 +345,7 @@ static DN_UTCore DN_Tests_Arena()
 
     for (DN_UT_Test(&result, "Test arena grows naturally, 1mb + 4mb")) {
       // NOTE: Allocate 1mb, then 4mb, this should force the arena to grow
-      DN_Arena arena = DN_Arena_InitFromOSVMem(DN_Megabytes(2), DN_Megabytes(2), DN_ArenaFlags_Nil);
+      DN_Arena arena = DN_Arena_FromVMem(DN_Megabytes(2), DN_Megabytes(2), DN_ArenaFlags_Nil);
       DN_DEFER
       {
         DN_Arena_Deinit(&arena);
@@ -369,7 +369,7 @@ static DN_UTCore DN_Tests_Arena()
     }
 
     for (DN_UT_Test(&result, "Test arena grows naturally, 1mb, temp memory 4mb")) {
-      DN_Arena arena = DN_Arena_InitFromOSVMem(DN_Megabytes(2), DN_Megabytes(2), DN_ArenaFlags_Nil);
+      DN_Arena arena = DN_Arena_FromVMem(DN_Megabytes(2), DN_Megabytes(2), DN_ArenaFlags_Nil);
       DN_DEFER
       {
         DN_Arena_Deinit(&arena);
@@ -414,79 +414,79 @@ static DN_UTCore DN_Tests_Bin()
   DN_UT_LogF(&test, "DN_Bin\n");
   {
     for (DN_UT_Test(&test, "Convert 0x123")) {
-      uint64_t result = DN_CVT_HexToU64(DN_STR8("0x123"));
+      uint64_t result = DN_CVT_U64FromHex(DN_STR8("0x123"));
       DN_UT_AssertF(&test, result == 0x123, "result: %" PRIu64, result);
     }
 
     for (DN_UT_Test(&test, "Convert 0xFFFF")) {
-      uint64_t result = DN_CVT_HexToU64(DN_STR8("0xFFFF"));
+      uint64_t result = DN_CVT_U64FromHex(DN_STR8("0xFFFF"));
       DN_UT_AssertF(&test, result == 0xFFFF, "result: %" PRIu64, result);
     }
 
     for (DN_UT_Test(&test, "Convert FFFF")) {
-      uint64_t result = DN_CVT_HexToU64(DN_STR8("FFFF"));
+      uint64_t result = DN_CVT_U64FromHex(DN_STR8("FFFF"));
       DN_UT_AssertF(&test, result == 0xFFFF, "result: %" PRIu64, result);
     }
 
     for (DN_UT_Test(&test, "Convert abCD")) {
-      uint64_t result = DN_CVT_HexToU64(DN_STR8("abCD"));
+      uint64_t result = DN_CVT_U64FromHex(DN_STR8("abCD"));
       DN_UT_AssertF(&test, result == 0xabCD, "result: %" PRIu64, result);
     }
 
     for (DN_UT_Test(&test, "Convert 0xabCD")) {
-      uint64_t result = DN_CVT_HexToU64(DN_STR8("0xabCD"));
+      uint64_t result = DN_CVT_U64FromHex(DN_STR8("0xabCD"));
       DN_UT_AssertF(&test, result == 0xabCD, "result: %" PRIu64, result);
     }
 
     for (DN_UT_Test(&test, "Convert 0x")) {
-      uint64_t result = DN_CVT_HexToU64(DN_STR8("0x"));
+      uint64_t result = DN_CVT_U64FromHex(DN_STR8("0x"));
       DN_UT_AssertF(&test, result == 0x0, "result: %" PRIu64, result);
     }
 
     for (DN_UT_Test(&test, "Convert 0X")) {
-      uint64_t result = DN_CVT_HexToU64(DN_STR8("0X"));
+      uint64_t result = DN_CVT_U64FromHex(DN_STR8("0X"));
       DN_UT_AssertF(&test, result == 0x0, "result: %" PRIu64, result);
     }
 
     for (DN_UT_Test(&test, "Convert 3")) {
-      uint64_t result = DN_CVT_HexToU64(DN_STR8("3"));
+      uint64_t result = DN_CVT_U64FromHex(DN_STR8("3"));
       DN_UT_AssertF(&test, result == 3, "result: %" PRIu64, result);
     }
 
     for (DN_UT_Test(&test, "Convert f")) {
-      uint64_t result = DN_CVT_HexToU64(DN_STR8("f"));
+      uint64_t result = DN_CVT_U64FromHex(DN_STR8("f"));
       DN_UT_AssertF(&test, result == 0xf, "result: %" PRIu64, result);
     }
 
     for (DN_UT_Test(&test, "Convert g")) {
-      uint64_t result = DN_CVT_HexToU64(DN_STR8("g"));
+      uint64_t result = DN_CVT_U64FromHex(DN_STR8("g"));
       DN_UT_AssertF(&test, result == 0, "result: %" PRIu64, result);
     }
 
     for (DN_UT_Test(&test, "Convert -0x3")) {
-      uint64_t result = DN_CVT_HexToU64(DN_STR8("-0x3"));
+      uint64_t result = DN_CVT_U64FromHex(DN_STR8("-0x3"));
       DN_UT_AssertF(&test, result == 0, "result: %" PRIu64, result);
     }
 
     uint32_t number = 0xd095f6;
     for (DN_UT_Test(&test, "Convert %x to string", number)) {
-      DN_Str8 number_hex = DN_CVT_BytesToHex(tmem.arena, &number, sizeof(number));
+      DN_Str8 number_hex = DN_CVT_HexFromBytes(tmem.arena, &number, sizeof(number));
       DN_UT_AssertF(&test, DN_Str8_Eq(number_hex, DN_STR8("f695d000")), "number_hex=%.*s", DN_STR_FMT(number_hex));
     }
 
     number = 0xf6ed00;
     for (DN_UT_Test(&test, "Convert %x to string", number)) {
-      DN_Str8 number_hex = DN_CVT_BytesToHex(tmem.arena, &number, sizeof(number));
+      DN_Str8 number_hex = DN_CVT_HexFromBytes(tmem.arena, &number, sizeof(number));
       DN_UT_AssertF(&test, DN_Str8_Eq(number_hex, DN_STR8("00edf600")), "number_hex=%.*s", DN_STR_FMT(number_hex));
     }
 
     DN_Str8 hex = DN_STR8("0xf6ed00");
     for (DN_UT_Test(&test, "Convert %.*s to bytes", DN_STR_FMT(hex))) {
-      DN_Str8 bytes = DN_CVT_HexToBytes(tmem.arena, hex);
+      DN_Str8 bytes = DN_CVT_BytesFromHex(tmem.arena, hex);
       DN_UT_AssertF(&test,
                     DN_Str8_Eq(bytes, DN_STR8("\xf6\xed\x00")),
                     "number_hex=%.*s",
-                    DN_STR_FMT(DN_CVT_BytesToHex(tmem.arena, bytes.data, bytes.size)));
+                    DN_STR_FMT(DN_CVT_HexFromBytes(tmem.arena, bytes.data, bytes.size)));
     }
   }
   return test;
@@ -808,7 +808,7 @@ static DN_UTCore DN_Tests_BaseContainers()
   {
     DN_OSTLSTMem tmem = DN_OS_TLSTMem(nullptr);
     {
-      DN_Arena           arena    = DN_Arena_InitFromOSVMem(0, 0, DN_ArenaFlags_Nil);
+      DN_Arena           arena    = DN_Arena_FromVMem(0, 0, DN_ArenaFlags_Nil);
       uint32_t const     MAP_SIZE = 64;
       DN_DSMap<uint64_t> map      = DN_DSMap_Init<uint64_t>(&arena, MAP_SIZE, DN_DSMapFlags_Nil);
       DN_DEFER
@@ -861,7 +861,7 @@ static DN_UTCore DN_Tests_BaseContainers()
       }
 
       DN_ArenaTempMemScope temp_mem_scope = DN_ArenaTempMemScope(tmem.arena);
-      DN_Arena             arena          = DN_Arena_InitFromOSVMem(0, 0, DN_ArenaFlags_Nil);
+      DN_Arena             arena          = DN_Arena_FromVMem(0, 0, DN_ArenaFlags_Nil);
       uint32_t const       MAP_SIZE       = 64;
       DN_DSMap<uint64_t>   map            = DN_DSMap_Init<uint64_t>(&arena, MAP_SIZE, DN_DSMapFlags_Nil);
       DN_DEFER
@@ -1332,24 +1332,6 @@ static DN_UTCore DN_Tests_BaseContainers()
   return result;
 }
 
-static DN_UTCore DN_Tests_FStr8()
-{
-  DN_UTCore result = DN_UT_Init();
-  DN_UT_LogF(&result, "DN_FStr8\n");
-  {
-    for (DN_UT_Test(&result, "Append too much fails")) {
-      DN_FStr8<4> str = {};
-      DN_UT_Assert(&result, !DN_FStr8_Add(&str, DN_STR8("abcde")));
-    }
-
-    for (DN_UT_Test(&result, "Append format string too much fails")) {
-      DN_FStr8<4> str = {};
-      DN_UT_Assert(&result, !DN_FStr8_AddF(&str, "abcde"));
-    }
-  }
-  return result;
-}
-
 static DN_UTCore DN_Tests_Intrinsics()
 {
   DN_UTCore result = DN_UT_Init();
@@ -1428,8 +1410,8 @@ static DN_UTCore DN_Tests_Intrinsics()
 
 #if defined(DN_UNIT_TESTS_WITH_KECCAK)
 DN_GCC_WARNING_PUSH
-DN_GCC_WARNING_DISABLE(-Wunused - parameter)
-DN_GCC_WARNING_DISABLE(-Wsign - compare)
+DN_GCC_WARNING_DISABLE(-Wunused-parameter)
+DN_GCC_WARNING_DISABLE(-Wsign-compare)
 
 DN_MSVC_WARNING_PUSH
 DN_MSVC_WARNING_DISABLE(4244)
@@ -1629,7 +1611,7 @@ DN_Str8 const DN_UT_HASH_STRING_[] =
 void DN_Tests_KeccakDispatch_(DN_UTCore *test, int hash_type, DN_Str8 input)
 {
   DN_OSTLSTMem tmem      = DN_OS_TLSTMem(nullptr);
-  DN_Str8      input_hex = DN_CVT_BytesToHex(tmem.arena, input.data, input.size);
+  DN_Str8      input_hex = DN_CVT_HexFromBytes(tmem.arena, input.data, input.size);
 
   switch (hash_type) {
     case Hash_SHA3_224: {
@@ -2105,7 +2087,7 @@ static DN_UTCore DN_Tests_Str8()
 
     for (DN_UT_Test(&result, "Initialise with format string")) {
       DN_OSTLSTMem tmem   = DN_OS_TLSTMem(nullptr);
-      DN_Str8      string = DN_Str8_InitF(tmem.arena, "%s", "AB");
+      DN_Str8      string = DN_Str8_FromF(tmem.arena, "%s", "AB");
       DN_UT_AssertF(&result, string.size == 2, "size: %zu", string.size);
       DN_UT_AssertF(&result, string.data[0] == 'A', "string[0]: %c", string.data[0]);
       DN_UT_AssertF(&result, string.data[1] == 'B', "string[1]: %c", string.data[1]);
@@ -2115,7 +2097,7 @@ static DN_UTCore DN_Tests_Str8()
     for (DN_UT_Test(&result, "Copy string")) {
       DN_OSTLSTMem tmem   = DN_OS_TLSTMem(nullptr);
       DN_Str8      string = DN_STR8("AB");
-      DN_Str8      copy   = DN_Str8_Copy(tmem.arena, string);
+      DN_Str8      copy   = DN_Str8_FromStr8(tmem.arena, string);
       DN_UT_AssertF(&result, copy.size == 2, "size: %zu", copy.size);
       DN_UT_AssertF(&result, copy.data[0] == 'A', "copy[0]: %c", copy.data[0]);
       DN_UT_AssertF(&result, copy.data[1] == 'B', "copy[1]: %c", copy.data[1]);
@@ -2190,28 +2172,28 @@ static DN_UTCore DN_Tests_Str8()
       DN_UT_Assert(&result, DN_CAST(bool) str_result == false);
     }
 
-    // NOTE: DN_Str8_BinarySplit ///////////////////////////////////////////////////////////////////
+    // NOTE: DN_Str8_BSplit ///////////////////////////////////////////////////////////////////
     {
       {
         char const *TEST_FMT  = "Binary split \"%.*s\" with \"%.*s\"";
         DN_Str8     delimiter = DN_STR8("/");
         DN_Str8     input     = DN_STR8("abcdef");
         for (DN_UT_Test(&result, TEST_FMT, DN_STR_FMT(input), DN_STR_FMT(delimiter))) {
-          DN_Str8BinarySplitResult split = DN_Str8_BinarySplit(input, delimiter);
+          DN_Str8BSplitResult split = DN_Str8_BSplit(input, delimiter);
           DN_UT_AssertF(&result, DN_Str8_Eq(split.lhs, DN_STR8("abcdef")), "[lhs=%.*s]", DN_STR_FMT(split.lhs));
           DN_UT_AssertF(&result, DN_Str8_Eq(split.rhs, DN_STR8("")), "[rhs=%.*s]", DN_STR_FMT(split.rhs));
         }
 
         input = DN_STR8("abc/def");
         for (DN_UT_Test(&result, TEST_FMT, DN_STR_FMT(input), DN_STR_FMT(delimiter))) {
-          DN_Str8BinarySplitResult split = DN_Str8_BinarySplit(input, delimiter);
+          DN_Str8BSplitResult split = DN_Str8_BSplit(input, delimiter);
           DN_UT_AssertF(&result, DN_Str8_Eq(split.lhs, DN_STR8("abc")), "[lhs=%.*s]", DN_STR_FMT(split.lhs));
           DN_UT_AssertF(&result, DN_Str8_Eq(split.rhs, DN_STR8("def")), "[rhs=%.*s]", DN_STR_FMT(split.rhs));
         }
 
         input = DN_STR8("/abcdef");
         for (DN_UT_Test(&result, TEST_FMT, DN_STR_FMT(input), DN_STR_FMT(delimiter))) {
-          DN_Str8BinarySplitResult split = DN_Str8_BinarySplit(input, delimiter);
+          DN_Str8BSplitResult split = DN_Str8_BSplit(input, delimiter);
           DN_UT_AssertF(&result, DN_Str8_Eq(split.lhs, DN_STR8("")), "[lhs=%.*s]", DN_STR_FMT(split.lhs));
           DN_UT_AssertF(&result, DN_Str8_Eq(split.rhs, DN_STR8("abcdef")), "[rhs=%.*s]", DN_STR_FMT(split.rhs));
         }
@@ -2221,7 +2203,7 @@ static DN_UTCore DN_Tests_Str8()
         DN_Str8 delimiter = DN_STR8("-=-");
         DN_Str8 input     = DN_STR8("123-=-456");
         for (DN_UT_Test(&result, "Binary split \"%.*s\" with \"%.*s\"", DN_STR_FMT(input), DN_STR_FMT(delimiter))) {
-          DN_Str8BinarySplitResult split = DN_Str8_BinarySplit(input, delimiter);
+          DN_Str8BSplitResult split = DN_Str8_BSplit(input, delimiter);
           DN_UT_AssertF(&result, DN_Str8_Eq(split.lhs, DN_STR8("123")), "[lhs=%.*s]", DN_STR_FMT(split.lhs));
           DN_UT_AssertF(&result, DN_Str8_Eq(split.rhs, DN_STR8("456")), "[rhs=%.*s]", DN_STR_FMT(split.rhs));
         }
@@ -2474,7 +2456,6 @@ DN_TestsResult DN_Tests_RunSuite(DN_TestsPrint print)
           DN_Tests_Bin(),
           DN_Tests_BinarySearch(),
           DN_Tests_BaseContainers(),
-          DN_Tests_FStr8(),
           DN_Tests_Intrinsics(),
 #if defined(DN_UNIT_TESTS_WITH_KECCAK)
           DN_Tests_Keccak(),

@@ -596,7 +596,7 @@ DN_API DN_OSFileRead DN_OS_FileRead(DN_OSFile *file, void *buffer, DN_USize size
 
   DN_OSTLSTMem tmem = DN_OS_TLSTMem(nullptr);
   if (!DN_Check(size <= (unsigned long)-1)) {
-    DN_Str8 buffer_size_str8 = DN_CVT_U64ToBytesStr8AutoFromTLS(size);
+    DN_Str8 buffer_size_str8 = DN_CVT_BytesStr8FromU64AutoTLS(size);
     DN_OS_ErrSinkAppendF(
         err,
         1 /*error_code*/,
@@ -652,7 +652,7 @@ DN_API bool DN_OS_FileWritePtr(DN_OSFile *file, void const *buffer, DN_USize siz
   if (!result) {
     DN_OSTLSTMem tmem             = DN_OS_TLSTMem(nullptr);
     DN_W32Error  win_error        = DN_W32_LastError(tmem.arena);
-    DN_Str8      buffer_size_str8 = DN_CVT_U64ToBytesStr8AutoFromTLS(size);
+    DN_Str8      buffer_size_str8 = DN_CVT_BytesStr8FromU64AutoTLS(size);
     DN_OS_ErrSinkAppendF(err, win_error.code, "Failed to write buffer (%.*s) to file handle: %.*s", DN_STR_FMT(buffer_size_str8), DN_STR_FMT(win_error.msg));
   }
   return result;
@@ -855,7 +855,7 @@ DN_API DN_OSExecAsyncHandle DN_OS_ExecAsync(DN_Slice<DN_Str8> cmd_line, DN_OSExe
   DN_Str16   cmd16         = DN_W32_Str8ToStr16(tmem.arena, cmd_rendered);
   DN_Str16   working_dir16 = DN_W32_Str8ToStr16(tmem.arena, args->working_dir);
 
-  DN_Str8Builder env_builder = DN_Str8Builder_InitFromTLS();
+  DN_Str8Builder env_builder = DN_Str8Builder_FromTLS();
   DN_Str8Builder_AppendArrayRef(&env_builder, args->environment.data, args->environment.size);
   if (env_builder.string_size)
     DN_Str8Builder_AppendRef(&env_builder, DN_STR8("\0"));
@@ -1277,7 +1277,7 @@ DN_API void DN_W32_ThreadSetName(DN_Str8 name)
 
   #pragma pack(pop)
 
-  DN_Str8              copy = DN_Str8_Copy(tmem.arena, name);
+  DN_Str8              copy = DN_Str8_FromStr8(tmem.arena, name);
   DN_W32ThreadNameInfo info = {};
   info.dwType               = 0x1000;
   info.szName               = (char *)copy.data;
@@ -1685,7 +1685,7 @@ DN_API DN_Str8 DN_W32_Str16ToStr8FromHeap(DN_Str16 src)
 
   // NOTE: Str8 allocate ensures there's one extra byte for
   // null-termination already so no-need to +1 the required size
-  DN_Str8 buffer = DN_Str8_AllocFromOSHeap(required_size, DN_ZeroMem_No);
+  DN_Str8 buffer = DN_Str8_FromHeap(required_size, DN_ZeroMem_No);
   if (!DN_Str8_HasData(buffer))
     return result;
 

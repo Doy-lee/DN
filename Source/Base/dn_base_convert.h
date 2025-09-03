@@ -54,35 +54,44 @@ enum DN_CVTU64AgeUnit_
   DN_CVTU64AgeUnit_All  = DN_CVTU64AgeUnit_HMS | DN_CVTU64AgeUnit_Day | DN_CVTU64AgeUnit_Week | DN_CVTU64AgeUnit_Year,
 };
 
-DN_API int               DN_CVT_FmtBuffer3DotTruncate                 (char *buffer, int size, DN_FMT_ATTRIB char const *fmt, ...);
-DN_API DN_CVTU64Str8     DN_CVT_U64ToStr8                             (DN_U64 val, char separator);
-DN_API DN_CVTU64Bytes    DN_CVT_U64ToBytes                            (DN_U64 bytes, DN_CVTBytesType type);
-#define                  DN_CVT_U64ToBytesAuto(bytes)                 DN_CVT_U64ToBytes(bytes, DN_CVTBytesType_Auto)
-DN_API DN_Str8           DN_CVT_U64ToBytesStr8                        (DN_Arena *arena, DN_U64 bytes, DN_CVTBytesType type);
-#define                  DN_CVT_U64ToBytesStr8Auto(arena, bytes)      DN_CVT_U64ToBytesStr8(arena,                 bytes, DN_CVTBytesType_Auto)
-#define                  DN_CVT_U64ToBytesStr8FromTLS(bytes, type)    DN_CVT_U64ToBytesStr8(DN_OS_TLSTopArena(),   bytes, type)
-#define                  DN_CVT_U64ToBytesStr8AutoFromTLS(bytes)      DN_CVT_U64ToBytesStr8(DN_OS_TLSTopArena(),   bytes, DN_CVTBytesType_Auto)
-#define                  DN_CVT_U64ToBytesStr8FromFrame(bytes, type)  DN_CVT_U64ToBytesStr8(DN_OS_TLSFrameArena(), bytes, type)
-#define                  DN_CVT_U64ToBytesStr8AutoFromFrame(bytes)    DN_CVT_U64ToBytesStr8(DN_OS_TLSFrameArena(), bytes, DN_CVTBytesType_Auto)
-DN_API DN_Str8           DN_CVT_BytesTypeToStr8                       (DN_CVTBytesType type);
-DN_API DN_Str8           DN_CVT_U64ToAge                              (DN_Arena *arena, DN_U64 age_s, DN_CVTU64AgeUnit unit);
-DN_API DN_Str8           DN_CVT_F64ToAge                              (DN_Arena *arena, DN_F64 age_s, DN_CVTU64AgeUnit unit);
+struct DN_NibbleFromU8Result
+{
+  char nibble0;
+  char nibble1;
+};
 
-DN_API DN_U64            DN_CVT_HexToU64                              (DN_Str8 hex);
-DN_API DN_Str8           DN_CVT_U64ToHex                              (DN_Arena *arena, DN_U64 number, DN_CVTU64HexStrFlags flags);
-#define                  DN_CVT_U64ToHexFromFrame(number, flags)      DN_CVT_U64ToHex(DN_OS_TLSFrameArena(), number, flags)
-DN_API DN_CVTU64HexStr   DN_CVT_U64ToHexStr                           (DN_U64 number, DN_CVTU64HexStrFlags flags);
+DN_API DN_NibbleFromU8Result DN_CVT_NibbleFromU8                          (DN_U8 u8);
+DN_API DN_U8                 DN_CVT_U8FromHexNibble                       (char hex);
 
-DN_API bool              DN_CVT_BytesToHexPtr                         (void const *src, DN_USize src_size, char *dest, DN_USize dest_size);
-DN_API DN_Str8           DN_CVT_BytesToHex                            (DN_Arena *arena, void const *src, DN_USize size);
-#define                  DN_CVT_BytesToHexFromTLS(...)                DN_CVT_BytesToHex(DN_OS_TLSTopArena(), __VA_ARGS__)
-#define                  DN_CVT_BytesToHexFromFrame(...)              DN_CVT_BytesToHex(DN_OS_TLSFrameArena(), __VA_ARGS__)
+DN_API int                   DN_CVT_FmtBuffer3DotTruncate                 (char *buffer, int size, DN_FMT_ATTRIB char const *fmt, ...);
+DN_API DN_CVTU64Str8         DN_CVT_Str8FromU64                           (DN_U64 val, char separator);
+DN_API DN_CVTU64Bytes        DN_CVT_BytesFromU64                          (DN_U64 bytes, DN_CVTBytesType type);
+#define                      DN_CVT_BytesFromU64Auto(bytes)               DN_CVT_BytesFromU64(bytes, DN_CVTBytesType_Auto)
+DN_API DN_Str8               DN_CVT_BytesStr8FromU64                      (DN_Arena *arena, DN_U64 bytes, DN_CVTBytesType type);
+#define                      DN_CVT_BytesStr8FromU64Auto(arena, bytes)    DN_CVT_BytesStr8FromU64(arena,                 bytes, DN_CVTBytesType_Auto)
+#define                      DN_CVT_BytesStr8FromTLS(bytes, type)         DN_CVT_BytesStr8FromU64(DN_OS_TLSTopArena(),   bytes, type)
+#define                      DN_CVT_BytesStr8FromU64AutoTLS(bytes)        DN_CVT_BytesStr8FromU64(DN_OS_TLSTopArena(),   bytes, DN_CVTBytesType_Auto)
+#define                      DN_CVT_BytesStr8FromU64Frame(bytes, type)    DN_CVT_BytesStr8FromU64(DN_OS_TLSFrameArena(), bytes, type)
+#define                      DN_CVT_BytesStr8FromU64AutoFrame(bytes)      DN_CVT_BytesStr8FromU64(DN_OS_TLSFrameArena(), bytes, DN_CVTBytesType_Auto)
+DN_API DN_Str8               DN_CVT_BytesTypeToStr8                       (DN_CVTBytesType type);
+DN_API DN_Str8               DN_CVT_AgeFromU64                            (DN_Arena *arena, DN_U64 age_s, DN_CVTU64AgeUnit unit);
+DN_API DN_Str8               DN_CVT_AgeFromF64                            (DN_Arena *arena, DN_F64 age_s, DN_CVTU64AgeUnit unit);
 
-DN_API DN_USize          DN_CVT_HexToBytesPtrUnchecked                (DN_Str8 hex, void *dest, DN_USize dest_size);
-DN_API DN_USize          DN_CVT_HexToBytesPtr                         (DN_Str8 hex, void *dest, DN_USize dest_size);
-DN_API DN_Str8           DN_CVT_HexToBytesUnchecked                   (DN_Arena *arena, DN_Str8 hex);
-#define                  DN_CVT_HexToBytesUncheckedFromTLS(...)       DN_CVT_HexToBytesUnchecked(DN_OS_TLSTopArena(), __VA_ARGS__)
-DN_API DN_Str8           DN_CVT_HexToBytes                            (DN_Arena *arena, DN_Str8 hex);
-#define                  DN_CVT_HexToBytesFromFrame(...)              DN_CVT_HexToBytes(DN_OS_TLSFrameArena(), __VA_ARGS__)
-#define                  DN_CVT_HexToBytesFromTLS(...)                DN_CVT_HexToBytes(DN_OS_TLSTopArena(), __VA_ARGS__)
+DN_API DN_U64                DN_CVT_U64FromHex                            (DN_Str8 hex);
+DN_API DN_Str8               DN_CVT_HexFromU64                            (DN_Arena *arena, DN_U64 number, DN_CVTU64HexStrFlags flags);
+#define                      DN_CVT_HexFromU64Frame(number, flags)        DN_CVT_HexFromU64(DN_OS_TLSFrameArena(), number, flags)
+DN_API DN_CVTU64HexStr       DN_CVT_HexFromU64Str                         (DN_U64 number, DN_CVTU64HexStrFlags flags);
+
+DN_API bool                  DN_CVT_HexFromBytesPtr                       (void const *src, DN_USize src_size, char *dest, DN_USize dest_size);
+DN_API DN_Str8               DN_CVT_HexFromBytes                          (DN_Arena *arena, void const *src, DN_USize size);
+#define                      DN_CVT_HexFromBytesTLS(...)                  DN_CVT_HexFromBytes(DN_OS_TLSTopArena(), __VA_ARGS__)
+#define                      DN_CVT_HexFromBytesFrame(...)                DN_CVT_HexFromBytes(DN_OS_TLSFrameArena(), __VA_ARGS__)
+
+DN_API DN_USize              DN_CVT_BytesFromHexPtrUnchecked              (DN_Str8 hex, void *dest, DN_USize dest_size);
+DN_API DN_USize              DN_CVT_BytesFromHexPtr                       (DN_Str8 hex, void *dest, DN_USize dest_size);
+DN_API DN_Str8               DN_CVT_BytesFromHexUnchecked                 (DN_Arena *arena, DN_Str8 hex);
+#define                      DN_CVT_BytesFromHexUncheckedFromTLS(...)     DN_CVT_BytesFromHexUnchecked(DN_OS_TLSTopArena(), __VA_ARGS__)
+DN_API DN_Str8               DN_CVT_BytesFromHex                          (DN_Arena *arena, DN_Str8 hex);
+#define                      DN_CVT_BytesFromHexFrame(...)                DN_CVT_BytesFromHex(DN_OS_TLSFrameArena(), __VA_ARGS__)
+#define                      DN_CVT_BytesFromHexTLS(...)                  DN_CVT_BytesFromHex(DN_OS_TLSTopArena(), __VA_ARGS__)
 #endif // defined(DN_BASE_CONVERT_H)

@@ -207,9 +207,9 @@ DN_API DN_Str8FindResult DN_SIMD_Str8FindLastAVX512F(DN_Str8 string, DN_Str8 fin
   return result;
 }
 
-DN_API DN_Str8BinarySplitResult DN_SIMD_Str8BinarySplitAVX512F(DN_Str8 string, DN_Str8 find)
+DN_API DN_Str8BSplitResult DN_SIMD_Str8BSplitAVX512F(DN_Str8 string, DN_Str8 find)
 {
-  DN_Str8BinarySplitResult result      = {};
+  DN_Str8BSplitResult result      = {};
   DN_Str8FindResult        find_result = DN_SIMD_Str8FindAVX512F(string, find);
   if (find_result.found) {
     result.lhs.data = string.data;
@@ -222,9 +222,9 @@ DN_API DN_Str8BinarySplitResult DN_SIMD_Str8BinarySplitAVX512F(DN_Str8 string, D
   return result;
 }
 
-DN_API DN_Str8BinarySplitResult DN_SIMD_Str8BinarySplitLastAVX512F(DN_Str8 string, DN_Str8 find)
+DN_API DN_Str8BSplitResult DN_SIMD_Str8BSplitLastAVX512F(DN_Str8 string, DN_Str8 find)
 {
-  DN_Str8BinarySplitResult result      = {};
+  DN_Str8BSplitResult result      = {};
   DN_Str8FindResult        find_result = DN_SIMD_Str8FindLastAVX512F(string, find);
   if (find_result.found) {
     result.lhs.data = string.data;
@@ -243,10 +243,10 @@ DN_API DN_USize DN_SIMD_Str8SplitAVX512F(DN_Str8 string, DN_Str8 delimiter, DN_S
   if (!DN_Str8_HasData(string) || !DN_Str8_HasData(delimiter) || delimiter.size <= 0)
     return result;
 
-  DN_Str8BinarySplitResult split = {};
+  DN_Str8BSplitResult split = {};
   DN_Str8                  first = string;
   do {
-    split = DN_SIMD_Str8BinarySplitAVX512F(first, delimiter);
+    split = DN_SIMD_Str8BSplitAVX512F(first, delimiter);
     if (split.lhs.size || mode == DN_Str8SplitIncludeEmptyStrings_Yes) {
       if (splits && result < splits_count)
         splits[result] = split.lhs;

@@ -250,7 +250,7 @@ static void DN_CSV_PackStr8(DN_CSVPack *pack, DN_CSVSerialise serialise, DN_Str8
 {
   if (serialise == DN_CSVSerialise_Read) {
     DN_Str8 csv_value = DN_CSV_TokeniserNextColumn(&pack->read_tokeniser);
-    *str8             = DN_Str8_Copy(arena, csv_value);
+    *str8             = DN_Str8_FromStr8(arena, csv_value);
   } else {
     DN_Str8Builder_AppendF(&pack->write_builder, "%s%.*s", pack->write_column++ ? "," : "", DN_STR_FMT(*str8));
   }

@@ -34,7 +34,7 @@ static DN_NET2Response DN_NET2_WaitForAnyResponse(DN_NET2Core *net, DN_Arena *ar
 
       // NOTE: Deallocate the memory used in the request
       DN_Arena_PopTo(&request->arena, request->start_response_arena_pos);
-      request->response.body = DN_Str8Builder_Init(&request->arena);
+      request->response.body = DN_Str8Builder_FromArena(&request->arena);
 
       // NOTE: For websocket requests, notify the NET thread we've read data from it and it can go
       // back to polling the socket for more data
@@ -70,7 +70,7 @@ static DN_NET2Response DN_NET2_WaitForResponse(DN_NET2Core *net, DN_NET2Request 
 
       // NOTE: Deallocate the memory used in the request
       DN_Arena_PopTo(&request_ptr->arena, request_ptr->start_response_arena_pos);
-      request_ptr->response.body = DN_Str8Builder_Init(&request_ptr->arena);
+      request_ptr->response.body = DN_Str8Builder_FromArena(&request_ptr->arena);
 
       // NOTE: Decrement the global completion tracking semaphore (this is so that if you waited on
       // the net object's semaphore, you don't get a phantom wakeup because this function already
@@ -267,12 +267,12 @@ static int32_t DN_NET2_ThreadEntryPoint_(DN_OSThread *thread)
           if (get_result == CURLE_OK) {
             request->response.status = DN_NET2RequestStatus_HTTPReceived;
           } else {
-            request->response.error  = DN_Str8_InitF(&request->arena, "Failed to get HTTP response status (CURL %d): %s", msg->data.result, curl_easy_strerror(get_result));
+            request->response.error  = DN_Str8_FromF(&request->arena, "Failed to get HTTP response status (CURL %d): %s", msg->data.result, curl_easy_strerror(get_result));
             request->response.status = DN_NET2RequestStatus_Error;
           }
         } else {
           request->response.status = DN_NET2RequestStatus_Error;
-          request->response.error  = DN_Str8_InitF(&request->arena,
+          request->response.error  = DN_Str8_FromF(&request->arena,
                                                   "Net request to '%.*s' failed (CURL %d): %s",
                                                   DN_STR_FMT(request->url),
                                                   msg->data.result,
@@ -364,7 +364,7 @@ static int32_t DN_NET2_ThreadEntryPoint_(DN_OSThread *thread)
       request->response.status = DN_NET2RequestStatus_WSReceived;
       if (receive_result != CURLE_OK) {
         request->response.status = DN_NET2RequestStatus_Error;
-        request->response.error  = DN_Str8_InitF(&request->arena,
+        request->response.error  = DN_Str8_FromF(&request->arena,
                                                 "Websocket failed to receive data for '%.*s' (CURL %d): %s",
                                                 DN_STR_FMT(request->url),
                                                 receive_result,
@@ -385,7 +385,7 @@ static void DN_NET2_Init(DN_NET2Core *net, char *ring_base, DN_USize ring_size, 
 {
   net->base               = base;
   net->base_size          = base_size;
-  net->arena              = DN_Arena_InitFromBuffer(net->base, net->base_size, DN_ArenaFlags_Nil);
+  net->arena              = DN_Arena_FromBuffer(net->base, net->base_size, DN_ArenaFlags_Nil);
   net->ring.base          = ring_base;
   net->ring.size          = ring_size;
   net->ring_mutex         = DN_OS_MutexInit();
@@ -480,7 +480,7 @@ static DN_NET2Request DN_NET2_DoRequest_(DN_NET2Core *net, DN_Str8 url, DN_Str8 
   if (request) {
     result.handle = DN_CAST(DN_U64) request;
     if (!request->arena.curr)
-      request->arena = DN_Arena_InitFromOSVMem(DN_Megabytes(1), DN_Kilobytes(1), DN_ArenaFlags_Nil);
+      request->arena = DN_Arena_FromVMem(DN_Megabytes(1), DN_Kilobytes(1), DN_ArenaFlags_Nil);
 
     request->type          = type;
     request->gen           = DN_Max(request->gen + 1, 1);
@@ -503,7 +503,7 @@ static DN_NET2Request DN_NET2_DoRequest_(DN_NET2Core *net, DN_Str8 url, DN_Str8 
       }
     }
 
-    request->response.body            = DN_Str8Builder_Init(&request->arena);
+    request->response.body            = DN_Str8Builder_FromArena(&request->arena);
     request->completion_sem           = DN_OS_SemaphoreInit(0);
     request->start_response_arena_pos = DN_Arena_Pos(&request->arena);
 

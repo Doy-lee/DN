@@ -245,10 +245,10 @@ DN_KCBytes64 DN_KC_Keccak512Str8(DN_Str8 string);
 // Convert a binary buffer into its hex representation into dest. The dest
 // buffer must be large enough to contain the hex representation, i.e.
 // atleast src_size * 2). This function does *not* null-terminate the buffer.
-void DN_KC_BytesToHex(void const *src, uint64_t src_size, char *dest, uint64_t dest_size);
+void DN_KC_HexFromBytes(void const *src, uint64_t src_size, char *dest, uint64_t dest_size);
 
 // Converts a fixed amount of bytes into a hexadecimal string. Helper functions
-// that call into DN_KCBytesToHex.
+// that call into DN_KCHexFromBytes.
 // return: The hexadecimal string of the bytes, null-terminated.
 DN_KCString56  DN_KC_Bytes28ToHex(DN_KCBytes28 const *bytes);
 DN_KCString64  DN_KC_Bytes32ToHex(DN_KCBytes32 const *bytes);
@@ -581,7 +581,7 @@ DN_KCBytes64 DN_KC_Keccak512Str8(DN_Str8 string)
 #endif // DN_BASE_STRING_H
 
 // NOTE: Helper functions //////////////////////////////////////////////////////////////////////////
-void DN_KC_BytesToHex(void const *src, size_t src_size, char *dest, size_t dest_size)
+void DN_KC_HexFromBytes(void const *src, size_t src_size, char *dest, size_t dest_size)
 {
     (void)src_size; (void)dest_size;
     DN_KC_ASSERT(dest_size >= src_size * 2);
@@ -600,7 +600,7 @@ void DN_KC_BytesToHex(void const *src, size_t src_size, char *dest, size_t dest_
 DN_KCString56 DN_KC_Bytes28ToHex(DN_KCBytes28 const *bytes)
 {
     DN_KCString56 result;
-    DN_KC_BytesToHex(bytes->data, sizeof(bytes->data), result.data, sizeof(result.data));
+    DN_KC_HexFromBytes(bytes->data, sizeof(bytes->data), result.data, sizeof(result.data));
     result.data[sizeof(result.data) - 1] = 0;
     return result;
 }
@@ -608,7 +608,7 @@ DN_KCString56 DN_KC_Bytes28ToHex(DN_KCBytes28 const *bytes)
 DN_KCString64 DN_KC_Bytes32ToHex(DN_KCBytes32 const *bytes)
 {
     DN_KCString64 result;
-    DN_KC_BytesToHex(bytes->data, sizeof(bytes->data), result.data, sizeof(result.data));
+    DN_KC_HexFromBytes(bytes->data, sizeof(bytes->data), result.data, sizeof(result.data));
     result.data[sizeof(result.data) - 1] = 0;
     return result;
 }
@@ -616,7 +616,7 @@ DN_KCString64 DN_KC_Bytes32ToHex(DN_KCBytes32 const *bytes)
 DN_KCString96 DN_KC_Bytes48ToHex(DN_KCBytes48 const *bytes)
 {
     DN_KCString96 result;
-    DN_KC_BytesToHex(bytes->data, sizeof(bytes->data), result.data, sizeof(result.data));
+    DN_KC_HexFromBytes(bytes->data, sizeof(bytes->data), result.data, sizeof(result.data));
     result.data[sizeof(result.data) - 1] = 0;
     return result;
 }
@@ -624,7 +624,7 @@ DN_KCString96 DN_KC_Bytes48ToHex(DN_KCBytes48 const *bytes)
 DN_KCString128 DN_KC_Bytes64ToHex(DN_KCBytes64 const *bytes)
 {
     DN_KCString128 result;
-    DN_KC_BytesToHex(bytes->data, sizeof(bytes->data), result.data, sizeof(result.data));
+    DN_KC_HexFromBytes(bytes->data, sizeof(bytes->data), result.data, sizeof(result.data));
     result.data[sizeof(result.data) - 1] = 0;
     return result;
 }
@@ -659,7 +659,7 @@ DN_KCBytes32 DN_KC_Hex64ToBytes(DN_Str8 hex)
 {
     DN_KC_ASSERT(hex.size == 64);
     DN_KCBytes32 result;
-    DN_CVT_HexToBytesPtr(hex, result.data, sizeof(result));
+    DN_CVT_BytesFromHexPtr(hex, result.data, sizeof(result));
     return result;
 }
 #endif // DN_BASE_STRING_H

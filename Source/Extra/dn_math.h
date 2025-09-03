@@ -288,8 +288,8 @@ DN_U32 const DN_V4_A_MASK_U32 = 0x000000FF;
 #define              DN_V4F32_From1N(x)                          DN_LITERAL(DN_V4F32){{(DN_F32)(x), (DN_F32)(x), (DN_F32)(x), (DN_F32)(x)}}
 #define              DN_V4F32_From4N(x, y, z, w)                 DN_LITERAL(DN_V4F32){{(DN_F32)(x), (DN_F32)(y), (DN_F32)(z), (DN_F32)(w)}}
 #define              DN_V4F32_FromV3And1N(xyz, w)                DN_LITERAL(DN_V4F32){{xyz.x,        xyz.y,        xyz.z,        w}}
-#define              DN_V4F32_FromRGBAU8(r, g, b, a)             DN_LITERAL(DN_V4F32){r / 255.f, g / 255.f, b / 255.f, a / 255.f}
-#define              DN_V4F32_FromRGBU8(r, g, b)                 DN_LITERAL(DN_V4F32){r / 255.f, g / 255.f, b / 255.f,       1.f}
+#define              DN_V4F32_FromRGBAU8(r, g, b, a)             DN_LITERAL(DN_V4F32){{r / 255.f, g / 255.f, b / 255.f, a / 255.f}}
+#define              DN_V4F32_FromRGBU8(r, g, b)                 DN_LITERAL(DN_V4F32){{r / 255.f, g / 255.f, b / 255.f,       1.f}}
 DN_API DN_V4F32      DN_V4F32_FromRGBU32(DN_U32 u32);
 DN_API DN_V4F32      DN_V4F32_FromRGBAU32(DN_U32 u32);
 #define              DN_V4F32_FromV4Alpha(v4, alpha)             DN_V4F32_FromV3And1N(v4.xyz, alpha)
@@ -331,9 +331,7 @@ DN_API DN_M4         DN_M4_AddF                                  (DN_M4 lhs, DN_
 DN_API DN_M4         DN_M4_SubF                                  (DN_M4 lhs, DN_F32 rhs);
 DN_API DN_M4         DN_M4_MulF                                  (DN_M4 lhs, DN_F32 rhs);
 DN_API DN_M4         DN_M4_DivF                                  (DN_M4 lhs, DN_F32 rhs);
-#if !defined(DN_NO_FSTR8)
-DN_API DN_FStr8<256> DN_M4_ColumnMajorString                     (DN_M4 mat);
-#endif
+DN_API DN_Str8x256   DN_M4_ColumnMajorString                     (DN_M4 mat);
 #endif // !defined(DN_NO_M4)
 // NOTE: DN_M2x3 ///////////////////////////////////////////////////////////////////////////////////
 DN_API bool          operator==                                  (DN_M2x3 const &lhs, DN_M2x3 const &rhs);

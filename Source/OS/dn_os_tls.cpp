@@ -38,8 +38,8 @@ DN_API void DN_OS_TLSInit(DN_OSTLS *tls, DN_OSTLSInitArgs args)
   for (DN_ForItCArray(it, DN_Arena, tls->arenas)) {
     DN_Arena *arena = it.data;
     switch (DN_CAST(DN_OSTLSArena) it.index) {
-      default:                      *arena = DN_Arena_InitFromOSVMem(reserve, commit, DN_ArenaFlags_AllocCanLeak | DN_ArenaFlags_NoAllocTrack); break;
-      case DN_OSTLSArena_ErrorSink: *arena = DN_Arena_InitFromOSVMem(err_sink_reserve, err_sink_commit, DN_ArenaFlags_AllocCanLeak | DN_ArenaFlags_NoAllocTrack); break;
+      default:                      *arena = DN_Arena_FromVMem(reserve, commit, DN_ArenaFlags_AllocCanLeak | DN_ArenaFlags_NoAllocTrack); break;
+      case DN_OSTLSArena_ErrorSink: *arena = DN_Arena_FromVMem(err_sink_reserve, err_sink_commit, DN_ArenaFlags_AllocCanLeak | DN_ArenaFlags_NoAllocTrack); break;
       case DN_OSTLSArena_Count:     DN_InvalidCodePath; break;
     }
   }
@@ -166,7 +166,7 @@ DN_API DN_OSErrSink *DN_OS_ErrSinkBegin_(DN_OSErrSinkMode mode, DN_CallSite call
   DN_USize    arena_pos = DN_Arena_Pos(result->arena);
 
   if (tls->err_sink.stack_size == DN_ArrayCountU(err->stack)) {
-    DN_Str8Builder builder = DN_Str8Builder_InitFromTLS();
+    DN_Str8Builder builder = DN_Str8Builder_FromTLS();
     DN_USize       counter = 0;
     for (DN_ForItSize(it, DN_OSErrSinkNode, err->stack, err->stack_size)) {
       DN_MSVC_WARNING_PUSH
@@ -222,9 +222,9 @@ DN_API DN_OSErrSinkMsg *DN_OS_ErrSinkEnd(DN_Arena *arena, DN_OSErrSink *err)
   DN_OSErrSinkMsg  *prev = nullptr;
   for (DN_OSErrSinkMsg *it = node->msg_sentinel->next; it != node->msg_sentinel; it = it->next) {
     DN_OSErrSinkMsg *entry = DN_Arena_New(arena, DN_OSErrSinkMsg, DN_ZeroMem_Yes);
-    entry->msg           = DN_Str8_Copy(arena, it->msg);
-    entry->call_site     = it->call_site;
-    entry->error_code    = it->error_code;
+    entry->msg             = DN_Str8_FromStr8(arena, it->msg);
+    entry->call_site       = it->call_site;
+    entry->error_code      = it->error_code;
     if (!result)
       result = entry; // Assign first entry if we haven't yet
     if (prev)
@@ -280,7 +280,7 @@ DN_API DN_Str8 DN_OS_ErrSinkEndStr8(DN_Arena *arena, DN_OSErrSink *err)
 
   // NOTE: Walk the list and allocate it onto the user's arena
   DN_OSTLSTMem      tmem    = DN_OS_TLSPushTMem(arena);
-  DN_Str8Builder  builder = DN_Str8Builder_InitFromTLS();
+  DN_Str8Builder  builder = DN_Str8Builder_FromTLS();
   DN_OSErrSinkNode *node    = err->stack + (err->stack_size - 1);
   DN_OS_ErrSinkAddMsgToStr8Builder_(&builder, node->msg_sentinel->next, node->msg_sentinel);
 
@@ -310,7 +310,7 @@ DN_API bool DN_OS_ErrSinkEndAndLogError_(DN_OSErrSink *err, DN_CallSite call_sit
   if (!msg)
     return false;
 
-  DN_Str8Builder builder = DN_Str8Builder_InitFromTLS();
+  DN_Str8Builder builder = DN_Str8Builder_FromTLS();
   if (DN_Str8_HasData(err_msg)) {
     DN_Str8Builder_AppendRef(&builder, err_msg);
     DN_Str8Builder_AppendRef(&builder, DN_STR8(":"));
@@ -333,7 +333,7 @@ DN_API bool DN_OS_ErrSinkEndAndLogError_(DN_OSErrSink *err, DN_CallSite call_sit
 DN_API bool DN_OS_ErrSinkEndAndLogErrorFV_(DN_OSErrSink *err, DN_CallSite call_site, DN_FMT_ATTRIB char const *fmt, va_list args)
 {
   DN_OSTLSTMem tmem   = DN_OS_TLSTMem(nullptr);
-  DN_Str8    log    = DN_Str8_InitFV(tmem.arena, fmt, args);
+  DN_Str8    log    = DN_Str8_FromFV(tmem.arena, fmt, args);
   bool       result = DN_OS_ErrSinkEndAndLogError_(err, call_site, log);
   return result;
 }
@@ -343,8 +343,8 @@ DN_API bool DN_OS_ErrSinkEndAndLogErrorF_(DN_OSErrSink *err, DN_CallSite call_si
   va_list args;
   va_start(args, fmt);
   DN_OSTLSTMem tmem   = DN_OS_TLSTMem(nullptr);
-  DN_Str8    log    = DN_Str8_InitFV(tmem.arena, fmt, args);
-  bool       result = DN_OS_ErrSinkEndAndLogError_(err, call_site, log);
+  DN_Str8      log    = DN_Str8_FromFV(tmem.arena, fmt, args);
+  bool         result = DN_OS_ErrSinkEndAndLogError_(err, call_site, log);
   va_end(args);
   return result;
 }
@@ -375,7 +375,7 @@ DN_API void DN_OS_ErrSinkAppendFV_(DN_OSErrSink *err, DN_U32 error_code, DN_FMT_
 
   DN_OSErrSinkMsg *msg = DN_Arena_New(err->arena, DN_OSErrSinkMsg, DN_ZeroMem_Yes);
   if (DN_Check(msg)) {
-    msg->msg        = DN_Str8_InitFV(err->arena, fmt, args);
+    msg->msg        = DN_Str8_FromFV(err->arena, fmt, args);
     msg->error_code = error_code;
     msg->call_site  = DN_OS_TLSGet()->call_site;
     DN_DLList_Prepend(node->msg_sentinel, msg);

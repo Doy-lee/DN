@@ -112,7 +112,7 @@ DN_API void DN_BinPack_Str8FromArena(DN_BinPack *pack, DN_Arena *arena, DN_BinPa
     DN_Str8Builder_AppendBytesCopy(&pack->writer, string->data, string->size);
   } else {
     DN_Str8 src = DN_Str8_Slice(pack->read, pack->read_index, string->size);
-    *string     = DN_Str8_Copy(arena, src);
+    *string     = DN_Str8_FromStr8(arena, src);
     pack->read_index += src.size;
   }
 }
@@ -125,19 +125,6 @@ DN_API void DN_BinPack_Str8FromPool(DN_BinPack *pack, DN_Pool *pool, DN_BinPackM
   } else {
     DN_Str8 src = DN_Str8_Slice(pack->read, pack->read_index, string->size);
     *string     = DN_Pool_AllocStr8Copy(pool, src);
-    pack->read_index += src.size;
-  }
-}
-
-template <DN_USize N>
-DN_API void DN_BinPack_FStr8(DN_BinPack *pack, DN_BinPackMode mode, DN_FStr8<N> *string)
-{
-  DN_BinPack_VarInt_(pack, mode, &string->size, sizeof(string->size));
-  if (mode == DN_BinPackMode_Serialise) {
-    DN_Str8Builder_AppendBytesCopy(&pack->writer, string->data, string->size);
-  } else {
-    DN_Str8 src = DN_Str8_Slice(pack->read, pack->read_index, string->size);
-    *string     = DN_FStr8_InitF<N>("%.*s", DN_STR_FMT(src));
     pack->read_index += src.size;
   }
 }

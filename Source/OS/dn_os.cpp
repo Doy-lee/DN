@@ -111,9 +111,9 @@ DN_API void DN_OS_Init(DN_OSCore *os, DN_OSInitArgs *args)
 
   {
     #if defined(DN_PLATFORM_EMSCRIPTEN)
-    os->arena = DN_Arena_InitFromOSHeap(DN_Megabytes(1), DN_ArenaFlags_NoAllocTrack);
+    os->arena = DN_Arena_FromHeap(DN_Megabytes(1), DN_ArenaFlags_NoAllocTrack);
     #else
-    os->arena = DN_Arena_InitFromOSVMem(DN_Megabytes(1), DN_Kilobytes(4), DN_ArenaFlags_NoAllocTrack);
+    os->arena = DN_Arena_FromVMem(DN_Megabytes(1), DN_Kilobytes(4), DN_ArenaFlags_NoAllocTrack);
     #endif
 
     #if defined(DN_PLATFORM_WIN32)
@@ -298,8 +298,8 @@ DN_API DN_Str8 DN_OS_EXEDir(DN_Arena *arena)
   DN_OSTLSTMem               tmem         = DN_OS_TLSTMem(arena);
   DN_Str8                  exe_path     = DN_OS_EXEPath(tmem.arena);
   DN_Str8                  separators[] = {DN_STR8("/"), DN_STR8("\\")};
-  DN_Str8BinarySplitResult split        = DN_Str8_BinarySplitLastArray(exe_path, separators, DN_ArrayCountU(separators));
-  result                                = DN_Str8_Copy(arena, split.lhs);
+  DN_Str8BSplitResult split        = DN_Str8_BSplitLastArray(exe_path, separators, DN_ArrayCountU(separators));
+  result                                = DN_Str8_FromStr8(arena, split.lhs);
   return result;
 }
 
@@ -463,7 +463,7 @@ DN_API DN_Str8 DN_OS_ReadAll(DN_Arena *arena, DN_Str8 path, DN_OSErrSink *error)
   result                   = DN_Str8_Alloc(arena, path_info.size, DN_ZeroMem_No);
   if (!DN_Str8_HasData(result)) {
     DN_OSTLSTMem tmem             = DN_OS_TLSTMem(nullptr);
-    DN_Str8      buffer_size_str8 = DN_CVT_U64ToBytesStr8AutoFromTLS(path_info.size);
+    DN_Str8      buffer_size_str8 = DN_CVT_BytesStr8FromU64AutoTLS(path_info.size);
     DN_OS_ErrSinkAppendF(error, 1 /*error_code*/, "Failed to allocate %.*s for reading file '%.*s'", DN_STR_FMT(buffer_size_str8), DN_STR_FMT(path));
     DN_Arena_TempMemEnd(temp_mem);
     result = {};
@@ -493,7 +493,7 @@ DN_API bool DN_OS_WriteAll(DN_Str8 path, DN_Str8 buffer, DN_OSErrSink *error)
 DN_API bool DN_OS_WriteAllFV(DN_Str8 file_path, DN_OSErrSink *error, DN_FMT_ATTRIB char const *fmt, va_list args)
 {
   DN_OSTLSTMem tmem   = DN_OS_TLSTMem(nullptr);
-  DN_Str8    buffer = DN_Str8_InitFV(tmem.arena, fmt, args);
+  DN_Str8    buffer = DN_Str8_FromFV(tmem.arena, fmt, args);
   bool       result = DN_OS_WriteAll(file_path, buffer, error);
   return result;
 }
@@ -510,7 +510,7 @@ DN_API bool DN_OS_WriteAllF(DN_Str8 file_path, DN_OSErrSink *error, DN_FMT_ATTRI
 DN_API bool DN_OS_WriteAllSafe(DN_Str8 path, DN_Str8 buffer, DN_OSErrSink *error)
 {
   DN_OSTLSTMem tmem     = DN_OS_TLSTMem(nullptr);
-  DN_Str8    tmp_path = DN_Str8_InitF(tmem.arena, "%.*s.tmp", DN_STR_FMT(path));
+  DN_Str8      tmp_path = DN_Str8_FromF(tmem.arena, "%.*s.tmp", DN_STR_FMT(path));
   if (!DN_OS_WriteAll(tmp_path, buffer, error))
     return false;
   if (!DN_OS_CopyFile(tmp_path, path, true /*overwrite*/, error))
@@ -523,7 +523,7 @@ DN_API bool DN_OS_WriteAllSafe(DN_Str8 path, DN_Str8 buffer, DN_OSErrSink *error
 DN_API bool DN_OS_WriteAllSafeFV(DN_Str8 path, DN_OSErrSink *error, DN_FMT_ATTRIB char const *fmt, va_list args)
 {
   DN_OSTLSTMem tmem   = DN_OS_TLSTMem(nullptr);
-  DN_Str8    buffer = DN_Str8_InitFV(tmem.arena, fmt, args);
+  DN_Str8    buffer = DN_Str8_FromFV(tmem.arena, fmt, args);
   bool       result = DN_OS_WriteAllSafe(path, buffer, error);
   return result;
 }
@@ -554,8 +554,8 @@ DN_API bool DN_OS_PathAddRef(DN_Arena *arena, DN_OSPath *fs_path, DN_Str8 path)
     fs_path->has_prefix_path_separator = (path.data[0] == '/');
 
   for (;;) {
-    DN_Str8BinarySplitResult delimiter = DN_Str8_BinarySplitArray(path, delimiter_array, DN_ArrayCountU(delimiter_array));
-    for (; delimiter.lhs.data; delimiter = DN_Str8_BinarySplitArray(delimiter.rhs, delimiter_array, DN_ArrayCountU(delimiter_array))) {
+    DN_Str8BSplitResult delimiter = DN_Str8_BSplitArray(path, delimiter_array, DN_ArrayCountU(delimiter_array));
+    for (; delimiter.lhs.data; delimiter = DN_Str8_BSplitArray(delimiter.rhs, delimiter_array, DN_ArrayCountU(delimiter_array))) {
       if (delimiter.lhs.size <= 0)
         continue;
 
@@ -583,7 +583,7 @@ DN_API bool DN_OS_PathAddRef(DN_Arena *arena, DN_OSPath *fs_path, DN_Str8 path)
 
 DN_API bool DN_OS_PathAdd(DN_Arena *arena, DN_OSPath *fs_path, DN_Str8 path)
 {
-  DN_Str8 copy   = DN_Str8_Copy(arena, path);
+  DN_Str8 copy   = DN_Str8_FromStr8(arena, path);
   bool    result = DN_Str8_HasData(copy) ? true : DN_OS_PathAddRef(arena, fs_path, copy);
   return result;
 }
@@ -592,7 +592,7 @@ DN_API bool DN_OS_PathAddF(DN_Arena *arena, DN_OSPath *fs_path, DN_FMT_ATTRIB ch
 {
   va_list args;
   va_start(args, fmt);
-  DN_Str8 path = DN_Str8_InitFV(arena, fmt, args);
+  DN_Str8 path = DN_Str8_FromFV(arena, fmt, args);
   va_end(args);
   bool result = DN_OS_PathAddRef(arena, fs_path, path);
   return result;
@@ -632,7 +632,7 @@ DN_API DN_Str8 DN_OS_PathToF(DN_Arena *arena, DN_Str8 path_separator, DN_FMT_ATT
   DN_OSTLSTMem tmem = DN_OS_TLSTMem(arena);
   va_list    args;
   va_start(args, fmt);
-  DN_Str8 path = DN_Str8_InitFV(tmem.arena, fmt, args);
+  DN_Str8 path = DN_Str8_FromFV(tmem.arena, fmt, args);
   va_end(args);
   DN_Str8 result = DN_OS_PathTo(arena, path, path_separator);
   return result;
@@ -649,7 +649,7 @@ DN_API DN_Str8 DN_OS_PathF(DN_Arena *arena, DN_FMT_ATTRIB char const *fmt, ...)
   DN_OSTLSTMem tmem = DN_OS_TLSTMem(arena);
   va_list    args;
   va_start(args, fmt);
-  DN_Str8 path = DN_Str8_InitFV(tmem.arena, fmt, args);
+  DN_Str8 path = DN_Str8_FromFV(tmem.arena, fmt, args);
   va_end(args);
   DN_Str8 result = DN_OS_Path(arena, path);
   return result;

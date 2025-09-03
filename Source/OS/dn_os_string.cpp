@@ -1,17 +1,31 @@
 #define DN_OS_STRING_CPP
 
-// NOTE: DN_Str8 ///////////////////////////////////////////////////////////////////////////////////
+#include "../dn_base_inc.h"
+#include "../dn_os_inc.h"
 
-DN_API  DN_Str8 DN_Str8_InitFFromFrame(DN_FMT_ATTRIB char const *fmt, ...)
+// NOTE: DN_Str8 ///////////////////////////////////////////////////////////////////////////////////
+DN_API  DN_Str8 DN_Str8_FromFrameF(DN_FMT_ATTRIB char const *fmt, ...)
 {
   va_list args;
   va_start(args, fmt);
-  DN_Str8 result = DN_Str8_InitFV(DN_OS_TLSGet()->frame_arena, fmt, args);
+  DN_Str8 result = DN_Str8_FromFV(DN_OS_TLSGet()->frame_arena, fmt, args);
   va_end(args);
   return result;
 }
 
-DN_API DN_Str8 DN_Str8_InitFFromOSHeap(DN_FMT_ATTRIB char const *fmt, ...)
+DN_API  DN_Str8 DN_Str8_FromFrameFV(DN_FMT_ATTRIB char const *fmt, va_list args)
+{
+  DN_Str8 result = DN_Str8_FromFV(DN_OS_TLSGet()->frame_arena, fmt, args);
+  return result;
+}
+
+DN_API DN_Str8 DN_Str8_FromFrame(DN_USize size, DN_ZeroMem zero_mem)
+{
+  DN_Str8 result = DN_Str8_Alloc(DN_OS_TLSGet()->frame_arena, size, zero_mem);
+  return result;
+}
+
+DN_API DN_Str8 DN_Str8_FromHeapF(DN_FMT_ATTRIB char const *fmt, ...)
 {
   va_list args;
   va_start(args, fmt);
@@ -19,7 +33,7 @@ DN_API DN_Str8 DN_Str8_InitFFromOSHeap(DN_FMT_ATTRIB char const *fmt, ...)
   DN_Str8  result = {};
   DN_USize size   = DN_CStr8_FVSize(fmt, args);
   if (size) {
-    result = DN_Str8_AllocFromOSHeap(size, DN_ZeroMem_No);
+    result = DN_Str8_FromHeap(size, DN_ZeroMem_No);
     if (DN_Str8_HasData(result))
       DN_VSNPrintF(result.data, DN_SaturateCastISizeToInt(size + 1 /*null-terminator*/), fmt, args);
   }
@@ -28,34 +42,7 @@ DN_API DN_Str8 DN_Str8_InitFFromOSHeap(DN_FMT_ATTRIB char const *fmt, ...)
   return result;
 }
 
-DN_API  DN_Str8 DN_Str8_InitFFromTLS(DN_FMT_ATTRIB char const *fmt, ...)
-{
-  va_list args;
-  va_start(args, fmt);
-  DN_Str8 result = DN_Str8_InitFV(DN_OS_TLSTopArena(), fmt, args);
-  va_end(args);
-  return result;
-}
-
-DN_API  DN_Str8 DN_Str8_InitFVFromFrame(DN_FMT_ATTRIB char const *fmt, va_list args)
-{
-  DN_Str8 result = DN_Str8_InitFV(DN_OS_TLSGet()->frame_arena, fmt, args);
-  return result;
-}
-
-DN_API  DN_Str8 DN_Str8_InitFVFromTLS(DN_FMT_ATTRIB char const *fmt, va_list args)
-{
-  DN_Str8 result = DN_Str8_InitFV(DN_OS_TLSTopArena(), fmt, args);
-  return result;
-}
-
-DN_API DN_Str8 DN_Str8_AllocFromFrame(DN_USize size, DN_ZeroMem zero_mem)
-{
-  DN_Str8 result = DN_Str8_Alloc(DN_OS_TLSGet()->frame_arena, size, zero_mem);
-  return result;
-}
-
-DN_API DN_Str8 DN_Str8_AllocFromOSHeap(DN_USize size, DN_ZeroMem zero_mem)
+DN_API DN_Str8 DN_Str8_FromHeap(DN_USize size, DN_ZeroMem zero_mem)
 {
   DN_Str8 result = {};
   result.data    = DN_CAST(char *)DN_OS_MemAlloc(size + 1, zero_mem);
@@ -65,31 +52,47 @@ DN_API DN_Str8 DN_Str8_AllocFromOSHeap(DN_USize size, DN_ZeroMem zero_mem)
   return result;
 }
 
-DN_API DN_Str8 DN_Str8_AllocFromTLS(DN_USize size, DN_ZeroMem zero_mem)
+DN_API  DN_Str8 DN_Str8_FromTLSFV(DN_FMT_ATTRIB char const *fmt, va_list args)
+{
+  DN_Str8 result = DN_Str8_FromFV(DN_OS_TLSTopArena(), fmt, args);
+  return result;
+}
+
+
+DN_API  DN_Str8 DN_Str8_FromTLSF(DN_FMT_ATTRIB char const *fmt, ...)
+{
+  va_list args;
+  va_start(args, fmt);
+  DN_Str8 result = DN_Str8_FromFV(DN_OS_TLSTopArena(), fmt, args);
+  va_end(args);
+  return result;
+}
+
+DN_API DN_Str8 DN_Str8_FromTLS(DN_USize size, DN_ZeroMem zero_mem)
 {
   DN_Str8 result = DN_Str8_Alloc(DN_OS_TLSTopArena(), size, zero_mem);
   return result;
 }
 
-DN_API DN_Str8 DN_Str8_CopyFromFrame(DN_Str8 string)
+DN_API DN_Str8 DN_Str8_FromStr8Frame(DN_Str8 string)
 {
-  DN_Str8 result = DN_Str8_Copy(DN_OS_TLSGet()->frame_arena, string);
+  DN_Str8 result = DN_Str8_FromStr8(DN_OS_TLSGet()->frame_arena, string);
   return result;
 }
 
-DN_API DN_Str8 DN_Str8_CopyFromTLS(DN_Str8 string)
+DN_API DN_Str8 DN_Str8_FromStr8TLS(DN_Str8 string)
 {
-  DN_Str8 result = DN_Str8_Copy(DN_OS_TLSTopArena(), string);
+  DN_Str8 result = DN_Str8_FromStr8(DN_OS_TLSTopArena(), string);
   return result;
 }
 
-DN_API DN_Slice<DN_Str8> DN_Str8_SplitAllocFromFrame(DN_Str8 string, DN_Str8 delimiter, DN_Str8SplitIncludeEmptyStrings mode)
+DN_API DN_Slice<DN_Str8> DN_Str8_SplitFromFrame(DN_Str8 string, DN_Str8 delimiter, DN_Str8SplitIncludeEmptyStrings mode)
 {
   DN_Slice<DN_Str8> result = DN_Str8_SplitAlloc(DN_OS_TLSGet()->frame_arena, string, delimiter, mode);
   return result;
 }
 
-DN_API DN_Slice<DN_Str8> DN_Str8_SplitAllocFromTLS(DN_Str8 string, DN_Str8 delimiter, DN_Str8SplitIncludeEmptyStrings mode)
+DN_API DN_Slice<DN_Str8> DN_Str8_SplitFromTLS(DN_Str8 string, DN_Str8 delimiter, DN_Str8SplitIncludeEmptyStrings mode)
 {
   DN_Slice<DN_Str8> result = DN_Str8_SplitAlloc(DN_OS_TLSTopArena(), string, delimiter, mode);
   return result;
@@ -171,14 +174,14 @@ DN_API DN_Str8DotTruncateResult DN_Str8_DotTruncateMiddleFromTLS(DN_Str8 str8, u
 DN_API DN_Str8 DN_Str8_PadNewLines(DN_Arena *arena, DN_Str8 src, DN_Str8 pad)
 {
   // TODO: Implement this without requiring TLS so it can go into base strings
-  DN_OSTLSTMem     tmem    = DN_OS_TLSPushTMem(arena);
-  DN_Str8Builder builder = DN_Str8Builder_InitFromTLS();
+  DN_OSTLSTMem   tmem    = DN_OS_TLSPushTMem(arena);
+  DN_Str8Builder builder = DN_Str8Builder_FromTLS();
 
-  DN_Str8BinarySplitResult split = DN_Str8_BinarySplit(src, DN_STR8("\n"));
+  DN_Str8BSplitResult split = DN_Str8_BSplit(src, DN_STR8("\n"));
   while (split.lhs.size) {
     DN_Str8Builder_AppendRef(&builder, pad);
     DN_Str8Builder_AppendRef(&builder, split.lhs);
-    split = DN_Str8_BinarySplit(split.rhs, DN_STR8("\n"));
+    split = DN_Str8_BSplit(split.rhs, DN_STR8("\n"));
     if (split.lhs.size)
       DN_Str8Builder_AppendRef(&builder, DN_STR8("\n"));
   }
@@ -233,12 +236,12 @@ DN_API DN_Str8 DN_Str8_Replace(DN_Str8       string,
   // TODO: Implement this without requiring TLS so it can go into base strings
   DN_Str8 result = {};
   if (!DN_Str8_HasData(string) || !DN_Str8_HasData(find) || find.size > string.size || find.size == 0 || string.size == 0) {
-    result = DN_Str8_Copy(arena, string);
+    result = DN_Str8_FromStr8(arena, string);
     return result;
   }
 
-  DN_OSTLSTMem     tmem           = DN_OS_TLSTMem(arena);
-  DN_Str8Builder string_builder = DN_Str8Builder_Init(tmem.arena);
+  DN_OSTLSTMem   tmem           = DN_OS_TLSTMem(arena);
+  DN_Str8Builder string_builder = DN_Str8Builder_FromArena(tmem.arena);
   DN_USize       max            = string.size - find.size;
   DN_USize       head           = start_index;
 
@@ -265,7 +268,7 @@ DN_API DN_Str8 DN_Str8_Replace(DN_Str8       string,
 
   if (string_builder.string_size == 0) {
     // NOTE: No replacement possible, so we just do a full-copy
-    result = DN_Str8_Copy(arena, string);
+    result = DN_Str8_FromStr8(arena, string);
   } else {
     DN_Str8 remainder = DN_Str8_Init(string.data + head, string.size - head);
     DN_Str8Builder_AppendRef(&string_builder, remainder);
@@ -282,7 +285,6 @@ DN_API DN_Str8 DN_Str8_ReplaceInsensitive(DN_Str8 string, DN_Str8 find, DN_Str8 
 }
 
 // NOTE: DN_Str8Builder ////////////////////////////////////////////////////////////////////////////
-
 DN_API DN_Str8 DN_Str8Builder_BuildFromOSHeap(DN_Str8Builder const *builder)
 {
   DN_Str8 result = DN_ZeroInit;

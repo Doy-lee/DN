@@ -13,13 +13,13 @@ DN_API void DN_Core_Init(DN_Core *core, DN_CoreOnInit on_init)
   #if defined(DN_LEAK_TRACKING)
   // NOTE: Setup the allocation table with allocation tracking turned off on
   // the arena we're using to initialise the table.
-  core->alloc_table_arena = DN_Arena_InitFromOSVMem(DN_Megabytes(1), DN_Kilobytes(512), DN_ArenaFlags_NoAllocTrack | DN_ArenaFlags_AllocCanLeak);
+  core->alloc_table_arena = DN_Arena_FromVMem(DN_Megabytes(1), DN_Kilobytes(512), DN_ArenaFlags_NoAllocTrack | DN_ArenaFlags_AllocCanLeak);
   core->alloc_table       = DN_DSMap_Init<DN_DebugAlloc>(&core->alloc_table_arena, 4096, DN_DSMapFlags_Nil);
   #endif
 
   // NOTE: Print out init features ///////////////////////////////////////////////////////////////
   DN_OSTLSTMem   tmem    = DN_OS_TLSPushTMem(nullptr);
-  DN_Str8Builder builder = DN_Str8Builder_Init(tmem.arena);
+  DN_Str8Builder builder = DN_Str8Builder_FromArena(tmem.arena);
   if (on_init & DN_CoreOnInit_LogLibFeatures) {
     DN_Str8Builder_AppendRef(&builder, DN_STR8("DN initialised:\n"));
 
