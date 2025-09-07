@@ -31,7 +31,7 @@ enum DN_NET2WSType
 
 struct DN_NET2CurlConn
 {
-  struct CURL       *curl;
+  void *curl;
   struct curl_slist *curl_slist;
 };
 
@@ -134,7 +134,7 @@ struct DN_NET2Core
   DN_OSThread             curl_thread;
 
   // NOTE: Networking thread only
-  struct CURLM           *curlm;
+  void                   *curlm;
   DN_NET2RequestInternal *http_list;
   DN_NET2RequestInternal *ws_list;
 };

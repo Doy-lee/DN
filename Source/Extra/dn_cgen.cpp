@@ -283,7 +283,7 @@ static bool DN_CGen_GatherTables_(DN_CGen *cgen, DN_OSErrSink *err)
   return result;
 }
 
-DN_API DN_CGen DN_CGen_InitFilesArgV(int argc, char const **argv, DN_OSErrSink *err)
+DN_API DN_CGen DN_CGen_FromFilesArgV(int argc, char const **argv, DN_OSErrSink *err)
 {
   DN_CGen result   = {};
   result.arena     = MD_ArenaAlloc();
@@ -376,8 +376,8 @@ DN_API void DN_CGen_LogF(MD_MessageKind kind, MD_Node *node, DN_OSErrSink *err, 
   if (!err)
     return;
 
-  DN_OSTLSTMem     tmem    = DN_OS_TLSPushTMem(nullptr);
-  DN_Str8Builder builder = DN_Str8Builder_InitFromTLS();
+  DN_OSTLSTMem   tmem    = DN_OS_TLSPushTMem(nullptr);
+  DN_Str8Builder builder = DN_Str8Builder_FromTLS();
 
   MD_String8 kind_string = MD_StringFromMessageKind(kind);
   MD_CodeLoc loc         = MD_CodeLocFromNode(node);
@@ -972,7 +972,7 @@ DN_API void DN_CGen_EmitCodeForTables(DN_CGen *cgen, DN_CGenEmit emit, DN_CppFil
                 cpp_label_str8_padding = 1 + it.table->headers[cpp_label.index].longest_string - cpp_label.column.string.size;
               }
 
-              DN_Str8Builder builder = DN_Str8Builder_InitFromTLS();
+              DN_Str8Builder builder = DN_Str8Builder_FromTLS();
               // NOTE: row
               DN_Str8Builder_AppendF(&builder, "{%2d, ", row_index);
 
@@ -1092,7 +1092,7 @@ DN_API void DN_CGen_EmitCodeForTables(DN_CGen *cgen, DN_CGenEmit emit, DN_CppFil
             fields         = DN_Str8_FromF(tmem.arena, "g_%.*s_type_fields", DN_STR_FMT(type_name));
           }
 
-          DN_Str8Builder builder = DN_Str8Builder_InitFromTLS();
+          DN_Str8Builder builder = DN_Str8Builder_FromTLS();
 
           // NOTE: name
           DN_Str8Builder_AppendF(&builder, "{DN_STR8(\"%.*s\"),%*s", DN_STR_FMT(type_name), name_padding, "");

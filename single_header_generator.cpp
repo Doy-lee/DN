@@ -32,7 +32,7 @@ struct File
 static void AppendCppFileLineByLine(DN_Str8Builder *dest, DN_Str8 cpp_path)
 {
   DN_OSErrSink *err    = DN_OS_ErrSinkBeginDefault();
-  DN_Str8       buffer = DN_OS_ReadAllFromTLS(cpp_path, err);
+  DN_Str8       buffer = DN_OS_FileReadAllTLS(cpp_path, err);
   DN_OS_ErrSinkEndAndExitIfErrorF(err, -1, "Failed to load file from '%S' for appending", cpp_path);
 
   for (DN_Str8 inc_walker = buffer;;) {
@@ -90,7 +90,7 @@ int main(int argc, char **argv)
 
   DN_Str8 dn_root_dir = DN_Str8_FromCStr8(argv[1]);
   DN_Str8 output_dir  = DN_Str8_FromCStr8(argv[2]);
-  if (!DN_OS_MakeDir(output_dir)) {
+  if (!DN_OS_PathMakeDir(output_dir)) {
     DN_OS_PrintErrF("Failed to make requested output directory: %S", output_dir);
     return -1;
   }
@@ -115,7 +115,7 @@ int main(int argc, char **argv)
       DN_Str8 path = DN_OS_PathFFromTLS("%S/%S", dn_root_dir, it.data->file_name);
       {
         DN_OSErrSink *err         = DN_OS_ErrSinkBeginDefault();
-        DN_Str8       file_buffer = DN_OS_ReadAllFromTLS(path, err);
+        DN_Str8       file_buffer = DN_OS_FileReadAllTLS(path, err);
         DN_OS_ErrSinkEndAndExitIfErrorF(err, -1, "Failed to load file");
 
         // NOTE: Walk the top-level dn_*_inc.[h|cpp] files
@@ -173,7 +173,7 @@ int main(int argc, char **argv)
     DN_Str8       buffer             = DN_Str8_TrimWhitespaceAround(DN_Str8Builder_BuildFromTLS(&builder));
     DN_Str8       single_header_path = DN_OS_PathFFromTLS("%S/dn_single_header.%S", output_dir, suffix);
     DN_OSErrSink *err                = DN_OS_ErrSinkBeginDefault();
-    DN_OS_WriteAllSafe(single_header_path, buffer, err);
+    DN_OS_FileWriteAllSafe(single_header_path, buffer, err);
     DN_OS_ErrSinkEndAndExitIfErrorF(err, -1, "Failed to write Single header file '%S'", single_header_path);
   }
 }

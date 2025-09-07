@@ -30,7 +30,7 @@ static DN_NET2Response DN_NET2_WaitForAnyResponse(DN_NET2Core *net, DN_Arena *ar
       result.http_status                      = response->http_status;
       result.body                             = DN_Str8Builder_Build(&response->body, arena);
       if (response->error.size)
-        result.error = DN_Str8_Copy(arena, response->error);
+        result.error = DN_Str8_FromStr8(arena, response->error);
 
       // NOTE: Deallocate the memory used in the request
       DN_Arena_PopTo(&request->arena, request->start_response_arena_pos);
@@ -66,7 +66,7 @@ static DN_NET2Response DN_NET2_WaitForResponse(DN_NET2Core *net, DN_NET2Request 
       result.http_status                      = response->http_status;
       result.body                             = DN_Str8Builder_Build(&response->body, arena);
       if (response->error.size)
-        result.error = DN_Str8_Copy(arena, response->error);
+        result.error = DN_Str8_FromStr8(arena, response->error);
 
       // NOTE: Deallocate the memory used in the request
       DN_Arena_PopTo(&request_ptr->arena, request_ptr->start_response_arena_pos);
@@ -130,7 +130,7 @@ static DN_USize DN_NET2_HTTPCallback_(char *payload, DN_USize size, DN_USize cou
 static int32_t DN_NET2_ThreadEntryPoint_(DN_OSThread *thread)
 {
   DN_NET2Core *net = DN_CAST(DN_NET2Core *) thread->user_context;
-  DN_OS_ThreadSetName(DN_FStr8_ToStr8(&net->curl_thread.name));
+  DN_OS_ThreadSetName(DN_Str8_Init(net->curl_thread.name.data, net->curl_thread.name.size));
 
   for (;;) {
     DN_OSTLSTMem tmem = DN_OS_TLSPushTMem(nullptr);
@@ -397,7 +397,7 @@ static void DN_NET2_Init(DN_NET2Core *net, char *ring_base, DN_USize ring_size, 
   DN_DLList_InitArena(net->ws_list, DN_NET2RequestInternal, &net->arena);
   DN_DLList_InitArena(net->done_list, DN_NET2RequestInternal, &net->arena);
 
-  net->curl_thread.name = DN_FStr8_InitF<64>("NET (CURL)");
+  DN_IStr8_AppendF(&net->curl_thread.name, "NET (CURL)");
   DN_OS_ThreadInit(&net->curl_thread, DN_NET2_ThreadEntryPoint_, net);
 }
 
@@ -484,21 +484,21 @@ static DN_NET2Request DN_NET2_DoRequest_(DN_NET2Core *net, DN_Str8 url, DN_Str8 
 
     request->type          = type;
     request->gen           = DN_Max(request->gen + 1, 1);
-    request->url           = DN_Str8_Copy(&request->arena, url);
-    request->method = DN_Str8_Copy(&request->arena, method);
+    request->url           = DN_Str8_FromStr8(&request->arena, url);
+    request->method = DN_Str8_FromStr8(&request->arena, method);
 
     if (args) {
       request->args.flags    = args->flags;
-      request->args.username = DN_Str8_Copy(&request->arena, args->username);
-      request->args.password = DN_Str8_Copy(&request->arena, args->password);
+      request->args.username = DN_Str8_FromStr8(&request->arena, args->username);
+      request->args.password = DN_Str8_FromStr8(&request->arena, args->password);
       if (type == DN_NET2RequestType_HTTP)
-        request->args.payload = DN_Str8_Copy(&request->arena, args->payload);
+        request->args.payload = DN_Str8_FromStr8(&request->arena, args->payload);
 
       request->args.headers = DN_Arena_NewArray(&request->arena, DN_Str8, args->headers_size, DN_ZeroMem_No);
       DN_Assert(request->args.headers);
       if (request->args.headers) {
         for (DN_ForItSize(it, DN_Str8, args->headers, args->headers_size))
-          request->args.headers[it.index] = DN_Str8_Copy(&request->arena, *it.data);
+          request->args.headers[it.index] = DN_Str8_FromStr8(&request->arena, *it.data);
         request->args.headers_size = args->headers_size;
       }
     }

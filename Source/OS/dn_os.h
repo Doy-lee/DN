@@ -431,7 +431,7 @@ DN_API DN_OSMutex                DN_OS_MutexInit                              ()
 DN_API void                      DN_OS_MutexDeinit                            (DN_OSMutex *mutex);
 DN_API void                      DN_OS_MutexLock                              (DN_OSMutex *mutex);
 DN_API void                      DN_OS_MutexUnlock                            (DN_OSMutex *mutex);
-#define DN_OS_MutexScope                                                      (mutex)  DN_DeferLoop(DN_OS_MutexLock(mutex), DN_OS_MutexUnlock(mutex))
+#define                          DN_OS_MutexScope(mutex)                      DN_DeferLoop(DN_OS_MutexLock(mutex), DN_OS_MutexUnlock(mutex))
 
 DN_API DN_OSConditionVariable    DN_OS_ConditionVariableInit                  ();
 DN_API void                      DN_OS_ConditionVariableDeinit                (DN_OSConditionVariable *cv);

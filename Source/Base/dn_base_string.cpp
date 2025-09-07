@@ -1065,13 +1065,19 @@ DN_API DN_Slice<DN_Str8> DN_Str8Builder_BuildSlice(DN_Str8Builder const *builder
   return result;
 }
 
+DN_API DN_Str8 DN_LStr8_AppendFV(char *buf, DN_USize *buf_size, DN_USize buf_max, char const *fmt, va_list args)
+{
+  *buf_size      += DN_VSNPrintF(buf + *buf_size, DN_CAST(int)(buf_max - *buf_size), fmt, args);
+  DN_Str8 result  = DN_Str8_Init(buf, *buf_size);
+  return result;
+}
+
 DN_API DN_Str8 DN_LStr8_AppendF(char *buf, DN_USize *buf_size, DN_USize buf_max, char const *fmt, ...)
 {
   va_list args;
   va_start(args, fmt);
-  *buf_size += DN_VSNPrintF(buf + *buf_size, DN_CAST(int)(buf_max - *buf_size), fmt, args);
+  DN_Str8 result = DN_LStr8_AppendFV(buf, buf_size, buf_max, fmt, args);
   va_end(args);
-  DN_Str8 result = DN_Str8_Init(buf, *buf_size);
   return result;
 }
 

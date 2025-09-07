@@ -191,6 +191,7 @@ DN_API  bool                     operator==                      (DN_Str8 const 
 DN_API  bool                     operator!=                      (DN_Str8 const &lhs, DN_Str8 const &rhs);
 #endif
 
+DN_API DN_Str8                   DN_LStr8_AppendFV                      (char *buf, DN_USize *buf_size, DN_USize buf_max, char const *fmt, va_list args);
 DN_API DN_Str8                   DN_LStr8_AppendF                       (char *buf, DN_USize *buf_size, DN_USize buf_max, char const *fmt, ...);
 #define                          DN_IStr8_AppendF(struct_ptr, fmt, ...) DN_LStr8_AppendF((struct_ptr)->data, &(struct_ptr)->size, DN_ArrayCountU((struct_ptr)->data), fmt, ##__VA_ARGS__)
 #define                          DN_Str8_FromIStr8(struct_ptr)          DN_Str8_Init((struct_ptr)->data, (struct_ptr)->size)
