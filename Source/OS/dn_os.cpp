@@ -1,5 +1,8 @@
 #define DN_OS_CPP
 
+#include "../dn_base_inc.h"
+#include "../dn_os_inc.h"
+
 #if defined(DN_PLATFORM_POSIX)
 #include <sys/sysinfo.h> // get_nprocs
 #include <unistd.h>      // getpagesize
@@ -389,11 +392,9 @@ DN_API uint64_t DN_OS_EstimateTSCPerSecond(uint64_t duration_ms_to_gauge_tsc_fre
   return result;
 }
 
-#if !defined(DN_NO_OS_FILE_API)
-// NOTE: DN_OSPathInfo/File ////////////////////////////////////////////////////////////////////////
-DN_API bool DN_OS_FileIsOlderThan(DN_Str8 file, DN_Str8 check_against)
+DN_API bool DN_OS_PathIsOlderThan(DN_Str8 path, DN_Str8 check_against)
 {
-  DN_OSPathInfo file_info          = DN_OS_PathInfo(file);
+  DN_OSPathInfo file_info          = DN_OS_PathInfo(path);
   DN_OSPathInfo check_against_info = DN_OS_PathInfo(check_against);
   bool          result             = !file_info.exists || file_info.last_write_time_in_s < check_against_info.last_write_time_in_s;
   return result;
@@ -445,44 +446,69 @@ DN_API bool DN_OS_FileWriteF(DN_OSFile *file, DN_OSErrSink *error, DN_FMT_ATTRIB
   return result;
 }
 
-// NOTE: R/W Entire File ///////////////////////////////////////////////////////////////////////////
-DN_API DN_Str8 DN_OS_ReadAll(DN_Arena *arena, DN_Str8 path, DN_OSErrSink *error)
+DN_API DN_Str8 DN_OS_FileReadAll(DN_Allocator alloc_type, void *allocator, DN_Str8 path, DN_OSErrSink *err)
 {
-  DN_Str8 result = {};
-  if (!arena)
-    return result;
-
-  // NOTE: Query file size + allocate buffer /////////////////////////////////////////////////////
+  // NOTE: Query file size
+  DN_Str8       result    = {};
   DN_OSPathInfo path_info = DN_OS_PathInfo(path);
   if (!path_info.exists) {
-    DN_OS_ErrSinkAppendF(error, 1, "File does not exist/could not be queried for reading '%.*s'", DN_STR_FMT(path));
+    DN_OS_ErrSinkAppendF(err, 1, "File does not exist/could not be queried for reading '%.*s'", DN_STR_FMT(path));
     return result;
   }
 
-  DN_ArenaTempMem temp_mem = DN_Arena_TempMemBegin(arena);
-  result                   = DN_Str8_Alloc(arena, path_info.size, DN_ZeroMem_No);
-  if (!DN_Str8_HasData(result)) {
-    DN_OSTLSTMem tmem             = DN_OS_TLSTMem(nullptr);
-    DN_Str8      buffer_size_str8 = DN_CVT_BytesStr8FromU64AutoTLS(path_info.size);
-    DN_OS_ErrSinkAppendF(error, 1 /*error_code*/, "Failed to allocate %.*s for reading file '%.*s'", DN_STR_FMT(buffer_size_str8), DN_STR_FMT(path));
-    DN_Arena_TempMemEnd(temp_mem);
-    result = {};
+  // NOTE: Allocate
+  DN_ArenaTempMem arena_tmp = {};
+  if (alloc_type == DN_Allocator_Arena) {
+    DN_Arena *arena = DN_CAST(DN_Arena *) allocator;
+    arena_tmp       = DN_Arena_TempMemBegin(arena);
+    result          = DN_Str8_Alloc(arena, path_info.size, DN_ZeroMem_No);
+  } else {
+    DN_Pool *pool = DN_CAST(DN_Pool *) allocator;
+    result        = DN_Str8_AllocPool(pool, path_info.size);
+  }
+
+  if (!result.data) {
+    DN_CVTU64Bytes bytes_str = DN_CVT_BytesFromU64Auto(path_info.size);
+    DN_OS_ErrSinkAppendF(err, 1 /*err_code*/, "Failed to allocate %.1f %.*s for reading file '%.*s'", bytes_str.bytes, DN_STR_FMT(bytes_str.suffix), DN_STR_FMT(path));
     return result;
   }
 
-  // NOTE: Read the file from disk ///////////////////////////////////////////////////////////////
-  DN_OSFile     file = DN_OS_FileOpen(path, DN_OSFileOpen_OpenIfExist, DN_OSFileAccess_Read, error);
-  DN_OSFileRead read = DN_OS_FileRead(&file, result.data, result.size, error);
+  // NOTE: Read all
+  DN_OSFile     file = DN_OS_FileOpen(path, DN_OSFileOpen_OpenIfExist, DN_OSFileAccess_Read, err);
+  DN_OSFileRead read = DN_OS_FileRead(&file, result.data, result.size, err);
   if (file.error || !read.success) {
-    DN_Arena_TempMemEnd(temp_mem);
+    if (alloc_type == DN_Allocator_Arena) {
+      DN_Arena_TempMemEnd(arena_tmp);
+    } else {
+      DN_Pool *pool = DN_CAST(DN_Pool *) allocator;
+      DN_Pool_Dealloc(pool, result.data);
+    }
     result = {};
   }
-  DN_OS_FileClose(&file);
 
+  DN_OS_FileClose(&file);
   return result;
 }
 
-DN_API bool DN_OS_WriteAll(DN_Str8 path, DN_Str8 buffer, DN_OSErrSink *error)
+DN_API DN_Str8 DN_OS_FileReadAllArena(DN_Arena *arena, DN_Str8 path, DN_OSErrSink *err)
+{
+  DN_Str8 result = DN_OS_FileReadAll(DN_Allocator_Arena, arena, path, err);
+  return result;
+}
+
+DN_API DN_Str8 DN_OS_FileReadAllPool(DN_Pool *pool, DN_Str8 path, DN_OSErrSink *err)
+{
+  DN_Str8 result = DN_OS_FileReadAll(DN_Allocator_Pool, pool, path, err);
+  return result;
+}
+
+DN_API DN_Str8 DN_OS_FileReadAllTLS(DN_Str8 path, DN_OSErrSink *err)
+{
+  DN_Str8 result = DN_OS_FileReadAll(DN_Allocator_Arena, DN_OS_TLSArena(), path, err);
+  return result;
+}
+
+DN_API bool DN_OS_FileWriteAll(DN_Str8 path, DN_Str8 buffer, DN_OSErrSink *error)
 {
   DN_OSFile file   = DN_OS_FileOpen(path, DN_OSFileOpen_CreateAlways, DN_OSFileAccess_Write, error);
   bool      result = DN_OS_FileWrite(&file, buffer, error);
@@ -490,54 +516,52 @@ DN_API bool DN_OS_WriteAll(DN_Str8 path, DN_Str8 buffer, DN_OSErrSink *error)
   return result;
 }
 
-DN_API bool DN_OS_WriteAllFV(DN_Str8 file_path, DN_OSErrSink *error, DN_FMT_ATTRIB char const *fmt, va_list args)
+DN_API bool DN_OS_FileWriteAllFV(DN_Str8 file_path, DN_OSErrSink *error, DN_FMT_ATTRIB char const *fmt, va_list args)
 {
   DN_OSTLSTMem tmem   = DN_OS_TLSTMem(nullptr);
-  DN_Str8    buffer = DN_Str8_FromFV(tmem.arena, fmt, args);
-  bool       result = DN_OS_WriteAll(file_path, buffer, error);
+  DN_Str8      buffer = DN_Str8_FromFV(tmem.arena, fmt, args);
+  bool         result = DN_OS_FileWriteAll(file_path, buffer, error);
   return result;
 }
 
-DN_API bool DN_OS_WriteAllF(DN_Str8 file_path, DN_OSErrSink *error, DN_FMT_ATTRIB char const *fmt, ...)
+DN_API bool DN_OS_FileWriteAllF(DN_Str8 file_path, DN_OSErrSink *error, DN_FMT_ATTRIB char const *fmt, ...)
 {
   va_list args;
   va_start(args, fmt);
-  bool result = DN_OS_WriteAllFV(file_path, error, fmt, args);
+  bool result = DN_OS_FileWriteAllFV(file_path, error, fmt, args);
   va_end(args);
   return result;
 }
 
-DN_API bool DN_OS_WriteAllSafe(DN_Str8 path, DN_Str8 buffer, DN_OSErrSink *error)
+DN_API bool DN_OS_FileWriteAllSafe(DN_Str8 path, DN_Str8 buffer, DN_OSErrSink *error)
 {
   DN_OSTLSTMem tmem     = DN_OS_TLSTMem(nullptr);
   DN_Str8      tmp_path = DN_Str8_FromF(tmem.arena, "%.*s.tmp", DN_STR_FMT(path));
-  if (!DN_OS_WriteAll(tmp_path, buffer, error))
+  if (!DN_OS_FileWriteAll(tmp_path, buffer, error))
     return false;
-  if (!DN_OS_CopyFile(tmp_path, path, true /*overwrite*/, error))
+  if (!DN_OS_FileCopy(tmp_path, path, true /*overwrite*/, error))
     return false;
   if (!DN_OS_PathDelete(tmp_path))
     return false;
   return true;
 }
 
-DN_API bool DN_OS_WriteAllSafeFV(DN_Str8 path, DN_OSErrSink *error, DN_FMT_ATTRIB char const *fmt, va_list args)
+DN_API bool DN_OS_FileWriteAllSafeFV(DN_Str8 path, DN_OSErrSink *error, DN_FMT_ATTRIB char const *fmt, va_list args)
 {
   DN_OSTLSTMem tmem   = DN_OS_TLSTMem(nullptr);
   DN_Str8    buffer = DN_Str8_FromFV(tmem.arena, fmt, args);
-  bool       result = DN_OS_WriteAllSafe(path, buffer, error);
+  bool       result = DN_OS_FileWriteAllSafe(path, buffer, error);
   return result;
 }
 
-DN_API bool DN_OS_WriteAllSafeF(DN_Str8 path, DN_OSErrSink *error, DN_FMT_ATTRIB char const *fmt, ...)
+DN_API bool DN_OS_FileWriteAllSafeF(DN_Str8 path, DN_OSErrSink *error, DN_FMT_ATTRIB char const *fmt, ...)
 {
   va_list args;
   va_start(args, fmt);
-  bool result = DN_OS_WriteAllSafeFV(path, error, fmt, args);
+  bool result = DN_OS_FileWriteAllSafeFV(path, error, fmt, args);
   return result;
 }
-#endif // !defined(DN_NO_OS_FILE_API)
 
-// NOTE: DN_OSPath /////////////////////////////////////////////////////////////////////////////////
 DN_API bool DN_OS_PathAddRef(DN_Arena *arena, DN_OSPath *fs_path, DN_Str8 path)
 {
   if (!arena || !fs_path || !DN_Str8_HasData(path))
@@ -579,6 +603,18 @@ DN_API bool DN_OS_PathAddRef(DN_Arena *arena, DN_OSPath *fs_path, DN_Str8 path)
   }
 
   return true;
+}
+
+DN_API bool DN_OS_PathAddRefTLS(DN_OSPath *fs_path, DN_Str8 path)
+{
+  bool result = DN_OS_PathAddRef(DN_OS_TLSTopArena(), fs_path, path);
+  return result;
+}
+
+DN_API bool DN_OS_PathAddRefFrame(DN_OSPath *fs_path, DN_Str8 path)
+{
+  bool result = DN_OS_PathAddRef(DN_OS_TLSFrameArena(), fs_path, path);
+  return result;
 }
 
 DN_API bool DN_OS_PathAdd(DN_Arena *arena, DN_OSPath *fs_path, DN_Str8 path)

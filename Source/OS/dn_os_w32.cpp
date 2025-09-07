@@ -298,7 +298,6 @@ DN_API DN_U64 DN_OS_PerfCounterNow()
   return result;
 }
 
-#if !defined(DN_NO_OS_FILE_API)
 static DN_U64 DN_W32_FileTimeToSeconds_(FILETIME const *time)
 {
   ULARGE_INTEGER time_large_int = {};
@@ -308,73 +307,7 @@ static DN_U64 DN_W32_FileTimeToSeconds_(FILETIME const *time)
   return result;
 }
 
-DN_API DN_OSPathInfo DN_OS_PathInfo(DN_Str8 path)
-{
-  DN_OSPathInfo result = {};
-  if (!DN_Str8_HasData(path))
-    return result;
-
-  DN_OSTLSTMem tmem   = DN_OS_TLSTMem(nullptr);
-  DN_Str16     path16 = DN_W32_Str8ToStr16(tmem.arena, path);
-
-  WIN32_FILE_ATTRIBUTE_DATA attrib_data = {};
-  if (!GetFileAttributesExW(path16.data, GetFileExInfoStandard, &attrib_data))
-    return result;
-
-  result.exists                = true;
-  result.create_time_in_s      = DN_W32_FileTimeToSeconds_(&attrib_data.ftCreationTime);
-  result.last_access_time_in_s = DN_W32_FileTimeToSeconds_(&attrib_data.ftLastAccessTime);
-  result.last_write_time_in_s  = DN_W32_FileTimeToSeconds_(&attrib_data.ftLastWriteTime);
-
-  LARGE_INTEGER large_int = {};
-  large_int.u.HighPart    = DN_CAST(int32_t) attrib_data.nFileSizeHigh;
-  large_int.u.LowPart     = attrib_data.nFileSizeLow;
-  result.size             = (DN_U64)large_int.QuadPart;
-
-  if (attrib_data.dwFileAttributes != INVALID_FILE_ATTRIBUTES) {
-    if (attrib_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
-      result.type = DN_OSPathInfoType_Directory;
-    else
-      result.type = DN_OSPathInfoType_File;
-  }
-
-  return result;
-}
-
-DN_API bool DN_OS_PathDelete(DN_Str8 path)
-{
-  bool result = false;
-  if (!DN_Str8_HasData(path))
-    return result;
-
-  DN_OSTLSTMem tmem   = DN_OS_TLSTMem(nullptr);
-  DN_Str16   path16 = DN_W32_Str8ToStr16(tmem.arena, path);
-  if (path16.size) {
-    result = DeleteFileW(path16.data);
-    if (!result)
-      result = RemoveDirectoryW(path16.data);
-  }
-  return result;
-}
-
-DN_API bool DN_OS_FileExists(DN_Str8 path)
-{
-  bool result = false;
-  if (!DN_Str8_HasData(path))
-    return result;
-
-  DN_OSTLSTMem tmem   = DN_OS_TLSTMem(nullptr);
-  DN_Str16   path16 = DN_W32_Str8ToStr16(tmem.arena, path);
-  if (path16.size) {
-    WIN32_FILE_ATTRIBUTE_DATA attrib_data = {};
-    if (GetFileAttributesExW(path16.data, GetFileExInfoStandard, &attrib_data))
-      result = (attrib_data.dwFileAttributes != INVALID_FILE_ATTRIBUTES) &&
-               !(attrib_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY);
-  }
-  return result;
-}
-
-DN_API bool DN_OS_CopyFile(DN_Str8 src, DN_Str8 dest, bool overwrite, DN_OSErrSink *err)
+DN_API bool DN_OS_FileCopy(DN_Str8 src, DN_Str8 dest, bool overwrite, DN_OSErrSink *err)
 {
   bool       result = false;
   DN_OSTLSTMem tmem   = DN_OS_TLSTMem(nullptr);
@@ -397,12 +330,12 @@ DN_API bool DN_OS_CopyFile(DN_Str8 src, DN_Str8 dest, bool overwrite, DN_OSErrSi
   return result;
 }
 
-DN_API bool DN_OS_MoveFile(DN_Str8 src, DN_Str8 dest, bool overwrite, DN_OSErrSink *err)
+DN_API bool DN_OS_FileMove(DN_Str8 src, DN_Str8 dest, bool overwrite, DN_OSErrSink *err)
 {
-  bool       result = false;
+  bool         result = false;
   DN_OSTLSTMem tmem   = DN_OS_TLSTMem(nullptr);
-  DN_Str16   src16  = DN_W32_Str8ToStr16(tmem.arena, src);
-  DN_Str16   dest16 = DN_W32_Str8ToStr16(tmem.arena, dest);
+  DN_Str16     src16  = DN_W32_Str8ToStr16(tmem.arena, src);
+  DN_Str16     dest16 = DN_W32_Str8ToStr16(tmem.arena, dest);
 
   unsigned long flags = MOVEFILE_COPY_ALLOWED;
   if (overwrite)
@@ -412,128 +345,16 @@ DN_API bool DN_OS_MoveFile(DN_Str8 src, DN_Str8 dest, bool overwrite, DN_OSErrSi
   if (!result) {
     DN_W32Error win_error = DN_W32_LastError(tmem.arena);
     DN_OS_ErrSinkAppendF(err,
-                       win_error.code,
-                       "Failed to move file '%.*s' to '%.*s': (%u) %.*s",
-                       DN_STR_FMT(src),
-                       DN_STR_FMT(dest),
-                       win_error.code,
-                       DN_STR_FMT(win_error.msg));
+                         win_error.code,
+                         "Failed to move file '%.*s' to '%.*s': (%u) %.*s",
+                         DN_STR_FMT(src),
+                         DN_STR_FMT(dest),
+                         win_error.code,
+                         DN_STR_FMT(win_error.msg));
   }
   return result;
 }
 
-DN_API bool DN_OS_MakeDir(DN_Str8 path)
-{
-  bool       result = true;
-  DN_OSTLSTMem tmem   = DN_OS_TLSTMem(nullptr);
-  DN_Str16   path16 = DN_W32_Str8ToStr16(tmem.arena, path);
-
-  // NOTE: Go back from the end of the string to all the directories in the
-  // string, and try to create them. Since Win32 API cannot create
-  // intermediate directories that don't exist in a path we need to go back
-  // and record all the directories until we encounter one that exists.
-  //
-  // From that point onwards go forwards and make all the directories
-  // inbetween by null-terminating the string temporarily, creating the
-  // directory and so forth until we reach the end.
-  //
-  // If we find a file at some point in the path we fail out because the
-  // series of directories can not be made if a file exists with the same
-  // name.
-  for (DN_USize index = 0; index < path16.size; index++) {
-    bool    first_char = index == (path16.size - 1);
-    wchar_t ch         = path16.data[index];
-    if (ch == '/' || ch == '\\' || first_char) {
-      wchar_t temp = path16.data[index];
-      if (!first_char)
-        path16.data[index] = 0; // Temporarily null terminate it
-
-      WIN32_FILE_ATTRIBUTE_DATA attrib_data = {};
-      bool                      successful  = GetFileAttributesExW(path16.data, GetFileExInfoStandard, &attrib_data); // Check
-
-      if (successful) {
-        if (attrib_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
-          // NOTE: The directory exists, continue iterating the path
-        } else {
-          // NOTE: There's some kind of file that exists at the path
-          // but it's not a directory. This request to make a
-          // directory is invalid.
-          return false;
-        }
-      } else {
-        // NOTE: There's nothing that exists at this path, we can create
-        // a directory here
-        result |= (CreateDirectoryW(path16.data, nullptr) == 0);
-      }
-
-      if (!first_char)
-        path16.data[index] = temp; // Undo null termination
-    }
-  }
-  return result;
-}
-
-DN_API bool DN_OS_DirExists(DN_Str8 path)
-{
-  bool result = false;
-  if (!DN_Str8_HasData(path))
-    return result;
-
-  DN_OSTLSTMem tmem   = DN_OS_TLSTMem(nullptr);
-  DN_Str16   path16 = DN_W32_Str8ToStr16(tmem.arena, path);
-  if (path16.size) {
-    WIN32_FILE_ATTRIBUTE_DATA attrib_data = {};
-    if (GetFileAttributesExW(path16.data, GetFileExInfoStandard, &attrib_data))
-      result = (attrib_data.dwFileAttributes != INVALID_FILE_ATTRIBUTES) &&
-               (attrib_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY);
-  }
-
-  return result;
-}
-
-DN_API bool DN_OS_DirIterate(DN_Str8 path, DN_OSDirIterator *it)
-{
-  if (!DN_Str8_HasData(path) || !it || path.size <= 0)
-    return false;
-
-  DN_OSTLSTMem             tmem    = DN_OS_TLSTMem(nullptr);
-  DN_W32FolderIteratorW wide_it = {};
-  DN_Str16               path16  = {};
-  if (it->handle) {
-    wide_it.handle = it->handle;
-  } else {
-    bool needs_asterisks = DN_Str8_EndsWith(path, DN_STR8("\\")) ||
-                           DN_Str8_EndsWith(path, DN_STR8("/"));
-    bool has_glob = DN_Str8_EndsWith(path, DN_STR8("\\*")) ||
-                    DN_Str8_EndsWith(path, DN_STR8("/*"));
-
-    DN_Str8 adjusted_path = path;
-    if (!has_glob) {
-      // NOTE: We are missing the glob for enumerating the files, we will
-      // add those characters in this branch, so overwrite the null
-      // character, add the glob and re-null terminate the buffer.
-      if (needs_asterisks)
-        adjusted_path = DN_OS_PathF(tmem.arena, "%.*s*", DN_STR_FMT(path));
-      else
-        adjusted_path = DN_OS_PathF(tmem.arena, "%.*s/*", DN_STR_FMT(path));
-    }
-
-    path16 = DN_W32_Str8ToStr16(tmem.arena, adjusted_path);
-    if (path16.size <= 0) // Conversion error
-      return false;
-  }
-
-  bool result = DN_W32_DirWIterate(path16, &wide_it);
-  it->handle  = wide_it.handle;
-  if (result) {
-    int size      = DN_W32_Str16ToStr8Buffer(wide_it.file_name, it->buffer, DN_ArrayCountU(it->buffer));
-    it->file_name = DN_Str8_Init(it->buffer, size);
-  }
-
-  return result;
-}
-
-// NOTE: R/W Stream API ////////////////////////////////////////////////////////////////////////////
 DN_API DN_OSFile DN_OS_FileOpen(DN_Str8 path, DN_OSFileOpen open_mode, DN_U32 access, DN_OSErrSink *err)
 {
   DN_OSFile result = {};
@@ -680,7 +501,184 @@ DN_API void DN_OS_FileClose(DN_OSFile *file)
   CloseHandle(file->handle);
   *file = {};
 }
-#endif // !defined(DN_NO_OS_FILE_API)
+
+DN_API DN_OSPathInfo DN_OS_PathInfo(DN_Str8 path)
+{
+  DN_OSPathInfo result = {};
+  if (!DN_Str8_HasData(path))
+    return result;
+
+  DN_OSTLSTMem tmem   = DN_OS_TLSTMem(nullptr);
+  DN_Str16     path16 = DN_W32_Str8ToStr16(tmem.arena, path);
+
+  WIN32_FILE_ATTRIBUTE_DATA attrib_data = {};
+  if (!GetFileAttributesExW(path16.data, GetFileExInfoStandard, &attrib_data))
+    return result;
+
+  result.exists                = true;
+  result.create_time_in_s      = DN_W32_FileTimeToSeconds_(&attrib_data.ftCreationTime);
+  result.last_access_time_in_s = DN_W32_FileTimeToSeconds_(&attrib_data.ftLastAccessTime);
+  result.last_write_time_in_s  = DN_W32_FileTimeToSeconds_(&attrib_data.ftLastWriteTime);
+
+  LARGE_INTEGER large_int = {};
+  large_int.u.HighPart    = DN_CAST(int32_t) attrib_data.nFileSizeHigh;
+  large_int.u.LowPart     = attrib_data.nFileSizeLow;
+  result.size             = (DN_U64)large_int.QuadPart;
+
+  if (attrib_data.dwFileAttributes != INVALID_FILE_ATTRIBUTES) {
+    if (attrib_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+      result.type = DN_OSPathInfoType_Directory;
+    else
+      result.type = DN_OSPathInfoType_File;
+  }
+
+  return result;
+}
+
+DN_API bool DN_OS_PathDelete(DN_Str8 path)
+{
+  bool result = false;
+  if (!DN_Str8_HasData(path))
+    return result;
+
+  DN_OSTLSTMem tmem   = DN_OS_TLSTMem(nullptr);
+  DN_Str16   path16 = DN_W32_Str8ToStr16(tmem.arena, path);
+  if (path16.size) {
+    result = DeleteFileW(path16.data);
+    if (!result)
+      result = RemoveDirectoryW(path16.data);
+  }
+  return result;
+}
+
+DN_API bool DN_OS_PathIsFile(DN_Str8 path)
+{
+  bool result = false;
+  if (!DN_Str8_HasData(path))
+    return result;
+
+  DN_OSTLSTMem tmem   = DN_OS_TLSTMem(nullptr);
+  DN_Str16   path16 = DN_W32_Str8ToStr16(tmem.arena, path);
+  if (path16.size) {
+    WIN32_FILE_ATTRIBUTE_DATA attrib_data = {};
+    if (GetFileAttributesExW(path16.data, GetFileExInfoStandard, &attrib_data))
+      result = (attrib_data.dwFileAttributes != INVALID_FILE_ATTRIBUTES) &&
+               !(attrib_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY);
+  }
+  return result;
+}
+
+DN_API bool DN_OS_PathIsDir(DN_Str8 path)
+{
+  bool result = false;
+  if (!DN_Str8_HasData(path))
+    return result;
+
+  DN_OSTLSTMem tmem   = DN_OS_TLSTMem(nullptr);
+  DN_Str16   path16 = DN_W32_Str8ToStr16(tmem.arena, path);
+  if (path16.size) {
+    WIN32_FILE_ATTRIBUTE_DATA attrib_data = {};
+    if (GetFileAttributesExW(path16.data, GetFileExInfoStandard, &attrib_data))
+      result = (attrib_data.dwFileAttributes != INVALID_FILE_ATTRIBUTES) &&
+               (attrib_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY);
+  }
+
+  return result;
+}
+
+DN_API bool DN_OS_PathMakeDir(DN_Str8 path)
+{
+  bool       result = true;
+  DN_OSTLSTMem tmem   = DN_OS_TLSTMem(nullptr);
+  DN_Str16   path16 = DN_W32_Str8ToStr16(tmem.arena, path);
+
+  // NOTE: Go back from the end of the string to all the directories in the
+  // string, and try to create them. Since Win32 API cannot create
+  // intermediate directories that don't exist in a path we need to go back
+  // and record all the directories until we encounter one that exists.
+  //
+  // From that point onwards go forwards and make all the directories
+  // inbetween by null-terminating the string temporarily, creating the
+  // directory and so forth until we reach the end.
+  //
+  // If we find a file at some point in the path we fail out because the
+  // series of directories can not be made if a file exists with the same
+  // name.
+  for (DN_USize index = 0; index < path16.size; index++) {
+    bool    first_char = index == (path16.size - 1);
+    wchar_t ch         = path16.data[index];
+    if (ch == '/' || ch == '\\' || first_char) {
+      wchar_t temp = path16.data[index];
+      if (!first_char)
+        path16.data[index] = 0; // Temporarily null terminate it
+
+      WIN32_FILE_ATTRIBUTE_DATA attrib_data = {};
+      bool                      successful  = GetFileAttributesExW(path16.data, GetFileExInfoStandard, &attrib_data); // Check
+
+      if (successful) {
+        if (attrib_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+          // NOTE: The directory exists, continue iterating the path
+        } else {
+          // NOTE: There's some kind of file that exists at the path
+          // but it's not a directory. This request to make a
+          // directory is invalid.
+          return false;
+        }
+      } else {
+        // NOTE: There's nothing that exists at this path, we can create
+        // a directory here
+        result |= (CreateDirectoryW(path16.data, nullptr) == 0);
+      }
+
+      if (!first_char)
+        path16.data[index] = temp; // Undo null termination
+    }
+  }
+  return result;
+}
+
+DN_API bool DN_OS_PathIterateDir(DN_Str8 path, DN_OSDirIterator *it)
+{
+  if (!DN_Str8_HasData(path) || !it || path.size <= 0)
+    return false;
+
+  DN_OSTLSTMem             tmem    = DN_OS_TLSTMem(nullptr);
+  DN_W32FolderIteratorW wide_it = {};
+  DN_Str16               path16  = {};
+  if (it->handle) {
+    wide_it.handle = it->handle;
+  } else {
+    bool needs_asterisks = DN_Str8_EndsWith(path, DN_STR8("\\")) ||
+                           DN_Str8_EndsWith(path, DN_STR8("/"));
+    bool has_glob = DN_Str8_EndsWith(path, DN_STR8("\\*")) ||
+                    DN_Str8_EndsWith(path, DN_STR8("/*"));
+
+    DN_Str8 adjusted_path = path;
+    if (!has_glob) {
+      // NOTE: We are missing the glob for enumerating the files, we will
+      // add those characters in this branch, so overwrite the null
+      // character, add the glob and re-null terminate the buffer.
+      if (needs_asterisks)
+        adjusted_path = DN_OS_PathF(tmem.arena, "%.*s*", DN_STR_FMT(path));
+      else
+        adjusted_path = DN_OS_PathF(tmem.arena, "%.*s/*", DN_STR_FMT(path));
+    }
+
+    path16 = DN_W32_Str8ToStr16(tmem.arena, adjusted_path);
+    if (path16.size <= 0) // Conversion error
+      return false;
+  }
+
+  bool result = DN_W32_DirWIterate(path16, &wide_it);
+  it->handle  = wide_it.handle;
+  if (result) {
+    int size      = DN_W32_Str16ToStr8Buffer(wide_it.file_name, it->buffer, DN_ArrayCountU(it->buffer));
+    it->file_name = DN_Str8_Init(it->buffer, size);
+  }
+
+  return result;
+}
+
 
 // NOTE: DN_OSExec /////////////////////////////////////////////////////////////////////////////////
 DN_API void DN_OS_Exit(int32_t exit_code)

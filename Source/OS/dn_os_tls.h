@@ -1,6 +1,9 @@
 #if !defined(DN_OS_TLS_H)
 #define DN_OS_TLS_H
 
+#include "../dn_base_inc.h"
+#include "../dn_os_inc.h"
+
 // NOTE: DN_OSErrSink /////////////////////////////////////////////////////////////////////////////
 enum DN_OSErrSinkMode
 {
@@ -87,7 +90,6 @@ struct DN_OSTLSInitArgs
   DN_U64 err_sink_commit;
 };
 
-// NOTE: DN_OSTLS ////////////////////////////////////////////////////////////////////////////////////
 DN_API void              DN_OS_TLSInit                       (DN_OSTLS *tls, DN_OSTLSInitArgs args);
 DN_API void              DN_OS_TLSDeinit                     (DN_OSTLS *tls);
 DN_API DN_OSTLS *        DN_OS_TLSGet                        ();
@@ -99,30 +101,29 @@ DN_API void              DN_OS_TLSPopArena                   ();
 DN_API DN_Arena *        DN_OS_TLSTopArena                   ();
 DN_API void              DN_OS_TLSBeginFrame                 (DN_Arena *frame_arena);
 DN_API DN_Arena *        DN_OS_TLSFrameArena                 ();
-#define                  DN_OS_TLSSaveCallSite do { DN_OS_TLSGet()->call_site = DN_CALL_SITE; } while (0)
-#define                  DN_OS_TLSTMem(...)     DN_OS_TLSGetTMem(__VA_ARGS__, DN_OSTLSPushTMem_No)
-#define                  DN_OS_TLSPushTMem(...) DN_OS_TLSGetTMem(__VA_ARGS__, DN_OSTLSPushTMem_Yes)
+#define                  DN_OS_TLSSaveCallSite               do { DN_OS_TLSGet()->call_site = DN_CALL_SITE; } while (0)
+#define                  DN_OS_TLSTMem(...)                  DN_OS_TLSGetTMem(__VA_ARGS__, DN_OSTLSPushTMem_No)
+#define                  DN_OS_TLSPushTMem(...)              DN_OS_TLSGetTMem(__VA_ARGS__, DN_OSTLSPushTMem_Yes)
 
-// NOTE: DN_OS_ErrSink ////////////////////////////////////////////////////////////////////////////
-DN_API DN_OSErrSink *   DN_OS_ErrSinkBegin_                  (DN_OSErrSinkMode mode, DN_CallSite call_site);
-#define                 DN_OS_ErrSinkBegin(mode)    DN_OS_ErrSinkBegin_(mode, DN_CALL_SITE)
-#define                 DN_OS_ErrSinkBeginDefault() DN_OS_ErrSinkBegin(DN_OSErrSinkMode_Nil)
-DN_API bool             DN_OS_ErrSinkHasError                (DN_OSErrSink *err);
-DN_API DN_OSErrSinkMsg *DN_OS_ErrSinkEnd                     (DN_Arena *arena, DN_OSErrSink *err);
-DN_API DN_Str8          DN_OS_ErrSinkEndStr8                 (DN_Arena *arena, DN_OSErrSink *err);
-DN_API void             DN_OS_ErrSinkEndAndIgnore            (DN_OSErrSink *err);
-DN_API bool             DN_OS_ErrSinkEndAndLogError_         (DN_OSErrSink *err, DN_CallSite call_site, DN_Str8 msg);
-DN_API bool             DN_OS_ErrSinkEndAndLogErrorFV_       (DN_OSErrSink *err, DN_CallSite call_site, DN_FMT_ATTRIB char const *fmt, va_list args);
-DN_API bool             DN_OS_ErrSinkEndAndLogErrorF_        (DN_OSErrSink *err, DN_CallSite call_site, DN_FMT_ATTRIB char const *fmt, ...);
-DN_API void             DN_OS_ErrSinkEndAndExitIfErrorF_     (DN_OSErrSink *err, DN_CallSite call_site, DN_U32 exit_val, DN_FMT_ATTRIB char const *fmt, ...);
-DN_API void             DN_OS_ErrSinkEndAndExitIfErrorFV_    (DN_OSErrSink *err, DN_CallSite call_site, DN_U32 exit_val, DN_FMT_ATTRIB char const *fmt, va_list args);
-DN_API void             DN_OS_ErrSinkAppendFV_               (DN_OSErrSink *err, DN_U32 error_code, DN_FMT_ATTRIB char const *fmt, va_list args);
-DN_API void             DN_OS_ErrSinkAppendF_                (DN_OSErrSink *err, DN_U32 error_code, DN_FMT_ATTRIB char const *fmt, ...);
-#define                 DN_OS_ErrSinkEndAndLogError(err, err_msg)                  DN_OS_ErrSinkEndAndLogError_(err, DN_CALL_SITE, err_msg)
-#define                 DN_OS_ErrSinkEndAndLogErrorFV(err, fmt, args)              DN_OS_ErrSinkEndAndLogErrorFV_(err, DN_CALL_SITE, fmt, args)
-#define                 DN_OS_ErrSinkEndAndLogErrorF(err, fmt, ...)                DN_OS_ErrSinkEndAndLogErrorF_(err, DN_CALL_SITE, fmt, ##__VA_ARGS__)
-#define                 DN_OS_ErrSinkEndAndExitIfErrorFV(err, exit_val, fmt, args) DN_OS_ErrSinkEndAndExitIfErrorFV_(err, DN_CALL_SITE, exit_val, fmt, args)
-#define                 DN_OS_ErrSinkEndAndExitIfErrorF(err, exit_val, fmt, ...)   DN_OS_ErrSinkEndAndExitIfErrorF_(err, DN_CALL_SITE, exit_val, fmt, ##__VA_ARGS__)
+DN_API DN_OSErrSink *    DN_OS_ErrSinkBegin_                 (DN_OSErrSinkMode mode, DN_CallSite call_site);
+#define                  DN_OS_ErrSinkBegin(mode)            DN_OS_ErrSinkBegin_(mode, DN_CALL_SITE)
+#define                  DN_OS_ErrSinkBeginDefault()         DN_OS_ErrSinkBegin(DN_OSErrSinkMode_Nil)
+DN_API bool              DN_OS_ErrSinkHasError               (DN_OSErrSink *err);
+DN_API DN_OSErrSinkMsg * DN_OS_ErrSinkEnd                    (DN_Arena *arena, DN_OSErrSink *err);
+DN_API DN_Str8           DN_OS_ErrSinkEndStr8                (DN_Arena *arena, DN_OSErrSink *err);
+DN_API void              DN_OS_ErrSinkEndAndIgnore           (DN_OSErrSink *err);
+DN_API bool              DN_OS_ErrSinkEndAndLogError_        (DN_OSErrSink *err, DN_CallSite call_site, DN_Str8 msg);
+DN_API bool              DN_OS_ErrSinkEndAndLogErrorFV_      (DN_OSErrSink *err, DN_CallSite call_site, DN_FMT_ATTRIB char const *fmt, va_list args);
+DN_API bool              DN_OS_ErrSinkEndAndLogErrorF_       (DN_OSErrSink *err, DN_CallSite call_site, DN_FMT_ATTRIB char const *fmt, ...);
+DN_API void              DN_OS_ErrSinkEndAndExitIfErrorF_    (DN_OSErrSink *err, DN_CallSite call_site, DN_U32 exit_val, DN_FMT_ATTRIB char const *fmt, ...);
+DN_API void              DN_OS_ErrSinkEndAndExitIfErrorFV_   (DN_OSErrSink *err, DN_CallSite call_site, DN_U32 exit_val, DN_FMT_ATTRIB char const *fmt, va_list args);
+DN_API void              DN_OS_ErrSinkAppendFV_              (DN_OSErrSink *err, DN_U32 error_code, DN_FMT_ATTRIB char const *fmt, va_list args);
+DN_API void              DN_OS_ErrSinkAppendF_               (DN_OSErrSink *err, DN_U32 error_code, DN_FMT_ATTRIB char const *fmt, ...);
+#define                  DN_OS_ErrSinkEndAndLogError(err, err_msg)                  DN_OS_ErrSinkEndAndLogError_(err, DN_CALL_SITE, err_msg)
+#define                  DN_OS_ErrSinkEndAndLogErrorFV(err, fmt, args)              DN_OS_ErrSinkEndAndLogErrorFV_(err, DN_CALL_SITE, fmt, args)
+#define                  DN_OS_ErrSinkEndAndLogErrorF(err, fmt, ...)                DN_OS_ErrSinkEndAndLogErrorF_(err, DN_CALL_SITE, fmt, ##__VA_ARGS__)
+#define                  DN_OS_ErrSinkEndAndExitIfErrorFV(err, exit_val, fmt, args) DN_OS_ErrSinkEndAndExitIfErrorFV_(err, DN_CALL_SITE, exit_val, fmt, args)
+#define                  DN_OS_ErrSinkEndAndExitIfErrorF(err, exit_val, fmt, ...)   DN_OS_ErrSinkEndAndExitIfErrorF_(err, DN_CALL_SITE, exit_val, fmt, ##__VA_ARGS__)
 
 #define DN_OS_ErrSinkAppendFV(error, error_code, fmt, args) \
   do {                                                      \

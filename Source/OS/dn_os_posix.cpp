@@ -196,7 +196,7 @@ DN_API DN_OSDiskSpace DN_OS_DiskSpace(DN_Str8 path)
 {
   DN_OSTLSTMem   tmem              = DN_OS_TLSPushTMem(nullptr);
   DN_OSDiskSpace result            = {};
-  DN_Str8        path_z_terminated = DN_Str8_Copy(tmem.arena, path);
+  DN_Str8        path_z_terminated = DN_Str8_FromStr8(tmem.arena, path);
 
   struct statvfs info = {};
   if (statvfs(path_z_terminated.data, &info) != 0)
@@ -297,52 +297,7 @@ DN_API DN_U64 DN_OS_PerfCounterNow()
   return result;
 }
 
-#if !defined(DN_NO_OS_FILE_API)
-DN_API DN_OSPathInfo DN_OS_PathInfo(DN_Str8 path)
-{
-  DN_OSPathInfo result = {};
-  if (!DN_Str8_HasData(path))
-    return result;
-
-  struct stat file_stat;
-  if (lstat(path.data, &file_stat) != -1) {
-    result.exists                = true;
-    result.size                  = file_stat.st_size;
-    result.last_access_time_in_s = file_stat.st_atime;
-    result.last_write_time_in_s  = file_stat.st_mtime;
-    // TODO(dn): Seems linux does not support creation time via stat. We
-    // shoddily deal with this.
-    result.create_time_in_s = DN_Min(result.last_access_time_in_s, result.last_write_time_in_s);
-
-    if (S_ISDIR(file_stat.st_mode))
-      result.type = DN_OSPathInfoType_Directory;
-    else if (S_ISREG(file_stat.st_mode))
-      result.type = DN_OSPathInfoType_File;
-  }
-  return result;
-}
-
-DN_API bool DN_OS_PathDelete(DN_Str8 path)
-{
-  bool result = false;
-  if (DN_Str8_HasData(path))
-    result = remove(path.data) == 0;
-  return result;
-}
-
-DN_API bool DN_OS_FileExists(DN_Str8 path)
-{
-  bool result = false;
-  if (!DN_Str8_HasData(path))
-    return result;
-
-  struct stat stat_result;
-  if (lstat(path.data, &stat_result) != -1)
-    result = S_ISREG(stat_result.st_mode) || S_ISLNK(stat_result.st_mode);
-  return result;
-}
-
-DN_API bool DN_OS_CopyFile(DN_Str8 src, DN_Str8 dest, bool overwrite, DN_OSErrSink *error)
+DN_API bool DN_OS_FileCopy(DN_Str8 src, DN_Str8 dest, bool overwrite, DN_OSErrSink *error)
 {
   bool result = false;
   #if defined(DN_PLATFORM_EMSCRIPTEN)
@@ -417,7 +372,7 @@ DN_API bool DN_OS_CopyFile(DN_Str8 src, DN_Str8 dest, bool overwrite, DN_OSErrSi
   return result;
 }
 
-DN_API bool DN_OS_MoveFile(DN_Str8 src, DN_Str8 dest, bool overwrite, DN_OSErrSink *error)
+DN_API bool DN_OS_FileMove(DN_Str8 src, DN_Str8 dest, bool overwrite, DN_OSErrSink *error)
 {
   // See: https://github.com/gingerBill/gb/blob/master/gb.h
   bool result     = false;
@@ -425,7 +380,7 @@ DN_API bool DN_OS_MoveFile(DN_Str8 src, DN_Str8 dest, bool overwrite, DN_OSErrSi
   if (link(src.data, dest.data) == -1) {
     // NOTE: Link can fail if we're trying to link across different volumes
     // so we fall back to a binary directory.
-    file_moved |= DN_OS_CopyFile(src, dest, overwrite, error);
+    file_moved |= DN_OS_FileCopy(src, dest, overwrite, error);
   }
 
   if (file_moved) {
@@ -445,108 +400,6 @@ DN_API bool DN_OS_MoveFile(DN_Str8 src, DN_Str8 dest, bool overwrite, DN_OSErrSi
   return result;
 }
 
-DN_API bool DN_OS_MakeDir(DN_Str8 path)
-{
-  DN_OSTLSTMem tmem   = DN_OS_TLSTMem(nullptr);
-  bool       result = true;
-
-  // TODO(doyle): Implement this without using the path indexes, it's not
-  // necessary. See Windows implementation.
-  DN_USize path_indexes_size = 0;
-  uint16_t path_indexes[64]  = {};
-
-  DN_Str8 copy = DN_Str8_Copy(tmem.arena, path);
-  for (DN_USize index = copy.size - 1; index < copy.size; index--) {
-    bool first_char = index == (copy.size - 1);
-    char ch         = copy.data[index];
-    if (ch == '/' || first_char) {
-      char temp = copy.data[index];
-
-      if (!first_char)
-        copy.data[index] = 0; // Temporarily null terminate it
-
-      bool is_file = DN_OS_FileExists(copy);
-
-      if (!first_char)
-        copy.data[index] = temp; // Undo null termination
-
-      if (is_file) {
-        // NOTE: There's something that exists in at this path, but
-        // it's not a directory. This request to make a directory is
-        // invalid.
-        return false;
-      } else if (DN_OS_DirExists(copy)) {
-        // NOTE: We found a directory, we can stop here and start
-        // building up all the directories that didn't exist up to
-        // this point.
-        break;
-      } else {
-        // NOTE: There's nothing that exists at this path, we can
-        // create a directory here
-        path_indexes[path_indexes_size++] = DN_CAST(uint16_t) index;
-      }
-    }
-  }
-
-  for (DN_USize index = path_indexes_size - 1; result && index < path_indexes_size; index--) {
-    uint16_t path_index = path_indexes[index];
-    char     temp       = copy.data[path_index];
-
-    if (index != 0)
-      copy.data[path_index] = 0;
-    result |= mkdir(copy.data, 0774) == 0;
-    if (index != 0)
-      copy.data[path_index] = temp;
-  }
-  return result;
-}
-
-DN_API bool DN_OS_DirExists(DN_Str8 path)
-{
-  bool result = false;
-  if (!DN_Str8_HasData(path))
-    return result;
-
-  struct stat stat_result;
-  if (lstat(path.data, &stat_result) != -1)
-    result = S_ISDIR(stat_result.st_mode);
-  return result;
-}
-
-DN_API bool DN_OS_DirIterate(DN_Str8 path, DN_OSDirIterator *it)
-{
-  if (!it->handle) {
-    it->handle = opendir(path.data);
-    if (!it->handle)
-      return false;
-  }
-
-  struct dirent *entry;
-  for (;;) {
-    entry = readdir(DN_CAST(DIR *) it->handle);
-    if (entry == NULL)
-      break;
-
-    if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
-      continue;
-
-    DN_USize name_size    = DN_CStr8_Size(entry->d_name);
-    DN_USize clamped_size = DN_Min(sizeof(it->buffer) - 1, name_size);
-    DN_AssertF(name_size == clamped_size, "name: %s, name_size: %zu, clamped_size: %zu", entry->d_name, name_size, clamped_size);
-    DN_Memcpy(it->buffer, entry->d_name, clamped_size);
-    it->buffer[clamped_size] = 0;
-    it->file_name            = DN_Str8_Init(it->buffer, clamped_size);
-    return true;
-  }
-
-  closedir(DN_CAST(DIR *) it->handle);
-  it->handle    = NULL;
-  it->file_name = {};
-  it->buffer[0] = 0;
-  return false;
-}
-
-// NOTE: R/W Stream API ////////////////////////////////////////////////////////////////////////////
 DN_API DN_OSFile DN_OS_FileOpen(DN_Str8         path,
                                 DN_OSFileOpen   open_mode,
                                 DN_OSFileAccess access,
@@ -678,9 +531,152 @@ DN_API void DN_OS_FileClose(DN_OSFile *file)
   fclose(DN_CAST(FILE *) file->handle);
   *file = {};
 }
-#endif // !defined(DN_NO_OS_FILE_API)
 
-// NOTE: DN_OSExec /////////////////////////////////////////////////////////////////////////////////
+DN_API DN_OSPathInfo DN_OS_PathInfo(DN_Str8 path)
+{
+  DN_OSPathInfo result = {};
+  if (!DN_Str8_HasData(path))
+    return result;
+
+  struct stat file_stat;
+  if (lstat(path.data, &file_stat) != -1) {
+    result.exists                = true;
+    result.size                  = file_stat.st_size;
+    result.last_access_time_in_s = file_stat.st_atime;
+    result.last_write_time_in_s  = file_stat.st_mtime;
+    // TODO(dn): Seems linux does not support creation time via stat. We
+    // shoddily deal with this.
+    result.create_time_in_s = DN_Min(result.last_access_time_in_s, result.last_write_time_in_s);
+
+    if (S_ISDIR(file_stat.st_mode))
+      result.type = DN_OSPathInfoType_Directory;
+    else if (S_ISREG(file_stat.st_mode))
+      result.type = DN_OSPathInfoType_File;
+  }
+  return result;
+}
+
+DN_API bool DN_OS_PathDelete(DN_Str8 path)
+{
+  bool result = false;
+  if (DN_Str8_HasData(path))
+    result = remove(path.data) == 0;
+  return result;
+}
+
+DN_API bool DN_OS_PathIsFile(DN_Str8 path)
+{
+  bool result = false;
+  if (!DN_Str8_HasData(path))
+    return result;
+
+  struct stat stat_result;
+  if (lstat(path.data, &stat_result) != -1)
+    result = S_ISREG(stat_result.st_mode) || S_ISLNK(stat_result.st_mode);
+  return result;
+}
+
+DN_API bool DN_OS_PathIsDir(DN_Str8 path)
+{
+  bool result = false;
+  if (!DN_Str8_HasData(path))
+    return result;
+
+  struct stat stat_result;
+  if (lstat(path.data, &stat_result) != -1)
+    result = S_ISDIR(stat_result.st_mode);
+  return result;
+}
+
+DN_API bool DN_OS_PathMakeDir(DN_Str8 path)
+{
+  DN_OSTLSTMem tmem   = DN_OS_TLSTMem(nullptr);
+  bool       result = true;
+
+  // TODO(doyle): Implement this without using the path indexes, it's not
+  // necessary. See Windows implementation.
+  DN_USize path_indexes_size = 0;
+  uint16_t path_indexes[64]  = {};
+
+  DN_Str8 copy = DN_Str8_FromStr8(tmem.arena, path);
+  for (DN_USize index = copy.size - 1; index < copy.size; index--) {
+    bool first_char = index == (copy.size - 1);
+    char ch         = copy.data[index];
+    if (ch == '/' || first_char) {
+      char temp = copy.data[index];
+
+      if (!first_char)
+        copy.data[index] = 0; // Temporarily null terminate it
+
+      bool is_file = DN_OS_PathIsFile(copy);
+
+      if (!first_char)
+        copy.data[index] = temp; // Undo null termination
+
+      if (is_file) {
+        // NOTE: There's something that exists in at this path, but
+        // it's not a directory. This request to make a directory is
+        // invalid.
+        return false;
+      } else if (DN_OS_PathIsDir(copy)) {
+        // NOTE: We found a directory, we can stop here and start
+        // building up all the directories that didn't exist up to
+        // this point.
+        break;
+      } else {
+        // NOTE: There's nothing that exists at this path, we can
+        // create a directory here
+        path_indexes[path_indexes_size++] = DN_CAST(uint16_t) index;
+      }
+    }
+  }
+
+  for (DN_USize index = path_indexes_size - 1; result && index < path_indexes_size; index--) {
+    uint16_t path_index = path_indexes[index];
+    char     temp       = copy.data[path_index];
+
+    if (index != 0)
+      copy.data[path_index] = 0;
+    result |= mkdir(copy.data, 0774) == 0;
+    if (index != 0)
+      copy.data[path_index] = temp;
+  }
+  return result;
+}
+
+DN_API bool DN_OS_PathIterateDir(DN_Str8 path, DN_OSDirIterator *it)
+{
+  if (!it->handle) {
+    it->handle = opendir(path.data);
+    if (!it->handle)
+      return false;
+  }
+
+  struct dirent *entry;
+  for (;;) {
+    entry = readdir(DN_CAST(DIR *) it->handle);
+    if (entry == NULL)
+      break;
+
+    if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+      continue;
+
+    DN_USize name_size    = DN_CStr8_Size(entry->d_name);
+    DN_USize clamped_size = DN_Min(sizeof(it->buffer) - 1, name_size);
+    DN_AssertF(name_size == clamped_size, "name: %s, name_size: %zu, clamped_size: %zu", entry->d_name, name_size, clamped_size);
+    DN_Memcpy(it->buffer, entry->d_name, clamped_size);
+    it->buffer[clamped_size] = 0;
+    it->file_name            = DN_Str8_Init(it->buffer, clamped_size);
+    return true;
+  }
+
+  closedir(DN_CAST(DIR *) it->handle);
+  it->handle    = NULL;
+  it->file_name = {};
+  it->buffer[0] = 0;
+  return false;
+}
+
 DN_API void DN_OS_Exit(int32_t exit_code)
 {
   exit(DN_CAST(int) exit_code);
@@ -914,7 +910,7 @@ DN_API DN_OSExecAsyncHandle DN_OS_ExecAsync(DN_Slice<DN_Str8> cmd_line,
 
     for (DN_ForIndexU(arg_index, cmd_line.size)) {
       DN_Str8 arg     = cmd_line.data[arg_index];
-      argv[arg_index] = DN_Str8_Copy(tmem.arena, arg).data; // NOTE: Copy string to guarantee it is null-terminated
+      argv[arg_index] = DN_Str8_FromStr8(tmem.arena, arg).data; // NOTE: Copy string to guarantee it is null-terminated
     }
 
     // NOTE: Change the working directory if there is one
@@ -932,7 +928,7 @@ DN_API DN_OSExecAsyncHandle DN_OS_ExecAsync(DN_Slice<DN_Str8> cmd_line,
 
     if (args->working_dir.size) {
       prev_working_dir    = get_current_dir_name();
-      DN_Str8 working_dir = DN_Str8_Copy(tmem.arena, args->working_dir);
+      DN_Str8 working_dir = DN_Str8_FromStr8(tmem.arena, args->working_dir);
       if (chdir(working_dir.data) == -1) {
         result.os_error_code = errno;
         DN_OS_ErrSinkAppendF(
@@ -1298,7 +1294,7 @@ DN_API void DN_Posix_ThreadSetName(DN_Str8 name)
   (void)name;
 #else
   DN_OSTLSTMem tmem   = DN_OS_TLSPushTMem(nullptr);
-  DN_Str8      copy   = DN_Str8_Copy(tmem.arena, name);
+  DN_Str8      copy   = DN_Str8_FromStr8(tmem.arena, name);
   pthread_t    thread = pthread_self();
   pthread_setname_np(thread, (char *)copy.data);
 #endif
@@ -1322,7 +1318,7 @@ DN_API DN_POSIXProcSelfStatus DN_Posix_ProcSelfStatus()
 
   if (!file.error) {
     char           buf[256];
-    DN_Str8Builder builder = DN_Str8Builder_InitFromTLS();
+    DN_Str8Builder builder = DN_Str8Builder_FromTLS();
     for (;;) {
       DN_OSFileRead read = DN_OS_FileRead(&file, buf, sizeof(buf), nullptr);
       if (!read.success || read.bytes_read == 0)

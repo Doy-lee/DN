@@ -68,8 +68,8 @@ DN_API DN_CVTU64Str8         DN_CVT_Str8FromU64                           (DN_U6
 DN_API DN_CVTU64Bytes        DN_CVT_BytesFromU64                          (DN_U64 bytes, DN_CVTBytesType type);
 #define                      DN_CVT_BytesFromU64Auto(bytes)               DN_CVT_BytesFromU64(bytes, DN_CVTBytesType_Auto)
 DN_API DN_Str8               DN_CVT_BytesStr8FromU64                      (DN_Arena *arena, DN_U64 bytes, DN_CVTBytesType type);
-#define                      DN_CVT_BytesStr8FromU64Auto(arena, bytes)    DN_CVT_BytesStr8FromU64(arena,                 bytes, DN_CVTBytesType_Auto)
 #define                      DN_CVT_BytesStr8FromTLS(bytes, type)         DN_CVT_BytesStr8FromU64(DN_OS_TLSTopArena(),   bytes, type)
+#define                      DN_CVT_BytesStr8FromU64Auto(arena, bytes)    DN_CVT_BytesStr8FromU64(arena,                 bytes, DN_CVTBytesType_Auto)
 #define                      DN_CVT_BytesStr8FromU64AutoTLS(bytes)        DN_CVT_BytesStr8FromU64(DN_OS_TLSTopArena(),   bytes, DN_CVTBytesType_Auto)
 #define                      DN_CVT_BytesStr8FromU64Frame(bytes, type)    DN_CVT_BytesStr8FromU64(DN_OS_TLSFrameArena(), bytes, type)
 #define                      DN_CVT_BytesStr8FromU64AutoFrame(bytes)      DN_CVT_BytesStr8FromU64(DN_OS_TLSFrameArena(), bytes, DN_CVTBytesType_Auto)

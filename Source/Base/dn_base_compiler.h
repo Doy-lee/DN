@@ -109,9 +109,9 @@
 #endif
 
 #if defined(__cplusplus)
-  #define DN_LITERAL(T) T
+  #define DN_Literal(T) T
 #else
-  #define DN_LITERAL(T) (T)
+  #define DN_Literal(T) (T)
 #endif
 
 // NOTE: Thread Locals /////////////////////////////////////////////////////////////////////////////

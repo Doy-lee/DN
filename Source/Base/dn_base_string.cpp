@@ -68,6 +68,16 @@ DN_API DN_Str8 DN_Str8_Alloc(DN_Arena *arena, DN_USize size, DN_ZeroMem zero_mem
   return result;
 }
 
+DN_API DN_Str8 DN_Str8_AllocPool(DN_Pool *pool, DN_USize size)
+{
+  DN_Str8 result = {};
+  result.data    = DN_Pool_NewArray(pool, char, size + 1);
+  if (result.data)
+    result.size = size;
+  result.data[result.size] = 0;
+  return result;
+}
+
 DN_API DN_Str8 DN_Str8_FromCStr8(char const *src)
 {
   DN_USize size   = DN_CStr8_Size(src);
@@ -81,6 +91,21 @@ DN_API DN_Str8 DN_Str8_FromF(DN_Arena *arena, DN_FMT_ATTRIB char const *fmt, ...
   va_start(va, fmt);
   DN_Str8 result = DN_Str8_FromFV(arena, fmt, va);
   va_end(va);
+  return result;
+}
+
+DN_API DN_Str8 DN_Str8_FromFPool(DN_Pool *pool, DN_FMT_ATTRIB char const *fmt, ...)
+{
+  va_list args;
+  va_start(args, fmt);
+  DN_USize size = DN_CStr8_FVSize(fmt, args);
+  va_end(args);
+
+  DN_Str8 result = {};
+  if (size)
+    result = DN_Str8_AllocPool(pool, size);
+  if (result.data)
+    DN_VSNPrintF(result.data, DN_SaturateCastISizeToInt(size + 1 /*null-terminator*/), fmt, args);
   return result;
 }
 

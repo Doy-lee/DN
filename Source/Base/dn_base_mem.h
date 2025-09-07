@@ -59,6 +59,12 @@ enum DN_MemPage_
   #define DN_ARENA_COMMIT_SIZE DN_Kilobytes(64)
 #endif
 
+enum DN_Allocator
+{
+  DN_Allocator_Arena,
+  DN_Allocator_Pool,
+};
+
 struct DN_ArenaBlock
 {
   DN_ArenaBlock *prev;

@@ -1814,7 +1814,7 @@ static DN_UTCore DN_Tests_OS()
       DN_OSTLSTMem tmem      = DN_OS_TLSTMem(nullptr);
       DN_Str8      os_result = DN_OS_EXEDir(tmem.arena);
       DN_UT_Assert(&result, DN_Str8_HasData(os_result));
-      DN_UT_AssertF(&result, DN_OS_DirExists(os_result), "result(%zu): %.*s", os_result.size, DN_STR_FMT(os_result));
+      DN_UT_AssertF(&result, DN_OS_PathIsDir(os_result), "result(%zu): %.*s", os_result.size, DN_STR_FMT(os_result));
     }
 
     for (DN_UT_Test(&result, "DN_OS_PerfCounterNow")) {
@@ -1844,11 +1844,11 @@ static DN_UTCore DN_Tests_OS()
   DN_UT_LogF(&result, "\nDN_OS Filesystem\n");
   {
     for (DN_UT_Test(&result, "Make directory recursive \"abcd/efgh\"")) {
-      DN_UT_AssertF(&result, DN_OS_MakeDir(DN_STR8("abcd/efgh")), "Failed to make directory");
-      DN_UT_AssertF(&result, DN_OS_DirExists(DN_STR8("abcd")), "Directory was not made");
-      DN_UT_AssertF(&result, DN_OS_DirExists(DN_STR8("abcd/efgh")), "Subdirectory was not made");
-      DN_UT_AssertF(&result, DN_OS_FileExists(DN_STR8("abcd")) == false, "This function should only return true for files");
-      DN_UT_AssertF(&result, DN_OS_FileExists(DN_STR8("abcd/efgh")) == false, "This function should only return true for files");
+      DN_UT_AssertF(&result, DN_OS_PathMakeDir(DN_STR8("abcd/efgh")), "Failed to make directory");
+      DN_UT_AssertF(&result, DN_OS_PathIsDir(DN_STR8("abcd")), "Directory was not made");
+      DN_UT_AssertF(&result, DN_OS_PathIsDir(DN_STR8("abcd/efgh")), "Subdirectory was not made");
+      DN_UT_AssertF(&result, DN_OS_PathIsFile(DN_STR8("abcd")) == false, "This function should only return true for files");
+      DN_UT_AssertF(&result, DN_OS_PathIsFile(DN_STR8("abcd/efgh")) == false, "This function should only return true for files");
       DN_UT_AssertF(&result, DN_OS_PathDelete(DN_STR8("abcd/efgh")), "Failed to delete directory");
       DN_UT_AssertF(&result, DN_OS_PathDelete(DN_STR8("abcd")), "Failed to cleanup directory");
     }
@@ -1856,29 +1856,29 @@ static DN_UTCore DN_Tests_OS()
     for (DN_UT_Test(&result, "File write, read, copy, move and delete")) {
       // NOTE: Write step
       DN_Str8 const SRC_FILE     = DN_STR8("dn_result_file");
-      DN_B32        write_result = DN_OS_WriteAll(SRC_FILE, DN_STR8("1234"), nullptr);
+      DN_B32        write_result = DN_OS_FileWriteAll(SRC_FILE, DN_STR8("1234"), nullptr);
       DN_UT_Assert(&result, write_result);
-      DN_UT_Assert(&result, DN_OS_FileExists(SRC_FILE));
+      DN_UT_Assert(&result, DN_OS_PathIsFile(SRC_FILE));
 
       // NOTE: Read step
       DN_OSTLSTMem tmem      = DN_OS_TLSTMem(nullptr);
-      DN_Str8      read_file = DN_OS_ReadAll(tmem.arena, SRC_FILE, nullptr);
+      DN_Str8      read_file = DN_OS_FileReadAllArena(tmem.arena, SRC_FILE, nullptr);
       DN_UT_AssertF(&result, DN_Str8_HasData(read_file), "Failed to load file");
       DN_UT_AssertF(&result, read_file.size == 4, "File read wrong amount of bytes (%zu)", read_file.size);
       DN_UT_AssertF(&result, DN_Str8_Eq(read_file, DN_STR8("1234")), "Read %zu bytes instead of the expected 4: '%.*s'", read_file.size, DN_STR_FMT(read_file));
 
       // NOTE: Copy step
       DN_Str8 const COPY_FILE   = DN_STR8("dn_result_file_copy");
-      DN_B32        copy_result = DN_OS_CopyFile(SRC_FILE, COPY_FILE, true /*overwrite*/, nullptr);
+      DN_B32        copy_result = DN_OS_FileCopy(SRC_FILE, COPY_FILE, true /*overwrite*/, nullptr);
       DN_UT_Assert(&result, copy_result);
-      DN_UT_Assert(&result, DN_OS_FileExists(COPY_FILE));
+      DN_UT_Assert(&result, DN_OS_PathIsFile(COPY_FILE));
 
       // NOTE: Move step
       DN_Str8 const MOVE_FILE   = DN_STR8("dn_result_file_move");
-      DN_B32        move_result = DN_OS_MoveFile(COPY_FILE, MOVE_FILE, true /*overwrite*/, nullptr);
+      DN_B32        move_result = DN_OS_FileMove(COPY_FILE, MOVE_FILE, true /*overwrite*/, nullptr);
       DN_UT_Assert(&result, move_result);
-      DN_UT_Assert(&result, DN_OS_FileExists(MOVE_FILE));
-      DN_UT_AssertF(&result, DN_OS_FileExists(COPY_FILE) == false, "Moving a file should remove the original");
+      DN_UT_Assert(&result, DN_OS_PathIsFile(MOVE_FILE));
+      DN_UT_AssertF(&result, DN_OS_PathIsFile(COPY_FILE) == false, "Moving a file should remove the original");
 
       // NOTE: Delete step
       DN_B32 delete_src_file   = DN_OS_PathDelete(SRC_FILE);

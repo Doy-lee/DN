@@ -322,7 +322,7 @@ void DN_Docs_Demo()
       // NOTE: My error sinks are thread-local, so the returned 'error' is
       // the same as the 'error' value above.
       DN_OS_ErrSinkBegin(DN_OSErrSinkMode_Nil);
-      DN_OS_WriteAll(DN_STR8("/path/to/another/file"), DN_STR8("123"), error);
+      DN_OS_FileWriteAll(DN_STR8("/path/to/another/file"), DN_STR8("123"), error);
       DN_OS_ErrSinkEndAndLogErrorF(error, "Failed to write to another file");
     }
 
@@ -451,7 +451,7 @@ void DN_Docs_Demo()
   // NOTE: DN_OS_DirIterate /////////////////////////////////////////////////////////////////////
   //
   // Iterate the files within the passed in folder
-  for (DN_OSDirIterator it = {}; DN_OS_DirIterate(DN_STR8("."), &it);) {
+  for (DN_OSDirIterator it = {}; DN_OS_PathIterateDir(DN_STR8("."), &it);) {
     // printf("%.*s\n", DN_STR_FMT(it.file_name));
   }
 
@@ -473,7 +473,7 @@ void DN_Docs_Demo()
   if (0) {
     DN_OSTLSTMem  tmem  = DN_OS_TLSTMem(nullptr);
     DN_OSErrSink *error = DN_OS_ErrSinkBegin(DN_OSErrSinkMode_Nil);
-    DN_OS_WriteAllSafe(/*path*/ DN_STR8("C:/Home/my.txt"), /*buffer*/ DN_STR8("Hello world"), error);
+    DN_OS_FileWriteAllSafe(/*path*/ DN_STR8("C:/Home/my.txt"), /*buffer*/ DN_STR8("Hello world"), error);
     DN_OS_ErrSinkEndAndLogErrorF(error, "");
   }
 

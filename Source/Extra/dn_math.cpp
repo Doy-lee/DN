@@ -1,8 +1,7 @@
 #define DN_MATH_CPP
 
-#if !defined(DN_NO_V2)
-// NOTE: DN_V2 /////////////////////////////////////////////////////////////////////////////////////
-// NOTE: DN_V2I32
+#include "dn_math.h"
+
 DN_API bool operator==(DN_V2I32 lhs, DN_V2I32 rhs)
 {
   bool result = (lhs.x == rhs.x) && (lhs.y == rhs.y);
@@ -159,7 +158,6 @@ DN_API DN_V2I32 DN_V2I32_Abs(DN_V2I32 a)
   return result;
 }
 
-// NOTE: DN_V2U16
 DN_API bool operator!=(DN_V2U16 lhs, DN_V2U16 rhs)
 {
   bool result = !(lhs == rhs);
@@ -292,7 +290,6 @@ DN_API DN_V2U16 &operator+=(DN_V2U16 &lhs, DN_V2U16 rhs)
   return lhs;
 }
 
-// NOTE: DN_V2
 DN_API bool operator!=(DN_V2F32 lhs, DN_V2F32 rhs)
 {
   bool result = !(lhs == rhs);
@@ -329,7 +326,6 @@ DN_API bool operator>(DN_V2F32 lhs, DN_V2F32 rhs)
   return result;
 }
 
-// NOTE: DN_V2F32 operator- //////////////////////////////////////////////////////////////////////////
 DN_API DN_V2F32 operator-(DN_V2F32 lhs)
 {
   DN_V2F32 result = DN_V2F32_From2N(-lhs.x, -lhs.y);
@@ -360,7 +356,6 @@ DN_API DN_V2F32 operator-(DN_V2F32 lhs, int32_t rhs)
   return result;
 }
 
-// NOTE: DN_V2F32 operator+ //////////////////////////////////////////////////////////////////////////
 DN_API DN_V2F32 operator+(DN_V2F32 lhs, DN_V2F32 rhs)
 {
   DN_V2F32 result = DN_V2F32_From2N(lhs.x + rhs.x, lhs.y + rhs.y);
@@ -385,7 +380,6 @@ DN_API DN_V2F32 operator+(DN_V2F32 lhs, int32_t rhs)
   return result;
 }
 
-// NOTE: DN_V2F32 operator* //////////////////////////////////////////////////////////////////////////
 DN_API DN_V2F32 operator*(DN_V2F32 lhs, DN_V2F32 rhs)
 {
   DN_V2F32 result = DN_V2F32_From2N(lhs.x * rhs.x, lhs.y * rhs.y);
@@ -410,7 +404,6 @@ DN_API DN_V2F32 operator*(DN_V2F32 lhs, int32_t rhs)
   return result;
 }
 
-// NOTE: DN_V2F32 operator/ //////////////////////////////////////////////////////////////////////////
 DN_API DN_V2F32 operator/(DN_V2F32 lhs, DN_V2F32 rhs)
 {
   DN_V2F32 result = DN_V2F32_From2N(lhs.x / rhs.x, lhs.y / rhs.y);
@@ -435,7 +428,6 @@ DN_API DN_V2F32 operator/(DN_V2F32 lhs, int32_t rhs)
   return result;
 }
 
-// NOTE: DN_V2F32 operator*/ /////////////////////////////////////////////////////////////////////////
 DN_API DN_V2F32 &operator*=(DN_V2F32 &lhs, DN_V2F32 rhs)
 {
   lhs = lhs * rhs;
@@ -460,7 +452,6 @@ DN_API DN_V2F32 &operator*=(DN_V2F32 &lhs, int32_t rhs)
   return lhs;
 }
 
-// NOTE: DN_V2F32 operator// /////////////////////////////////////////////////////////////////////////
 DN_API DN_V2F32 &operator/=(DN_V2F32 &lhs, DN_V2F32 rhs)
 {
   lhs = lhs / rhs;
@@ -485,7 +476,6 @@ DN_API DN_V2F32 &operator/=(DN_V2F32 &lhs, int32_t rhs)
   return lhs;
 }
 
-// NOTE: DN_V2F32 operator-/ /////////////////////////////////////////////////////////////////////////
 DN_API DN_V2F32 &operator-=(DN_V2F32 &lhs, DN_V2F32 rhs)
 {
   lhs = lhs - rhs;
@@ -510,7 +500,6 @@ DN_API DN_V2F32 &operator-=(DN_V2F32 &lhs, int32_t rhs)
   return lhs;
 }
 
-// NOTE: DN_V2F32 operator+/ /////////////////////////////////////////////////////////////////////////
 DN_API DN_V2F32 &operator+=(DN_V2F32 &lhs, DN_V2F32 rhs)
 {
   lhs = lhs + rhs;
@@ -682,10 +671,7 @@ DN_API DN_F32 DN_V2F32_Area(DN_V2F32 a)
   DN_F32 result = a.w * a.h;
   return result;
 }
-#endif // !defined(DN_NO_V2)
 
-#if !defined(DN_NO_V3)
-// NOTE: DN_V3 /////////////////////////////////////////////////////////////////////////////////////
 DN_API bool operator!=(DN_V3F32 lhs, DN_V3F32 rhs)
 {
   bool result = !(lhs == rhs);
@@ -843,10 +829,7 @@ DN_API DN_V3F32 DN_V3_Normalise(DN_V3F32 a)
   DN_V3F32 result = a / length;
   return result;
 }
-#endif // !defined(DN_NO_V3)
 
-#if !defined(DN_NO_V4)
-// NOTE: DN_V4 /////////////////////////////////////////////////////////////////////////////////////
 DN_API DN_V4F32 DN_V4F32_FromRGBU32(DN_U32 u32)
 {
   DN_U8    r      = (DN_U8)(((u32 << 8) & DN_V4_R_MASK_U32) >> 24);
@@ -979,10 +962,7 @@ DN_API DN_F32 DN_V4F32Dot(DN_V4F32 a, DN_V4F32 b)
   DN_F32 result = (a.x * b.x) + (a.y * b.y) + (a.z * b.z) + (a.w * b.w);
   return result;
 }
-#endif // !defined(DN_NO_V4)
 
-#if !defined(DN_NO_M4)
-// NOTE: DN_M4 /////////////////////////////////////////////////////////////////////////////////////
 DN_API DN_M4 DN_M4_Identity()
 {
   DN_M4 result =
@@ -1231,9 +1211,7 @@ DN_API DN_Str8x256 DN_M4_ColumnMajorString(DN_M4 mat)
 
   return result;
 }
-#endif // !defined(DN_M4)
 
-// NOTE: DN_M2x3 ///////////////////////////////////////////////////////////////////////////////////
 DN_API bool operator==(DN_M2x3 const &lhs, DN_M2x3 const &rhs)
 {
   bool result = DN_Memcmp(lhs.e, rhs.e, sizeof(lhs.e[0]) * DN_ArrayCountU(lhs.e)) == 0;
@@ -1355,8 +1333,6 @@ DN_API DN_V2F32 DN_M2x3_MulV2(DN_M2x3 m1, DN_V2F32 v2)
   return result;
 }
 
-#if !defined(DN_NO_RECT)
-// NOTE: DN_Rect ///////////////////////////////////////////////////////////////////////////////////
 DN_API bool operator==(const DN_Rect &lhs, const DN_Rect &rhs)
 {
   bool result = (lhs.pos == rhs.pos) && (lhs.size == rhs.size);
@@ -1561,9 +1537,6 @@ DN_API DN_V2F32 DN_Rect_BottomRight(DN_Rect rect)
   DN_V2F32 result = DN_Rect_InterpolatedPoint(rect, DN_V2F32_From2N(1, 1));
   return result;
 }
-#endif // !defined(DN_NO_RECT)
-
-// NOTE: Raycast ///////////////////////////////////////////////////////////////////////////////////
 
 DN_API DN_RaycastLineIntersectV2Result DN_Raycast_LineIntersectV2(DN_V2F32 origin_a, DN_V2F32 dir_a, DN_V2F32 origin_b, DN_V2F32 dir_b)
 {
@@ -1596,7 +1569,6 @@ DN_API DN_RaycastLineIntersectV2Result DN_Raycast_LineIntersectV2(DN_V2F32 origi
   return result;
 }
 
-// NOTE: Other /////////////////////////////////////////////////////////////////////////////////////
 DN_API DN_V2F32 DN_Lerp_V2F32(DN_V2F32 a, DN_F32 t, DN_V2F32 b)
 {
   DN_V2F32 result = {};
