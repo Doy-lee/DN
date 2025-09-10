@@ -168,6 +168,7 @@ DN_API DN_V2U16 &    operator+=                                  (DN_V2U16& lhs,
 #define              DN_V2F32_From1N(x)                          DN_Literal(DN_V2F32){{(DN_F32)(x),    (DN_F32)(x)}}
 #define              DN_V2F32_From2N(x, y)                       DN_Literal(DN_V2F32){{(DN_F32)(x),    (DN_F32)(y)}}
 #define              DN_V2F32_FromV2I32(xy)                      DN_Literal(DN_V2F32){{(DN_F32)(xy).x, (DN_F32)(xy).y}}
+#define              DN_V2F32_FromV2U32(xy)                      DN_Literal(DN_V2F32){{(DN_F32)(xy).x, (DN_F32)(xy).y}}
 
 DN_API bool          operator!=                                  (DN_V2F32  lhs, DN_V2F32  rhs);
 DN_API bool          operator==                                  (DN_V2F32  lhs, DN_V2F32  rhs);
