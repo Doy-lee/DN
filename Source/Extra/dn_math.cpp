@@ -832,9 +832,9 @@ DN_API DN_V3F32 DN_V3_Normalise(DN_V3F32 a)
 
 DN_API DN_V4F32 DN_V4F32_FromRGBU32(DN_U32 u32)
 {
-  DN_U8    r      = (DN_U8)((u32 & DN_V4_R_MASK_U32) >> 24);
-  DN_U8    g      = (DN_U8)((u32 & DN_V4_G_MASK_U32) >> 16);
-  DN_U8    b      = (DN_U8)((u32 & DN_V4_B_MASK_U32) >> 8);
+  DN_U8    r      = (DN_U8)(((u32 << 8) & DN_V4_R_MASK_U32) >> 24);
+  DN_U8    g      = (DN_U8)(((u32 << 8) & DN_V4_G_MASK_U32) >> 16);
+  DN_U8    b      = (DN_U8)(((u32 << 8) & DN_V4_B_MASK_U32) >> 8);
   DN_V4F32 result = DN_V4F32_FromRGBU8(r, g, b);
   return result;
 }

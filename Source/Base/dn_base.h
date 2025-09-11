@@ -3,7 +3,7 @@
 
 #include "../dn_base_inc.h"
 
-// NOTE: Macros ////////////////////////////////////////////////////////////////////////////////////
+// NOTE: Macros
 #define DN_Stringify(x) #x
 #define DN_TokenCombine2(x, y) x ## y
 #define DN_TokenCombine(x, y) DN_TokenCombine2(x, y)
@@ -29,7 +29,7 @@
 #define DN_IsPowerOfTwo(value)             ((((uintptr_t)(value)) & (((uintptr_t)(value)) - 1)) == 0)
 #define DN_IsPowerOfTwoAligned(value, pot) ((((uintptr_t)value) & (((uintptr_t)pot) - 1)) == 0)
 
-// NOTE: String.h Dependencies /////////////////////////////////////////////////////////////////////
+// NOTE: String.h Dependencies
 #if !defined(DN_Memcpy) || !defined(DN_Memset) || !defined(DN_Memcmp) || !defined(DN_Memmove)
   #include <string.h>
   #if !defined(DN_Memcpy)
@@ -46,7 +46,7 @@
   #endif
 #endif
 
-// NOTE: Math.h Dependencies ///////////////////////////////////////////////////////////////////////
+// NOTE: Math.h Dependencies
 #if !defined(DN_SqrtF32) || !defined(DN_SinF32) || !defined(DN_CosF32) || !defined(DN_TanF32)
   #include <math.h>
   #if !defined(DN_SqrtF32)
@@ -63,7 +63,7 @@
   #endif
 #endif
 
-// NOTE: Math //////////////////////////////////////////////////////////////////////////////////////
+// NOTE: Math
 #define DN_PiF32 3.14159265359f
 
 #define DN_DegreesToRadians(degrees) ((degrees) * (DN_PI / 180.0f))
@@ -82,19 +82,19 @@
     b         = temp; \
   } while (0)
 
-// NOTE: Size //////////////////////////////////////////////////////////////////////////////////////
+// NOTE: Size
 #define DN_SizeOfI(val)       DN_CAST(ptrdiff_t)sizeof(val)
 #define DN_ArrayCountU(array) (sizeof(array)/(sizeof((array)[0])))
 #define DN_ArrayCountI(array) (DN_ISize)DN_ArrayCountU(array)
 #define DN_CharCountU(string) (sizeof(string) - 1)
 
-// NOTE: SI Byte ///////////////////////////////////////////////////////////////////////////////////
+// NOTE: SI Byte
 #define DN_Bytes(val)     ((DN_U64)val)
 #define DN_Kilobytes(val) ((DN_U64)1024 * DN_Bytes(val))
 #define DN_Megabytes(val) ((DN_U64)1024 * DN_Kilobytes(val))
 #define DN_Gigabytes(val) ((DN_U64)1024 * DN_Megabytes(val))
 
-// NOTE: Time //////////////////////////////////////////////////////////////////////////////////////
+// NOTE: Time
 #define DN_SecondsToMs(val)  ((val) * 1000)
 #define DN_MinutesToSec(val) ((val) * 60ULL)
 #define DN_HoursToSec(val)   (DN_MinutesToSec(val)  * 60ULL)
@@ -102,7 +102,7 @@
 #define DN_WeeksToSec(val)   (DN_DaysToSec(val)     *  7ULL)
 #define DN_YearsToSec(val)   (DN_WeeksToSec(val)    * 52ULL)
 
-// NOTE: Debug Break ///////////////////////////////////////////////////////////////////////////////
+// NOTE: Debug Break
 #if !defined(DN_DebugBreak)
   #if defined(NDEBUG)
     #define DN_DebugBreak
@@ -124,7 +124,7 @@
   #endif
 #endif
 
-// NOTE: Byte swaps ////////////////////////////////////////////////////////////////////////////////
+// NOTE: Byte swaps
 #define DN_ByteSwap64(u64) (((((u64) >> 56) & 0xFF) <<  0) | \
                               ((((u64) >> 48) & 0xFF) <<  8) | \
                               ((((u64) >> 40) & 0xFF) << 16) | \
@@ -134,32 +134,7 @@
                               ((((u64) >> 8)  & 0xFF) << 48) | \
                               ((((u64) >> 0)  & 0xFF) << 56))
 
-// NOTE: Defer Macro ///////////////////////////////////////////////////////////////////////////////
-#if defined(__cplusplus)
-template <typename Procedure>
-struct DN_Defer
-{
-  Procedure proc;
-  DN_Defer(Procedure p) : proc(p) {}
-  ~DN_Defer() { proc(); }
-};
-
-struct DN_DeferHelper
-{
-  template <typename Lambda>
-  DN_Defer<Lambda> operator+(Lambda lambda) { return DN_Defer<Lambda>(lambda); };
-};
-
-#define DN_UniqueName(prefix) DN_TokenCombine(prefix, __LINE__)
-#define DN_DEFER              const auto DN_UniqueName(defer_lambda_) = DN_DeferHelper() + [&]()
-#endif // defined(__cplusplus)
-
-#define DN_DeferLoop(begin, end)            \
-  bool DN_UniqueName(once) = (begin, true); \
-  DN_UniqueName(once);                      \
-  end, DN_UniqueName(once) = false
-
-// NOTE: Types /////////////////////////////////////////////////////////////////////////////////////
+// NOTE: Types
 typedef intptr_t  DN_ISize;
 typedef uintptr_t DN_USize;
 
@@ -196,24 +171,22 @@ struct DN_Str8
 {
   char    *data; // The bytes of the string
   DN_USize size; // The number of bytes in the string
-
-  char const *begin() const { return data; }
-  char const *end()   const { return data + size; }
-  char       *begin()       { return data; }
-  char       *end()         { return data + size; }
 };
 
 struct DN_Str16 // A pointer and length style string that holds slices to UTF16 bytes.
 {
   wchar_t *data; // The UTF16 bytes of the string
   DN_USize size; // The number of characters in the string
+};
 
-  #if defined(__cplusplus)
-  wchar_t const *begin() const { return data; } // Const begin iterator for range-for loops
-  wchar_t const *end() const { return data + size; } // Const end iterator for range-for loops
-  wchar_t *begin() { return data; } // Begin iterator for range-for loops
-  wchar_t *end() { return data + size; } // End iterator for range-for loops
-  #endif
+struct DN_U8x32
+{
+  DN_U8 data[32];
+};
+
+struct DN_U8x64
+{
+  DN_U8 data[64];
 };
 
 template <typename T>
@@ -228,16 +201,42 @@ struct DN_Slice // A pointer and length container of data
   T const *end() const { return data + size; }
 };
 
-// NOTE: DN_CallSite ///////////////////////////////////////////////////////////////////////////////
 struct DN_CallSite
 {
   DN_Str8 file;
   DN_Str8 function;
   DN_U32  line;
 };
+
 #define DN_CALL_SITE DN_CallSite { DN_STR8(__FILE__), DN_STR8(__func__), __LINE__ }
 
-// NOTE: Intrinsics ////////////////////////////////////////////////////////////////////////////////
+// NOTE: Defer Macro
+#if defined(__cplusplus)
+template <typename Procedure>
+struct DN_Defer
+{
+  Procedure proc;
+  DN_Defer(Procedure p) : proc(p) {}
+  ~DN_Defer() { proc(); }
+};
+
+struct DN_DeferHelper
+{
+  template <typename Lambda>
+  DN_Defer<Lambda> operator+(Lambda lambda) { return DN_Defer<Lambda>(lambda); };
+};
+
+#define DN_UniqueName(prefix) DN_TokenCombine(prefix, __LINE__)
+#define DN_DEFER              const auto DN_UniqueName(defer_lambda_) = DN_DeferHelper() + [&]()
+#endif // defined(__cplusplus)
+
+#define DN_DeferLoop(begin, end)            \
+  bool DN_UniqueName(once) = (begin, true); \
+  DN_UniqueName(once);                      \
+  end, DN_UniqueName(once) = false
+
+
+// NOTE: Intrinsics
 // NOTE: DN_AtomicAdd/Exchange return the previous value store in the target
 #if defined(DN_COMPILER_MSVC) || defined(DN_COMPILER_CLANG_CL)
   #include <intrin.h>
