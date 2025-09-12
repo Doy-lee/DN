@@ -49,6 +49,11 @@
 
 #define DN_InvalidCodePathF(fmt, ...) DN_HardAssertF(0, fmt, ##__VA_ARGS__)
 #define DN_InvalidCodePath            DN_InvalidCodePathF("Invalid code path triggered")
+#define DN_StaticAssert(expr)                                                     \
+  DN_GCC_WARNING_PUSH                                                             \
+  DN_GCC_WARNING_DISABLE(-Wunused-local-typedefs)                                 \
+  typedef char DN_TokenCombine(static_assert_dummy__, __LINE__)[(expr) ? 1 : -1]; \
+  DN_GCC_WARNING_POP
 
 #define DN_Check(expr) DN_CheckF(expr, "")
 #if defined(DN_NO_CHECK_BREAK)
