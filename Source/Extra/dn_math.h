@@ -369,5 +369,4 @@ DN_API DN_Rect       DN_RectCut_Cut                              (DN_RectCut rec
 DN_API DN_RaycastLineIntersectV2Result DN_Raycast_LineIntersectV2(DN_V2F32 origin_a, DN_V2F32 dir_a, DN_V2F32 origin_b, DN_V2F32 dir_b);
 DN_API DN_V2F32                        DN_Lerp_V2F32             (DN_V2F32 a, DN_F32 t, DN_V2F32 b);
 DN_API DN_F32                          DN_Lerp_F32               (DN_F32 a, DN_F32 t, DN_F32 b);
-
 #endif // !defined(DN_MATH_H)

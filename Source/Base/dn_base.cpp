@@ -762,3 +762,10 @@ DN_API void DN_ASanUnpoisonMemoryRegion(void const volatile *ptr, DN_USize size)
   (void)size;
 #endif
 }
+
+DN_API DN_F32 DN_EpsilonClampF32(DN_F32 value, DN_F32 target, DN_F32 epsilon)
+{
+  DN_F32 delta  = DN_Abs(target - value);
+  DN_F32 result = (delta < epsilon) ? target : value;
+  return result;
+}

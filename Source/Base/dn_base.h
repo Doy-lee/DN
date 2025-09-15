@@ -489,4 +489,7 @@ DN_API DN_U64          DN_SaturateCastIntToU64    (int val);
 
 DN_API void            DN_ASanPoisonMemoryRegion  (void const volatile *ptr, DN_USize size);
 DN_API void            DN_ASanUnpoisonMemoryRegion(void const volatile *ptr, DN_USize size);
+
+DN_API DN_F32          DN_EpsilonClampF32         (DN_F32 value, DN_F32 target, DN_F32 epsilon);
+
 #endif // !defined(DN_BASE_H)
