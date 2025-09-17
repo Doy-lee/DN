@@ -5,11 +5,7 @@ DN_API void DN_Core_Init(DN_Core *core, DN_CoreOnInit on_init)
   DN_Assert(g_dn_os_core_);
   g_dn_core = core;
 
-  // NOTE Initialise fields //////////////////////////////////////////////////////////////////////
-  #if !defined(DN_NO_PROFILER)
-  core->profiler = &core->profiler_default_instance;
-  #endif
-
+  // NOTE Initialise fields
   #if defined(DN_LEAK_TRACKING)
   // NOTE: Setup the allocation table with allocation tracking turned off on
   // the arena we're using to initialise the table.
@@ -42,10 +38,6 @@ DN_API void DN_Core_Init(DN_Core *core, DN_CoreOnInit on_init)
 
     #if defined(DN_LEAK_TRACKING)
     DN_Str8Builder_AppendRef(&builder, DN_STR8("  Allocation leak tracing\n"));
-    #endif
-
-    #if !defined(DN_NO_PROFILER)
-    DN_Str8Builder_AppendRef(&builder, DN_STR8("  TSC profiler available\n"));
     #endif
 
     #if defined(DN_PLATFORM_EMSCRIPTEN) || defined(DN_PLATFORM_POSIX)
@@ -90,11 +82,3 @@ DN_API void DN_Core_BeginFrame()
 {
   DN_AtomicSetValue64(&g_dn_os_core_->mem_allocs_frame, 0);
 }
-
-#if !defined(DN_NO_PROFILER)
-DN_API void DN_Core_SetProfiler(DN_Profiler *profiler)
-{
-  if (profiler)
-    g_dn_core->profiler = profiler;
-}
-#endif

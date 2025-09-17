@@ -3,8 +3,7 @@
 
 #include "../dn_base_inc.h"
 
-// NOTE: DN_StackTrace /////////////////////////////////////////////////////////////////////////////
-// NOTE: DN_Debug //////////////////////////////////////////////////////////////////////////////////
+// NOTE: DN_Debug
 enum DN_DebugAllocFlag
 {
   DN_DebugAllocFlag_Freed         = 1 << 0,
@@ -26,12 +25,7 @@ static_assert(sizeof(DN_DebugAlloc) == 64 || sizeof(DN_DebugAlloc) == 32, // NOT
               "memory tracking can get expensive. Enforce that there is no "
               "unexpected padding.");
 
-// NOTE: DN_Profiler ///////////////////////////////////////////////////////////////////////////////
-#if !defined(DN_NO_PROFILER)
-#if !defined(DN_PROFILER_ANCHOR_BUFFER_SIZE)
-  #define DN_PROFILER_ANCHOR_BUFFER_SIZE 256
-#endif
-
+// NOTE: DN_Profiler
 struct DN_ProfilerAnchor
 {
   // Inclusive refers to the time spent to complete the function call
@@ -55,47 +49,50 @@ struct DN_ProfilerZone
   DN_U64 elapsed_tsc_at_zone_start;
 };
 
-#if defined(__cplusplus)
-struct DN_ProfilerZoneScope
+struct DN_ProfilerAnchorArray
 {
-  DN_ProfilerZoneScope(DN_Str8 name, DN_U16 anchor_index);
-  ~DN_ProfilerZoneScope();
-  DN_ProfilerZone zone;
+  DN_ProfilerAnchor *data;
+  DN_USize           count;
 };
 
-#define DN_Profiler_ZoneScopeAtIndex(name, anchor_index) auto DN_UniqueName(profile_zone_) = DN_ProfilerZoneScope(DN_STR8(name), anchor_index)
-#define DN_Profiler_ZoneScope(name)                      DN_Profiler_ZoneScopeAtIndex(name, __COUNTER__ + 1)
-#endif
-
-#define DN_Profiler_ZoneBlockIndex(name, index)                                                                                \
-  for (DN_ProfilerZone DN_UniqueName(profile_zone__) = DN_Profiler_BeginZoneAtIndex(name, index), DN_UniqueName(dummy__) = {}; \
-       DN_UniqueName(dummy__).begin_tsc == 0;                                                                                  \
-       DN_Profiler_EndZone(DN_UniqueName(profile_zone__)), DN_UniqueName(dummy__).begin_tsc = 1)
-
-#define DN_Profiler_ZoneBlock(name) DN_Profiler_ZoneBlockIndex(DN_STR8(name), __COUNTER__ + 1)
-
-enum DN_ProfilerAnchorBuffer
+enum DN_ProfilerTSC
 {
-  DN_ProfilerAnchorBuffer_Back,
-  DN_ProfilerAnchorBuffer_Front,
+  DN_ProfilerTSC_RDTSC,
+  DN_ProfilerTSC_OSPerformanceCounter,
 };
 
 struct DN_Profiler
 {
-  DN_ProfilerAnchor anchors[2][DN_PROFILER_ANCHOR_BUFFER_SIZE];
-  DN_U8             active_anchor_buffer;
-  DN_U16            parent_zone;
+  DN_USize           frame_index;
+  DN_ProfilerAnchor *anchors;
+  DN_USize           anchors_count;
+  DN_USize           anchors_per_frame;
+  DN_U16             parent_zone;
+  bool               paused;
+  DN_ProfilerTSC     tsc;
+  DN_U64             tsc_frequency;
+  DN_ProfilerZone    frame_zone;
+  DN_F64             frame_avg_tsc;
 };
 
-DN_API DN_ProfilerAnchor * DN_Profiler_ReadBuffer                  ();
-DN_API DN_ProfilerAnchor * DN_Profiler_WriteBuffer                 ();
-#define                    DN_Profiler_BeginZone(name)             DN_Profiler_BeginZoneAtIndex(DN_STR8(name), __COUNTER__ + 1)
-DN_API DN_ProfilerZone     DN_Profiler_BeginZoneAtIndex            (DN_Str8 name, DN_U16 anchor_index);
-DN_API void                DN_Profiler_EndZone                     (DN_ProfilerZone zone);
-DN_API DN_ProfilerAnchor * DN_Profiler_AnchorBuffer                (DN_ProfilerAnchorBuffer buffer);
-DN_API void                DN_Profiler_SwapAnchorBuffer            ();
-DN_API void                DN_Profiler_Dump                        (DN_U64 tsc_per_second);
-#endif // !defined(DN_NO_PROFILER)
+#define DN_Profiler_ZoneLoop(prof, name, index)                                                                         \
+  DN_ProfilerZone DN_UniqueName(zone_) = DN_Profiler_BeginZone(prof, DN_STR8(name), index), DN_UniqueName(dummy_) = {}; \
+  DN_UniqueName(dummy_).begin_tsc == 0;                                                                                 \
+  DN_Profiler_EndZone(prof, DN_UniqueName(zone_)), DN_UniqueName(dummy_).begin_tsc = 1
+
+#define DN_Profiler_ZoneLoopAuto(prof, name) DN_Profiler_ZoneLoop(prof, name, __COUNTER__ + 1)
+
+DN_API DN_Profiler            DN_Profiler_Init                      (DN_ProfilerAnchor *anchors, DN_USize count, DN_USize anchors_per_frame, DN_ProfilerTSC tsc, DN_U64 tsc_frequency);
+DN_API DN_ProfilerZone        DN_Profiler_BeginZone                 (DN_Profiler *profiler, DN_Str8 name, DN_U16 anchor_index);
+#define                       DN_Profiler_BeginZoneAuto(prof, name) DN_Profiler_BeginZone(prof, DN_STR8(name), __COUNTER__ + 1)
+DN_API void                   DN_Profiler_EndZone                   (DN_Profiler *profiler, DN_ProfilerZone zone);
+DN_API DN_USize               DN_Profiler_FrameCount                (DN_Profiler const *profiler);
+DN_API DN_ProfilerAnchorArray DN_Profiler_FrameAnchorsFromIndex     (DN_Profiler *profiler, DN_USize frame_index);
+DN_API DN_ProfilerAnchorArray DN_Profiler_FrameAnchors              (DN_Profiler *profiler);
+DN_API void                   DN_Profiler_NewFrame                  (DN_Profiler *profiler);
+DN_API void                   DN_Profiler_Dump                      (DN_Profiler *profiler);
+DN_API DN_F64                 DN_Profiler_SecFromTSC                (DN_Profiler *profiler, DN_U64 duration_tsc);
+DN_API DN_F64                 DN_Profiler_MsFromTSC                 (DN_Profiler *profiler, DN_U64 duration_tsc);
 
 
 #if defined(DN_LEAK_TRACKING)

@@ -272,7 +272,7 @@ struct DN_OSCore
   DN_CPUReport                    cpu_report;
   DN_OSTLS                        tls;                      // Thread local storage state for the main thread.
 
-  // NOTE: Logging ///////////////////////////////////////////////////////////////////////////////
+  // NOTE: Logging
   DN_LOGEmitFromTypeFVFunc *      log_callback;             // Set this pointer to override the logging routine
   void *                          log_user_data;            // User pointer passed into 'log_callback'
   bool                            log_to_file;              // Output logs to file as well as standard out
@@ -280,12 +280,12 @@ struct DN_OSCore
   DN_TicketMutex                  log_file_mutex;           // Is locked when instantiating the log_file for the first time
   bool                            log_no_colour;            // Disable colours in the logging output
 
-  // NOTE: OS //////////////////////////////////////////////////////////////////////////////////////
+  // NOTE: OS
   DN_U32                          logical_processor_count;
   DN_U32                          page_size;
   DN_U32                          alloc_granularity;
 
-  // NOTE: Memory ////////////////////////////////////////////////////////////////////////////////
+  // NOTE: Memory
   // Total OS mem allocs in lifetime of program (e.g. malloc, VirtualAlloc, HeapAlloc ...). This
   // only includes allocations routed through the library such as the growing nature of arenas or
   // using the memory allocation routines in the library like DN_OS_MemCommit and so forth.
