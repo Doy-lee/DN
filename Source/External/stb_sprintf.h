@@ -2,6 +2,7 @@
 //  - Adding STBSP__ASAN to STBSP__PUBLICDEC so that MSVC's ASAN does not trigger (https://github.com/nothings/stb/pull/1350)
 //  - Adding __attribute__((no_sanitize("undefined"))) to STBSP__ASAN for CLANG so that UBSAN does not trigger (https://github.com/nothings/stb/pull/1477)
 //  - Adding '%S' for DN_Str8
+//  - Using defined(__wasm64__) to correctly assign stbsp__uintptr to stbsp__uint64 for a 64bit WASM target.
 
 // stb_sprintf - v1.10 - public domain snprintf() implementation
 // originally by Jeff Roberts / RAD Game Tools, 2015/10/20
@@ -239,7 +240,7 @@ STBSP__PUBLICDEC void STB_SPRINTF_DECORATE(set_separators)(char comma, char peri
 #define stbsp__uint16 unsigned short
 
 #ifndef stbsp__uintptr
-#if defined(__ppc64__) || defined(__powerpc64__) || defined(__aarch64__) || defined(_M_X64) || defined(__x86_64__) || defined(__x86_64) || defined(__s390x__)
+#if defined(__ppc64__) || defined(__powerpc64__) || defined(__aarch64__) || defined(_M_X64) || defined(__x86_64__) || defined(__x86_64) || defined(__s390x__) || defined(__wasm64__)
 #define stbsp__uintptr stbsp__uint64
 #else
 #define stbsp__uintptr stbsp__uint32

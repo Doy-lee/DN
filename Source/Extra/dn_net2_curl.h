@@ -67,6 +67,7 @@ struct DN_NET2ResponseInternal
 struct DN_NET2Request
 {
   DN_U64 handle;
+  DN_U64 gen;
 };
 
 struct DN_NET2Response

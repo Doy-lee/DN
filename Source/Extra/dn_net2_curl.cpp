@@ -482,9 +482,9 @@ static DN_NET2Request DN_NET2_DoRequest_(DN_NET2Core *net, DN_Str8 url, DN_Str8 
     if (!request->arena.curr)
       request->arena = DN_Arena_FromVMem(DN_Megabytes(1), DN_Kilobytes(1), DN_ArenaFlags_Nil);
 
-    request->type          = type;
-    request->gen           = DN_Max(request->gen + 1, 1);
-    request->url           = DN_Str8_FromStr8(&request->arena, url);
+    request->type   = type;
+    request->gen    = DN_Max(request->gen + 1, 1);
+    request->url    = DN_Str8_FromStr8(&request->arena, url);
     request->method = DN_Str8_FromStr8(&request->arena, method);
 
     if (args) {
