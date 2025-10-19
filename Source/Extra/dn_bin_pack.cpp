@@ -6,11 +6,11 @@ DN_API void DN_BinPack_U64(DN_BinPack *pack, DN_BinPackMode mode, DN_U64 *item)
   if (mode == DN_BinPackMode_Serialise) {
     DN_U64 it = *item;
     do {
-      DN_U8 write_value = DN_CAST(DN_U8)(it & VALUE_MASK);
+      DN_U8 write_value = DN_Cast(DN_U8)(it & VALUE_MASK);
       it >>= 7;
       if (it)
         write_value |= CONTINUE_BIT;
-      DN_Str8Builder_AppendBytesCopy(&pack->writer, &write_value, sizeof(write_value));
+      DN_Str8BuilderAppendBytesCopy(&pack->writer, &write_value, sizeof(write_value));
     } while (it);
   } else {
     *item              = 0;
@@ -18,7 +18,7 @@ DN_API void DN_BinPack_U64(DN_BinPack *pack, DN_BinPackMode mode, DN_U64 *item)
     for (DN_U8 src = CONTINUE_BIT; (src & CONTINUE_BIT) && bits_read < 64; bits_read += 7) {
       src              = pack->read.data[pack->read_index++];
       DN_U8 masked_src = src & VALUE_MASK;
-      *item |= (DN_CAST(DN_U64) masked_src << bits_read);
+      *item |= (DN_Cast(DN_U64) masked_src << bits_read);
     }
   }
 }
@@ -109,10 +109,10 @@ DN_API void DN_BinPack_Str8FromArena(DN_BinPack *pack, DN_Arena *arena, DN_BinPa
 {
   DN_BinPack_VarInt_(pack, mode, &string->size, sizeof(string->size));
   if (mode == DN_BinPackMode_Serialise) {
-    DN_Str8Builder_AppendBytesCopy(&pack->writer, string->data, string->size);
+    DN_Str8BuilderAppendBytesCopy(&pack->writer, string->data, string->size);
   } else {
-    DN_Str8 src = DN_Str8_Slice(pack->read, pack->read_index, string->size);
-    *string     = DN_Str8_FromStr8(arena, src);
+    DN_Str8 src = DN_Str8Slice(pack->read, pack->read_index, string->size);
+    *string     = DN_Str8FromStr8Arena(arena, src);
     pack->read_index += src.size;
   }
 }
@@ -121,17 +121,17 @@ DN_API void DN_BinPack_Str8FromPool(DN_BinPack *pack, DN_Pool *pool, DN_BinPackM
 {
   DN_BinPack_VarInt_(pack, mode, &string->size, sizeof(string->size));
   if (mode == DN_BinPackMode_Serialise) {
-    DN_Str8Builder_AppendBytesCopy(&pack->writer, string->data, string->size);
+    DN_Str8BuilderAppendBytesCopy(&pack->writer, string->data, string->size);
   } else {
-    DN_Str8 src = DN_Str8_Slice(pack->read, pack->read_index, string->size);
-    *string     = DN_Pool_AllocStr8Copy(pool, src);
+    DN_Str8 src = DN_Str8Slice(pack->read, pack->read_index, string->size);
+    *string     = DN_Str8FromStr8Pool(pool, src);
     pack->read_index += src.size;
   }
 }
 
 DN_API void DN_BinPack_BytesFromArena(DN_BinPack *pack, DN_Arena *arena, DN_BinPackMode mode, void **ptr, DN_USize *size)
 {
-  DN_Str8 string = DN_Str8_Init(*ptr, *size);
+  DN_Str8 string = DN_Str8FromPtr(*ptr, *size);
   DN_BinPack_Str8FromArena(pack, arena, mode, &string);
   *ptr  = string.data;
   *size = string.size;
@@ -139,7 +139,7 @@ DN_API void DN_BinPack_BytesFromArena(DN_BinPack *pack, DN_Arena *arena, DN_BinP
 
 DN_API void DN_BinPack_BytesFromPool(DN_BinPack *pack, DN_Pool *pool, DN_BinPackMode mode, void **ptr, DN_USize *size)
 {
-  DN_Str8 string = DN_Str8_Init(*ptr, *size);
+  DN_Str8 string = DN_Str8FromPtr(*ptr, *size);
   DN_BinPack_Str8FromPool(pack, pool, mode, &string);
   *ptr  = string.data;
   *size = string.size;
@@ -149,9 +149,9 @@ DN_API void DN_BinPack_CArray(DN_BinPack *pack, DN_BinPackMode mode, void *ptr, 
 {
   DN_BinPack_VarInt_(pack, mode, &size, sizeof(size));
   if (mode == DN_BinPackMode_Serialise) {
-    DN_Str8Builder_AppendBytesCopy(&pack->writer, ptr, size);
+    DN_Str8BuilderAppendBytesCopy(&pack->writer, ptr, size);
   } else {
-    DN_Str8 src = DN_Str8_Slice(pack->read, pack->read_index, size);
+    DN_Str8 src = DN_Str8Slice(pack->read, pack->read_index, size);
     DN_Assert(src.size == size);
     DN_Memcpy(ptr, src.data, DN_Min(src.size, size));
     pack->read_index += src.size;
@@ -160,6 +160,6 @@ DN_API void DN_BinPack_CArray(DN_BinPack *pack, DN_BinPackMode mode, void *ptr, 
 
 DN_API DN_Str8 DN_BinPack_Build(DN_BinPack const *pack, DN_Arena *arena)
 {
-  DN_Str8 result = DN_Str8Builder_Build(&pack->writer, arena);
+  DN_Str8 result = DN_Str8BuilderBuild(&pack->writer, arena);
   return result;
 }

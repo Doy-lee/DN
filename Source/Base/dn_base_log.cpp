@@ -23,9 +23,9 @@ DN_API DN_Str8 DN_LOG_ColourEscapeCodeStr8FromRGB(DN_LOGColourType colour, DN_U8
 
 DN_API DN_Str8 DN_LOG_ColourEscapeCodeStr8FromU32(DN_LOGColourType colour, DN_U32 value)
 {
-  DN_U8   r      = DN_CAST(DN_U8)(value >> 24);
-  DN_U8   g      = DN_CAST(DN_U8)(value >> 16);
-  DN_U8   b      = DN_CAST(DN_U8)(value >> 8);
+  DN_U8   r      = DN_Cast(DN_U8)(value >> 24);
+  DN_U8   g      = DN_Cast(DN_U8)(value >> 16);
+  DN_U8   b      = DN_Cast(DN_U8)(value >> 8);
   DN_Str8 result = DN_LOG_ColourEscapeCodeStr8FromRGB(colour, r, g, b);
   return result;
 }
@@ -35,35 +35,35 @@ DN_API DN_LOGPrefixSize DN_LOG_MakePrefix(DN_LOGStyle style, DN_LOGTypeParam typ
   DN_Str8 type_str8 = type.str8;
   if (type.is_u32_enum) {
     switch (type.u32) {
-      case DN_LOGType_Debug:   type_str8 = DN_STR8("DEBUG"); break;
-      case DN_LOGType_Info:    type_str8 = DN_STR8("INFO "); break;
-      case DN_LOGType_Warning: type_str8 = DN_STR8("WARN");  break;
-      case DN_LOGType_Error:   type_str8 = DN_STR8("ERROR"); break;
-      case DN_LOGType_Count:   type_str8 = DN_STR8("BADXX"); break;
+      case DN_LOGType_Debug:   type_str8 = DN_Str8Lit("DEBUG"); break;
+      case DN_LOGType_Info:    type_str8 = DN_Str8Lit("INFO "); break;
+      case DN_LOGType_Warning: type_str8 = DN_Str8Lit("WARN");  break;
+      case DN_LOGType_Error:   type_str8 = DN_Str8Lit("ERROR"); break;
+      case DN_LOGType_Count:   type_str8 = DN_Str8Lit("BADXX"); break;
     }
   }
 
   static DN_USize max_type_length = 0;
   max_type_length                 = DN_Max(max_type_length, type_str8.size);
-  int type_padding                = DN_CAST(int)(max_type_length - type_str8.size);
+  int type_padding                = DN_Cast(int)(max_type_length - type_str8.size);
 
   DN_Str8 colour_esc = {};
   DN_Str8 bold_esc   = {};
   DN_Str8 reset_esc  = {};
   if (style.colour) {
-    bold_esc   = DN_STR8(DN_LOG_BoldEscapeCode);
-    reset_esc  = DN_STR8(DN_LOG_ResetEscapeCode);
+    bold_esc   = DN_Str8Lit(DN_LOG_BoldEscapeCode);
+    reset_esc  = DN_Str8Lit(DN_LOG_ResetEscapeCode);
     colour_esc = DN_LOG_ColourEscapeCodeStr8FromRGB(DN_LOGColourType_Fg, style.r, style.g, style.b);
   }
 
-  DN_Str8 file_name = DN_Str8_FileNameFromPath(call_site.file);
+  DN_Str8 file_name = DN_Str8FileNameFromPath(call_site.file);
   DN_GCC_WARNING_PUSH
   DN_GCC_WARNING_DISABLE(-Wformat)
   DN_GCC_WARNING_DISABLE(-Wformat-extra-args)
   DN_MSVC_WARNING_PUSH
   DN_MSVC_WARNING_DISABLE(4477)
   int     size      = DN_SNPrintF(dest,
-                         DN_CAST(int)dest_size,
+                         DN_Cast(int)dest_size,
                          "%04u-%02u-%02uT%02u:%02u:%02u" // date
                          "%S"                            // colour
                          "%S"                            // bold
@@ -82,7 +82,7 @@ DN_API DN_LOGPrefixSize DN_LOG_MakePrefix(DN_LOGStyle style, DN_LOGTypeParam typ
                          colour_esc,      // colour
                          bold_esc,        // bold
                          type_str8,       // type
-                         DN_CAST(int) type_padding,
+                         DN_Cast(int) type_padding,
                          "",              // type padding
                          reset_esc,       // reset
                          file_name,       // file name

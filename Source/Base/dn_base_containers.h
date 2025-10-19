@@ -176,7 +176,7 @@ template <typename T> struct DN_List
 //   ```
 //   MyStruct buffer[TB_ASType_Count] = {};
 //   DN_USize size                    = 0;
-//   MyStruct *item                   = DN_LArray_Make(buffer, size, DN_ArrayCountU(buffer), DN_ZeroMem_No);
+//   MyStruct *item                   = DN_LArray_Make(buffer, size, DN_ArrayCountU(buffer), DN_ZMem_No);
 //   ```
 //
 // IArray => Intrusive Array
@@ -189,7 +189,7 @@ template <typename T> struct DN_List
 //     DN_USize  max;
 //   } my_array = {};
 //
-//   MyStruct *item = DN_IArray_Make(&my_array, MyArray, DN_ZeroMem_No);
+//   MyStruct *item = DN_IArray_Make(&my_array, MyArray, DN_ZMem_No);
 //   ```
 // ISLList => Intrusive Singly Linked List
 //   Define a struct with the members 'next':
@@ -210,13 +210,13 @@ template <typename T> struct DN_List
 
 #define DN_DLList_InitArena(list, T, arena)          \
   do {                                               \
-    (list) = DN_Arena_New(arena, T, DN_ZeroMem_Yes); \
+    (list) = DN_ArenaNew(arena, T, DN_ZMem_Yes); \
     DN_DLList_Init(list);                            \
   } while (0)
 
 #define DN_DLList_InitPool(list, T, pool) \
   do {                                    \
-    (list) = DN_Pool_New(pool, T);        \
+    (list) = DN_PoolNew(pool, T);        \
     DN_DLList_Init(list);                 \
   } while (0)
 
@@ -278,10 +278,10 @@ template <typename T> struct DN_List
 #define                      DN_LArray_ResizeFromPool(c_array, size, max, pool, new_max)         DN_CArray2_ResizeFromPool((void **)&(c_array), size, max, sizeof((c_array)[0]), pool, new_max)
 #define                      DN_LArray_GrowFromPool(c_array, size, max, pool, new_max)           DN_CArray2_GrowFromPool((void **)&(c_array), size, max, sizeof((c_array)[0]), pool, new_max)
 #define                      DN_LArray_GrowIfNeededFromPool(c_array, size, max, pool, add_count) DN_CArray2_GrowIfNeededFromPool((void **)(c_array), size, max, sizeof((c_array)[0]), pool, add_count)
-#define                      DN_LArray_MakeArray(c_array, size, max, count, zero_mem)            (decltype(&(c_array)[0])) DN_CArray2_MakeArray(c_array, size, max, sizeof((c_array)[0]), count, zero_mem)
-#define                      DN_LArray_MakeArrayZ(c_array, size, max, count)                     (decltype(&(c_array)[0])) DN_CArray2_MakeArray(c_array, size, max, sizeof((c_array)[0]), count, DN_ZeroMem_Yes)
-#define                      DN_LArray_Make(c_array, size, max, zero_mem)                        (decltype(&(c_array)[0])) DN_CArray2_MakeArray(c_array, size, max, sizeof((c_array)[0]), 1,     zero_mem)
-#define                      DN_LArray_MakeZ(c_array, size, max)                                 (decltype(&(c_array)[0])) DN_CArray2_MakeArray(c_array, size, max, sizeof((c_array)[0]), 1,     DN_ZeroMem_Yes)
+#define                      DN_LArray_MakeArray(c_array, size, max, count, z_mem)            (decltype(&(c_array)[0])) DN_CArray2_MakeArray(c_array, size, max, sizeof((c_array)[0]), count, z_mem)
+#define                      DN_LArray_MakeArrayZ(c_array, size, max, count)                     (decltype(&(c_array)[0])) DN_CArray2_MakeArray(c_array, size, max, sizeof((c_array)[0]), count, DN_ZMem_Yes)
+#define                      DN_LArray_Make(c_array, size, max, z_mem)                        (decltype(&(c_array)[0])) DN_CArray2_MakeArray(c_array, size, max, sizeof((c_array)[0]), 1,     z_mem)
+#define                      DN_LArray_MakeZ(c_array, size, max)                                 (decltype(&(c_array)[0])) DN_CArray2_MakeArray(c_array, size, max, sizeof((c_array)[0]), 1,     DN_ZMem_Yes)
 #define                      DN_LArray_AddArray(c_array, size, max, items, count, add)           (decltype(&(c_array)[0])) DN_CArray2_AddArray (c_array, size, max, sizeof((c_array)[0]), items, count, add)
 #define                      DN_LArray_Add(c_array, size, max, item, add)                        (decltype(&(c_array)[0])) DN_CArray2_AddArray (c_array, size, max, sizeof((c_array)[0]), &item, 1,     add)
 #define                      DN_LArray_AppendArray(c_array, size, max, items, count)             (decltype(&(c_array)[0])) DN_CArray2_AddArray (c_array, size, max, sizeof((c_array)[0]), items, count, DN_ArrayAdd_Append)
@@ -296,10 +296,10 @@ template <typename T> struct DN_List
 #define                      DN_IArray_ResizeFromPool(array, pool, new_max)                      DN_CArray2_ResizeFromPool((void **)(&(array)->data), &(array)->size, &(array)->max, sizeof((array)->data[0]), pool, new_max)
 #define                      DN_IArray_GrowFromPool(array, pool, new_max)                        DN_CArray2_GrowFromPool((void **)(&(array)->data), &(array)->size, &(array)->max, sizeof((array)->data[0]), pool, new_max)
 #define                      DN_IArray_GrowIfNeededFromPool(array, pool, add_count)              DN_CArray2_GrowIfNeededFromPool((void **)(&(array)->data), (array)->size, &(array)->max, sizeof((array)->data[0]), pool, add_count)
-#define                      DN_IArray_MakeArray(array, count, zero_mem)                         (decltype(&((array)->data)[0])) DN_CArray2_MakeArray((array)->data, &(array)->size, (array)->max, sizeof(((array)->data)[0]), count, zero_mem)
-#define                      DN_IArray_MakeArrayZ(array, count)                                  (decltype(&((array)->data)[0])) DN_CArray2_MakeArray((array)->data, &(array)->size, (array)->max, sizeof(((array)->data)[0]), count, DN_ZeroMem_Yes)
-#define                      DN_IArray_Make(array, zero_mem)                                     (decltype(&((array)->data)[0])) DN_CArray2_MakeArray((array)->data, &(array)->size, (array)->max, sizeof(((array)->data)[0]), 1,     zero_mem)
-#define                      DN_IArray_MakeZ(array)                                              (decltype(&((array)->data)[0])) DN_CArray2_MakeArray((array)->data, &(array)->size, (array)->max, sizeof(((array)->data)[0]), 1,     DN_ZeroMem_Yes)
+#define                      DN_IArray_MakeArray(array, count, z_mem)                         (decltype(&((array)->data)[0])) DN_CArray2_MakeArray((array)->data, &(array)->size, (array)->max, sizeof(((array)->data)[0]), count, z_mem)
+#define                      DN_IArray_MakeArrayZ(array, count)                                  (decltype(&((array)->data)[0])) DN_CArray2_MakeArray((array)->data, &(array)->size, (array)->max, sizeof(((array)->data)[0]), count, DN_ZMem_Yes)
+#define                      DN_IArray_Make(array, z_mem)                                     (decltype(&((array)->data)[0])) DN_CArray2_MakeArray((array)->data, &(array)->size, (array)->max, sizeof(((array)->data)[0]), 1,     z_mem)
+#define                      DN_IArray_MakeZ(array)                                              (decltype(&((array)->data)[0])) DN_CArray2_MakeArray((array)->data, &(array)->size, (array)->max, sizeof(((array)->data)[0]), 1,     DN_ZMem_Yes)
 #define                      DN_IArray_AddArray(array, items, count, add)                        (decltype(&((array)->data)[0])) DN_CArray2_AddArray ((array)->data, &(array)->size, (array)->max, sizeof(((array)->data)[0]), items, count, add)
 #define                      DN_IArray_Add(array, item, add)                                     (decltype(&((array)->data)[0])) DN_CArray2_AddArray ((array)->data, &(array)->size, (array)->max, sizeof(((array)->data)[0]), &item, 1,     add)
 #define                      DN_IArray_AppendArray(array, items, count)                          (decltype(&((array)->data)[0])) DN_CArray2_AddArray ((array)->data, &(array)->size, (array)->max, sizeof(((array)->data)[0]), items, count, DN_ArrayAdd_Append)
@@ -312,7 +312,7 @@ template <typename T> struct DN_List
 #define                      DN_IArray_Insert(array, index, item, count)                         (decltype(&((array)->data)[0])) DN_CArray2_InsertArray((array)->data, &(array)->size, (array)->max, sizeof(((array)->data)[0]), index, &item, 1)
 
 DN_API  DN_ArrayEraseResult  DN_CArray2_EraseRange           (void *data, DN_USize *size, DN_USize elem_size, DN_USize begin_index, DN_ISize count, DN_ArrayErase erase);
-DN_API  void                *DN_CArray2_MakeArray            (void *data, DN_USize *size, DN_USize max, DN_USize data_size, DN_USize make_size, DN_ZeroMem zero_mem);
+DN_API  void                *DN_CArray2_MakeArray            (void *data, DN_USize *size, DN_USize max, DN_USize data_size, DN_USize make_size, DN_ZMem z_mem);
 DN_API  void                *DN_CArray2_AddArray             (void *data, DN_USize *size, DN_USize max, DN_USize data_size, void const *elems, DN_USize elems_count, DN_ArrayAdd add);
 DN_API  bool                 DN_CArray2_Resize               (void **data, DN_USize *size, DN_USize *max, DN_USize data_size, DN_Pool *pool, DN_USize new_max);
 DN_API  bool                 DN_CArray2_Grow                 (void **data, DN_USize *size, DN_USize *max, DN_USize data_size, DN_Pool *pool, DN_USize new_max);
@@ -327,7 +327,7 @@ DN_API  void                 DN_Ring_Read                    (DN_Ring *ring, voi
 #define                      DN_Ring_ReadStruct(ring, dest)  DN_Ring_Read((ring), (dest), sizeof(*(dest)))
 
 template <typename T>                           DN_ArrayEraseResult   DN_CArray_EraseRange              (T *data, DN_USize *size, DN_USize begin_index, DN_ISize count, DN_ArrayErase erase);
-template <typename T>                           T *                   DN_CArray_MakeArray               (T *data, DN_USize *size, DN_USize max, DN_USize count, DN_ZeroMem zero_mem);
+template <typename T>                           T *                   DN_CArray_MakeArray               (T *data, DN_USize *size, DN_USize max, DN_USize count, DN_ZMem z_mem);
 template <typename T>                           T *                   DN_CArray_InsertArray             (T *data, DN_USize *size, DN_USize max, DN_USize index, T const *items, DN_USize count);
 template <typename T>                           T                     DN_CArray_PopFront                (T *data, DN_USize *size, DN_USize count);
 template <typename T>                           T                     DN_CArray_PopBack                 (T *data, DN_USize *size, DN_USize count);
@@ -335,9 +335,9 @@ template <typename T>                           DN_ArrayFindResult<T> DN_CArray_
 
 // NOTE: DN_SArray /////////////////////////////////////////////////////////////////////////////////
 #if !defined(DN_NO_SARRAY)
-template <typename T>                           DN_SArray<T>          DN_SArray_Init                    (DN_Arena *arena, DN_USize size, DN_ZeroMem zero_mem);
-template <typename T>                           DN_SArray<T>          DN_SArray_InitSlice               (DN_Arena *arena, DN_Slice<T> slice, DN_USize size, DN_ZeroMem zero_mem);
-template <typename T, size_t N>                 DN_SArray<T>          DN_SArray_InitCArray              (DN_Arena *arena, T const (&array)[N], DN_USize size, DN_ZeroMem);
+template <typename T>                           DN_SArray<T>          DN_SArray_Init                    (DN_Arena *arena, DN_USize size, DN_ZMem z_mem);
+template <typename T>                           DN_SArray<T>          DN_SArray_InitSlice               (DN_Arena *arena, DN_Slice<T> slice, DN_USize size, DN_ZMem z_mem);
+template <typename T, size_t N>                 DN_SArray<T>          DN_SArray_InitCArray              (DN_Arena *arena, T const (&array)[N], DN_USize size, DN_ZMem);
 template <typename T>                           DN_SArray<T>          DN_SArray_InitBuffer              (T* buffer, DN_USize size);
 template <typename T>                           bool                  DN_SArray_IsValid                 (DN_SArray<T> const *array);
 template <typename T>                           DN_Slice<T>           DN_SArray_Slice                   (DN_SArray<T> const *array);
@@ -347,8 +347,8 @@ template <typename T>                           T *                   DN_SArray_
 #define                                                               DN_SArray_AddArrayAssert(...)     DN_HardAssert(DN_SArray_AddArray(__VA_ARGS__))
 #define                                                               DN_SArray_AddCArrayAssert(...)    DN_HardAssert(DN_SArray_AddCArray(__VA_ARGS__))
 #define                                                               DN_SArray_AddAssert(...)          DN_HardAssert(DN_SArray_Add(__VA_ARGS__))
-template <typename T>                           T *                   DN_SArray_MakeArray               (DN_SArray<T> *array, DN_USize count, DN_ZeroMem zero_mem);
-template <typename T>                           T *                   DN_SArray_Make                    (DN_SArray<T> *array, DN_ZeroMem zero_mem);
+template <typename T>                           T *                   DN_SArray_MakeArray               (DN_SArray<T> *array, DN_USize count, DN_ZMem z_mem);
+template <typename T>                           T *                   DN_SArray_Make                    (DN_SArray<T> *array, DN_ZMem z_mem);
 #define                                                               DN_SArray_MakeArrayAssert(...)    DN_HardAssert(DN_SArray_MakeArray(__VA_ARGS__))
 #define                                                               DN_SArray_MakeAssert(...)         DN_HardAssert(DN_SArray_Make(__VA_ARGS__))
 template <typename T>                           T *                   DN_SArray_InsertArray             (DN_SArray<T> *array, DN_USize index, T const *items, DN_USize count);
@@ -378,8 +378,8 @@ template <typename T, DN_USize N>               T *                   DN_FArray_
 #define                                                               DN_FArray_AddArrayAssert(...)      DN_HardAssert(DN_FArray_AddArray(__VA_ARGS__))
 #define                                                               DN_FArray_AddCArrayAssert(...)     DN_HardAssert(DN_FArray_AddCArray(__VA_ARGS__))
 #define                                                               DN_FArray_AddAssert(...)           DN_HardAssert(DN_FArray_Add(__VA_ARGS__))
-template <typename T, DN_USize N>               T *                   DN_FArray_MakeArray                (DN_FArray<T, N> *array, DN_USize count, DN_ZeroMem zero_mem);
-template <typename T, DN_USize N>               T *                   DN_FArray_Make                     (DN_FArray<T, N> *array, DN_ZeroMem zero_mem);
+template <typename T, DN_USize N>               T *                   DN_FArray_MakeArray                (DN_FArray<T, N> *array, DN_USize count, DN_ZMem z_mem);
+template <typename T, DN_USize N>               T *                   DN_FArray_Make                     (DN_FArray<T, N> *array, DN_ZMem z_mem);
 #define                                                               DN_FArray_MakeArrayAssert(...)     DN_HardAssert(DN_FArray_MakeArray(__VA_ARGS__))
 #define                                                               DN_FArray_MakeAssert(...)          DN_HardAssert(DN_FArray_Make(__VA_ARGS__))
 template <typename T, DN_USize N>               T *                   DN_FArray_InsertArray              (DN_FArray<T, N> *array, T const &item, DN_USize index);
@@ -401,7 +401,7 @@ template <typename T>                           DN_Slice<T>           DN_Slice_I
 template <typename T, DN_USize N>               DN_Slice<T>           DN_Slice_InitCArrayCopy           (DN_Arena *arena, T const (&array)[N]);
 template <typename T>                           DN_Slice<T>           DN_Slice_Copy                     (DN_Arena *arena, DN_Slice<T> slice);
 template <typename T>                           DN_Slice<T>           DN_Slice_CopyPtr                  (DN_Arena *arena, T* const data, DN_USize size);
-template <typename T>                           DN_Slice<T>           DN_Slice_Alloc                    (DN_Arena *arena, DN_USize size, DN_ZeroMem zero_mem);
+template <typename T>                           DN_Slice<T>           DN_Slice_Alloc                    (DN_Arena *arena, DN_USize size, DN_ZMem z_mem);
                                                 DN_Str8               DN_Slice_Str8Render               (DN_Arena *arena, DN_Slice<DN_Str8> array, DN_Str8 separator);
                                                 DN_Str8               DN_Slice_Str8RenderSpaceSeparated (DN_Arena *arena, DN_Slice<DN_Str8> array);
                                                 DN_Str16              DN_Slice_Str16Render              (DN_Arena *arena, DN_Slice<DN_Str16> array, DN_Str16 separator);
@@ -410,7 +410,7 @@ template <typename T>                           DN_Slice<T>           DN_Slice_A
 
 #if !defined(DN_NO_DSMAP)
 template <typename T>                           DN_DSMap<T>           DN_DSMap_Init                     (DN_Arena *arena, DN_U32 size, DN_DSMapFlags flags);
-template <typename T>                           void                  DN_DSMap_Deinit                   (DN_DSMap<T> *map, DN_ZeroMem zero_mem);
+template <typename T>                           void                  DN_DSMap_Deinit                   (DN_DSMap<T> *map, DN_ZMem z_mem);
 template <typename T>                           bool                  DN_DSMap_IsValid                  (DN_DSMap<T> const *map);
 template <typename T>                           DN_U32                DN_DSMap_Hash                     (DN_DSMap<T> const *map, DN_DSMapKey key);
 template <typename T>                           DN_U32                DN_DSMap_HashToSlotIndex          (DN_DSMap<T> const *map, DN_DSMapKey key);

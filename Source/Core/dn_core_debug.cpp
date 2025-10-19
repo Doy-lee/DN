@@ -24,7 +24,7 @@ DN_API DN_StackTraceWalkResult DN_StackTrace_Walk(DN_Arena *arena, uint16_t limi
     if (!SymInitialize(result.process, nullptr /*UserSearchPath*/, true /*fInvadeProcess*/)) {
       DN_OSTLSTMem  tmem  = DN_OS_TLSTMem(arena);
       DN_W32Error error = DN_W32_LastError(tmem.arena);
-      DN_LOG_ErrorF("SymInitialize failed, stack trace can not be generated (%lu): %.*s\n", error.code, DN_STR_FMT(error.msg));
+      DN_LOG_ErrorF("SymInitialize failed, stack trace can not be generated (%lu): %.*s\n", error.code, DN_Str8PrintFmt(error.msg));
     }
   }
 
@@ -58,8 +58,8 @@ DN_API DN_StackTraceWalkResult DN_StackTrace_Walk(DN_Arena *arena, uint16_t limi
   }
   DN_TicketMutex_End(&mutex);
 
-  result.base_addr = DN_Arena_NewArray(arena, uint64_t, raw_frames.size, DN_ZeroMem_No);
-  result.size      = DN_CAST(uint16_t) raw_frames.size;
+  result.base_addr = DN_ArenaNewArray(arena, uint64_t, raw_frames.size, DN_ZMem_No);
+  result.size      = DN_Cast(uint16_t) raw_frames.size;
   DN_Memcpy(result.base_addr, raw_frames.data, raw_frames.size * sizeof(raw_frames.data[0]));
 #else
   (void)limit;
@@ -68,14 +68,14 @@ DN_API DN_StackTraceWalkResult DN_StackTrace_Walk(DN_Arena *arena, uint16_t limi
   return result;
 }
 
-static void DN_StackTrace_AddWalkToStr8Builder_(DN_StackTraceWalkResult const *walk, DN_Str8Builder *builder, DN_USize skip)
+static void DN_StackTrace_AddWalkToStr8Builder(DN_StackTraceWalkResult const *walk, DN_Str8Builder *builder, DN_USize skip)
 {
   DN_StackTraceRawFrame raw_frame = {};
   raw_frame.process               = walk->process;
   for (DN_USize index = skip; index < walk->size; index++) {
     raw_frame.base_addr      = walk->base_addr[index];
     DN_StackTraceFrame frame = DN_StackTrace_RawFrameToFrame(builder->arena, raw_frame);
-    DN_Str8Builder_AppendF(builder, "%.*s(%zu): %.*s%s", DN_STR_FMT(frame.file_name), frame.line_number, DN_STR_FMT(frame.function_name), (DN_CAST(int) index == walk->size - 1) ? "" : "\n");
+    DN_Str8BuilderAppendF(builder, "%.*s(%zu): %.*s%s", DN_Str8PrintFmt(frame.file_name), frame.line_number, DN_Str8PrintFmt(frame.function_name), (DN_Cast(int) index == walk->size - 1) ? "" : "\n");
   }
 }
 
@@ -101,9 +101,9 @@ DN_API DN_Str8 DN_StackTrace_WalkResultToStr8(DN_Arena *arena, DN_StackTraceWalk
     return result;
 
   DN_OSTLSTMem     tmem    = DN_OS_TLSTMem(arena);
-  DN_Str8Builder builder = DN_Str8Builder_FromArena(tmem.arena);
-  DN_StackTrace_AddWalkToStr8Builder_(walk, &builder, skip);
-  result = DN_Str8Builder_Build(&builder, arena);
+  DN_Str8Builder builder = DN_Str8BuilderFromArena(tmem.arena);
+  DN_StackTrace_AddWalkToStr8Builder(walk, &builder, skip);
+  result = DN_Str8BuilderBuild(&builder, arena);
   return result;
 }
 
@@ -119,12 +119,12 @@ DN_API DN_Str8 DN_StackTrace_WalkStr8FromHeap(uint16_t limit, uint16_t skip)
 {
   // NOTE: We don't use WalkResultToStr8 because that uses the TLS arenas which
   // does not use the OS heap.
-  DN_Arena       arena         = DN_Arena_FromHeap(DN_Kilobytes(64), DN_ArenaFlags_NoAllocTrack);
-  DN_Str8Builder builder       = DN_Str8Builder_FromArena(&arena);
+  DN_Arena       arena         = DN_ArenaFromHeap(DN_Kilobytes(64), DN_ArenaFlags_NoAllocTrack);
+  DN_Str8Builder builder       = DN_Str8BuilderFromArena(&arena);
   DN_StackTraceWalkResult walk = DN_StackTrace_Walk(&arena, limit);
-  DN_StackTrace_AddWalkToStr8Builder_(&walk, &builder, skip);
-  DN_Str8 result               = DN_Str8Builder_BuildFromOSHeap(&builder);
-  DN_Arena_Deinit(&arena);
+  DN_StackTrace_AddWalkToStr8Builder(&walk, &builder, skip);
+  DN_Str8 result               = DN_Str8BuilderBuildFromOSHeap(&builder);
+  DN_ArenaDeinit(&arena);
   return result;
 }
 
@@ -140,7 +140,7 @@ DN_API DN_Slice<DN_StackTraceFrame> DN_StackTrace_GetFrames(DN_Arena *arena, uin
         return result;
 
     DN_USize slice_index = 0;
-    result                = DN_Slice_Alloc<DN_StackTraceFrame>(arena, walk.size, DN_ZeroMem_No);
+    result                = DN_Slice_Alloc<DN_StackTraceFrame>(arena, walk.size, DN_ZMem_No);
     for (DN_StackTraceWalkResultIterator it = {}; DN_StackTrace_WalkResultIterate(&it, &walk); ) {
         result.data[slice_index++] = DN_StackTrace_RawFrameToFrame(arena, it.raw_frame);
     }
@@ -167,7 +167,7 @@ DN_API DN_StackTraceFrame DN_StackTrace_RawFrameToFrame(DN_Arena *arena, DN_Stac
     // NOTE: Get function name /////////////////////////////////////////////////////////////////////
 
     alignas(SYMBOL_INFOW) char buffer[sizeof(SYMBOL_INFOW) + (MAX_SYM_NAME * sizeof(wchar_t))] = {};
-    SYMBOL_INFOW *symbol = DN_CAST(SYMBOL_INFOW *)buffer;
+    SYMBOL_INFOW *symbol = DN_Cast(SYMBOL_INFOW *)buffer;
     symbol->SizeOfStruct = sizeof(*symbol);
     symbol->MaxNameLen   = sizeof(buffer) - sizeof(*symbol);
 
@@ -176,7 +176,7 @@ DN_API DN_StackTraceFrame DN_StackTrace_RawFrameToFrame(DN_Arena *arena, DN_Stac
 
     // NOTE: Construct result //////////////////////////////////////////////////////////////////////
 
-    DN_Str16 file_name16     = DN_Str16{line.FileName, DN_CStr16_Size(line.FileName)};
+    DN_Str16 file_name16     = DN_Str16{line.FileName, DN_CStr16Size(line.FileName)};
     DN_Str16 function_name16 = DN_Str16{symbol->Name, symbol->NameLen};
 
     DN_StackTraceFrame result = {};
@@ -185,10 +185,10 @@ DN_API DN_StackTraceFrame DN_StackTrace_RawFrameToFrame(DN_Arena *arena, DN_Stac
     result.file_name           = DN_W32_Str16ToStr8(arena, file_name16);
     result.function_name       = DN_W32_Str16ToStr8(arena, function_name16);
 
-    if (!DN_Str8_HasData(result.function_name))
-        result.function_name = DN_STR8("<unknown function>");
-    if (!DN_Str8_HasData(result.file_name))
-        result.file_name = DN_STR8("<unknown file>");
+    if (result.function_name.size == 0)
+        result.function_name = DN_Str8Lit("<unknown function>");
+    if (result.file_name.size == 0)
+        result.file_name = DN_Str8Lit("<unknown file>");
     #else
     DN_StackTraceFrame result = {};
     #endif
@@ -200,7 +200,7 @@ DN_API void DN_StackTrace_Print(uint16_t limit)
     DN_OSTLSTMem                    tmem        = DN_OS_TLSTMem(nullptr);
     DN_Slice<DN_StackTraceFrame> stack_trace = DN_StackTrace_GetFrames(tmem.arena, limit);
     for (DN_StackTraceFrame &frame : stack_trace)
-        DN_OS_PrintErrLnF("%.*s(%I64u): %.*s", DN_STR_FMT(frame.file_name), frame.line_number, DN_STR_FMT(frame.function_name));
+        DN_OS_PrintErrLnF("%.*s(%I64u): %.*s", DN_Str8PrintFmt(frame.file_name), frame.line_number, DN_Str8PrintFmt(frame.function_name));
 }
 
 DN_API void DN_StackTrace_ReloadSymbols()
@@ -229,12 +229,12 @@ DN_API void DN_DBGTrackAlloc(void *ptr, DN_USize size, bool leak_permitted)
   // already existed.
   DN_Str8                       stack_trace = DN_StackTrace_WalkStr8FromHeap(128, 3 /*skip*/);
   DN_DSMap<DN_DebugAlloc>      *alloc_table = &g_dn_core->alloc_table;
-  DN_DSMapResult<DN_DebugAlloc> alloc_entry = DN_DSMap_MakeKeyU64(alloc_table, DN_CAST(uint64_t) ptr);
+  DN_DSMapResult<DN_DebugAlloc> alloc_entry = DN_DSMap_MakeKeyU64(alloc_table, DN_Cast(uint64_t) ptr);
   DN_DebugAlloc                *alloc       = alloc_entry.value;
   if (alloc_entry.found) {
     if ((alloc->flags & DN_DebugAllocFlag_Freed) == 0) {
-      DN_Str8 alloc_size     = DN_CVT_BytesStr8FromU64Auto(alloc_table->arena, alloc->size);
-      DN_Str8 new_alloc_size = DN_CVT_BytesStr8FromU64Auto(alloc_table->arena, size);
+      DN_Str8x32 alloc_size     = DN_ByteCountStr8x32(alloc->size);
+      DN_Str8x32 new_alloc_size = DN_ByteCountStr8x32(size);
       DN_HardAssertF(
           alloc->flags & DN_DebugAllocFlag_Freed,
           "This pointer is already in the leak tracker, however it has not been freed yet. This "
@@ -250,10 +250,10 @@ DN_API void DN_DBGTrackAlloc(void *ptr, DN_USize size, bool leak_permitted)
           "\n"
           "%.*s\n",
           ptr,
-          DN_STR_FMT(alloc_size),
-          DN_STR_FMT(alloc->stack_trace),
-          DN_STR_FMT(new_alloc_size),
-          DN_STR_FMT(stack_trace));
+          DN_Str8PrintFmt(alloc_size),
+          DN_Str8PrintFmt(alloc->stack_trace),
+          DN_Str8PrintFmt(new_alloc_size),
+          DN_Str8PrintFmt(stack_trace));
     }
 
     // NOTE: Pointer was reused, clean up the prior entry
@@ -282,7 +282,7 @@ DN_API void DN_DBGTrackDealloc(void *ptr)
 
     DN_Str8                        stack_trace = DN_StackTrace_WalkStr8FromHeap(128, 3 /*skip*/);
     DN_DSMap<DN_DebugAlloc>      *alloc_table  = &g_dn_core->alloc_table;
-    DN_DSMapResult<DN_DebugAlloc> alloc_entry  = DN_DSMap_FindKeyU64(alloc_table, DN_CAST(uintptr_t) ptr);
+    DN_DSMapResult<DN_DebugAlloc> alloc_entry  = DN_DSMap_FindKeyU64(alloc_table, DN_Cast(uintptr_t) ptr);
     DN_HardAssertF(alloc_entry.found,
                      "Allocated pointer can not be removed as it does not exist in the "
                      "allocation table. When this memory was allocated, the pointer was "
@@ -291,7 +291,7 @@ DN_API void DN_DBGTrackDealloc(void *ptr)
 
     DN_DebugAlloc *alloc = alloc_entry.value;
     if (alloc->flags & DN_DebugAllocFlag_Freed) {
-        DN_Str8 freed_size = DN_CVT_BytesStr8FromU64Auto(alloc_table->arena, alloc->freed_size);
+        DN_Str8x32 freed_size = DN_ByteCountStr8x32(alloc->freed_size);
         DN_HardAssertF((alloc->flags & DN_DebugAllocFlag_Freed) == 0,
                          "Double free detected, pointer to free was already marked "
                          "as freed. Either the pointer was reallocated but not "
@@ -309,13 +309,13 @@ DN_API void DN_DBGTrackDealloc(void *ptr)
                          "\n"
                          "%.*s\n"
                          ,
-                         ptr, DN_STR_FMT(freed_size),
-                         DN_STR_FMT(alloc->stack_trace),
-                         DN_STR_FMT(alloc->freed_stack_trace),
-                         DN_STR_FMT(stack_trace));
+                         ptr, DN_Str8PrintFmt(freed_size),
+                         DN_Str8PrintFmt(alloc->stack_trace),
+                         DN_Str8PrintFmt(alloc->freed_stack_trace),
+                         DN_Str8PrintFmt(stack_trace));
     }
 
-    DN_Assert(!DN_Str8_HasData(alloc->freed_stack_trace));
+    DN_Assert(alloc->freed_stack_trace.size == 0);
     alloc->flags             |= DN_DebugAllocFlag_Freed;
     alloc->freed_stack_trace  = stack_trace;
     g_dn_core->alloc_table_bytes_allocated_for_stack_traces += alloc->freed_stack_trace.size;
@@ -333,19 +333,17 @@ DN_API void DN_DBGDumpLeaks()
         if (alloc_leaked && !leak_permitted) {
             leaked_bytes += alloc->size;
             leak_count++;
-            DN_Str8 alloc_size = DN_CVT_BytesStr8FromU64Auto(g_dn_core->alloc_table.arena, alloc->size);
+            DN_Str8x32 alloc_size = DN_ByteCountStr8x32(alloc->size);
             DN_LOG_WarningF("Pointer (0x%p) leaked %.*s at:\n"
                              "%.*s",
-                             alloc->ptr, DN_STR_FMT(alloc_size),
-                             DN_STR_FMT(alloc->stack_trace));
+                             alloc->ptr, DN_Str8PrintFmt(alloc_size),
+                             DN_Str8PrintFmt(alloc->stack_trace));
         }
     }
 
     if (leak_count) {
-        char buffer[512];
-        DN_Arena arena    = DN_Arena_FromBuffer(buffer, sizeof(buffer), DN_ArenaFlags_Nil);
-        DN_Str8 leak_size = DN_CVT_BytesStr8FromU64Auto(&arena, leaked_bytes);
-        DN_LOG_WarningF("There were %I64u leaked allocations totalling %.*s", leak_count, DN_STR_FMT(leak_size));
+      DN_Str8x32 leak_size = DN_ByteCountStr8x32(leaked_bytes);
+      DN_LOG_WarningF("There were %I64u leaked allocations totalling %.*s", leak_count, DN_Str8PrintFmt(leak_size));
     }
 }
 #endif // DN_LEAK_TRACKING
@@ -396,8 +394,8 @@ DN_API DN_ProfilerZone DN_Profiler_BeginZone(DN_Profiler *profiler, DN_Str8 name
   // TODO: We need per-thread-local-storage profiler so that we can use these apis
   // across threads. For now, we let them overwrite each other but this is not tenable.
   #if 0
-    if (DN_Str8_HasData(anchor->name) && anchor->name != name)
-        DN_AssertF(name == anchor->name, "Potentially overwriting a zone by accident? Anchor is '%.*s', name is '%.*s'", DN_STR_FMT(anchor->name), DN_STR_FMT(name));
+    if (DN_Str8HasData(anchor->name) && anchor->name != name)
+        DN_AssertF(name == anchor->name, "Potentially overwriting a zone by accident? Anchor is '%.*s', name is '%.*s'", DN_Str8PrintFmt(anchor->name), DN_Str8PrintFmt(name));
   #endif
 
   if (profiler->tsc == DN_ProfilerTSC_RDTSC)
@@ -455,7 +453,7 @@ DN_API void DN_Profiler_NewFrame(DN_Profiler *profiler)
   DN_Memset(next_anchors.data, 0, sizeof(*profiler->anchors) * next_anchors.count);
 
   // NOTE: Start the frame's zone
-  profiler->frame_zone = DN_Profiler_BeginZone(profiler, DN_STR8("Profiler Frame"), 0);
+  profiler->frame_zone = DN_Profiler_BeginZone(profiler, DN_Str8Lit("Profiler Frame"), 0);
 }
 
 DN_API void DN_Profiler_Dump(DN_Profiler *profiler)
@@ -474,13 +472,13 @@ DN_API void DN_Profiler_Dump(DN_Profiler *profiler)
 
     DN_U64 tsc_exclusive              = anchor->tsc_exclusive;
     DN_U64 tsc_inclusive              = anchor->tsc_inclusive;
-    DN_F64 tsc_exclusive_milliseconds = tsc_exclusive * 1000 / DN_CAST(DN_F64) profiler->tsc_frequency;
+    DN_F64 tsc_exclusive_milliseconds = tsc_exclusive * 1000 / DN_Cast(DN_F64) profiler->tsc_frequency;
     if (tsc_exclusive == tsc_inclusive) {
-      DN_OS_PrintOutLnF("%.*s[%u]: %.1fms", DN_STR_FMT(anchor->name), anchor->hit_count, tsc_exclusive_milliseconds);
+      DN_OS_PrintOutLnF("%.*s[%u]: %.1fms", DN_Str8PrintFmt(anchor->name), anchor->hit_count, tsc_exclusive_milliseconds);
     } else {
-      DN_F64 tsc_inclusive_milliseconds = tsc_inclusive * 1000 / DN_CAST(DN_F64) profiler->tsc_frequency;
+      DN_F64 tsc_inclusive_milliseconds = tsc_inclusive * 1000 / DN_Cast(DN_F64) profiler->tsc_frequency;
       DN_OS_PrintOutLnF("%.*s[%u]: %.1f/%.1fms",
-                        DN_STR_FMT(anchor->name),
+                        DN_Str8PrintFmt(anchor->name),
                         anchor->hit_count,
                         tsc_exclusive_milliseconds,
                         tsc_inclusive_milliseconds);
@@ -490,12 +488,12 @@ DN_API void DN_Profiler_Dump(DN_Profiler *profiler)
 
 DN_API DN_F64 DN_Profiler_SecFromTSC(DN_Profiler *profiler, DN_U64 duration_tsc)
 {
-  DN_F64 result = DN_CAST(DN_F64)duration_tsc / profiler->tsc_frequency;
+  DN_F64 result = DN_Cast(DN_F64)duration_tsc / profiler->tsc_frequency;
   return result;
 }
 
 DN_API DN_F64 DN_Profiler_MsFromTSC(DN_Profiler *profiler, DN_U64 duration_tsc)
 {
-  DN_F64 result = DN_CAST(DN_F64)duration_tsc / profiler->tsc_frequency * 1000.0;
+  DN_F64 result = DN_Cast(DN_F64)duration_tsc / profiler->tsc_frequency * 1000.0;
   return result;
 }

@@ -57,15 +57,15 @@ DN_API void DN_OS_Print(DN_OSPrintDest dest, DN_Str8 string)
   }
 
   // NOTE: Write the string //////////////////////////////////////////////////////////////////////
-  DN_Assert(string.size < DN_CAST(unsigned long) - 1);
+  DN_Assert(string.size < DN_Cast(unsigned long) - 1);
   unsigned long bytes_written = 0;
   (void)bytes_written;
   if (print_to_console)
-    WriteConsoleA(print_handle, string.data, DN_CAST(unsigned long) string.size, &bytes_written, nullptr);
+    WriteConsoleA(print_handle, string.data, DN_Cast(unsigned long) string.size, &bytes_written, nullptr);
   else
-    WriteFile(print_handle, string.data, DN_CAST(unsigned long) string.size, &bytes_written, nullptr);
+    WriteFile(print_handle, string.data, DN_Cast(unsigned long) string.size, &bytes_written, nullptr);
 #else
-  fprintf(dest == DN_OSPrintDest_Out ? stdout : stderr, "%.*s", DN_STR_FMT(string));
+  fprintf(dest == DN_OSPrintDest_Out ? stdout : stderr, "%.*s", DN_Str8PrintFmt(string));
 #endif
 }
 
@@ -91,20 +91,20 @@ DN_API void DN_OS_PrintStyle(DN_OSPrintDest dest, DN_LOGStyle style, DN_Str8 str
     if (style.colour)
       DN_OS_Print(dest, DN_LOG_ColourEscapeCodeStr8FromRGB(DN_LOGColourType_Fg, style.r, style.g, style.b));
     if (style.bold == DN_LOGBold_Yes)
-      DN_OS_Print(dest, DN_STR8(DN_LOG_BoldEscapeCode));
+      DN_OS_Print(dest, DN_Str8Lit(DN_LOG_BoldEscapeCode));
     DN_OS_Print(dest, string);
     if (style.colour || style.bold == DN_LOGBold_Yes)
-      DN_OS_Print(dest, DN_STR8(DN_LOG_ResetEscapeCode));
+      DN_OS_Print(dest, DN_Str8Lit(DN_LOG_ResetEscapeCode));
   }
 }
 
 static char *DN_OS_PrintVSPrintfChunker_(const char *buf, void *user, int len)
 {
   DN_Str8 string = {};
-  string.data    = DN_CAST(char *) buf;
+  string.data    = DN_Cast(char *) buf;
   string.size    = len;
 
-  DN_OSPrintDest dest = DN_CAST(DN_OSPrintDest) DN_CAST(uintptr_t) user;
+  DN_OSPrintDest dest = DN_Cast(DN_OSPrintDest) DN_Cast(uintptr_t) user;
   DN_OS_Print(dest, string);
   return (char *)buf;
 }
@@ -113,7 +113,7 @@ DN_API void DN_OS_PrintFV(DN_OSPrintDest dest, DN_FMT_ATTRIB char const *fmt, va
 {
   char buffer[STB_SPRINTF_MIN];
   STB_SPRINTF_DECORATE(vsprintfcb)
-  (DN_OS_PrintVSPrintfChunker_, DN_CAST(void *) DN_CAST(uintptr_t) dest, buffer, fmt, args);
+  (DN_OS_PrintVSPrintfChunker_, DN_Cast(void *) DN_Cast(uintptr_t) dest, buffer, fmt, args);
 }
 
 DN_API void DN_OS_PrintFVStyle(DN_OSPrintDest dest, DN_LOGStyle style, DN_FMT_ATTRIB char const *fmt, va_list args)
@@ -122,17 +122,17 @@ DN_API void DN_OS_PrintFVStyle(DN_OSPrintDest dest, DN_LOGStyle style, DN_FMT_AT
     if (style.colour)
       DN_OS_Print(dest, DN_LOG_ColourEscapeCodeStr8FromRGB(DN_LOGColourType_Fg, style.r, style.g, style.b));
     if (style.bold == DN_LOGBold_Yes)
-      DN_OS_Print(dest, DN_STR8(DN_LOG_BoldEscapeCode));
+      DN_OS_Print(dest, DN_Str8Lit(DN_LOG_BoldEscapeCode));
     DN_OS_PrintFV(dest, fmt, args);
     if (style.colour || style.bold == DN_LOGBold_Yes)
-      DN_OS_Print(dest, DN_STR8(DN_LOG_ResetEscapeCode));
+      DN_OS_Print(dest, DN_Str8Lit(DN_LOG_ResetEscapeCode));
   }
 }
 
 DN_API void DN_OS_PrintLn(DN_OSPrintDest dest, DN_Str8 string)
 {
   DN_OS_Print(dest, string);
-  DN_OS_Print(dest, DN_STR8("\n"));
+  DN_OS_Print(dest, DN_Str8Lit("\n"));
 }
 
 DN_API void DN_OS_PrintLnF(DN_OSPrintDest dest, DN_FMT_ATTRIB char const *fmt, ...)
@@ -146,13 +146,13 @@ DN_API void DN_OS_PrintLnF(DN_OSPrintDest dest, DN_FMT_ATTRIB char const *fmt, .
 DN_API void DN_OS_PrintLnFV(DN_OSPrintDest dest, DN_FMT_ATTRIB char const *fmt, va_list args)
 {
   DN_OS_PrintFV(dest, fmt, args);
-  DN_OS_Print(dest, DN_STR8("\n"));
+  DN_OS_Print(dest, DN_Str8Lit("\n"));
 }
 
 DN_API void DN_OS_PrintLnStyle(DN_OSPrintDest dest, DN_LOGStyle style, DN_Str8 string)
 {
   DN_OS_PrintStyle(dest, style, string);
-  DN_OS_Print(dest, DN_STR8("\n"));
+  DN_OS_Print(dest, DN_Str8Lit("\n"));
 }
 
 DN_API void DN_OS_PrintLnFStyle(DN_OSPrintDest dest, DN_LOGStyle style, DN_FMT_ATTRIB char const *fmt, ...)
@@ -166,5 +166,5 @@ DN_API void DN_OS_PrintLnFStyle(DN_OSPrintDest dest, DN_LOGStyle style, DN_FMT_A
 DN_API void DN_OS_PrintLnFVStyle(DN_OSPrintDest dest, DN_LOGStyle style, DN_FMT_ATTRIB char const *fmt, va_list args)
 {
   DN_OS_PrintFVStyle(dest, style, fmt, args);
-  DN_OS_Print(dest, DN_STR8("\n"));
+  DN_OS_Print(dest, DN_Str8Lit("\n"));
 }

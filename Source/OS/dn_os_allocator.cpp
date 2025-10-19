@@ -3,23 +3,23 @@
 #include "../dn_base_inc.h"
 #include "../dn_os_inc.h"
 
-static void *DN_Arena_BasicAllocFromOSHeap(DN_USize size)
+static void *DN_ArenaBasicAllocFromOSHeap(DN_USize size)
 {
-  void *result = DN_OS_MemAlloc(size, DN_ZeroMem_Yes);
+  void *result = DN_OS_MemAlloc(size, DN_ZMem_Yes);
   return result;
 }
 
-DN_API DN_Arena DN_Arena_FromHeap(DN_U64 size, DN_ArenaFlags flags)
+DN_API DN_Arena DN_ArenaFromHeap(DN_U64 size, DN_ArenaFlags flags)
 {
   DN_ArenaMemFuncs mem_funcs = {};
   mem_funcs.type             = DN_ArenaMemFuncType_Basic;
-  mem_funcs.basic_alloc      = DN_Arena_BasicAllocFromOSHeap;
+  mem_funcs.basic_alloc      = DN_ArenaBasicAllocFromOSHeap;
   mem_funcs.basic_dealloc    = DN_OS_MemDealloc;
-  DN_Arena result            = DN_Arena_FromMemFuncs(size, size, flags, mem_funcs);
+  DN_Arena result            = DN_ArenaFromMemFuncs(size, size, flags, mem_funcs);
   return result;
 }
 
-DN_API DN_Arena DN_Arena_FromVMem(DN_U64 reserve, DN_U64 commit, DN_ArenaFlags flags)
+DN_API DN_Arena DN_ArenaFromVMem(DN_U64 reserve, DN_U64 commit, DN_ArenaFlags flags)
 {
   DN_ArenaMemFuncs mem_funcs = {};
   mem_funcs.type             = DN_ArenaMemFuncType_VMem;
@@ -27,7 +27,7 @@ DN_API DN_Arena DN_Arena_FromVMem(DN_U64 reserve, DN_U64 commit, DN_ArenaFlags f
   mem_funcs.vmem_reserve     = DN_OS_MemReserve;
   mem_funcs.vmem_commit      = DN_OS_MemCommit;
   mem_funcs.vmem_release     = DN_OS_MemRelease;
-  DN_Arena result            = DN_Arena_FromMemFuncs(reserve, commit, flags, mem_funcs);
+  DN_Arena result            = DN_ArenaFromMemFuncs(reserve, commit, flags, mem_funcs);
   return result;
 }
 

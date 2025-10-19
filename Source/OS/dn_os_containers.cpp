@@ -22,7 +22,7 @@ template <typename T>
 DN_VArray<T> DN_VArray_InitByteSize(DN_USize byte_size)
 {
   DN_VArray<T> result = {};
-  result.data         = DN_CAST(T *) DN_OS_MemReserve(byte_size, DN_MemCommit_No, DN_MemPage_ReadWrite);
+  result.data         = DN_Cast(T *) DN_OS_MemReserve(byte_size, DN_MemCommit_No, DN_MemPage_ReadWrite);
   if (result.data)
     result.max = byte_size / sizeof(T);
   return result;
@@ -80,7 +80,7 @@ DN_Slice<T> DN_VArray_Slice(DN_VArray<T> const *array)
 template <typename T>
 T *DN_VArray_AddArray(DN_VArray<T> *array, T const *items, DN_USize count)
 {
-  T *result = DN_VArray_MakeArray(array, count, DN_ZeroMem_No);
+  T *result = DN_VArray_MakeArray(array, count, DN_ZMem_No);
   if (result)
     DN_Memcpy(result, items, count * sizeof(T));
   return result;
@@ -101,7 +101,7 @@ T *DN_VArray_Add(DN_VArray<T> *array, T const &item)
 }
 
 template <typename T>
-T *DN_VArray_MakeArray(DN_VArray<T> *array, DN_USize count, DN_ZeroMem zero_mem)
+T *DN_VArray_MakeArray(DN_VArray<T> *array, DN_USize count, DN_ZMem z_mem)
 {
   if (!DN_VArray_IsValid(array))
     return nullptr;
@@ -115,15 +115,15 @@ T *DN_VArray_MakeArray(DN_VArray<T> *array, DN_USize count, DN_ZeroMem zero_mem)
   // TODO: Use placement new
   T *result = array->data + array->size;
   array->size += count;
-  if (zero_mem == DN_ZeroMem_Yes)
+  if (z_mem == DN_ZMem_Yes)
     DN_Memset(result, 0, count * sizeof(T));
   return result;
 }
 
 template <typename T>
-T *DN_VArray_Make(DN_VArray<T> *array, DN_ZeroMem zero_mem)
+T *DN_VArray_Make(DN_VArray<T> *array, DN_ZMem z_mem)
 {
-  T *result = DN_VArray_MakeArray(array, 1, zero_mem);
+  T *result = DN_VArray_MakeArray(array, 1, z_mem);
   return result;
 }
 
@@ -177,10 +177,10 @@ DN_ArrayEraseResult DN_VArray_EraseRange(DN_VArray<T> *array, DN_USize begin_ind
 }
 
 template <typename T>
-void DN_VArray_Clear(DN_VArray<T> *array, DN_ZeroMem zero_mem)
+void DN_VArray_Clear(DN_VArray<T> *array, DN_ZMem z_mem)
 {
   if (array) {
-    if (zero_mem == DN_ZeroMem_Yes)
+    if (z_mem == DN_ZMem_Yes)
       DN_Memset(array->data, 0, array->size * sizeof(T));
     array->size = 0;
   }

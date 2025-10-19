@@ -10,14 +10,14 @@ DN_API void *DN_CArray2_InsertArray(void *data, DN_USize *size, DN_USize max, DN
 
   DN_USize clamped_index = DN_Min(index, *size);
   if (clamped_index != *size) {
-    char const *src           = DN_CAST(char *)data + (clamped_index * elem_size);
-    char const *dest          = DN_CAST(char *)data + ((clamped_index + count) * elem_size);
-    char const *end           = DN_CAST(char *)data + (size[0] * elem_size);
+    char const *src           = DN_Cast(char *)data + (clamped_index * elem_size);
+    char const *dest          = DN_Cast(char *)data + ((clamped_index + count) * elem_size);
+    char const *end           = DN_Cast(char *)data + (size[0] * elem_size);
     DN_USize    bytes_to_move = end - src;
-    DN_Memmove(DN_CAST(void *) dest, src, bytes_to_move);
+    DN_Memmove(DN_Cast(void *) dest, src, bytes_to_move);
   }
 
-  result = DN_CAST(char *)data + (clamped_index * elem_size);
+  result = DN_Cast(char *)data + (clamped_index * elem_size);
   DN_Memcpy(result, items, elem_size * count);
   *size += count;
   return result;
@@ -66,14 +66,14 @@ DN_API DN_ArrayEraseResult DN_CArray2_EraseRange(void *data, DN_USize *size, DN_
   return result;
 }
 
-DN_API void *DN_CArray2_MakeArray(void *data, DN_USize *size, DN_USize max, DN_USize data_size, DN_USize make_size, DN_ZeroMem zero_mem)
+DN_API void *DN_CArray2_MakeArray(void *data, DN_USize *size, DN_USize max, DN_USize data_size, DN_USize make_size, DN_ZMem z_mem)
 {
   void *result = nullptr;
   DN_USize new_size = *size + make_size;
   if (new_size <= max) {
-    result = DN_CAST(char *) data + (data_size * size[0]);
+    result = DN_Cast(char *) data + (data_size * size[0]);
     *size  = new_size;
-    if (zero_mem == DN_ZeroMem_Yes)
+    if (z_mem == DN_ZMem_Yes)
       DN_Memset(result, 0, data_size * make_size);
   }
 
@@ -82,13 +82,13 @@ DN_API void *DN_CArray2_MakeArray(void *data, DN_USize *size, DN_USize max, DN_U
 
 DN_API void *DN_CArray2_AddArray(void *data, DN_USize *size, DN_USize max, DN_USize data_size, void const *elems, DN_USize elems_count, DN_ArrayAdd add)
 {
-  void *result = DN_CArray2_MakeArray(data, size, max, data_size, elems_count, DN_ZeroMem_No);
+  void *result = DN_CArray2_MakeArray(data, size, max, data_size, elems_count, DN_ZMem_No);
   if (result) {
     if (add == DN_ArrayAdd_Append) {
       DN_Memcpy(result, elems, elems_count * data_size);
     } else {
-      char *move_dest = DN_CAST(char *)data + (elems_count * data_size); // Shift elements forward
-      char *move_src  = DN_CAST(char *)data;
+      char *move_dest = DN_Cast(char *)data + (elems_count * data_size); // Shift elements forward
+      char *move_src  = DN_Cast(char *)data;
       DN_Memmove(move_dest, move_src, data_size * size[0]);
       DN_Memcpy(data, elems, data_size * elems_count);
     }
@@ -101,11 +101,11 @@ DN_API bool DN_CArray2_ResizeFromPool(void **data, DN_USize *size, DN_USize *max
   bool result = true;
   if (new_max != *max) {
     DN_USize bytes_to_alloc = data_size * new_max;
-    void    *buffer         = DN_Pool_NewArray(pool, DN_U8, bytes_to_alloc);
+    void    *buffer         = DN_PoolNewArray(pool, DN_U8, bytes_to_alloc);
     if (buffer) {
       DN_USize bytes_to_copy = data_size * DN_Min(*size, new_max);
       DN_Memcpy(buffer, *data, bytes_to_copy);
-      DN_Pool_Dealloc(pool, *data);
+      DN_PoolDealloc(pool, *data);
       *data = buffer;
       *max  = new_max;
       *size = DN_Min(*size, new_max);
@@ -243,7 +243,7 @@ DN_ArrayEraseResult DN_CArray_EraseRange(T *data, DN_USize *size, DN_USize begin
 }
 
 template <typename T>
-T *DN_CArray_MakeArray(T *data, DN_USize *size, DN_USize max, DN_USize count, DN_ZeroMem zero_mem)
+T *DN_CArray_MakeArray(T *data, DN_USize *size, DN_USize max, DN_USize count, DN_ZMem z_mem)
 {
   if (!data || !size || count == 0)
     return nullptr;
@@ -254,7 +254,7 @@ T *DN_CArray_MakeArray(T *data, DN_USize *size, DN_USize max, DN_USize count, DN
   // TODO: Use placement new? Why doesn't this work?
   T *result = data + *size;
   *size += count;
-  if (zero_mem == DN_ZeroMem_Yes)
+  if (z_mem == DN_ZMem_Yes)
     DN_Memset(result, 0, sizeof(*result) * count);
   return result;
 }
@@ -268,11 +268,11 @@ T *DN_CArray_InsertArray(T *data, DN_USize *size, DN_USize max, DN_USize index, 
 
   DN_USize clamped_index = DN_Min(index, *size);
   if (clamped_index != *size) {
-    char const *src           = DN_CAST(char *)(data + clamped_index);
-    char const *dest          = DN_CAST(char *)(data + (clamped_index + count));
-    char const *end           = DN_CAST(char *)(data + (*size));
+    char const *src           = DN_Cast(char *)(data + clamped_index);
+    char const *dest          = DN_Cast(char *)(data + (clamped_index + count));
+    char const *end           = DN_Cast(char *)(data + (*size));
     DN_USize    bytes_to_move = end - src;
-    DN_Memmove(DN_CAST(void *) dest, src, bytes_to_move);
+    DN_Memmove(DN_Cast(void *) dest, src, bytes_to_move);
   }
 
   result = data + clamped_index;
@@ -329,34 +329,34 @@ DN_ArrayFindResult<T> DN_CArray_Find(T *data, DN_USize size, T const &value)
 #if !defined(DN_NO_SARRAY)
 // NOTE: DN_SArray /////////////////////////////////////////////////////////////////////////////////
 template <typename T>
-DN_SArray<T> DN_SArray_Init(DN_Arena *arena, DN_USize size, DN_ZeroMem zero_mem)
+DN_SArray<T> DN_SArray_Init(DN_Arena *arena, DN_USize size, DN_ZMem z_mem)
 {
   DN_SArray<T> result = {};
   if (!arena || !size)
     return result;
-  result.data = DN_Arena_NewArray(arena, T, size, zero_mem);
+  result.data = DN_ArenaNewArray(arena, T, size, z_mem);
   if (result.data)
     result.max = size;
   return result;
 }
 
 template <typename T>
-DN_SArray<T> DN_SArray_InitSlice(DN_Arena *arena, DN_Slice<T> slice, DN_USize size, DN_ZeroMem zero_mem)
+DN_SArray<T> DN_SArray_InitSlice(DN_Arena *arena, DN_Slice<T> slice, DN_USize size, DN_ZMem z_mem)
 {
   DN_USize     max    = DN_Max(slice.size, size);
-  DN_SArray<T> result = DN_SArray_Init<T>(arena, max, DN_ZeroMem_No);
+  DN_SArray<T> result = DN_SArray_Init<T>(arena, max, DN_ZMem_No);
   if (DN_SArray_IsValid(&result)) {
     DN_SArray_AddArray(&result, slice.data, slice.size);
-    if (zero_mem == DN_ZeroMem_Yes)
+    if (z_mem == DN_ZMem_Yes)
       DN_Memset(result.data + result.size, 0, (result.max - result.size) * sizeof(T));
   }
   return result;
 }
 
 template <typename T, size_t N>
-DN_SArray<T> DN_SArray_InitCArray(DN_Arena *arena, T const (&array)[N], DN_USize size, DN_ZeroMem zero_mem)
+DN_SArray<T> DN_SArray_InitCArray(DN_Arena *arena, T const (&array)[N], DN_USize size, DN_ZMem z_mem)
 {
-  DN_SArray<T> result = DN_SArray_InitSlice(arena, DN_Slice_Init(DN_CAST(T *) array, N), size, zero_mem);
+  DN_SArray<T> result = DN_SArray_InitSlice(arena, DN_Slice_Init(DN_Cast(T *) array, N), size, z_mem);
   return result;
 }
 
@@ -381,30 +381,30 @@ DN_Slice<T> DN_SArray_Slice(DN_SArray<T> const *array)
 {
   DN_Slice<T> result = {};
   if (array)
-    result = DN_Slice_Init<T>(DN_CAST(T *) array->data, array->size);
+    result = DN_Slice_Init<T>(DN_Cast(T *) array->data, array->size);
   return result;
 }
 
 template <typename T>
-T *DN_SArray_MakeArray(DN_SArray<T> *array, DN_USize count, DN_ZeroMem zero_mem)
+T *DN_SArray_MakeArray(DN_SArray<T> *array, DN_USize count, DN_ZMem z_mem)
 {
   if (!DN_SArray_IsValid(array))
     return nullptr;
-  T *result = DN_CArray_MakeArray(array->data, &array->size, array->max, count, zero_mem);
+  T *result = DN_CArray_MakeArray(array->data, &array->size, array->max, count, z_mem);
   return result;
 }
 
 template <typename T>
-T *DN_SArray_Make(DN_SArray<T> *array, DN_ZeroMem zero_mem)
+T *DN_SArray_Make(DN_SArray<T> *array, DN_ZMem z_mem)
 {
-  T *result = DN_SArray_MakeArray(array, 1, zero_mem);
+  T *result = DN_SArray_MakeArray(array, 1, z_mem);
   return result;
 }
 
 template <typename T>
 T *DN_SArray_AddArray(DN_SArray<T> *array, T const *items, DN_USize count)
 {
-  T *result = DN_SArray_MakeArray(array, count, DN_ZeroMem_No);
+  T *result = DN_SArray_MakeArray(array, count, DN_ZMem_No);
   if (result)
     DN_Memcpy(result, items, count * sizeof(T));
   return result;
@@ -517,14 +517,14 @@ DN_Slice<T> DN_FArray_Slice(DN_FArray<T, N> const *array)
 {
   DN_Slice<T> result = {};
   if (array)
-    result = DN_Slice_Init<T>(DN_CAST(T *) array->data, array->size);
+    result = DN_Slice_Init<T>(DN_Cast(T *) array->data, array->size);
   return result;
 }
 
 template <typename T, DN_USize N>
 T *DN_FArray_AddArray(DN_FArray<T, N> *array, T const *items, DN_USize count)
 {
-  T *result = DN_FArray_MakeArray(array, count, DN_ZeroMem_No);
+  T *result = DN_FArray_MakeArray(array, count, DN_ZMem_No);
   if (result)
     DN_Memcpy(result, items, count * sizeof(T));
   return result;
@@ -533,7 +533,7 @@ T *DN_FArray_AddArray(DN_FArray<T, N> *array, T const *items, DN_USize count)
 template <typename T, DN_USize N, DN_USize K>
 T *DN_FArray_AddCArray(DN_FArray<T, N> *array, T const (&items)[K])
 {
-  T *result = DN_FArray_MakeArray(array, K, DN_ZeroMem_No);
+  T *result = DN_FArray_MakeArray(array, K, DN_ZMem_No);
   if (result)
     DN_Memcpy(result, items, K * sizeof(T));
   return result;
@@ -547,18 +547,18 @@ T *DN_FArray_Add(DN_FArray<T, N> *array, T const &item)
 }
 
 template <typename T, DN_USize N>
-T *DN_FArray_MakeArray(DN_FArray<T, N> *array, DN_USize count, DN_ZeroMem zero_mem)
+T *DN_FArray_MakeArray(DN_FArray<T, N> *array, DN_USize count, DN_ZMem z_mem)
 {
   if (!DN_FArray_IsValid(array))
     return nullptr;
-  T *result = DN_CArray_MakeArray(array->data, &array->size, N, count, zero_mem);
+  T *result = DN_CArray_MakeArray(array->data, &array->size, N, count, z_mem);
   return result;
 }
 
 template <typename T, DN_USize N>
-T *DN_FArray_Make(DN_FArray<T, N> *array, DN_ZeroMem zero_mem)
+T *DN_FArray_Make(DN_FArray<T, N> *array, DN_ZMem z_mem)
 {
-  T *result = DN_FArray_MakeArray(array, 1, zero_mem);
+  T *result = DN_FArray_MakeArray(array, 1, z_mem);
   return result;
 }
 
@@ -640,7 +640,7 @@ DN_Slice<T> DN_Slice_Init(T *const data, DN_USize size)
 template <typename T, DN_USize N>
 DN_Slice<T> DN_Slice_InitCArrayCopy(DN_Arena *arena, T const (&array)[N])
 {
-  DN_Slice<T> result = DN_Slice_Alloc<T>(arena, N, DN_ZeroMem_No);
+  DN_Slice<T> result = DN_Slice_Alloc<T>(arena, N, DN_ZMem_No);
   if (result.data)
     DN_Memcpy(result.data, array, sizeof(T) * N);
   return result;
@@ -649,7 +649,7 @@ DN_Slice<T> DN_Slice_InitCArrayCopy(DN_Arena *arena, T const (&array)[N])
 template <typename T>
 DN_Slice<T> DN_Slice_CopyPtr(DN_Arena *arena, T *const data, DN_USize size)
 {
-  T          *copy   = DN_Arena_NewArrayCopy(arena, T, data, size);
+  T          *copy   = DN_ArenaNewArrayCopy(arena, T, data, size);
   DN_Slice<T> result = DN_Slice_Init(copy, copy ? size : 0);
   return result;
 }
@@ -662,12 +662,12 @@ DN_Slice<T> DN_Slice_Copy(DN_Arena *arena, DN_Slice<T> slice)
 }
 
 template <typename T>
-DN_Slice<T> DN_Slice_Alloc(DN_Arena *arena, DN_USize size, DN_ZeroMem zero_mem)
+DN_Slice<T> DN_Slice_Alloc(DN_Arena *arena, DN_USize size, DN_ZMem z_mem)
 {
   DN_Slice<T> result = {};
   if (!arena || size == 0)
     return result;
-  result.data = DN_Arena_NewArray(arena, T, size, zero_mem);
+  result.data = DN_ArenaNewArray(arena, T, size, z_mem);
   if (result.data)
     result.size = size;
   return result;
@@ -691,9 +691,9 @@ DN_DSMap<T> DN_DSMap_Init(DN_Arena *arena, DN_U32 size, DN_DSMapFlags flags)
   if (!DN_Check(arena))
     return result;
   result.arena        = arena;
-  result.pool         = DN_Pool_FromArena(arena, DN_POOL_DEFAULT_ALIGN);
-  result.hash_to_slot = DN_Arena_NewArray(result.arena, DN_U32, size, DN_ZeroMem_Yes);
-  result.slots        = DN_Arena_NewArray(result.arena, DN_DSMapSlot<T>, size, DN_ZeroMem_Yes);
+  result.pool         = DN_PoolFromArena(arena, DN_POOL_DEFAULT_ALIGN);
+  result.hash_to_slot = DN_ArenaNewArray(result.arena, DN_U32, size, DN_ZMem_Yes);
+  result.slots        = DN_ArenaNewArray(result.arena, DN_DSMapSlot<T>, size, DN_ZMem_Yes);
   result.occupied     = 1; // For sentinel
   result.size         = size;
   result.initial_size = size;
@@ -703,13 +703,13 @@ DN_DSMap<T> DN_DSMap_Init(DN_Arena *arena, DN_U32 size, DN_DSMapFlags flags)
 }
 
 template <typename T>
-void DN_DSMap_Deinit(DN_DSMap<T> *map, DN_ZeroMem zero_mem)
+void DN_DSMap_Deinit(DN_DSMap<T> *map, DN_ZMem z_mem)
 {
   if (!map)
     return;
-  // TODO(doyle): Use zero_mem
-  (void)zero_mem;
-  DN_Arena_Deinit(map->arena);
+  // TODO(doyle): Use z_mem
+  (void)z_mem;
+  DN_ArenaDeinit(map->arena);
   *map = {};
 }
 
@@ -733,7 +733,7 @@ DN_U32 DN_DSMap_Hash(DN_DSMap<T> const *map, DN_DSMapKey key)
     return result;
 
   if (key.type == DN_DSMapKeyType_U64NoHash) {
-    result = DN_CAST(DN_U32) key.u64;
+    result = DN_Cast(DN_U32) key.u64;
     return result;
   }
 
@@ -761,12 +761,12 @@ DN_U32 DN_DSMap_Hash(DN_DSMap<T> const *map, DN_DSMapKey key)
       case DN_DSMapKeyType_Invalid:           break;
 
       case DN_DSMapKeyType_Buffer:
-        key_ptr = DN_CAST(char const *) key.buffer_data;
+        key_ptr = DN_Cast(char const *) key.buffer_data;
         len     = key.buffer_size;
         break;
 
       case DN_DSMapKeyType_U64:
-        key_ptr = DN_CAST(char const *) & key.u64;
+        key_ptr = DN_Cast(char const *) & key.u64;
         len     = sizeof(key.u64);
         break;
     }
@@ -870,7 +870,7 @@ DN_DSMapResult<T> DN_DSMap_Make(DN_DSMap<T> *map, DN_DSMapKey key)
       if ((key.type == DN_DSMapKeyType_Buffer ||
            key.type == DN_DSMapKeyType_BufferAsU64NoHash) &&
           !key.no_copy_buffer)
-        result.slot->key.buffer_data = DN_Pool_NewArrayCopy(&map->pool, char, key.buffer_data, key.buffer_size);
+        result.slot->key.buffer_data = DN_PoolNewArrayCopy(&map->pool, char, key.buffer_data, key.buffer_size);
     }
   } else {
     result.slot  = map->slots + map->hash_to_slot[index];
@@ -970,7 +970,7 @@ bool DN_DSMap_Resize(DN_DSMap<T> *map, DN_U32 size)
   }
 
   if ((map->flags & DN_DSMapFlags_DontFreeArenaOnResize) == 0)
-    DN_DSMap_Deinit(map, DN_ZeroMem_No);
+    DN_DSMap_Deinit(map, DN_ZMem_No);
   *map            = new_map;    // Update the map inplace
   map->arena      = prev_arena; // Restore the previous arena pointer, it's been de-init-ed
   *map->arena     = new_arena;  // Re-init the old arena with the new data
@@ -997,7 +997,7 @@ bool DN_DSMap_Erase(DN_DSMap<T> *map, DN_DSMapKey key)
 
   DN_DSMapSlot<T> *slot = map->slots + slot_index;
   if (!slot->key.no_copy_buffer)
-    DN_Pool_Dealloc(&map->pool, DN_CAST(void *) slot->key.buffer_data);
+    DN_PoolDealloc(&map->pool, DN_Cast(void *) slot->key.buffer_data);
   *slot = {}; // TODO: Optional?
 
   if (map->occupied > 1 /*Sentinel*/) {
@@ -1074,7 +1074,7 @@ DN_DSMapKey DN_DSMap_KeyBuffer(DN_DSMap<T> const *map, void const *data, DN_USiz
   DN_DSMapKey result = {};
   result.type        = DN_DSMapKeyType_Buffer;
   result.buffer_data = data;
-  result.buffer_size = DN_CAST(DN_U32) size;
+  result.buffer_size = DN_Cast(DN_U32) size;
   result.hash        = DN_DSMap_Hash(map, result);
   return result;
 }
@@ -1085,7 +1085,7 @@ DN_DSMapKey DN_DSMap_KeyBufferAsU64NoHash(DN_DSMap<T> const *map, void const *da
   DN_DSMapKey result = {};
   result.type        = DN_DSMapKeyType_BufferAsU64NoHash;
   result.buffer_data = data;
-  result.buffer_size = DN_CAST(DN_U32) size;
+  result.buffer_size = DN_Cast(DN_U32) size;
   DN_Assert(size >= sizeof(result.hash));
   DN_Memcpy(&result.hash, data, sizeof(result.hash));
   return result;
@@ -1158,16 +1158,16 @@ DN_API bool DN_List_AttachTail_(DN_List<T> *list, DN_ListChunk<T> *tail)
 template <typename T>
 DN_API DN_ListChunk<T> *DN_List_AllocArena_(DN_List<T> *list, DN_Arena *arena, DN_USize count)
 {
-  auto           *result = DN_Arena_New(arena, DN_ListChunk<T>, DN_ZeroMem_Yes);
-  DN_ArenaTempMem tmem   = DN_Arena_TempMemBegin(arena);
+  auto           *result = DN_ArenaNew(arena, DN_ListChunk<T>, DN_ZMem_Yes);
+  DN_ArenaTempMem tmem   = DN_ArenaTempMemBegin(arena);
   if (!result)
     return nullptr;
 
   DN_USize items = DN_Max(list->chunk_size, count);
-  result->data   = DN_Arena_NewArray(arena, T, items, DN_ZeroMem_Yes);
+  result->data   = DN_ArenaNewArray(arena, T, items, DN_ZMem_Yes);
   result->size   = items;
   if (!result->data) {
-    DN_Arena_TempMemEnd(tmem);
+    DN_ArenaTempMemEnd(tmem);
     result = nullptr;
   }
 
@@ -1178,15 +1178,15 @@ DN_API DN_ListChunk<T> *DN_List_AllocArena_(DN_List<T> *list, DN_Arena *arena, D
 template <typename T>
 DN_API DN_ListChunk<T> *DN_List_AllocPool_(DN_List<T> *list, DN_Pool *pool, DN_USize count)
 {
-  auto *result = DN_Pool_New(pool, DN_ListChunk<T>);
+  auto *result = DN_PoolNew(pool, DN_ListChunk<T>);
   if (!result)
     return nullptr;
 
   DN_USize items = DN_Max(list->chunk_size, count);
-  result->data   = DN_Pool_NewArray(pool, T, items);
+  result->data   = DN_PoolNewArray(pool, T, items);
   result->size   = items;
   if (!result->data) {
-    DN_Pool_Dealloc(result);
+    DN_PoolDealloc(result);
     result = nullptr;
   }
 
@@ -1349,12 +1349,12 @@ template <typename T>
 DN_Slice<T> DN_List_ToSliceCopy(DN_List<T> const *list, DN_Arena *arena)
 {
   // TODO(doyle): Chunk memcopies is much faster
-  DN_Slice<T> result = DN_Slice_Alloc<T>(arena, list->count, DN_ZeroMem_No);
+  DN_Slice<T> result = DN_Slice_Alloc<T>(arena, list->count, DN_ZMem_No);
   if (result.size) {
     DN_USize slice_index = 0;
     DN_MSVC_WARNING_PUSH
     DN_MSVC_WARNING_DISABLE(6011) // Dereferencing NULL pointer 'x'
-    for (DN_ListIterator<T> it = {}; DN_List_Iterate<T>(DN_CAST(DN_List<T> *) list, &it, 0);)
+    for (DN_ListIterator<T> it = {}; DN_List_Iterate<T>(DN_Cast(DN_List<T> *) list, &it, 0);)
       result.data[slice_index++] = *it.data;
     DN_MSVC_WARNING_POP
     DN_Assert(slice_index == result.size);
@@ -1378,7 +1378,7 @@ DN_API DN_Str8 DN_Slice_Str8Render(DN_Arena *arena, DN_Slice<DN_Str8> array, DN_
     total_size += item.size;
   }
 
-  result = DN_Str8_Alloc(arena, total_size, DN_ZeroMem_No);
+  result = DN_Str8FromArena(arena, total_size, DN_ZMem_No);
   if (result.data) {
     DN_USize write_index = 0;
     for (DN_USize index = 0; index < array.size; index++) {
@@ -1397,7 +1397,7 @@ DN_API DN_Str8 DN_Slice_Str8Render(DN_Arena *arena, DN_Slice<DN_Str8> array, DN_
 
 DN_API DN_Str8 DN_Slice_Str8RenderSpaceSeparated(DN_Arena *arena, DN_Slice<DN_Str8> array)
 {
-  DN_Str8 result = DN_Slice_Str8Render(arena, array, DN_STR8(" "));
+  DN_Str8 result = DN_Slice_Str8Render(arena, array, DN_Str8Lit(" "));
   return result;
 }
 
@@ -1415,7 +1415,7 @@ DN_API DN_Str16 DN_Slice_Str16Render(DN_Arena *arena, DN_Slice<DN_Str16> array, 
     total_size += item.size;
   }
 
-  result = {DN_Arena_NewArray(arena, wchar_t, total_size + 1, DN_ZeroMem_No), total_size};
+  result = {DN_ArenaNewArray(arena, wchar_t, total_size + 1, DN_ZMem_No), total_size};
   if (result.data) {
     DN_USize write_index = 0;
     for (DN_USize index = 0; index < array.size; index++) {
@@ -1435,7 +1435,7 @@ DN_API DN_Str16 DN_Slice_Str16Render(DN_Arena *arena, DN_Slice<DN_Str16> array, 
 
 DN_API DN_Str16 DN_Slice_Str16RenderSpaceSeparated(DN_Arena *arena, DN_Slice<DN_Str16> array)
 {
-  DN_Str16 result = DN_Slice_Str16Render(arena, array, DN_STR16(L" "));
+  DN_Str16 result = DN_Slice_Str16Render(arena, array, DN_Str16Lit(L" "));
   return result;
 }
 
@@ -1446,7 +1446,7 @@ DN_API DN_DSMapKey DN_DSMap_KeyU64NoHash(DN_U64 u64)
   DN_DSMapKey result = {};
   result.type        = DN_DSMapKeyType_U64NoHash;
   result.u64         = u64;
-  result.hash        = DN_CAST(DN_U32) u64;
+  result.hash        = DN_Cast(DN_U32) u64;
   return result;
 }
 

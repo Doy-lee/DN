@@ -1200,15 +1200,14 @@ DN_API DN_Str8x256 DN_M4_ColumnMajorString(DN_M4 mat)
   for (int row = 0; row < 4; row++) {
     for (int it = 0; it < 4; it++) {
       if (it == 0)
-        DN_IStr8_AppendF(&result, "|");
-      DN_IStr8_AppendF(&result, "%.5f", mat.columns[it][row]);
+        DN_FmtAppend(result.data, &result.size, sizeof(result.data), "|");
+      DN_FmtAppend(result.data, &result.size, sizeof(result.data), "%.5f", mat.columns[it][row]);
       if (it != 3)
-        DN_IStr8_AppendF(&result, ", ");
+        DN_FmtAppend(result.data, &result.size, sizeof(result.data), ", ");
       else
-        DN_IStr8_AppendF(&result, "|\n");
+        DN_FmtAppend(result.data, &result.size, sizeof(result.data), "|\n");
     }
   }
-
   return result;
 }
 

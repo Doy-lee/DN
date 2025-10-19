@@ -94,8 +94,8 @@ DN_API int DN_OS_MemProtect(void *ptr, DN_USize size, DN_U32 page_flags)
     return 0;
 
   static DN_Str8 const ALIGNMENT_ERROR_MSG =
-      DN_STR8("Page protection requires pointers to be page aligned because we can only guard memory at a multiple of the page boundary.");
-  DN_AssertF(DN_IsPowerOfTwoAligned(DN_CAST(uintptr_t) ptr, g_dn_os_core_->page_size), "%s", ALIGNMENT_ERROR_MSG.data);
+      DN_Str8Lit("Page protection requires pointers to be page aligned because we can only guard memory at a multiple of the page boundary.");
+  DN_AssertF(DN_IsPowerOfTwoAligned(DN_Cast(uintptr_t) ptr, g_dn_os_core_->page_size), "%s", ALIGNMENT_ERROR_MSG.data);
   DN_AssertF(DN_IsPowerOfTwoAligned(size, g_dn_os_core_->page_size), "%s", ALIGNMENT_ERROR_MSG.data);
 
   unsigned long os_page_flags = DN_OS_MemConvertPageToOSFlags_(page_flags);
@@ -108,11 +108,11 @@ DN_API int DN_OS_MemProtect(void *ptr, DN_USize size, DN_U32 page_flags)
   return result;
 }
 
-DN_API void *DN_OS_MemAlloc(DN_USize size, DN_ZeroMem zero_mem)
+DN_API void *DN_OS_MemAlloc(DN_USize size, DN_ZMem z_mem)
 {
-  DN_U32 flags = zero_mem == DN_ZeroMem_Yes ? HEAP_ZERO_MEMORY : 0;
-  DN_Assert(size <= DN_CAST(DWORD)(-1));
-  void *result = HeapAlloc(GetProcessHeap(), flags, DN_CAST(DWORD) size);
+  DN_U32 flags = z_mem == DN_ZMem_Yes ? HEAP_ZERO_MEMORY : 0;
+  DN_Assert(size <= DN_Cast(DWORD)(-1));
+  void *result = HeapAlloc(GetProcessHeap(), flags, DN_Cast(DWORD) size);
   DN_Assert(g_dn_os_core_);
   DN_AtomicAddU64(&g_dn_os_core_->mem_allocs_total, 1);
   DN_AtomicAddU64(&g_dn_os_core_->mem_allocs_frame, 1);
@@ -131,12 +131,12 @@ DN_API DN_OSDateTime DN_OS_DateLocalTimeNow()
   GetLocalTime(&sys_time);
 
   DN_OSDateTime result = {};
-  result.hour          = DN_CAST(uint8_t) sys_time.wHour;
-  result.minutes       = DN_CAST(uint8_t) sys_time.wMinute;
-  result.seconds       = DN_CAST(uint8_t) sys_time.wSecond;
-  result.day           = DN_CAST(uint8_t) sys_time.wDay;
-  result.month         = DN_CAST(uint8_t) sys_time.wMonth;
-  result.year          = DN_CAST(int16_t) sys_time.wYear;
+  result.hour          = DN_Cast(uint8_t) sys_time.wHour;
+  result.minutes       = DN_Cast(uint8_t) sys_time.wMinute;
+  result.seconds       = DN_Cast(uint8_t) sys_time.wSecond;
+  result.day           = DN_Cast(uint8_t) sys_time.wDay;
+  result.month         = DN_Cast(uint8_t) sys_time.wMonth;
+  result.year          = DN_Cast(int16_t) sys_time.wYear;
   return result;
 }
 
@@ -214,22 +214,22 @@ DN_API DN_OSDateTime DN_OS_DateUnixTimeSToDate(DN_U64 time)
   FileTimeToSystemTime(&file_time, &sys_time);
 
   DN_OSDateTime result = {};
-  result.year          = DN_CAST(uint16_t) sys_time.wYear;
-  result.month         = DN_CAST(uint8_t) sys_time.wMonth;
-  result.day           = DN_CAST(uint8_t) sys_time.wDay;
-  result.hour          = DN_CAST(uint8_t) sys_time.wHour;
-  result.minutes       = DN_CAST(uint8_t) sys_time.wMinute;
-  result.seconds       = DN_CAST(uint8_t) sys_time.wSecond;
+  result.year          = DN_Cast(uint16_t) sys_time.wYear;
+  result.month         = DN_Cast(uint8_t) sys_time.wMonth;
+  result.day           = DN_Cast(uint8_t) sys_time.wDay;
+  result.hour          = DN_Cast(uint8_t) sys_time.wHour;
+  result.minutes       = DN_Cast(uint8_t) sys_time.wMinute;
+  result.seconds       = DN_Cast(uint8_t) sys_time.wSecond;
   return result;
 }
 
 DN_API void DN_OS_GenBytesSecure(void *buffer, DN_U32 size)
 {
   DN_Assert(g_dn_os_core_);
-  DN_W32Core *w32 = DN_CAST(DN_W32Core *) g_dn_os_core_->platform_context;
+  DN_W32Core *w32 = DN_Cast(DN_W32Core *) g_dn_os_core_->platform_context;
   DN_Assert(w32->bcrypt_init_success);
 
-  long gen_status = BCryptGenRandom(w32->bcrypt_rng_handle, DN_CAST(unsigned char *) buffer, size, 0 /*flags*/);
+  long gen_status = BCryptGenRandom(w32->bcrypt_rng_handle, DN_Cast(unsigned char *) buffer, size, 0 /*flags*/);
   // NOTE: This can only fail if the handle is invalid or one or more parameters are invalid. We
   // validate our parameters so this shouldn't be the case.
   DN_Assert(gen_status == 0);
@@ -284,7 +284,7 @@ DN_API void DN_OS_SleepMs(DN_UInt milliseconds)
 DN_API DN_U64 DN_OS_PerfCounterFrequency()
 {
   DN_Assert(g_dn_os_core_);
-  DN_W32Core *w32 = DN_CAST(DN_W32Core *) g_dn_os_core_->platform_context;
+  DN_W32Core *w32 = DN_Cast(DN_W32Core *) g_dn_os_core_->platform_context;
   DN_Assert(w32->qpc_frequency.QuadPart);
   DN_U64 result = w32->qpc_frequency.QuadPart;
   return result;
@@ -322,10 +322,10 @@ DN_API bool DN_OS_FileCopy(DN_Str8 src, DN_Str8 dest, bool overwrite, DN_OSErrSi
     DN_OS_ErrSinkAppendF(err,
                        win_error.code,
                        "Failed to copy file '%.*s' to '%.*s': (%u) %.*s",
-                       DN_STR_FMT(src),
-                       DN_STR_FMT(dest),
+                       DN_Str8PrintFmt(src),
+                       DN_Str8PrintFmt(dest),
                        win_error.code,
-                       DN_STR_FMT(win_error.msg));
+                       DN_Str8PrintFmt(win_error.msg));
   }
   return result;
 }
@@ -347,10 +347,10 @@ DN_API bool DN_OS_FileMove(DN_Str8 src, DN_Str8 dest, bool overwrite, DN_OSErrSi
     DN_OS_ErrSinkAppendF(err,
                          win_error.code,
                          "Failed to move file '%.*s' to '%.*s': (%u) %.*s",
-                         DN_STR_FMT(src),
-                         DN_STR_FMT(dest),
+                         DN_Str8PrintFmt(src),
+                         DN_Str8PrintFmt(dest),
                          win_error.code,
-                         DN_STR_FMT(win_error.msg));
+                         DN_Str8PrintFmt(win_error.msg));
   }
   return result;
 }
@@ -358,7 +358,7 @@ DN_API bool DN_OS_FileMove(DN_Str8 src, DN_Str8 dest, bool overwrite, DN_OSErrSi
 DN_API DN_OSFile DN_OS_FileOpen(DN_Str8 path, DN_OSFileOpen open_mode, DN_U32 access, DN_OSErrSink *err)
 {
   DN_OSFile result = {};
-  if (!DN_Str8_HasData(path) || path.size <= 0)
+  if (path.size == 0 || path.size <= 0)
     return result;
 
   if ((access & ~DN_OSFileAccess_All) || ((access & DN_OSFileAccess_All) == 0)) {
@@ -401,7 +401,7 @@ DN_API DN_OSFile DN_OS_FileOpen(DN_Str8 path, DN_OSFileOpen open_mode, DN_U32 ac
   if (handle == INVALID_HANDLE_VALUE) {
     DN_W32Error win_error = DN_W32_LastError(tmem.arena);
     result.error          = true;
-    DN_OS_ErrSinkAppendF(err, win_error.code, "Failed to open file at '%.*s': '%.*s'", DN_STR_FMT(path), DN_STR_FMT(win_error.msg));
+    DN_OS_ErrSinkAppendF(err, win_error.code, "Failed to open file at '%.*s': '%.*s'", DN_Str8PrintFmt(path), DN_Str8PrintFmt(win_error.msg));
     return result;
   }
 
@@ -417,24 +417,24 @@ DN_API DN_OSFileRead DN_OS_FileRead(DN_OSFile *file, void *buffer, DN_USize size
 
   DN_OSTLSTMem tmem = DN_OS_TLSTMem(nullptr);
   if (!DN_Check(size <= (unsigned long)-1)) {
-    DN_Str8 buffer_size_str8 = DN_CVT_BytesStr8FromU64AutoTLS(size);
+    DN_Str8x32 buffer_size_str8 = DN_ByteCountStr8x32(size);
     DN_OS_ErrSinkAppendF(
         err,
         1 /*error_code*/,
         "Current implementation doesn't support reading >4GiB file (requested %.*s), implement Win32 overlapped IO",
-        DN_STR_FMT(buffer_size_str8));
+        DN_Str8PrintFmt(buffer_size_str8));
     return result;
   }
 
   unsigned long bytes_read  = 0;
   unsigned long read_result = ReadFile(/*HANDLE       hFile*/ file->handle,
                                        /*LPVOID       lpBuffer*/ buffer,
-                                       /*DWORD        nNumberOfBytesToRead*/ DN_CAST(unsigned long) size,
+                                       /*DWORD        nNumberOfBytesToRead*/ DN_Cast(unsigned long) size,
                                        /*LPDWORD      lpNumberOfByesRead*/ &bytes_read,
                                        /*LPOVERLAPPED lpOverlapped*/ nullptr);
   if (read_result == 0) {
     DN_W32Error win_error = DN_W32_LastError(tmem.arena);
-    DN_OS_ErrSinkAppendF(err, win_error.code, "Failed to read data from file: (%u) %.*s", win_error.code, DN_STR_FMT(win_error.msg));
+    DN_OS_ErrSinkAppendF(err, win_error.code, "Failed to read data from file: (%u) %.*s", win_error.code, DN_Str8PrintFmt(win_error.msg));
     return result;
   }
 
@@ -445,9 +445,9 @@ DN_API DN_OSFileRead DN_OS_FileRead(DN_OSFile *file, void *buffer, DN_USize size
         win_error.code,
         "Failed to read the desired number of bytes from file, we read %uB but we expected %uB: (%u) %.*s",
         bytes_read,
-        DN_CAST(unsigned long) size,
+        DN_Cast(unsigned long) size,
         win_error.code,
-        DN_STR_FMT(win_error.msg));
+        DN_Str8PrintFmt(win_error.msg));
     return result;
   }
 
@@ -462,9 +462,9 @@ DN_API bool DN_OS_FileWritePtr(DN_OSFile *file, void const *buffer, DN_USize siz
     return false;
 
   bool        result = true;
-  char const *end    = DN_CAST(char *) buffer + size;
-  for (char const *ptr = DN_CAST(char const *) buffer; result && ptr != end;) {
-    unsigned long write_size    = DN_CAST(unsigned long) DN_Min((unsigned long)-1, end - ptr);
+  char const *end    = DN_Cast(char *) buffer + size;
+  for (char const *ptr = DN_Cast(char const *) buffer; result && ptr != end;) {
+    unsigned long write_size    = DN_Cast(unsigned long) DN_Min((unsigned long)-1, end - ptr);
     unsigned long bytes_written = 0;
     result                      = WriteFile(file->handle, ptr, write_size, &bytes_written, nullptr /*lpOverlapped*/) != 0;
     ptr += bytes_written;
@@ -473,8 +473,8 @@ DN_API bool DN_OS_FileWritePtr(DN_OSFile *file, void const *buffer, DN_USize siz
   if (!result) {
     DN_OSTLSTMem tmem             = DN_OS_TLSTMem(nullptr);
     DN_W32Error  win_error        = DN_W32_LastError(tmem.arena);
-    DN_Str8      buffer_size_str8 = DN_CVT_BytesStr8FromU64AutoTLS(size);
-    DN_OS_ErrSinkAppendF(err, win_error.code, "Failed to write buffer (%.*s) to file handle: %.*s", DN_STR_FMT(buffer_size_str8), DN_STR_FMT(win_error.msg));
+    DN_Str8x32   buffer_size_str8 = DN_ByteCountStr8x32(size);
+    DN_OS_ErrSinkAppendF(err, win_error.code, "Failed to write buffer (%.*s) to file handle: %.*s", DN_Str8PrintFmt(buffer_size_str8), DN_Str8PrintFmt(win_error.msg));
   }
   return result;
 }
@@ -484,14 +484,14 @@ DN_API bool DN_OS_FileFlush(DN_OSFile *file, DN_OSErrSink *err)
   if (!file || !file->handle || file->error)
     return false;
 
-  BOOL result = FlushFileBuffers(DN_CAST(HANDLE) file->handle);
+  BOOL result = FlushFileBuffers(DN_Cast(HANDLE) file->handle);
   if (!result) {
     DN_OSTLSTMem  tmem      = DN_OS_TLSTMem(nullptr);
     DN_W32Error win_error = DN_W32_LastError(tmem.arena);
-    DN_OS_ErrSinkAppendF(err, win_error.code, "Failed to flush file buffer to disk: %.*s", DN_STR_FMT(win_error.msg));
+    DN_OS_ErrSinkAppendF(err, win_error.code, "Failed to flush file buffer to disk: %.*s", DN_Str8PrintFmt(win_error.msg));
   }
 
-  return DN_CAST(bool) result;
+  return DN_Cast(bool) result;
 }
 
 DN_API void DN_OS_FileClose(DN_OSFile *file)
@@ -505,7 +505,7 @@ DN_API void DN_OS_FileClose(DN_OSFile *file)
 DN_API DN_OSPathInfo DN_OS_PathInfo(DN_Str8 path)
 {
   DN_OSPathInfo result = {};
-  if (!DN_Str8_HasData(path))
+  if (path.size == 0)
     return result;
 
   DN_OSTLSTMem tmem   = DN_OS_TLSTMem(nullptr);
@@ -521,7 +521,7 @@ DN_API DN_OSPathInfo DN_OS_PathInfo(DN_Str8 path)
   result.last_write_time_in_s  = DN_W32_FileTimeToSeconds_(&attrib_data.ftLastWriteTime);
 
   LARGE_INTEGER large_int = {};
-  large_int.u.HighPart    = DN_CAST(int32_t) attrib_data.nFileSizeHigh;
+  large_int.u.HighPart    = DN_Cast(int32_t) attrib_data.nFileSizeHigh;
   large_int.u.LowPart     = attrib_data.nFileSizeLow;
   result.size             = (DN_U64)large_int.QuadPart;
 
@@ -538,7 +538,7 @@ DN_API DN_OSPathInfo DN_OS_PathInfo(DN_Str8 path)
 DN_API bool DN_OS_PathDelete(DN_Str8 path)
 {
   bool result = false;
-  if (!DN_Str8_HasData(path))
+  if (path.size == 0)
     return result;
 
   DN_OSTLSTMem tmem   = DN_OS_TLSTMem(nullptr);
@@ -554,7 +554,7 @@ DN_API bool DN_OS_PathDelete(DN_Str8 path)
 DN_API bool DN_OS_PathIsFile(DN_Str8 path)
 {
   bool result = false;
-  if (!DN_Str8_HasData(path))
+  if (path.size == 0)
     return result;
 
   DN_OSTLSTMem tmem   = DN_OS_TLSTMem(nullptr);
@@ -571,7 +571,7 @@ DN_API bool DN_OS_PathIsFile(DN_Str8 path)
 DN_API bool DN_OS_PathIsDir(DN_Str8 path)
 {
   bool result = false;
-  if (!DN_Str8_HasData(path))
+  if (path.size == 0)
     return result;
 
   DN_OSTLSTMem tmem   = DN_OS_TLSTMem(nullptr);
@@ -639,7 +639,7 @@ DN_API bool DN_OS_PathMakeDir(DN_Str8 path)
 
 DN_API bool DN_OS_PathIterateDir(DN_Str8 path, DN_OSDirIterator *it)
 {
-  if (!DN_Str8_HasData(path) || !it || path.size <= 0)
+  if (path.size == 0 || !it || path.size <= 0)
     return false;
 
   DN_OSTLSTMem             tmem    = DN_OS_TLSTMem(nullptr);
@@ -648,10 +648,10 @@ DN_API bool DN_OS_PathIterateDir(DN_Str8 path, DN_OSDirIterator *it)
   if (it->handle) {
     wide_it.handle = it->handle;
   } else {
-    bool needs_asterisks = DN_Str8_EndsWith(path, DN_STR8("\\")) ||
-                           DN_Str8_EndsWith(path, DN_STR8("/"));
-    bool has_glob = DN_Str8_EndsWith(path, DN_STR8("\\*")) ||
-                    DN_Str8_EndsWith(path, DN_STR8("/*"));
+    bool needs_asterisks = DN_Str8EndsWith(path, DN_Str8Lit("\\")) ||
+                           DN_Str8EndsWith(path, DN_Str8Lit("/"));
+    bool has_glob = DN_Str8EndsWith(path, DN_Str8Lit("\\*")) ||
+                    DN_Str8EndsWith(path, DN_Str8Lit("/*"));
 
     DN_Str8 adjusted_path = path;
     if (!has_glob) {
@@ -659,9 +659,9 @@ DN_API bool DN_OS_PathIterateDir(DN_Str8 path, DN_OSDirIterator *it)
       // add those characters in this branch, so overwrite the null
       // character, add the glob and re-null terminate the buffer.
       if (needs_asterisks)
-        adjusted_path = DN_OS_PathF(tmem.arena, "%.*s*", DN_STR_FMT(path));
+        adjusted_path = DN_OS_PathF(tmem.arena, "%.*s*", DN_Str8PrintFmt(path));
       else
-        adjusted_path = DN_OS_PathF(tmem.arena, "%.*s/*", DN_STR_FMT(path));
+        adjusted_path = DN_OS_PathF(tmem.arena, "%.*s/*", DN_Str8PrintFmt(path));
     }
 
     path16 = DN_W32_Str8ToStr16(tmem.arena, adjusted_path);
@@ -673,7 +673,7 @@ DN_API bool DN_OS_PathIterateDir(DN_Str8 path, DN_OSDirIterator *it)
   it->handle  = wide_it.handle;
   if (result) {
     int size      = DN_W32_Str16ToStr8Buffer(wide_it.file_name, it->buffer, DN_ArrayCountU(it->buffer));
-    it->file_name = DN_Str8_Init(it->buffer, size);
+    it->file_name = DN_Str8FromPtr(it->buffer, size);
   }
 
   return result;
@@ -683,7 +683,7 @@ DN_API bool DN_OS_PathIterateDir(DN_Str8 path, DN_OSDirIterator *it)
 // NOTE: DN_OSExec /////////////////////////////////////////////////////////////////////////////////
 DN_API void DN_OS_Exit(int32_t exit_code)
 {
-  ExitProcess(DN_CAST(UINT) exit_code);
+  ExitProcess(DN_Cast(UINT) exit_code);
 }
 
 DN_API DN_OSExecResult DN_OS_ExecPump(DN_OSExecAsyncHandle handle,
@@ -734,7 +734,7 @@ DN_API DN_OSExecResult DN_OS_ExecPump(DN_OSExecAsyncHandle handle,
   if (exec_result == WAIT_FAILED) {
     DN_W32Error win_error = DN_W32_LastError(tmem.arena);
     result.os_error_code  = win_error.code;
-    DN_OS_ErrSinkAppendF(err, result.os_error_code, "Executed command failed to terminate: %.*s", DN_STR_FMT(win_error.msg));
+    DN_OS_ErrSinkAppendF(err, result.os_error_code, "Executed command failed to terminate: %.*s", DN_Str8PrintFmt(win_error.msg));
   } else if (DN_Check(exec_result == WAIT_TIMEOUT || exec_result == WAIT_OBJECT_0)) {
     // NOTE: Read stdout from process //////////////////////////////////////////////////////
     // If the pipes are full, the process will block. We periodically
@@ -746,7 +746,7 @@ DN_API DN_OSExecResult DN_OS_ExecPump(DN_OSExecAsyncHandle handle,
         DWORD  bytes_read  = 0;
         char  *dest_buffer = handle.stdout_write && stdout_buffer ? stdout_buffer : sink;
         size_t dest_size   = handle.stdout_write && stdout_buffer ? stdout_buffer_size : DN_ArrayCountU(sink);
-        BOOL   success     = ReadFile(handle.stdout_read, dest_buffer, DN_CAST(DWORD) dest_size, &bytes_read, NULL);
+        BOOL   success     = ReadFile(handle.stdout_read, dest_buffer, DN_Cast(DWORD) dest_size, &bytes_read, NULL);
         (void)success; // TODO:
         if (stdout_size)
           *stdout_size = bytes_read;
@@ -760,7 +760,7 @@ DN_API DN_OSExecResult DN_OS_ExecPump(DN_OSExecAsyncHandle handle,
         char  *dest_buffer = handle.stderr_write && stderr_buffer ? stderr_buffer : sink;
         size_t dest_size   = handle.stderr_write && stderr_buffer ? stderr_buffer_size : DN_ArrayCountU(sink);
         DWORD  bytes_read  = 0;
-        BOOL   success     = ReadFile(handle.stderr_read, dest_buffer, DN_CAST(DWORD) dest_size, &bytes_read, NULL);
+        BOOL   success     = ReadFile(handle.stderr_read, dest_buffer, DN_Cast(DWORD) dest_size, &bytes_read, NULL);
         (void)success; // TODO:
         if (stderr_size)
           *stderr_size = bytes_read;
@@ -779,7 +779,7 @@ DN_API DN_OSExecResult DN_OS_ExecPump(DN_OSExecAsyncHandle handle,
       DN_OS_ErrSinkAppendF(err,
                          result.os_error_code,
                          "Failed to retrieve command exit code: %.*s",
-                         DN_STR_FMT(win_error.msg));
+                         DN_Str8PrintFmt(win_error.msg));
     }
 
     // NOTE: Cleanup ///////////////////////////////////////////////////////////////////////////////
@@ -790,8 +790,8 @@ DN_API DN_OSExecResult DN_OS_ExecPump(DN_OSExecAsyncHandle handle,
     CloseHandle(handle.process);
   }
 
-  result.stdout_text = DN_Str8_Init(stdout_buffer, stdout_size ? *stdout_size : 0);
-  result.stderr_text = DN_Str8_Init(stderr_buffer, stderr_size ? *stderr_size : 0);
+  result.stdout_text = DN_Str8FromPtr(stdout_buffer, stdout_size ? *stdout_size : 0);
+  result.stderr_text = DN_Str8FromPtr(stderr_buffer, stderr_size ? *stderr_size : 0);
   return result;
 }
 
@@ -827,17 +827,17 @@ DN_API DN_OSExecResult DN_OS_ExecWait(DN_OSExecAsyncHandle handle, DN_Arena *are
   while (!result.finished) {
     size_t stdout_size   = DN_Kilobytes(8);
     size_t stderr_size   = DN_Kilobytes(8);
-    char  *stdout_buffer = DN_Arena_NewArray(tmem.arena, char, stdout_size, DN_ZeroMem_No);
-    char  *stderr_buffer = DN_Arena_NewArray(tmem.arena, char, stderr_size, DN_ZeroMem_No);
+    char  *stdout_buffer = DN_ArenaNewArray(tmem.arena, char, stdout_size, DN_ZMem_No);
+    char  *stderr_buffer = DN_ArenaNewArray(tmem.arena, char, stderr_size, DN_ZMem_No);
     result               = DN_OS_ExecPump(handle, stdout_buffer, &stdout_size, stderr_buffer, &stderr_size, wait_ms, err);
-    DN_Str8Builder_AppendCopy(&stdout_builder, result.stdout_text);
-    DN_Str8Builder_AppendCopy(&stderr_builder, result.stderr_text);
-    wait_ms = (DN_Str8_HasData(result.stdout_text) || DN_Str8_HasData(result.stderr_text)) ? FAST_WAIT_TIME_MS : SLOW_WAIT_TIME_MS;
+    DN_Str8BuilderAppendCopy(&stdout_builder, result.stdout_text);
+    DN_Str8BuilderAppendCopy(&stderr_builder, result.stderr_text);
+    wait_ms = (result.stdout_text.size || result.stderr_text.size) ? FAST_WAIT_TIME_MS : SLOW_WAIT_TIME_MS;
   }
 
   // NOTE: Get stdout/stderr. If no arena is passed this is a no-op //////////////////////////////
-  result.stdout_text = DN_Str8Builder_Build(&stdout_builder, arena);
-  result.stderr_text = DN_Str8Builder_Build(&stderr_builder, arena);
+  result.stdout_text = DN_Str8BuilderBuild(&stdout_builder, arena);
+  result.stderr_text = DN_Str8BuilderBuild(&stderr_builder, arena);
   return result;
 }
 
@@ -849,16 +849,16 @@ DN_API DN_OSExecAsyncHandle DN_OS_ExecAsync(DN_Slice<DN_Str8> cmd_line, DN_OSExe
     return result;
 
   DN_OSTLSTMem tmem          = DN_OS_TLSTMem(nullptr);
-  DN_Str8    cmd_rendered  = DN_Slice_Str8Render(tmem.arena, cmd_line, DN_STR8(" "));
+  DN_Str8    cmd_rendered  = DN_Slice_Str8Render(tmem.arena, cmd_line, DN_Str8Lit(" "));
   DN_Str16   cmd16         = DN_W32_Str8ToStr16(tmem.arena, cmd_rendered);
   DN_Str16   working_dir16 = DN_W32_Str8ToStr16(tmem.arena, args->working_dir);
 
-  DN_Str8Builder env_builder = DN_Str8Builder_FromTLS();
-  DN_Str8Builder_AppendArrayRef(&env_builder, args->environment.data, args->environment.size);
+  DN_Str8Builder env_builder = DN_Str8BuilderFromTLS();
+  DN_Str8BuilderAppendArrayRef(&env_builder, args->environment.data, args->environment.size);
   if (env_builder.string_size)
-    DN_Str8Builder_AppendRef(&env_builder, DN_STR8("\0"));
+    DN_Str8BuilderAppendRef(&env_builder, DN_Str8Lit("\0"));
 
-  DN_Str8  env_block8  = DN_Str8Builder_BuildDelimitedFromTLS(&env_builder, DN_STR8("\0"));
+  DN_Str8  env_block8  = DN_Str8BuilderBuildDelimitedFromTLS(&env_builder, DN_Str8Lit("\0"));
   DN_Str16 env_block16 = {};
   if (env_block8.size)
     env_block16 = DN_W32_Str8ToStr16(tmem.arena, env_block8);
@@ -887,8 +887,8 @@ DN_API DN_OSExecAsyncHandle DN_OS_ExecAsync(DN_Slice<DN_Str8> cmd_line, DN_OSExe
           err,
           result.os_error_code,
           "Failed to create stdout pipe to redirect the output of the command '%.*s': %.*s",
-          DN_STR_FMT(cmd_rendered),
-          DN_STR_FMT(win_error.msg));
+          DN_Str8PrintFmt(cmd_rendered),
+          DN_Str8PrintFmt(win_error.msg));
       return result;
     }
 
@@ -899,8 +899,8 @@ DN_API DN_OSExecAsyncHandle DN_OS_ExecAsync(DN_Slice<DN_Str8> cmd_line, DN_OSExe
                          result.os_error_code,
                          "Failed to make stdout 'read' pipe non-inheritable when trying to "
                          "execute command '%.*s': %.*s",
-                         DN_STR_FMT(cmd_rendered),
-                         DN_STR_FMT(win_error.msg));
+                         DN_Str8PrintFmt(cmd_rendered),
+                         DN_Str8PrintFmt(win_error.msg));
       return result;
     }
   }
@@ -928,8 +928,8 @@ DN_API DN_OSExecAsyncHandle DN_OS_ExecAsync(DN_Slice<DN_Str8> cmd_line, DN_OSExe
             err,
             result.os_error_code,
             "Failed to create stderr pipe to redirect the output of the command '%.*s': %.*s",
-            DN_STR_FMT(cmd_rendered),
-            DN_STR_FMT(win_error.msg));
+            DN_Str8PrintFmt(cmd_rendered),
+            DN_Str8PrintFmt(win_error.msg));
         return result;
       }
 
@@ -940,8 +940,8 @@ DN_API DN_OSExecAsyncHandle DN_OS_ExecAsync(DN_Slice<DN_Str8> cmd_line, DN_OSExe
                            result.os_error_code,
                            "Failed to make stderr 'read' pipe non-inheritable when trying to "
                            "execute command '%.*s': %.*s",
-                           DN_STR_FMT(cmd_rendered),
-                           DN_STR_FMT(win_error.msg));
+                           DN_Str8PrintFmt(cmd_rendered),
+                           DN_Str8PrintFmt(win_error.msg));
         return result;
       }
     }
@@ -971,8 +971,8 @@ DN_API DN_OSExecAsyncHandle DN_OS_ExecAsync(DN_Slice<DN_Str8> cmd_line, DN_OSExe
     DN_OS_ErrSinkAppendF(err,
                        result.os_error_code,
                        "Failed to execute command '%.*s': %.*s",
-                       DN_STR_FMT(cmd_rendered),
-                       DN_STR_FMT(win_error.msg));
+                       DN_Str8PrintFmt(cmd_rendered),
+                       DN_Str8PrintFmt(win_error.msg));
     return result;
   }
 
@@ -992,7 +992,7 @@ DN_API DN_OSExecAsyncHandle DN_OS_ExecAsync(DN_Slice<DN_Str8> cmd_line, DN_OSExe
 static DN_W32Core *DN_OS_GetW32Core_()
 {
   DN_Assert(g_dn_os_core_ && g_dn_os_core_->platform_context);
-  DN_W32Core *result = DN_CAST(DN_W32Core *)g_dn_os_core_->platform_context;
+  DN_W32Core *result = DN_Cast(DN_W32Core *)g_dn_os_core_->platform_context;
   return result;
 }
 
@@ -1023,7 +1023,7 @@ static DN_W32SyncPrimitive *DN_W32_AllocSyncPrimitive_()
       result->next                  = nullptr;
     } else {
       DN_OSCore *os = g_dn_os_core_;
-      result        = DN_Arena_New(&os->arena, DN_W32SyncPrimitive, DN_ZeroMem_Yes);
+      result        = DN_ArenaNew(&os->arena, DN_W32SyncPrimitive, DN_ZMem_Yes);
     }
   }
   LeaveCriticalSection(&w32->sync_primitive_free_list_mutex);
@@ -1164,7 +1164,7 @@ DN_API bool DN_OS_ConditionVariableWait(DN_OSConditionVariable *cv, DN_OSMutex *
   if (mutex && cv && mutex->handle != 0 && cv->handle != 0 && sleep_ms > 0) {
     DN_W32SyncPrimitive *mutex_primitive = DN_OS_U64ToW32SyncPrimitive_(mutex->handle);
     DN_W32SyncPrimitive *cv_primitive    = DN_OS_U64ToW32SyncPrimitive_(cv->handle);
-    result                               = SleepConditionVariableCS(&cv_primitive->cv, &mutex_primitive->mutex, DN_CAST(DWORD) sleep_ms);
+    result                               = SleepConditionVariableCS(&cv_primitive->cv, &mutex_primitive->mutex, DN_Cast(DWORD) sleep_ms);
   }
   return result;
 }
@@ -1248,7 +1248,7 @@ DN_API DN_U32 DN_OS_ThreadID()
 DN_API void DN_W32_ThreadSetName(DN_Str8 name)
 {
   DN_OSTLS       *tls  = DN_OS_TLSGet();
-  DN_ArenaTempMem tmem = DN_Arena_TempMemBegin(tls->arenas + DN_OSTLSArena_TMem0);
+  DN_ArenaTempMem tmem = DN_ArenaTempMemBegin(tls->arenas + DN_OSTLSArena_TMem0);
 
   // NOTE: SetThreadDescription is only available in
   // Windows Server 2016, Windows 10 LTSB 2016 and Windows 10 version 1607
@@ -1258,7 +1258,7 @@ DN_API void DN_W32_ThreadSetName(DN_Str8 name)
   if (w32->set_thread_description) {
     DN_Str16 name16 = DN_W32_Str8ToStr16(tmem.arena, name);
     w32->set_thread_description(GetCurrentThread(), (WCHAR *)name16.data);
-    DN_Arena_TempMemEnd(tmem);
+    DN_ArenaTempMemEnd(tmem);
     return;
   }
 
@@ -1275,7 +1275,7 @@ DN_API void DN_W32_ThreadSetName(DN_Str8 name)
 
   #pragma pack(pop)
 
-  DN_Str8              copy = DN_Str8_FromStr8(tmem.arena, name);
+  DN_Str8              copy = DN_Str8FromStr8Arena(tmem.arena, name);
   DN_W32ThreadNameInfo info = {};
   info.dwType               = 0x1000;
   info.szName               = (char *)copy.data;
@@ -1291,7 +1291,7 @@ DN_API void DN_W32_ThreadSetName(DN_Str8 name)
   }
   DN_MSVC_WARNING_POP
 
-  DN_Arena_TempMemEnd(tmem);
+  DN_ArenaTempMemEnd(tmem);
 }
 
 // NOTE: DN_OSHttp /////////////////////////////////////////////////////////////////////////////////
@@ -1300,8 +1300,8 @@ void DN_OS_HttpRequestWin32Callback(HINTERNET session, DWORD *dwContext, DWORD d
   (void)session;
   (void)dwStatusInformationLength;
 
-  DN_OSHttpResponse *response         = DN_CAST(DN_OSHttpResponse *) dwContext;
-  HINTERNET          request          = DN_CAST(HINTERNET) response->w32_request_handle;
+  DN_OSHttpResponse *response         = DN_Cast(DN_OSHttpResponse *) dwContext;
+  HINTERNET          request          = DN_Cast(HINTERNET) response->w32_request_handle;
   DN_W32Error        error            = {};
   DWORD const        READ_BUFFER_SIZE = DN_Megabytes(1);
 
@@ -1331,7 +1331,7 @@ void DN_OS_HttpRequestWin32Callback(HINTERNET session, DWORD *dwContext, DWORD d
                             &status,
                             &status_size,
                             WINHTTP_NO_HEADER_INDEX)) {
-      response->http_status = DN_CAST(uint16_t) status;
+      response->http_status = DN_Cast(uint16_t) status;
 
       // NOTE: You can normally call into WinHttpQueryDataAvailable which means the kernel
       // will buffer the response into a single buffer and return us the full size of the
@@ -1343,7 +1343,7 @@ void DN_OS_HttpRequestWin32Callback(HINTERNET session, DWORD *dwContext, DWORD d
       // This is advantageous to avoid a copy from the kernel buffer into our buffer. If the
       // end user application knows the typical payload size then they can optimise for this
       // to prevent unnecessary allocation on the user side.
-      void *buffer = DN_Arena_Alloc(response->builder.arena, READ_BUFFER_SIZE, 1 /*align*/, DN_ZeroMem_No);
+      void *buffer = DN_ArenaAlloc(response->builder.arena, READ_BUFFER_SIZE, 1 /*align*/, DN_ZMem_No);
       if (!WinHttpReadData(request, buffer, READ_BUFFER_SIZE, nullptr))
         error = DN_W32_LastError(&response->tmp_arena);
     } else {
@@ -1353,17 +1353,17 @@ void DN_OS_HttpRequestWin32Callback(HINTERNET session, DWORD *dwContext, DWORD d
   } else if (dwInternetStatus == WINHTTP_CALLBACK_STATUS_READ_COMPLETE) {
     DWORD bytes_read = dwStatusInformationLength;
     if (bytes_read) {
-      DN_Str8 prev_buffer = DN_Str8_Init(DN_CAST(char *) lpvStatusInformation, bytes_read);
-      DN_Str8Builder_AppendRef(&response->builder, prev_buffer);
+      DN_Str8 prev_buffer = DN_Str8FromPtr(DN_Cast(char *) lpvStatusInformation, bytes_read);
+      DN_Str8BuilderAppendRef(&response->builder, prev_buffer);
 
-      void *buffer = DN_Arena_Alloc(response->builder.arena, READ_BUFFER_SIZE, 1 /*align*/, DN_ZeroMem_No);
+      void *buffer = DN_ArenaAlloc(response->builder.arena, READ_BUFFER_SIZE, 1 /*align*/, DN_ZMem_No);
       if (!WinHttpReadData(request, buffer, READ_BUFFER_SIZE, nullptr))
         error = DN_W32_LastError(&response->tmp_arena);
     }
   } else if (dwInternetStatus == WINHTTP_CALLBACK_STATUS_WRITE_COMPLETE) {
   } else if (dwInternetStatus == WINHTTP_CALLBACK_STATUS_REQUEST_ERROR) {
-    WINHTTP_ASYNC_RESULT *async_result = DN_CAST(WINHTTP_ASYNC_RESULT *) lpvStatusInformation;
-    error                              = DN_W32_ErrorCodeToMsg(&response->tmp_arena, DN_CAST(DN_U32) async_result->dwError);
+    WINHTTP_ASYNC_RESULT *async_result = DN_Cast(WINHTTP_ASYNC_RESULT *) lpvStatusInformation;
+    error                              = DN_W32_ErrorCodeToMsg(&response->tmp_arena, DN_Cast(DN_U32) async_result->dwError);
   } else if (dwInternetStatus == WINHTTP_CALLBACK_STATUS_SENDREQUEST_COMPLETE) {
     if (!WinHttpReceiveResponse(request, 0))
       error = DN_W32_LastError(&response->tmp_arena);
@@ -1375,7 +1375,7 @@ void DN_OS_HttpRequestWin32Callback(HINTERNET session, DWORD *dwContext, DWORD d
   if (request) {
     bool read_complete = dwInternetStatus == WINHTTP_CALLBACK_STATUS_READ_COMPLETE && dwStatusInformationLength == 0;
     if (read_complete)
-      response->body = DN_Str8Builder_Build(&response->builder, response->arena);
+      response->body = DN_Str8BuilderBuild(&response->builder, response->arena);
 
     if (read_complete || dwInternetStatus == WINHTTP_CALLBACK_STATUS_REQUEST_ERROR || error.code) {
       DN_OS_SemaphoreIncrement(&response->on_complete_semaphore, 1);
@@ -1433,9 +1433,9 @@ DN_API void DN_OS_HttpRequestAsync(DN_OSHttpResponse     *response,
                          WINHTTP_CALLBACK_STATUS_REQUEST_ERROR |
                          WINHTTP_CALLBACK_STATUS_SENDREQUEST_COMPLETE;
   if (WinHttpSetStatusCallback(response->w32_request_session,
-                               DN_CAST(WINHTTP_STATUS_CALLBACK) DN_OS_HttpRequestWin32Callback,
+                               DN_Cast(WINHTTP_STATUS_CALLBACK) DN_OS_HttpRequestWin32Callback,
                                callback_flags,
-                               DN_CAST(DWORD_PTR) nullptr /*dwReserved*/) == WINHTTP_INVALID_STATUS_CALLBACK) {
+                               DN_Cast(DWORD_PTR) nullptr /*dwReserved*/) == WINHTTP_INVALID_STATUS_CALLBACK) {
     error = DN_W32_LastError(&response->tmp_arena);
     return;
   }
@@ -1465,11 +1465,11 @@ DN_API void DN_OS_HttpRequestAsync(DN_OSHttpResponse     *response,
   response->on_complete_semaphore = DN_OS_SemaphoreInit(0);
   if (!WinHttpSendRequest(response->w32_request_handle,
                           headers16.data,
-                          DN_CAST(DWORD) headers16.size,
+                          DN_Cast(DWORD) headers16.size,
                           body.data /*optional data*/,
-                          DN_CAST(DWORD) body.size /*optional length*/,
-                          DN_CAST(DWORD) body.size /*total content length*/,
-                          DN_CAST(DWORD_PTR) response)) {
+                          DN_Cast(DWORD) body.size /*optional length*/,
+                          DN_Cast(DWORD) body.size /*total content length*/,
+                          DN_Cast(DWORD_PTR) response)) {
     error = DN_W32_LastError(&response->tmp_arena);
     return;
   }
@@ -1486,7 +1486,7 @@ DN_API void DN_OS_HttpRequestFree(DN_OSHttpResponse *response)
   response->w32_request_session    = nullptr;
   response->w32_request_connection = nullptr;
   response->w32_request_handle     = nullptr;
-  DN_Arena_Deinit(&response->tmp_arena);
+  DN_ArenaDeinit(&response->tmp_arena);
   DN_OS_SemaphoreDeinit(&response->on_complete_semaphore);
 
   *response = {};
@@ -1569,11 +1569,11 @@ DN_API void DN_W32_MakeProcessDPIAware()
   if (!lib_handle)
     return;
 
-  if (auto *set_process_dpi_awareness_context = DN_CAST(SetProcessDpiAwarenessContextProc *) GetProcAddress(DN_CAST(HMODULE) lib_handle, "SetProcessDpiAwarenessContext"))
+  if (auto *set_process_dpi_awareness_context = DN_Cast(SetProcessDpiAwarenessContextProc *) GetProcAddress(DN_Cast(HMODULE) lib_handle, "SetProcessDpiAwarenessContext"))
     set_process_dpi_awareness_context(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
-  else if (auto *set_process_dpi_awareness = DN_CAST(SetProcessDpiAwarenessProc *) GetProcAddress(DN_CAST(HMODULE) lib_handle, "SetProcessDpiAwareness"))
+  else if (auto *set_process_dpi_awareness = DN_Cast(SetProcessDpiAwarenessProc *) GetProcAddress(DN_Cast(HMODULE) lib_handle, "SetProcessDpiAwareness"))
     set_process_dpi_awareness(DPI_AWARENESS_PER_MONITOR_AWARE);
-  else if (auto *set_process_dpi_aware = DN_CAST(SetProcessDpiAwareProc *) GetProcAddress(DN_CAST(HMODULE) lib_handle, "SetProcessDpiAware"))
+  else if (auto *set_process_dpi_aware = DN_Cast(SetProcessDpiAwareProc *) GetProcAddress(DN_Cast(HMODULE) lib_handle, "SetProcessDpiAware"))
     set_process_dpi_aware();
 }
 
@@ -1581,18 +1581,18 @@ DN_API void DN_W32_MakeProcessDPIAware()
 DN_API DN_Str16 DN_W32_Str8ToStr16(DN_Arena *arena, DN_Str8 src)
 {
   DN_Str16 result = {};
-  if (!arena || !DN_Str8_HasData(src))
+  if (!arena || src.size == 0)
     return result;
 
-  int required_size = MultiByteToWideChar(CP_UTF8, 0 /*dwFlags*/, src.data, DN_CAST(int) src.size, nullptr /*dest*/, 0 /*dest size*/);
+  int required_size = MultiByteToWideChar(CP_UTF8, 0 /*dwFlags*/, src.data, DN_Cast(int) src.size, nullptr /*dest*/, 0 /*dest size*/);
   if (required_size <= 0)
     return result;
 
-  wchar_t *buffer = DN_Arena_NewArray(arena, wchar_t, required_size + 1, DN_ZeroMem_No);
+  wchar_t *buffer = DN_ArenaNewArray(arena, wchar_t, required_size + 1, DN_ZMem_No);
   if (!buffer)
     return result;
 
-  int chars_written = MultiByteToWideChar(CP_UTF8, 0 /*dwFlags*/, src.data, DN_CAST(int) src.size, buffer, required_size);
+  int chars_written = MultiByteToWideChar(CP_UTF8, 0 /*dwFlags*/, src.data, DN_Cast(int) src.size, buffer, required_size);
   if (DN_Check(chars_written == required_size)) {
     result.data              = buffer;
     result.size              = chars_written;
@@ -1604,14 +1604,14 @@ DN_API DN_Str16 DN_W32_Str8ToStr16(DN_Arena *arena, DN_Str8 src)
 DN_API int DN_W32_Str8ToStr16Buffer(DN_Str8 src, wchar_t *dest, int dest_size)
 {
   int result = 0;
-  if (!DN_Str8_HasData(src))
+  if (src.size == 0)
     return result;
 
-  result = MultiByteToWideChar(CP_UTF8, 0 /*dwFlags*/, src.data, DN_CAST(int) src.size, nullptr /*dest*/, 0 /*dest size*/);
+  result = MultiByteToWideChar(CP_UTF8, 0 /*dwFlags*/, src.data, DN_Cast(int) src.size, nullptr /*dest*/, 0 /*dest size*/);
   if (result <= 0 || result > dest_size || !dest)
     return result;
 
-  result = MultiByteToWideChar(CP_UTF8, 0 /*dwFlags*/, src.data, DN_CAST(int) src.size, dest, DN_CAST(int) dest_size);
+  result = MultiByteToWideChar(CP_UTF8, 0 /*dwFlags*/, src.data, DN_Cast(int) src.size, dest, DN_Cast(int) dest_size);
   dest[DN_Min(result, dest_size - 1)] = 0;
   return result;
 }
@@ -1620,7 +1620,7 @@ DN_API int DN_W32_Str8ToStr16Buffer(DN_Str8 src, wchar_t *dest, int dest_size)
 DN_API int DN_W32_Str16ToStr8Buffer(DN_Str16 src, char *dest, int dest_size)
 {
   int result = 0;
-  if (!DN_Str16_HasData(src))
+  if (src.size == 0)
     return result;
 
   int src_size = DN_SaturateCastISizeToInt(src.size);
@@ -1631,7 +1631,7 @@ DN_API int DN_W32_Str16ToStr8Buffer(DN_Str16 src, char *dest, int dest_size)
   if (result <= 0 || result > dest_size || !dest)
     return result;
 
-  result = WideCharToMultiByte(CP_UTF8, 0 /*dwFlags*/, src.data, src_size, dest, DN_CAST(int) dest_size, nullptr, nullptr);
+  result = WideCharToMultiByte(CP_UTF8, 0 /*dwFlags*/, src.data, src_size, dest, DN_Cast(int) dest_size, nullptr, nullptr);
   dest[DN_Min(result, dest_size - 1)] = 0;
   return result;
 }
@@ -1639,7 +1639,7 @@ DN_API int DN_W32_Str16ToStr8Buffer(DN_Str16 src, char *dest, int dest_size)
 DN_API DN_Str8 DN_W32_Str16ToStr8(DN_Arena *arena, DN_Str16 src)
 {
   DN_Str8 result = {};
-  if (!arena || !DN_Str16_HasData(src))
+  if (!arena || src.size == 0)
     return result;
 
   int src_size = DN_SaturateCastISizeToInt(src.size);
@@ -1653,11 +1653,11 @@ DN_API DN_Str8 DN_W32_Str16ToStr8(DN_Arena *arena, DN_Str16 src)
   // NOTE: Str8 allocate ensures there's one extra byte for
   // null-termination already so no-need to +1 the required size
   DN_ArenaTempMemScope temp_mem = DN_ArenaTempMemScope(arena);
-  DN_Str8              buffer   = DN_Str8_Alloc(arena, required_size, DN_ZeroMem_No);
-  if (!DN_Str8_HasData(buffer))
+  DN_Str8              buffer   = DN_Str8FromArena(arena, required_size, DN_ZMem_No);
+  if (buffer.size == 0)
     return result;
 
-  int chars_written = WideCharToMultiByte(CP_UTF8, 0 /*dwFlags*/, src.data, src_size, buffer.data, DN_CAST(int) buffer.size, nullptr, nullptr);
+  int chars_written = WideCharToMultiByte(CP_UTF8, 0 /*dwFlags*/, src.data, src_size, buffer.data, DN_Cast(int) buffer.size, nullptr, nullptr);
   if (DN_Check(chars_written == required_size)) {
     result                   = buffer;
     result.data[result.size] = 0;
@@ -1670,7 +1670,7 @@ DN_API DN_Str8 DN_W32_Str16ToStr8(DN_Arena *arena, DN_Str16 src)
 DN_API DN_Str8 DN_W32_Str16ToStr8FromHeap(DN_Str16 src)
 {
   DN_Str8 result = {};
-  if (!DN_Str16_HasData(src))
+  if (src.size == 0)
     return result;
 
   int src_size = DN_SaturateCastISizeToInt(src.size);
@@ -1683,11 +1683,11 @@ DN_API DN_Str8 DN_W32_Str16ToStr8FromHeap(DN_Str16 src)
 
   // NOTE: Str8 allocate ensures there's one extra byte for
   // null-termination already so no-need to +1 the required size
-  DN_Str8 buffer = DN_Str8_FromHeap(required_size, DN_ZeroMem_No);
-  if (!DN_Str8_HasData(buffer))
+  DN_Str8 buffer = DN_Str8FromHeap(required_size, DN_ZMem_No);
+  if (buffer.size == 0)
     return result;
 
-  int chars_written = WideCharToMultiByte(CP_UTF8, 0 /*dwFlags*/, src.data, src_size, buffer.data, DN_CAST(int) buffer.size, nullptr, nullptr);
+  int chars_written = WideCharToMultiByte(CP_UTF8, 0 /*dwFlags*/, src.data, src_size, buffer.data, DN_Cast(int) buffer.size, nullptr, nullptr);
   if (DN_Check(chars_written == required_size)) {
     result                   = buffer;
     result.data[result.size] = 0;
@@ -1708,17 +1708,17 @@ DN_API DN_Str16 DN_W32_EXEPathW(DN_Arena *arena)
   wchar_t   *module_path = nullptr;
   do {
     module_size += 256;
-    module_path = DN_Arena_NewArray(tmem.arena, wchar_t, module_size, DN_ZeroMem_No);
+    module_path = DN_ArenaNewArray(tmem.arena, wchar_t, module_size, DN_ZMem_No);
     if (!module_path)
       return result;
-    module_size = DN_CAST(DN_USize) GetModuleFileNameW(nullptr /*module*/, module_path, DN_CAST(int) module_size);
+    module_size = DN_Cast(DN_USize) GetModuleFileNameW(nullptr /*module*/, module_path, DN_Cast(int) module_size);
   } while (GetLastError() == ERROR_INSUFFICIENT_BUFFER);
 
   DN_USize index_of_last_slash = 0;
   for (DN_USize index = module_size - 1; !index_of_last_slash && index < module_size; index--)
     index_of_last_slash = module_path[index] == '\\' ? index : 0;
 
-  result.data = DN_Arena_NewArray(arena, wchar_t, module_size + 1, DN_ZeroMem_No);
+  result.data = DN_ArenaNewArray(arena, wchar_t, module_size + 1, DN_ZMem_No);
   result.size = module_size;
   DN_Memcpy(result.data, module_path, sizeof(wchar_t) * result.size);
   result.data[result.size] = 0;
@@ -1734,17 +1734,17 @@ DN_API DN_Str16 DN_W32_EXEDirW(DN_Arena *arena)
   wchar_t   *module_path = nullptr;
   do {
     module_size += 256;
-    module_path = DN_Arena_NewArray(tmem.arena, wchar_t, module_size, DN_ZeroMem_No);
+    module_path = DN_ArenaNewArray(tmem.arena, wchar_t, module_size, DN_ZMem_No);
     if (!module_path)
       return result;
-    module_size = DN_CAST(DN_USize) GetModuleFileNameW(nullptr /*module*/, module_path, DN_CAST(int) module_size);
+    module_size = DN_Cast(DN_USize) GetModuleFileNameW(nullptr /*module*/, module_path, DN_Cast(int) module_size);
   } while (GetLastError() == ERROR_INSUFFICIENT_BUFFER);
 
   DN_USize index_of_last_slash = 0;
   for (DN_USize index = module_size - 1; !index_of_last_slash && index < module_size; index--)
     index_of_last_slash = module_path[index] == '\\' ? index : 0;
 
-  result.data = DN_Arena_NewArray(arena, wchar_t, index_of_last_slash + 1, DN_ZeroMem_No);
+  result.data = DN_ArenaNewArray(arena, wchar_t, index_of_last_slash + 1, DN_ZMem_No);
   result.size = index_of_last_slash;
   DN_Memcpy(result.data, module_path, sizeof(wchar_t) * result.size);
   result.data[result.size] = 0;
@@ -1768,9 +1768,9 @@ DN_API DN_Str16 DN_W32_WorkingDirW(DN_Arena *arena, DN_Str16 suffix)
   // NOTE: required_size is the size required *including* the null-terminator
   DN_OSTLSTMem    tmem          = DN_OS_TLSTMem(arena);
   unsigned long required_size = GetCurrentDirectoryW(0, nullptr);
-  unsigned long desired_size  = required_size + DN_CAST(unsigned long) suffix.size;
+  unsigned long desired_size  = required_size + DN_Cast(unsigned long) suffix.size;
 
-  wchar_t *tmem_w_path = DN_Arena_NewArray(tmem.arena, wchar_t, desired_size, DN_ZeroMem_No);
+  wchar_t *tmem_w_path = DN_ArenaNewArray(tmem.arena, wchar_t, desired_size, DN_ZMem_No);
   if (!tmem_w_path)
     return result;
 
@@ -1780,7 +1780,7 @@ DN_API DN_Str16 DN_W32_WorkingDirW(DN_Arena *arena, DN_Str16 suffix)
     return result;
   }
 
-  wchar_t *w_path = DN_Arena_NewArray(arena, wchar_t, desired_size, DN_ZeroMem_No);
+  wchar_t *w_path = DN_ArenaNewArray(arena, wchar_t, desired_size, DN_ZMem_No);
   if (!w_path)
     return result;
 
@@ -1790,7 +1790,7 @@ DN_API DN_Str16 DN_W32_WorkingDirW(DN_Arena *arena, DN_Str16 suffix)
     w_path[desired_size] = 0;
   }
 
-  result = DN_Str16{w_path, DN_CAST(DN_USize)(desired_size - 1)};
+  result = DN_Str16{w_path, DN_Cast(DN_USize)(desired_size - 1)};
   return result;
 }
 
@@ -1821,7 +1821,7 @@ DN_API bool DN_W32_DirWIterate(DN_Str16 path, DN_W32FolderIteratorW *it)
     if (find_data.cFileName[0] == '.' || (find_data.cFileName[0] == '.' && find_data.cFileName[1] == '.'))
       continue;
 
-    it->file_name.size = DN_CStr16_Size(find_data.cFileName);
+    it->file_name.size = DN_CStr16Size(find_data.cFileName);
     DN_Assert(it->file_name.size < (DN_ArrayCountU(it->file_name_buf) - 1));
     DN_Memcpy(it->file_name.data, find_data.cFileName, it->file_name.size * sizeof(wchar_t));
     it->file_name_buf[it->file_name.size] = 0;

@@ -124,7 +124,7 @@ enum DN_OSFileAccess_
   #else
     #define DN_OSPathSeperator "/"
   #endif
-  #define DN_OSPathSeperatorString DN_STR8(DN_OSPathSeperator)
+  #define DN_OSPathSeperatorString DN_Str8Lit(DN_OSPathSeperator)
 #endif
 
 struct DN_OSPathLink
@@ -208,7 +208,7 @@ struct DN_OSConditionVariable
   DN_U64 handle;
 };
 
-// NOTE: DN_OSThread ///////////////////////////////////////////////////////////////////////////////
+// NOTE: DN_OSThread
 typedef DN_I32(DN_OSThreadFunc)(struct DN_OSThread *);
 
 struct DN_OSThread
@@ -223,7 +223,7 @@ struct DN_OSThread
   DN_OSSemaphore   init_semaphore;
 };
 
-// NOTE: DN_OSHttp /////////////////////////////////////////////////////////////////////////////////
+// NOTE: DN_OSHttp
 enum DN_OSHttpRequestSecure
 {
   DN_OSHttpRequestSecure_No,
@@ -309,13 +309,18 @@ DN_API void                      DN_OS_Init                                   (D
 DN_API void                      DN_OS_EmitLogsWithOSPrintFunctions           (DN_OSCore *os);
 DN_API void                      DN_OS_DumpThreadContextArenaStat             (DN_Str8 file_path);
 
+DN_API DN_Str8                   DN_OS_BytesFromHexPtrArenaFrame              (void const *hex, DN_USize hex_count);
+DN_API DN_Str8                   DN_OS_BytesFromHexStr8ArenaFrame             (DN_Str8 hex);
+DN_API DN_Str8                   DN_OS_HexFromBytesPtrArenaFrame              (void const *bytes, DN_USize bytes_count);
+DN_API DN_Str8                   DN_OS_HexFromBytesPtrArenaTLS                (void const *bytes, DN_USize bytes_count);
+
 DN_API void *                    DN_OS_MemReserve                             (DN_USize size, DN_MemCommit commit, DN_MemPage page_flags);
 DN_API bool                      DN_OS_MemCommit                              (void *ptr, DN_USize size, DN_U32 page_flags);
 DN_API void                      DN_OS_MemDecommit                            (void *ptr, DN_USize size);
 DN_API void                      DN_OS_MemRelease                             (void *ptr, DN_USize size);
 DN_API int                       DN_OS_MemProtect                             (void *ptr, DN_USize size, DN_U32 page_flags);
 
-DN_API void *                    DN_OS_MemAlloc                               (DN_USize size, DN_ZeroMem zero_mem);
+DN_API void *                    DN_OS_MemAlloc                               (DN_USize size, DN_ZMem z_mem);
 DN_API void                      DN_OS_MemDealloc                             (void *ptr);
 
 DN_API DN_OSDateTime             DN_OS_DateLocalTimeNow                       ();
@@ -409,8 +414,8 @@ DN_API DN_Str8                   DN_OS_PathF                                  (D
 #define                          DN_OS_PathFFromTLS(...)                      DN_OS_PathF(DN_OS_TLSTopArena(), ##__VA_ARGS__)
 #define                          DN_OS_PathFFromFrame(...)                    DN_OS_PathF(DN_OS_TLSFrameArena(), ##__VA_ARGS__)
 
-#define                          DN_OS_PathBuildFwdSlash(allocator, fs_path)  DN_OS_PathBuildWithSeparator(allocator, fs_path, DN_STR8("/"))
-#define                          DN_OS_PathBuildBackSlash(allocator, fs_path) DN_OS_PathBuildWithSeparator(allocator, fs_path, DN_STR8("\\"))
+#define                          DN_OS_PathBuildFwdSlash(allocator, fs_path)  DN_OS_PathBuildWithSeparator(allocator, fs_path, DN_Str8Lit("/"))
+#define                          DN_OS_PathBuildBackSlash(allocator, fs_path) DN_OS_PathBuildWithSeparator(allocator, fs_path, DN_Str8Lit("\\"))
 #define                          DN_OS_PathBuild(allocator, fs_path)          DN_OS_PathBuildWithSeparator(allocator, fs_path, DN_OSPathSeparatorString)
 
 DN_API void                      DN_OS_Exit                                   (int32_t exit_code);

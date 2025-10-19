@@ -180,10 +180,10 @@ enum DN_CGenEmit
   DN_CGenEmit_Implementation = 1 << 1,
 };
 
-#define DN_CGen_MDToDNStr8(str8) DN_Str8_Init((str8).str, (str8).size)
+#define DN_CGen_MDToDNStr8(str8) DN_Str8FromPtr((str8).str, (str8).size)
 #define DN_CGen_DNToMDStr8(str8) \
   {                              \
-    DN_CAST(MD_u8 *)             \
+    DN_Cast(MD_u8 *)             \
     (str8).data,                 \
         (str8).size              \
   }

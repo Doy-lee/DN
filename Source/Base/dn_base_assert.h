@@ -6,7 +6,7 @@
     if (!(expr)) {                                                                      \
       DN_Str8 stack_trace_ = DN_StackTrace_WalkStr8FromHeap(128 /*limit*/, 2 /*skip*/); \
       DN_LOG_ErrorF("Hard assertion [" #expr "], stack trace was:\n\n%.*s\n\n" fmt,     \
-                    DN_STR_FMT(stack_trace_),                                           \
+                    DN_Str8PrintFmt(stack_trace_),                                           \
                     ##__VA_ARGS__);                                                     \
       DN_DebugBreak;                                                                    \
     }                                                                                   \
@@ -24,7 +24,7 @@
       if (!(expr)) {                                                                      \
         DN_Str8 stack_trace_ = DN_StackTrace_WalkStr8FromHeap(128 /*limit*/, 2 /*skip*/); \
         DN_LOG_ErrorF("Assertion [" #expr "], stack trace was:\n\n%.*s\n\n" fmt,          \
-                      DN_STR_FMT(stack_trace_),                                           \
+                      DN_Str8PrintFmt(stack_trace_),                                           \
                       ##__VA_ARGS__);                                                     \
         DN_DebugBreak;                                                                    \
       }                                                                                   \
@@ -37,7 +37,7 @@
         once                 = false;                                                     \
         DN_Str8 stack_trace_ = DN_StackTrace_WalkStr8FromHeap(128 /*limit*/, 2 /*skip*/); \
         DN_LOG_ErrorF("Assertion [" #expr "], stack trace was:\n\n%.*s\n\n" fmt,          \
-                      DN_STR_FMT(stack_trace_),                                           \
+                      DN_Str8PrintFmt(stack_trace_),                                           \
                       ##__VA_ARGS__);                                                     \
         DN_DebugBreak;                                                                    \
       }                                                                                   \

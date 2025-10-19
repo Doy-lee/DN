@@ -95,42 +95,6 @@ struct DN_BinarySearchResult
 template <typename T>
 using DN_QSortLessThanProc = bool(T const &a, T const &b, void *user_context);
 
-// NOTE: Misc //////////////////////////////////////////////////////////////////////////////////////
-// NOTE: DN_JobQueue ///////////////////////////////////////////////////////////////////////////////
-typedef void(DN_JobQueueFunc)(DN_OSThread *thread, void *user_context);
-struct DN_Job
-{
-  DN_JobQueueFunc *func;         // The function to invoke for the job
-  void            *user_context; // Pointer user can set to use in their `job_func`
-  uint64_t         elapsed_tsc;
-  uint16_t         user_tag;                // Arbitrary value the user can set to identiy the type of `user_context` this job has
-  bool             add_to_completion_queue; // When true, on job completion, job must be dequeued from the completion queue via `GetFinishedJobs`
-};
-
-#if !defined(DN_JOB_QUEUE_SPMC_SIZE)
-  #define DN_JOB_QUEUE_SPMC_SIZE 128
-#endif
-
-struct DN_JobQueueSPMC
-{
-  DN_OSMutex     mutex;
-  DN_OSSemaphore thread_wait_for_job_semaphore;
-  DN_OSSemaphore wait_for_completion_semaphore;
-  DN_U32         threads_waiting_for_completion;
-
-  DN_Job jobs[DN_JOB_QUEUE_SPMC_SIZE];
-  DN_B32 quit;
-  DN_U32 quit_exit_code;
-  DN_U32 volatile read_index;
-  DN_U32 volatile finish_index;
-  DN_U32 volatile write_index;
-
-  DN_OSSemaphore complete_queue_write_semaphore;
-  DN_Job         complete_queue[DN_JOB_QUEUE_SPMC_SIZE];
-  DN_U32 volatile complete_read_index;
-  DN_U32 volatile complete_write_index;
-};
-
 // NOTE: DN_PCG32 //////////////////////////////////////////////////////////////////////////////////
 DN_API DN_PCG32            DN_PCG32_Init                          (uint64_t seed);
 DN_API uint32_t            DN_PCG32_Next                          (DN_PCG32 *rng);
@@ -173,41 +137,25 @@ DN_API void                DN_JSONBuilder_I64Named                (DN_JSONBuilde
 DN_API void                DN_JSONBuilder_F64Named                (DN_JSONBuilder *builder, DN_Str8 key, double value, int decimal_places);
 DN_API void                DN_JSONBuilder_BoolNamed               (DN_JSONBuilder *builder, DN_Str8 key, bool value);
 
-#define                    DN_JSONBuilder_ObjectBegin(builder)    DN_JSONBuilder_ObjectBeginNamed(builder, DN_STR8(""))
-#define                    DN_JSONBuilder_ArrayBegin(builder)     DN_JSONBuilder_ArrayBeginNamed(builder, DN_STR8(""))
-#define                    DN_JSONBuilder_Str8(builder, value)    DN_JSONBuilder_Str8Named(builder, DN_STR8(""), value)
-#define                    DN_JSONBuilder_Literal(builder, value) DN_JSONBuilder_LiteralNamed(builder, DN_STR8(""), value)
-#define                    DN_JSONBuilder_U64(builder, value)     DN_JSONBuilder_U64Named(builder, DN_STR8(""), value)
-#define                    DN_JSONBuilder_I64(builder, value)     DN_JSONBuilder_I64Named(builder, DN_STR8(""), value)
-#define                    DN_JSONBuilder_F64(builder, value)     DN_JSONBuilder_F64Named(builder, DN_STR8(""), value)
-#define                    DN_JSONBuilder_Bool(builder, value)    DN_JSONBuilder_BoolNamed(builder, DN_STR8(""), value)
+#define                    DN_JSONBuilder_ObjectBegin(builder)    DN_JSONBuilder_ObjectBeginNamed(builder, DN_Str8Lit(""))
+#define                    DN_JSONBuilder_ArrayBegin(builder)     DN_JSONBuilder_ArrayBeginNamed(builder, DN_Str8Lit(""))
+#define                    DN_JSONBuilder_Str8(builder, value)    DN_JSONBuilder_Str8Named(builder, DN_Str8Lit(""), value)
+#define                    DN_JSONBuilder_Literal(builder, value) DN_JSONBuilder_LiteralNamed(builder, DN_Str8Lit(""), value)
+#define                    DN_JSONBuilder_U64(builder, value)     DN_JSONBuilder_U64Named(builder, DN_Str8Lit(""), value)
+#define                    DN_JSONBuilder_I64(builder, value)     DN_JSONBuilder_I64Named(builder, DN_Str8Lit(""), value)
+#define                    DN_JSONBuilder_F64(builder, value)     DN_JSONBuilder_F64Named(builder, DN_Str8Lit(""), value)
+#define                    DN_JSONBuilder_Bool(builder, value)    DN_JSONBuilder_BoolNamed(builder, DN_Str8Lit(""), value)
 #endif // !defined(DN_NO_JSON_BUILDER)
 
-// NOTE: DN_BinarySearch ///////////////////////////////////////////////////////////////////////////
+// NOTE: DN_BinarySearch
 template <typename T> bool                  DN_BinarySearch_DefaultLessThan(T const &lhs, T const &rhs);
-template <typename T> DN_BinarySearchResult DN_BinarySearch                (T const *array,
-                                                                              DN_USize array_size,
-                                                                              T const &find,
-                                                                              DN_BinarySearchType type = DN_BinarySearchType_Match,
-                                                                              DN_BinarySearchLessThanProc<T> less_than = DN_BinarySearch_DefaultLessThan);
+template <typename T> DN_BinarySearchResult DN_BinarySearch                (T const *array, DN_USize array_size, T const &find, DN_BinarySearchType type = DN_BinarySearchType_Match, DN_BinarySearchLessThanProc<T> less_than = DN_BinarySearch_DefaultLessThan);
 
-// NOTE: DN_QSort //////////////////////////////////////////////////////////////////////////////////
+// NOTE: DN_QSort
 template <typename T> bool DN_QSort_DefaultLessThan(T const &lhs, T const &rhs, void *user_context);
-template <typename T> void DN_QSort                (T *array,
-                                                     DN_USize array_size,
-                                                     void *user_context,
-                                                     DN_QSortLessThanProc<T> less_than = DN_QSort_DefaultLessThan);
+template <typename T> void DN_QSort                (T *array, DN_USize array_size, void *user_context, DN_QSortLessThanProc<T> less_than = DN_QSort_DefaultLessThan);
 
-// NOTE: DN_JobQueue ///////////////////////////////////////////////////////////////////////////////
-DN_API DN_JobQueueSPMC     DN_OS_JobQueueSPMCInit                  ();
-DN_API bool                DN_OS_JobQueueSPMCCanAdd                (DN_JobQueueSPMC const *queue, uint32_t count);
-DN_API bool                DN_OS_JobQueueSPMCAddArray              (DN_JobQueueSPMC *queue, DN_Job *jobs, uint32_t count);
-DN_API bool                DN_OS_JobQueueSPMCAdd                   (DN_JobQueueSPMC *queue, DN_Job job);
-DN_API void                DN_OS_JobQueueSPMCWaitForCompletion     (DN_JobQueueSPMC *queue);
-DN_API int32_t             DN_OS_JobQueueSPMCThread                (DN_OSThread *thread);
-DN_API DN_USize            DN_OS_JobQueueSPMCGetFinishedJobs       (DN_JobQueueSPMC *queue, DN_Job *jobs, DN_USize jobs_size);
-
-// NOTE: DN_BinarySearch ///////////////////////////////////////////////////////////////////////////
+// NOTE: DN_BinarySearch
 template <typename T>
 bool DN_BinarySearch_DefaultLessThan(T const &lhs, T const &rhs)
 {

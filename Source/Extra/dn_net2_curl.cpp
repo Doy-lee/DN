@@ -24,24 +24,24 @@ static DN_NET2Response DN_NET2_WaitForAnyResponse(DN_NET2Core *net, DN_Arena *ar
 
       // NOTE: Fill in the result
       DN_NET2ResponseInternal const *response = &request->response;
-      result.request                          = {DN_CAST(DN_U64) request};
+      result.request                          = {DN_Cast(DN_U64) request};
       result.success                          = response->status != DN_NET2RequestStatus_Error;
       result.ws_type                          = response->ws_type;
       result.http_status                      = response->http_status;
-      result.body                             = DN_Str8Builder_Build(&response->body, arena);
+      result.body                             = DN_Str8BuilderBuild(&response->body, arena);
       if (response->error.size)
-        result.error = DN_Str8_FromStr8(arena, response->error);
+        result.error = DN_Str8FromStr8Arena(arena, response->error);
 
       // NOTE: Deallocate the memory used in the request
-      DN_Arena_PopTo(&request->arena, request->start_response_arena_pos);
-      request->response.body = DN_Str8Builder_FromArena(&request->arena);
+      DN_ArenaPopTo(&request->arena, request->start_response_arena_pos);
+      request->response.body = DN_Str8BuilderFromArena(&request->arena);
 
       // NOTE: For websocket requests, notify the NET thread we've read data from it and it can go
       // back to polling the socket for more data
       if (request->type == DN_NET2RequestType_WS && request->response.status != DN_NET2RequestStatus_Error) {
         DN_NET2RingEvent event = {};
         event.type             = DN_NET2RingEventType_ReceivedWSReceipt;
-        event.request          = {DN_CAST(DN_U64)request};
+        event.request          = {DN_Cast(DN_U64)request};
         for (DN_OS_MutexScope(&net->ring_mutex))
           DN_Ring_WriteStruct(&net->ring, &event);
         curl_multi_wakeup(net->curlm);
@@ -55,7 +55,7 @@ static DN_NET2Response DN_NET2_WaitForResponse(DN_NET2Core *net, DN_NET2Request 
 {
   DN_NET2Response result = {};
   if (request.handle != 0) {
-    DN_NET2RequestInternal  *request_ptr = DN_CAST(DN_NET2RequestInternal *) request.handle;
+    DN_NET2RequestInternal  *request_ptr = DN_Cast(DN_NET2RequestInternal *) request.handle;
     DN_OSSemaphoreWaitResult wait        = DN_OS_SemaphoreWait(&request_ptr->completion_sem, timeout_ms);
     if (wait == DN_OSSemaphoreWaitResult_Success) {
       // NOTE: Fill in the result
@@ -64,19 +64,19 @@ static DN_NET2Response DN_NET2_WaitForResponse(DN_NET2Core *net, DN_NET2Request 
       result.success                          = response->status != DN_NET2RequestStatus_Error;
       result.ws_type                          = response->ws_type;
       result.http_status                      = response->http_status;
-      result.body                             = DN_Str8Builder_Build(&response->body, arena);
+      result.body                             = DN_Str8BuilderBuild(&response->body, arena);
       if (response->error.size)
-        result.error = DN_Str8_FromStr8(arena, response->error);
+        result.error = DN_Str8FromStr8Arena(arena, response->error);
 
       // NOTE: Deallocate the memory used in the request
-      DN_Arena_PopTo(&request_ptr->arena, request_ptr->start_response_arena_pos);
-      request_ptr->response.body = DN_Str8Builder_FromArena(&request_ptr->arena);
+      DN_ArenaPopTo(&request_ptr->arena, request_ptr->start_response_arena_pos);
+      request_ptr->response.body = DN_Str8BuilderFromArena(&request_ptr->arena);
 
       // NOTE: Decrement the global completion tracking semaphore (this is so that if you waited on
       // the net object's semaphore, you don't get a phantom wakeup because this function already
       // consumed it).
       DN_OSSemaphoreWaitResult net_wait_result = DN_OS_SemaphoreWait(&net->completion_sem, 0 /*timeout_ms*/);
-      DN_AssertF(net_wait_result == DN_OSSemaphoreWaitResult_Success, "Wait result was: %zu", DN_CAST(DN_USize)net_wait_result);
+      DN_AssertF(net_wait_result == DN_OSSemaphoreWaitResult_Success, "Wait result was: %zu", DN_Cast(DN_USize)net_wait_result);
 
       // NOTE: Remove the request from the done list
       for (DN_OS_MutexScope(&net->free_or_done_mutex)) {
@@ -119,18 +119,18 @@ static void DN_NET2_DeinitRequest(DN_NET2Core *net, DN_NET2Request *request)
 
 static DN_USize DN_NET2_HTTPCallback_(char *payload, DN_USize size, DN_USize count, void *user_data)
 {
-  auto    *request      = DN_CAST(DN_NET2RequestInternal *) user_data;
+  auto    *request      = DN_Cast(DN_NET2RequestInternal *) user_data;
   DN_USize result       = 0;
   DN_USize payload_size = size * count;
-  if (DN_Str8Builder_AppendBytesCopy(&request->response.body, payload, payload_size))
+  if (DN_Str8BuilderAppendBytesCopy(&request->response.body, payload, payload_size))
     result = payload_size;
   return result;
 }
 
 static int32_t DN_NET2_ThreadEntryPoint_(DN_OSThread *thread)
 {
-  DN_NET2Core *net = DN_CAST(DN_NET2Core *) thread->user_context;
-  DN_OS_ThreadSetName(DN_Str8_Init(net->curl_thread.name.data, net->curl_thread.name.size));
+  DN_NET2Core *net = DN_Cast(DN_NET2Core *) thread->user_context;
+  DN_OS_ThreadSetName(DN_Str8FromPtr(net->curl_thread.name.data, net->curl_thread.name.size));
 
   for (;;) {
     DN_OSTLSTMem tmem = DN_OS_TLSPushTMem(nullptr);
@@ -146,7 +146,7 @@ static int32_t DN_NET2_ThreadEntryPoint_(DN_OSThread *thread)
         case DN_NET2RingEventType_Nil: dequeue_ring = false; break;
 
         case DN_NET2RingEventType_DoHTTP: {
-          DN_NET2RequestInternal *request = DN_CAST(DN_NET2RequestInternal *)event.request.handle;
+          DN_NET2RequestInternal *request = DN_Cast(DN_NET2RequestInternal *)event.request.handle;
           DN_Assert(request->response.status != DN_NET2RequestStatus_Error);
           switch (request->type) {
             case DN_NET2RequestType_Nil: {
@@ -156,7 +156,7 @@ static int32_t DN_NET2_ThreadEntryPoint_(DN_OSThread *thread)
 
             case DN_NET2RequestType_HTTP: {
               DN_Assert(request->response.status == DN_NET2RequestStatus_Nil);
-              DN_NET2CurlConn *conn      = DN_CAST(DN_NET2CurlConn *) request->context;
+              DN_NET2CurlConn *conn      = DN_Cast(DN_NET2CurlConn *) request->context;
               CURLMcode        multi_add = curl_multi_add_handle(net->curlm, conn->curl);
               DN_Assert(multi_add == CURLM_OK);
               DN_Assert(request->next == nullptr);
@@ -172,7 +172,7 @@ static int32_t DN_NET2_ThreadEntryPoint_(DN_OSThread *thread)
               DN_Assert(request->next == nullptr);
               DN_Assert(request->prev == nullptr);
               if (request->response.status == DN_NET2RequestStatus_Nil) {
-                DN_NET2CurlConn *conn      = DN_CAST(DN_NET2CurlConn *) request->context;
+                DN_NET2CurlConn *conn      = DN_Cast(DN_NET2CurlConn *) request->context;
                 CURLMcode        multi_add = curl_multi_add_handle(net->curlm, conn->curl);
                 DN_Assert(multi_add == CURLM_OK);
                 DN_DLList_Append(net->http_list, request); // Open the WS connection
@@ -187,7 +187,7 @@ static int32_t DN_NET2_ThreadEntryPoint_(DN_OSThread *thread)
           DN_Str8 payload = {};
           for (DN_OS_MutexScope(&net->ring_mutex)) {
             DN_Assert(DN_Ring_HasData(&net->ring, event.send_ws_payload_size));
-            payload = DN_Str8_Alloc(tmem.arena, event.send_ws_payload_size, DN_ZeroMem_No);
+            payload = DN_Str8FromArena(tmem.arena, event.send_ws_payload_size, DN_ZMem_No);
             DN_Ring_Read(&net->ring, payload.data, payload.size);
           }
 
@@ -201,11 +201,11 @@ static int32_t DN_NET2_ThreadEntryPoint_(DN_OSThread *thread)
             case DN_NET2WSType_Pong:   curlws_flag = CURLWS_PONG; break;
           }
 
-          DN_NET2RequestInternal *request = DN_CAST(DN_NET2RequestInternal *) event.request.handle;
+          DN_NET2RequestInternal *request = DN_Cast(DN_NET2RequestInternal *) event.request.handle;
           DN_Assert(request->type == DN_NET2RequestType_WS);
           DN_Assert(request->response.status == DN_NET2RequestStatus_HTTPReceived || request->response.status == DN_NET2RequestStatus_WSReceived);
 
-          DN_NET2CurlConn        *conn        = DN_CAST(DN_NET2CurlConn *) request->context;
+          DN_NET2CurlConn        *conn        = DN_Cast(DN_NET2CurlConn *) request->context;
           DN_USize                sent        = 0;
           CURLcode                send_result = curl_ws_send(conn->curl, payload.data, payload.size, &sent, 0, curlws_flag);
           DN_AssertF(send_result == CURLE_OK, "Failed to send: %s", curl_easy_strerror(send_result));
@@ -213,7 +213,7 @@ static int32_t DN_NET2_ThreadEntryPoint_(DN_OSThread *thread)
         } break;
 
         case DN_NET2RingEventType_ReceivedWSReceipt: {
-          DN_NET2RequestInternal *request = DN_CAST(DN_NET2RequestInternal *) event.request.handle;
+          DN_NET2RequestInternal *request = DN_Cast(DN_NET2RequestInternal *) event.request.handle;
           DN_Assert(request->type == DN_NET2RequestType_WS);
           DN_Assert(request->response.status == DN_NET2RequestStatus_WSReceived ||
                     request->response.status == DN_NET2RequestStatus_HTTPReceived);
@@ -224,13 +224,13 @@ static int32_t DN_NET2_ThreadEntryPoint_(DN_OSThread *thread)
 
         case DN_NET2RingEventType_DeinitRequest: {
           if (event.request.handle != 0) {
-            DN_NET2RequestInternal *request = DN_CAST(DN_NET2RequestInternal *) event.request.handle;
+            DN_NET2RequestInternal *request = DN_Cast(DN_NET2RequestInternal *) event.request.handle;
             request->response               = {};
 
-            DN_Arena_Clear(&request->arena);
+            DN_ArenaClear(&request->arena);
             DN_OS_SemaphoreDeinit(&request->completion_sem);
 
-            DN_NET2CurlConn *conn = DN_CAST(DN_NET2CurlConn *) request->context;
+            DN_NET2CurlConn *conn = DN_Cast(DN_NET2CurlConn *) request->context;
             curl_multi_remove_handle(net->curlm, conn->curl);
             curl_easy_reset(conn->curl);
             curl_slist_free_all(conn->curl_slist);
@@ -255,10 +255,10 @@ static int32_t DN_NET2_ThreadEntryPoint_(DN_OSThread *thread)
       if (msg) {
         // NOTE: Get request handle
         DN_NET2RequestInternal *request = nullptr;
-        curl_easy_getinfo(msg->easy_handle, CURLINFO_PRIVATE, DN_CAST(void **) & request);
+        curl_easy_getinfo(msg->easy_handle, CURLINFO_PRIVATE, DN_Cast(void **) & request);
         DN_Assert(request);
 
-        DN_NET2CurlConn *conn = DN_CAST(DN_NET2CurlConn *)request->context;
+        DN_NET2CurlConn *conn = DN_Cast(DN_NET2CurlConn *)request->context;
         DN_Assert(conn->curl == msg->easy_handle);
 
         if (msg->data.result == CURLE_OK) {
@@ -267,14 +267,14 @@ static int32_t DN_NET2_ThreadEntryPoint_(DN_OSThread *thread)
           if (get_result == CURLE_OK) {
             request->response.status = DN_NET2RequestStatus_HTTPReceived;
           } else {
-            request->response.error  = DN_Str8_FromF(&request->arena, "Failed to get HTTP response status (CURL %d): %s", msg->data.result, curl_easy_strerror(get_result));
+            request->response.error  = DN_Str8FromFmtArena(&request->arena, "Failed to get HTTP response status (CURL %d): %s", msg->data.result, curl_easy_strerror(get_result));
             request->response.status = DN_NET2RequestStatus_Error;
           }
         } else {
           request->response.status = DN_NET2RequestStatus_Error;
-          request->response.error  = DN_Str8_FromF(&request->arena,
+          request->response.error  = DN_Str8FromFmtArena(&request->arena,
                                                   "Net request to '%.*s' failed (CURL %d): %s",
-                                                  DN_STR_FMT(request->url),
+                                                  DN_Str8PrintFmt(request->url),
                                                   msg->data.result,
                                                   curl_easy_strerror(msg->data.result));
         }
@@ -309,7 +309,7 @@ static int32_t DN_NET2_ThreadEntryPoint_(DN_OSThread *thread)
       const curl_ws_frame *meta                  = nullptr;
       size_t               bytes_read_this_frame = {};
 
-      DN_NET2CurlConn *conn = DN_CAST(DN_NET2CurlConn *) request->context;
+      DN_NET2CurlConn *conn = DN_Cast(DN_NET2CurlConn *) request->context;
       for (;;) {
         // NOTE: Determine WS payload size received
         DN_USize bytes_read = 0;
@@ -318,10 +318,10 @@ static int32_t DN_NET2_ThreadEntryPoint_(DN_OSThread *thread)
           break;
 
         // NOTE: Allocate and read
-        DN_Str8 buffer         = DN_Str8_Alloc(&request->arena, meta->bytesleft, DN_ZeroMem_No);
+        DN_Str8 buffer         = DN_Str8FromArena(&request->arena, meta->bytesleft, DN_ZMem_No);
         receive_result         = curl_ws_recv(conn->curl, buffer.data, buffer.size, &buffer.size, &meta);
         bytes_read_this_frame += buffer.size;
-        DN_Str8Builder_AppendRef(&request->response.body, buffer);
+        DN_Str8BuilderAppendRef(&request->response.body, buffer);
 
         if (meta->flags & CURLWS_TEXT)
           request->response.ws_type = DN_NET2WSType_Text;
@@ -364,9 +364,9 @@ static int32_t DN_NET2_ThreadEntryPoint_(DN_OSThread *thread)
       request->response.status = DN_NET2RequestStatus_WSReceived;
       if (receive_result != CURLE_OK) {
         request->response.status = DN_NET2RequestStatus_Error;
-        request->response.error  = DN_Str8_FromF(&request->arena,
+        request->response.error  = DN_Str8FromFmtArena(&request->arena,
                                                 "Websocket failed to receive data for '%.*s' (CURL %d): %s",
-                                                DN_STR_FMT(request->url),
+                                                DN_Str8PrintFmt(request->url),
                                                 receive_result,
                                                 curl_easy_strerror(receive_result));
       }
@@ -385,25 +385,25 @@ static void DN_NET2_Init(DN_NET2Core *net, char *ring_base, DN_USize ring_size, 
 {
   net->base               = base;
   net->base_size          = base_size;
-  net->arena              = DN_Arena_FromBuffer(net->base, net->base_size, DN_ArenaFlags_Nil);
+  net->arena              = DN_ArenaFromBuffer(net->base, net->base_size, DN_ArenaFlags_Nil);
   net->ring.base          = ring_base;
   net->ring.size          = ring_size;
   net->ring_mutex         = DN_OS_MutexInit();
   net->completion_sem     = DN_OS_SemaphoreInit(0);
   net->free_or_done_mutex = DN_OS_MutexInit();
-  net->curlm              = DN_CAST(CURLM *)curl_multi_init();
+  net->curlm              = DN_Cast(CURLM *)curl_multi_init();
   DN_DLList_InitArena(net->free_list, DN_NET2RequestInternal, &net->arena);
   DN_DLList_InitArena(net->http_list, DN_NET2RequestInternal, &net->arena);
   DN_DLList_InitArena(net->ws_list, DN_NET2RequestInternal, &net->arena);
   DN_DLList_InitArena(net->done_list, DN_NET2RequestInternal, &net->arena);
 
-  DN_IStr8_AppendF(&net->curl_thread.name, "NET (CURL)");
+  DN_FmtAppend(net->curl_thread.name.data, &net->curl_thread.name.size, sizeof(net->curl_thread.name.data), "NET (CURL)");
   DN_OS_ThreadInit(&net->curl_thread, DN_NET2_ThreadEntryPoint_, net);
 }
 
 static void DN_NET2_SetupCurlRequest_(DN_NET2RequestInternal *request)
 {
-  DN_NET2CurlConn *conn = DN_CAST(DN_NET2CurlConn *) request->context;
+  DN_NET2CurlConn *conn = DN_Cast(DN_NET2CurlConn *) request->context;
   CURL            *curl = conn->curl;
   curl_easy_setopt(curl, CURLOPT_PRIVATE, request);
 
@@ -430,13 +430,13 @@ static void DN_NET2_SetupCurlRequest_(DN_NET2RequestInternal *request)
     } break;
 
     case DN_NET2RequestType_HTTP: {
-      request->method    = DN_Str8_TrimWhitespaceAround(request->method);
-      DN_Str8 const GET  = DN_STR8("GET");
-      DN_Str8 const POST = DN_STR8("POST");
+      request->method    = DN_Str8TrimWhitespaceAround(request->method);
+      DN_Str8 const GET  = DN_Str8Lit("GET");
+      DN_Str8 const POST = DN_Str8Lit("POST");
 
-      if (DN_Str8_EqInsensitive(request->method, GET)) {
+      if (DN_Str8EqInsensitive(request->method, GET)) {
         curl_easy_setopt(curl, CURLOPT_HTTPGET, 1);
-      } else if (DN_Str8_EqInsensitive(request->method, POST)) {
+      } else if (DN_Str8EqInsensitive(request->method, POST)) {
         curl_easy_setopt(curl, CURLOPT_POST, 1);
         if (request->args.payload.size > DN_Gigabytes(2))
           curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE_LARGE, request->args.payload.size);
@@ -451,7 +451,7 @@ static void DN_NET2_SetupCurlRequest_(DN_NET2RequestInternal *request)
 
   // NOTE: Handle basic auth
   if (request->args.flags & DN_NET2DoHTTPFlags_BasicAuth) {
-    if (DN_Str8_HasData(request->args.username) && DN_Str8_HasData(request->args.password)) {
+    if (request->args.username.size && request->args.password.size) {
       DN_Assert(request->args.username.data[request->args.username.size] == 0);
       DN_Assert(request->args.password.data[request->args.password.size] == 0);
       curl_easy_setopt(curl, CURLOPT_USERNAME, request->args.username.data);
@@ -470,42 +470,42 @@ static DN_NET2Request DN_NET2_DoRequest_(DN_NET2Core *net, DN_Str8 url, DN_Str8 
     DN_DLList_Dequeue(net->free_list, request);
 
   if (!request) {
-    request               = DN_Arena_New(&net->arena, DN_NET2RequestInternal, DN_ZeroMem_Yes);
+    request               = DN_ArenaNew(&net->arena, DN_NET2RequestInternal, DN_ZMem_Yes);
     DN_NET2CurlConn *conn = new (request->context) DN_NET2CurlConn;
-    conn->curl            = DN_CAST(CURL *)curl_easy_init();
+    conn->curl            = DN_Cast(CURL *)curl_easy_init();
   }
 
   // NOTE: Setup request
   DN_NET2Request result = {};
   if (request) {
-    result.handle = DN_CAST(DN_U64) request;
+    result.handle = DN_Cast(DN_U64) request;
     if (!request->arena.curr)
-      request->arena = DN_Arena_FromVMem(DN_Megabytes(1), DN_Kilobytes(1), DN_ArenaFlags_Nil);
+      request->arena = DN_ArenaFromVMem(DN_Megabytes(1), DN_Kilobytes(1), DN_ArenaFlags_Nil);
 
     request->type   = type;
     request->gen    = DN_Max(request->gen + 1, 1);
-    request->url    = DN_Str8_FromStr8(&request->arena, url);
-    request->method = DN_Str8_FromStr8(&request->arena, method);
+    request->url    = DN_Str8FromStr8Arena(&request->arena, url);
+    request->method = DN_Str8FromStr8Arena(&request->arena, method);
 
     if (args) {
       request->args.flags    = args->flags;
-      request->args.username = DN_Str8_FromStr8(&request->arena, args->username);
-      request->args.password = DN_Str8_FromStr8(&request->arena, args->password);
+      request->args.username = DN_Str8FromStr8Arena(&request->arena, args->username);
+      request->args.password = DN_Str8FromStr8Arena(&request->arena, args->password);
       if (type == DN_NET2RequestType_HTTP)
-        request->args.payload = DN_Str8_FromStr8(&request->arena, args->payload);
+        request->args.payload = DN_Str8FromStr8Arena(&request->arena, args->payload);
 
-      request->args.headers = DN_Arena_NewArray(&request->arena, DN_Str8, args->headers_size, DN_ZeroMem_No);
+      request->args.headers = DN_ArenaNewArray(&request->arena, DN_Str8, args->headers_size, DN_ZMem_No);
       DN_Assert(request->args.headers);
       if (request->args.headers) {
         for (DN_ForItSize(it, DN_Str8, args->headers, args->headers_size))
-          request->args.headers[it.index] = DN_Str8_FromStr8(&request->arena, *it.data);
+          request->args.headers[it.index] = DN_Str8FromStr8Arena(&request->arena, *it.data);
         request->args.headers_size = args->headers_size;
       }
     }
 
-    request->response.body            = DN_Str8Builder_FromArena(&request->arena);
+    request->response.body            = DN_Str8BuilderFromArena(&request->arena);
     request->completion_sem           = DN_OS_SemaphoreInit(0);
-    request->start_response_arena_pos = DN_Arena_Pos(&request->arena);
+    request->start_response_arena_pos = DN_ArenaPos(&request->arena);
 
     DN_NET2_SetupCurlRequest_(request);
 
@@ -530,7 +530,7 @@ static DN_NET2Request DN_NET2_DoHTTP(DN_NET2Core *net, DN_Str8 url, DN_Str8 meth
 
 static DN_NET2Request DN_NET2_OpenWS(DN_NET2Core *net, DN_Str8 url, DN_NET2DoHTTPArgs const *args)
 {
-  DN_NET2Request result = DN_NET2_DoRequest_(net, url, DN_STR8(""), args, DN_NET2RequestType_WS);
+  DN_NET2Request result = DN_NET2_DoRequest_(net, url, DN_Str8Lit(""), args, DN_NET2RequestType_WS);
   return result;
 }
 

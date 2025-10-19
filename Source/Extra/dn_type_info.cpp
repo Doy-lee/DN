@@ -25,7 +25,7 @@ DN_TypeGetField DN_Type_GetField(DN_TypeInfo const *type_info, DN_Str8 name)
         if (type_field->name == name) {
             result.success = true;
             result.index   = index;
-            result.field   = DN_CAST(DN_TypeField *)type_field;
+            result.field   = DN_Cast(DN_TypeField *)type_field;
             break;
         }
     }

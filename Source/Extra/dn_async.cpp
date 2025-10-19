@@ -6,8 +6,8 @@
 
 static DN_I32 DN_ASYNC_ThreadEntryPoint_(DN_OSThread *thread)
 {
-  DN_OS_ThreadSetName(DN_Str8_FromIStr8(&thread->name));
-  DN_ASYNCCore *async = DN_CAST(DN_ASYNCCore *) thread->user_context;
+  DN_OS_ThreadSetName(DN_Str8FromPtr(thread->name.data, thread->name.size));
+  DN_ASYNCCore *async = DN_Cast(DN_ASYNCCore *) thread->user_context;
   DN_Ring      *ring  = &async->ring;
   for (;;) {
     DN_OS_SemaphoreWait(&async->worker_sem, UINT32_MAX);
@@ -51,7 +51,7 @@ DN_API void DN_ASYNC_Init(DN_ASYNCCore *async, char *base, DN_USize base_size, D
   async->threads       = threads;
   for (DN_ForIndexU(index, async->thread_count)) {
     DN_OSThread *thread = async->threads + index;
-    DN_IStr8_AppendF(&thread->name, "ASYNC W%zu", index);
+    DN_FmtAppend(thread->name.data, &thread->name.size, DN_ArrayCountU(thread->name.data), "ASYNC W%zu", index);
     DN_OS_ThreadInit(thread, DN_ASYNC_ThreadEntryPoint_, async);
   }
 }

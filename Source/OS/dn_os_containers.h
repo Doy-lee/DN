@@ -30,8 +30,8 @@ template <typename T>                           T *                   DN_VArray_
 #define                                                               DN_VArray_AddArrayAssert(...)     DN_HardAssert(DN_VArray_AddArray(__VA_ARGS__))
 #define                                                               DN_VArray_AddCArrayAssert(...)    DN_HardAssert(DN_VArray_AddCArray(__VA_ARGS__))
 #define                                                               DN_VArray_AddAssert(...)          DN_HardAssert(DN_VArray_Add(__VA_ARGS__))
-template <typename T>                           T *                   DN_VArray_MakeArray               (DN_VArray<T> *array, DN_USize count, DN_ZeroMem zero_mem);
-template <typename T>                           T *                   DN_VArray_Make                    (DN_VArray<T> *array, DN_ZeroMem zero_mem);
+template <typename T>                           T *                   DN_VArray_MakeArray               (DN_VArray<T> *array, DN_USize count, DN_ZMem z_mem);
+template <typename T>                           T *                   DN_VArray_Make                    (DN_VArray<T> *array, DN_ZMem z_mem);
 #define                                                               DN_VArray_MakeArrayAssert(...)    DN_HardAssert(DN_VArray_MakeArray(__VA_ARGS__))
 #define                                                               DN_VArray_MakeAssert(...)         DN_HardAssert(DN_VArray_Make(__VA_ARGS__))
 template <typename T>                           T *                   DN_VArray_InsertArray             (DN_VArray<T> *array, DN_USize index, T const *items, DN_USize count);
@@ -43,5 +43,5 @@ template <typename T>                           T *                   DN_VArray_
 template <typename T>                           T                     DN_VArray_PopFront                (DN_VArray<T> *array, DN_USize count);
 template <typename T>                           T                     DN_VArray_PopBack                 (DN_VArray<T> *array, DN_USize count);
 template <typename T>                           DN_ArrayEraseResult   DN_VArray_EraseRange              (DN_VArray<T> *array, DN_USize begin_index, DN_ISize count, DN_ArrayErase erase);
-template <typename T>                           void                  DN_VArray_Clear                   (DN_VArray<T> *array, DN_ZeroMem zero_mem);
+template <typename T>                           void                  DN_VArray_Clear                   (DN_VArray<T> *array, DN_ZMem z_mem);
 #endif // !defined(DN_OS_CONTAINERS_H)

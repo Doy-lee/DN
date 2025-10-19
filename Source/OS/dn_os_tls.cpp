@@ -5,7 +5,7 @@ DN_OSTLSTMem::DN_OSTLSTMem(DN_OSTLS *tls, DN_U8 arena_index, DN_OSTLSPushTMem pu
 {
   DN_Assert(arena_index == DN_OSTLSArena_TMem0 || arena_index == DN_OSTLSArena_TMem1);
   arena      = tls->arenas + arena_index;
-  temp_mem   = DN_Arena_TempMemBegin(arena);
+  temp_mem   = DN_ArenaTempMemBegin(arena);
   destructed = false;
   push_arena = push_tmem;
   if (push_arena)
@@ -15,7 +15,7 @@ DN_OSTLSTMem::DN_OSTLSTMem(DN_OSTLS *tls, DN_U8 arena_index, DN_OSTLSPushTMem pu
 DN_OSTLSTMem::~DN_OSTLSTMem()
 {
   DN_Assert(destructed == false);
-  DN_Arena_TempMemEnd(temp_mem);
+  DN_ArenaTempMemEnd(temp_mem);
   destructed = true;
   if (push_arena)
     DN_OS_TLSPopArena();
@@ -37,9 +37,9 @@ DN_API void DN_OS_TLSInit(DN_OSTLS *tls, DN_OSTLSInitArgs args)
   // for setting up the alloc tracking data structures.
   for (DN_ForItCArray(it, DN_Arena, tls->arenas)) {
     DN_Arena *arena = it.data;
-    switch (DN_CAST(DN_OSTLSArena) it.index) {
-      default:                      *arena = DN_Arena_FromVMem(reserve, commit, DN_ArenaFlags_AllocCanLeak | DN_ArenaFlags_NoAllocTrack); break;
-      case DN_OSTLSArena_ErrorSink: *arena = DN_Arena_FromVMem(err_sink_reserve, err_sink_commit, DN_ArenaFlags_AllocCanLeak | DN_ArenaFlags_NoAllocTrack); break;
+    switch (DN_Cast(DN_OSTLSArena) it.index) {
+      default:                      *arena = DN_ArenaFromVMem(reserve, commit, DN_ArenaFlags_AllocCanLeak | DN_ArenaFlags_NoAllocTrack); break;
+      case DN_OSTLSArena_ErrorSink: *arena = DN_ArenaFromVMem(err_sink_reserve, err_sink_commit, DN_ArenaFlags_AllocCanLeak | DN_ArenaFlags_NoAllocTrack); break;
       case DN_OSTLSArena_Count:     DN_InvalidCodePath; break;
     }
   }
@@ -55,7 +55,7 @@ DN_API void DN_OS_TLSDeinit(DN_OSTLS *tls)
   tls->err_sink          = {};
   tls->arena_stack_index = {};
   for (DN_ForItCArray(it, DN_Arena, tls->arenas))
-    DN_Arena_Deinit(it.data);
+    DN_ArenaDeinit(it.data);
 }
 
 DN_THREAD_LOCAL DN_OSTLS *g_dn_curr_thread_tls;
@@ -163,22 +163,22 @@ DN_API DN_OSErrSink *DN_OS_ErrSinkBegin_(DN_OSErrSinkMode mode, DN_CallSite call
   DN_OSTLS     *tls       = DN_OS_TLSGet();
   DN_OSErrSink *err       = &tls->err_sink;
   DN_OSErrSink *result    = err;
-  DN_USize    arena_pos = DN_Arena_Pos(result->arena);
+  DN_USize    arena_pos = DN_ArenaPos(result->arena);
 
   if (tls->err_sink.stack_size == DN_ArrayCountU(err->stack)) {
-    DN_Str8Builder builder = DN_Str8Builder_FromTLS();
+    DN_Str8Builder builder = DN_Str8BuilderFromTLS();
     DN_USize       counter = 0;
     for (DN_ForItSize(it, DN_OSErrSinkNode, err->stack, err->stack_size)) {
       DN_MSVC_WARNING_PUSH
-      DN_MSVC_WARNING_DISABLE(6284) // Object passed as _Param_(4) when a string is required in call to 'DN_Str8Builder_AppendF' Actual type: 'struct DN_Str8'.
-      DN_Str8Builder_AppendF(&builder, "  [%04zu] %S:%u %S\n", counter++, it.data->call_site.file, it.data->call_site.line, it.data->call_site.function);
+      DN_MSVC_WARNING_DISABLE(6284) // Object passed as _Param_(4) when a string is required in call to 'DN_Str8BuilderAppendF' Actual type: 'struct DN_Str8'.
+      DN_Str8BuilderAppendF(&builder, "  [%04zu] %S:%u %S\n", counter++, it.data->call_site.file, it.data->call_site.line, it.data->call_site.function);
       DN_MSVC_WARNING_POP
     }
 
     DN_MSVC_WARNING_PUSH
     DN_MSVC_WARNING_DISABLE(6284) // Object passed as _Param_(6) when a string is required in call to 'DN_LOG_EmitFromType' Actual type: 'struct DN_Str8'.
     DN_AssertF(tls->err_sink.stack_size < DN_ArrayCountU(err->stack),
-               "Error sink has run out of error scopes, potential leak. Scopes were\n%S", DN_Str8Builder_BuildFromTLS(&builder));
+               "Error sink has run out of error scopes, potential leak. Scopes were\n%S", DN_Str8BuilderBuildFromTLS(&builder));
     DN_MSVC_WARNING_POP
   }
 
@@ -190,7 +190,7 @@ DN_API DN_OSErrSink *DN_OS_ErrSinkBegin_(DN_OSErrSinkMode mode, DN_CallSite call
 
   // NOTE: Handle allocation error
   if (!DN_Check(node && node->msg_sentinel)) {
-    DN_Arena_PopTo(result->arena, arena_pos);
+    DN_ArenaPopTo(result->arena, arena_pos);
     node->msg_sentinel = nullptr;
     tls->err_sink.stack_size--;
   }
@@ -221,8 +221,8 @@ DN_API DN_OSErrSinkMsg *DN_OS_ErrSinkEnd(DN_Arena *arena, DN_OSErrSink *err)
   DN_OSErrSinkNode *node = err->stack + (err->stack_size - 1);
   DN_OSErrSinkMsg  *prev = nullptr;
   for (DN_OSErrSinkMsg *it = node->msg_sentinel->next; it != node->msg_sentinel; it = it->next) {
-    DN_OSErrSinkMsg *entry = DN_Arena_New(arena, DN_OSErrSinkMsg, DN_ZeroMem_Yes);
-    entry->msg             = DN_Str8_FromStr8(arena, it->msg);
+    DN_OSErrSinkMsg *entry = DN_ArenaNew(arena, DN_OSErrSinkMsg, DN_ZMem_Yes);
+    entry->msg             = DN_Str8FromStr8Arena(arena, it->msg);
     entry->call_site       = it->call_site;
     entry->error_code      = it->error_code;
     if (!result)
@@ -234,36 +234,36 @@ DN_API DN_OSErrSinkMsg *DN_OS_ErrSinkEnd(DN_Arena *arena, DN_OSErrSink *err)
 
   // NOTE: Deallocate all the memory for this scope
   err->stack_size--;
-  DN_Arena_PopTo(err->arena, node->arena_pos);
+  DN_ArenaPopTo(err->arena, node->arena_pos);
   return result;
 }
 
-static void DN_OS_ErrSinkAddMsgToStr8Builder_(DN_Str8Builder *builder, DN_OSErrSinkMsg *msg, DN_OSErrSinkMsg *end)
+static void DN_OS_ErrSinkAddMsgToStr8Builder(DN_Str8Builder *builder, DN_OSErrSinkMsg *msg, DN_OSErrSinkMsg *end)
 {
   if (msg == end) // NOTE: No error messages to add
     return;
 
   if (msg->next == end) {
     DN_OSErrSinkMsg *it        = msg;
-    DN_Str8        file_name = DN_Str8_FileNameFromPath(it->call_site.file);
-    DN_Str8Builder_AppendF(builder,
+    DN_Str8        file_name = DN_Str8FileNameFromPath(it->call_site.file);
+    DN_Str8BuilderAppendF(builder,
                            "%.*s:%05I32u:%.*s %.*s",
-                           DN_STR_FMT(file_name),
+                           DN_Str8PrintFmt(file_name),
                            it->call_site.line,
-                           DN_STR_FMT(it->call_site.function),
-                           DN_STR_FMT(it->msg));
+                           DN_Str8PrintFmt(it->call_site.function),
+                           DN_Str8PrintFmt(it->msg));
   } else {
     // NOTE: More than one message
     for (DN_OSErrSinkMsg *it = msg; it != end; it = it->next) {
-      DN_Str8 file_name = DN_Str8_FileNameFromPath(it->call_site.file);
-      DN_Str8Builder_AppendF(builder,
+      DN_Str8 file_name = DN_Str8FileNameFromPath(it->call_site.file);
+      DN_Str8BuilderAppendF(builder,
                              "%s  - %.*s:%05I32u:%.*s%s%.*s",
                              it == msg ? "" : "\n",
-                             DN_STR_FMT(file_name),
+                             DN_Str8PrintFmt(file_name),
                              it->call_site.line,
-                             DN_STR_FMT(it->call_site.function),
-                             DN_Str8_HasData(it->msg) ? " " : "",
-                             DN_STR_FMT(it->msg));
+                             DN_Str8PrintFmt(it->call_site.function),
+                             it->msg.size ? " " : "",
+                             DN_Str8PrintFmt(it->msg));
     }
   }
 }
@@ -280,16 +280,16 @@ DN_API DN_Str8 DN_OS_ErrSinkEndStr8(DN_Arena *arena, DN_OSErrSink *err)
 
   // NOTE: Walk the list and allocate it onto the user's arena
   DN_OSTLSTMem      tmem    = DN_OS_TLSPushTMem(arena);
-  DN_Str8Builder  builder = DN_Str8Builder_FromTLS();
+  DN_Str8Builder  builder = DN_Str8BuilderFromTLS();
   DN_OSErrSinkNode *node    = err->stack + (err->stack_size - 1);
-  DN_OS_ErrSinkAddMsgToStr8Builder_(&builder, node->msg_sentinel->next, node->msg_sentinel);
+  DN_OS_ErrSinkAddMsgToStr8Builder(&builder, node->msg_sentinel->next, node->msg_sentinel);
 
   // NOTE: Deallocate all the memory for this scope
   err->stack_size--;
   DN_U64 arena_pos = node->arena_pos;
-  DN_Arena_PopTo(err->arena, arena_pos);
+  DN_ArenaPopTo(err->arena, arena_pos);
 
-  result = DN_Str8Builder_Build(&builder, arena);
+  result = DN_Str8BuilderBuild(&builder, arena);
   return result;
 }
 
@@ -310,20 +310,20 @@ DN_API bool DN_OS_ErrSinkEndAndLogError_(DN_OSErrSink *err, DN_CallSite call_sit
   if (!msg)
     return false;
 
-  DN_Str8Builder builder = DN_Str8Builder_FromTLS();
-  if (DN_Str8_HasData(err_msg)) {
-    DN_Str8Builder_AppendRef(&builder, err_msg);
-    DN_Str8Builder_AppendRef(&builder, DN_STR8(":"));
+  DN_Str8Builder builder = DN_Str8BuilderFromTLS();
+  if (err_msg.size) {
+    DN_Str8BuilderAppendRef(&builder, err_msg);
+    DN_Str8BuilderAppendRef(&builder, DN_Str8Lit(":"));
   } else {
-    DN_Str8Builder_AppendRef(&builder, DN_STR8("Error(s) encountered:"));
+    DN_Str8BuilderAppendRef(&builder, DN_Str8Lit("Error(s) encountered:"));
   }
 
   if (msg->next) // NOTE: More than 1 message
-    DN_Str8Builder_AppendRef(&builder, DN_STR8("\n"));
-  DN_OS_ErrSinkAddMsgToStr8Builder_(&builder, msg, nullptr);
+    DN_Str8BuilderAppendRef(&builder, DN_Str8Lit("\n"));
+  DN_OS_ErrSinkAddMsgToStr8Builder(&builder, msg, nullptr);
 
-  DN_Str8 log = DN_Str8Builder_BuildFromTLS(&builder);
-  DN_LOG_EmitFromType(DN_LOG_MakeU32LogTypeParam(DN_LOGType_Error), call_site, "%.*s", DN_STR_FMT(log));
+  DN_Str8 log = DN_Str8BuilderBuildFromTLS(&builder);
+  DN_LOG_EmitFromType(DN_LOG_MakeU32LogTypeParam(DN_LOGType_Error), call_site, "%.*s", DN_Str8PrintFmt(log));
 
   if (mode == DN_OSErrSinkMode_DebugBreakOnEndAndLog)
     DN_DebugBreak;
@@ -333,7 +333,7 @@ DN_API bool DN_OS_ErrSinkEndAndLogError_(DN_OSErrSink *err, DN_CallSite call_sit
 DN_API bool DN_OS_ErrSinkEndAndLogErrorFV_(DN_OSErrSink *err, DN_CallSite call_site, DN_FMT_ATTRIB char const *fmt, va_list args)
 {
   DN_OSTLSTMem tmem   = DN_OS_TLSTMem(nullptr);
-  DN_Str8    log    = DN_Str8_FromFV(tmem.arena, fmt, args);
+  DN_Str8    log    = DN_Str8FromFmtVArena(tmem.arena, fmt, args);
   bool       result = DN_OS_ErrSinkEndAndLogError_(err, call_site, log);
   return result;
 }
@@ -343,7 +343,7 @@ DN_API bool DN_OS_ErrSinkEndAndLogErrorF_(DN_OSErrSink *err, DN_CallSite call_si
   va_list args;
   va_start(args, fmt);
   DN_OSTLSTMem tmem   = DN_OS_TLSTMem(nullptr);
-  DN_Str8      log    = DN_Str8_FromFV(tmem.arena, fmt, args);
+  DN_Str8      log    = DN_Str8FromFmtVArena(tmem.arena, fmt, args);
   bool         result = DN_OS_ErrSinkEndAndLogError_(err, call_site, log);
   va_end(args);
   return result;
@@ -373,9 +373,9 @@ DN_API void DN_OS_ErrSinkAppendFV_(DN_OSErrSink *err, DN_U32 error_code, DN_FMT_
   DN_OSErrSinkNode *node = err->stack + (err->stack_size - 1);
   DN_AssertF(node, "Error sink must be begun by calling 'Begin' before using this function.");
 
-  DN_OSErrSinkMsg *msg = DN_Arena_New(err->arena, DN_OSErrSinkMsg, DN_ZeroMem_Yes);
+  DN_OSErrSinkMsg *msg = DN_ArenaNew(err->arena, DN_OSErrSinkMsg, DN_ZMem_Yes);
   if (DN_Check(msg)) {
-    msg->msg        = DN_Str8_FromFV(err->arena, fmt, args);
+    msg->msg        = DN_Str8FromFmtVArena(err->arena, fmt, args);
     msg->error_code = error_code;
     msg->call_site  = DN_OS_TLSGet()->call_site;
     DN_DLList_Prepend(node->msg_sentinel, msg);

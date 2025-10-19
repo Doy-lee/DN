@@ -34,12 +34,12 @@ struct DN_StackTraceWalkResultIterator
 
 
 #if defined(DN_FREESTANDING)
-#define                             DN_StackTrace_WalkStr8FromHeap(...) DN_STR8("N/A")
+#define                             DN_StackTrace_WalkStr8FromHeap(...) DN_Str8Lit("N/A")
 #define                             DN_StackTrace_Walk(...)
 #define                             DN_StackTrace_WalkResultIterate(...)
-#define                             DN_StackTrace_WalkResultToStr8(...) DN_STR8("N/A")
-#define                             DN_StackTrace_WalkStr8(...) DN_STR8("N/A")
-#define                             DN_StackTrace_WalkStr8FromHeap(...) DN_STR8("N/A")
+#define                             DN_StackTrace_WalkResultToStr8(...) DN_Str8Lit("N/A")
+#define                             DN_StackTrace_WalkStr8(...) DN_Str8Lit("N/A")
+#define                             DN_StackTrace_WalkStr8FromHeap(...) DN_Str8Lit("N/A")
 #define                             DN_StackTrace_GetFrames(...)
 #define                             DN_StackTrace_RawFrameToFrame(...)
 #define                             DN_StackTrace_Print(...)

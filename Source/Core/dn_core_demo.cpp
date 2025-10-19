@@ -39,8 +39,8 @@ void DN_Docs_Demo()
   DN_Core_Init(&core, DN_CoreOnInit_Nil);
 #endif
 
-  // NOTE: DN_AtomicSetValue64 /////////////////////////////////////////////////////////////////
-  // NOTE: DN_AtomicSetValue32 /////////////////////////////////////////////////////////////////
+  // NOTE: DN_AtomicSetValue64
+  // NOTE: DN_AtomicSetValue32
   // Atomically set the value into the target using an atomic compare and swap
   // idiom. The return value of the function is the value that was last stored
   // in the target.
@@ -54,15 +54,24 @@ void DN_Docs_Demo()
     }
   }
 
-  // NOTE: DN_CVT_HexFromBytes ////////////////////////////////////////////////////////////////////////
+  // NOTE: DN_HexFromBytes
   {
-    DN_OSTLSTMem    tmem     = DN_OS_TLSTMem(nullptr);
+    DN_OSTLSTMem  tmem     = DN_OS_TLSTMem(nullptr);
     unsigned char bytes[2] = {0xFA, 0xCE};
-    DN_Str8       hex      = DN_CVT_HexFromBytes(tmem.arena, bytes, sizeof(bytes));
-    DN_Assert(hex == DN_STR8("face")); // NOTE: Guaranteed to be null-terminated
+    DN_Str8       hex      = DN_HexFromBytesPtrArena(bytes, sizeof(bytes), tmem.arena);
+    DN_Assert(DN_Str8Eq(hex, DN_Str8Lit("face"))); // NOTE: Guaranteed to be null-terminated
   }
 
-  // NOTE: DN_Check /////////////////////////////////////////////////////////////////////////////
+  // NOTE: DN_BytesFromHex
+  {
+    unsigned char bytes[2];
+    DN_USize      bytes_written = DN_BytesFromHexStr8(DN_Str8Lit("0xFACE"), bytes, sizeof(bytes));
+    DN_Assert(bytes_written == 2);
+    DN_Assert(bytes[0] == 0xFA);
+    DN_Assert(bytes[1] == 0xCE);
+  }
+
+  // NOTE: DN_Check
   //
   // Check the expression trapping in debug, whilst in release- trapping is
   // removed and the expression is evaluated as if it were a normal 'if' branch.
@@ -76,7 +85,7 @@ void DN_Docs_Demo()
     }
   }
 
-  // NOTE: DN_CPUID /////////////////////////////////////////////////////////////////////////////
+  // NOTE: DN_CPUID
   // Execute the 'CPUID' instruction which lets you query the capabilities of
   // the current CPU.
 
@@ -94,7 +103,7 @@ void DN_Docs_Demo()
     // On scope exit, DN_DEFER object executes and assigns x = 3
   }
 
-  // NOTE: DN_DSMap /////////////////////////////////////////////////////////////////////////////
+  // NOTE: DN_DSMap
   //
   // A hash table configured using the presets recommended by Demitri Spanos
   // from the Handmade Network (HMN),
@@ -135,8 +144,8 @@ void DN_Docs_Demo()
   // buffer, this buffer must be valid throughout the lifetime of the hash
   // table!
   {
-    // NOTE: DN_DSMap_Init   //////////////////////////////////////////////////////////////////
-    // NOTE: DN_DSMap_Deinit //////////////////////////////////////////////////////////////////
+    // NOTE: DN_DSMap_Init  
+    // NOTE: DN_DSMap_Deinit
     //
     // Initialise a hash table where the table size *must* be a
     // power-of-two, otherwise an assert will be triggered. If
@@ -154,16 +163,16 @@ void DN_Docs_Demo()
     //
     // A 'Deinit' of the map will similarly deallocate the passed in arena (as
     // the map takes ownership of the arena).
-    DN_Arena      arena = DN_Arena_FromVMem(0, 0, DN_ArenaFlags_Nil);
+    DN_Arena      arena = DN_ArenaFromVMem(0, 0, DN_ArenaFlags_Nil);
     DN_DSMap<int> map   = DN_DSMap_Init<int>(&arena, /*size*/ 1024, DN_DSMapFlags_Nil); // Size must be PoT!
     DN_Assert(DN_DSMap_IsValid(&map));                                                  // Valid if no initialisation failure (e.g. mem alloc failure)
 
-    // NOTE: DN_DSMap_KeyCStringLit ///////////////////////////////////////////////////////////
-    // NOTE: DN_DSMap_KeyU64        ///////////////////////////////////////////////////////////
-    // NOTE: DN_DSMap_KeyU64NoHash  ///////////////////////////////////////////////////////////
-    // NOTE: DN_DSMap_KeyBuffer     ///////////////////////////////////////////////////////////
-    // NOTE: DN_DSMap_KeyStr8       ///////////////////////////////////////////////////////////
-    // NOTE: DN_DSMap_KeyStr8Copy   ///////////////////////////////////////////////////////////
+    // NOTE: DN_DSMap_KeyCStringLit
+    // NOTE: DN_DSMap_KeyU64       
+    // NOTE: DN_DSMap_KeyU64NoHash 
+    // NOTE: DN_DSMap_KeyBuffer    
+    // NOTE: DN_DSMap_KeyStr8      
+    // NOTE: DN_DSMap_KeyStr8Copy  
     // Create a hash-table key where:
     //
     //   KeyCStringLit: Uses a Hash(cstring literal)
@@ -184,11 +193,11 @@ void DN_Docs_Demo()
     // already sufficiently uniformly distributed already (e.g. using 8
     // bytes taken from a SHA256 hash as the key) and the first 4 bytes
     // will be used verbatim.
-    DN_DSMapKey key = DN_DSMap_KeyStr8(&map, DN_STR8("Sample Key"));
+    DN_DSMapKey key = DN_DSMap_KeyStr8(&map, DN_Str8Lit("Sample Key"));
 
-    // NOTE: DN_DSMap_Find ////////////////////////////////////////////////////////////////////
-    // NOTE: DN_DSMap_Make ////////////////////////////////////////////////////////////////////
-    // NOTE: DN_DSMap_Set  ////////////////////////////////////////////////////////////////////
+    // NOTE: DN_DSMap_Find
+    // NOTE: DN_DSMap_Make
+    // NOTE: DN_DSMap_Set 
     //
     // Query or commit key-value pair to the table, where:
     //
@@ -219,10 +228,10 @@ void DN_Docs_Demo()
       int               *it_value = &it->value;
       DN_Assert(*it_value == 0xCAFE);
 
-      DN_Assert(DN_Str8_Init(it_key.buffer_data, it_key.buffer_size) == DN_STR8("Sample Key"));
+      DN_Assert(DN_Str8Eq(DN_Str8FromPtr(it_key.buffer_data, it_key.buffer_size), DN_Str8Lit("Sample Key")));
     }
 
-    // NOTE: DN_DSMap_Erase ///////////////////////////////////////////////////////////////////
+    // NOTE: DN_DSMap_Erase
     //
     // Remove the key-value pair from the table. If by erasing the key-value
     // pair from the table puts the table under 25% load, the table will be
@@ -234,26 +243,26 @@ void DN_Docs_Demo()
       DN_Assert(map.occupied == 1); // Sentinel element
     }
 
-    DN_DSMap_Deinit(&map, DN_ZeroMem_Yes); // Deallocates the 'arena' for us!
+    DN_DSMap_Deinit(&map, DN_ZMem_Yes); // Deallocates the 'arena' for us!
   }
 
-// NOTE: DN_DSMap_Hash ////////////////////////////////////////////////////////////////////////
+// NOTE: DN_DSMap_Hash
 //
 // Hash the input key using the custom hash function if it's set on the map,
 // otherwise uses the default hashing function (32bit Murmur3).
 
-// NOTE: DN_DSMap_HashToSlotIndex /////////////////////////////////////////////////////////////
+// NOTE: DN_DSMap_HashToSlotIndex
 //
 // Calculate the index into the map's 'slots' array from the given hash.
 
-// NOTE: DN_DSMap_Resize //////////////////////////////////////////////////////////////////////
+// NOTE: DN_DSMap_Resize
 //
 // Resize the table and move all elements to the new map, note that the new
 // size must be a power of two. This function wil fail on memory allocation
 // failure, or the requested size is smaller than the current number of
 // elements in the map to resize.
 
-// NOTE: DN_OSErrSink /////////////////////////////////////////////////////////////////////////
+// NOTE: DN_OSErrSink
 //
 // Error sinks are a way of accumulating errors from API calls related or
 // unrelated into 1 unified error handling pattern. The implemenation of a
@@ -290,8 +299,8 @@ void DN_Docs_Demo()
   // produce errors take in the error sink as a parameter.
   if (0) {
     DN_OSErrSink *error = DN_OS_ErrSinkBegin(DN_OSErrSinkMode_Nil);
-    DN_OSFile   file  = DN_OS_FileOpen(DN_STR8("/path/to/file"), DN_OSFileOpen_OpenIfExist, DN_OSFileAccess_ReadWrite, error);
-    DN_OS_FileWrite(&file, DN_STR8("abc"), error);
+    DN_OSFile   file  = DN_OS_FileOpen(DN_Str8Lit("/path/to/file"), DN_OSFileOpen_OpenIfExist, DN_OSFileAccess_ReadWrite, error);
+    DN_OS_FileWrite(&file, DN_Str8Lit("abc"), error);
     DN_OS_FileClose(&file);
     if (DN_OS_ErrSinkEndAndLogErrorF(error, "Failed to write to file")) {
       // Do error handling!
@@ -314,15 +323,15 @@ void DN_Docs_Demo()
 
   if (0) {
     DN_OSErrSink *error = DN_OS_ErrSinkBegin(DN_OSErrSinkMode_Nil);
-    DN_OSFile   file  = DN_OS_FileOpen(DN_STR8("/path/to/file"), DN_OSFileOpen_OpenIfExist, DN_OSFileAccess_ReadWrite, error);
-    DN_OS_FileWrite(&file, DN_STR8("abc"), error);
+    DN_OSFile   file  = DN_OS_FileOpen(DN_Str8Lit("/path/to/file"), DN_OSFileOpen_OpenIfExist, DN_OSFileAccess_ReadWrite, error);
+    DN_OS_FileWrite(&file, DN_Str8Lit("abc"), error);
     DN_OS_FileClose(&file);
 
     {
       // NOTE: My error sinks are thread-local, so the returned 'error' is
       // the same as the 'error' value above.
       DN_OS_ErrSinkBegin(DN_OSErrSinkMode_Nil);
-      DN_OS_FileWriteAll(DN_STR8("/path/to/another/file"), DN_STR8("123"), error);
+      DN_OS_FileWriteAll(DN_Str8Lit("/path/to/another/file"), DN_Str8Lit("123"), error);
       DN_OS_ErrSinkEndAndLogErrorF(error, "Failed to write to another file");
     }
 
@@ -331,16 +340,7 @@ void DN_Docs_Demo()
     }
   }
 
-  // NOTE: DN_CVT_BytesFromHex ////////////////////////////////////////////////////////////////////////
-  {
-    unsigned char bytes[2];
-    DN_USize      bytes_written = DN_CVT_BytesFromHexPtr(DN_STR8("0xFACE"), bytes, sizeof(bytes));
-    DN_Assert(bytes_written == 2);
-    DN_Assert(bytes[0] == 0xFA);
-    DN_Assert(bytes[1] == 0xCE);
-  }
-
-  // NOTE: DN_JSONBuilder_Build /////////////////////////////////////////////////////////////////
+  // NOTE: DN_JSONBuilder_Build
   //
   // Convert the internal JSON buffer in the builder into a string.
 
@@ -366,14 +366,14 @@ void DN_Docs_Demo()
   // the following '"<key>": <value>' (e.g. useful for emitting the 'null'
   // value)
 
-  // NOTE: DN_JSONBuilder_U64       /////////////////////////////////////////////////////////////
-  // NOTE: DN_JSONBuilder_U64Named  /////////////////////////////////////////////////////////////
-  // NOTE: DN_JSONBuilder_I64       /////////////////////////////////////////////////////////////
-  // NOTE: DN_JSONBuilder_I64Named  /////////////////////////////////////////////////////////////
-  // NOTE: DN_JSONBuilder_F64       /////////////////////////////////////////////////////////////
-  // NOTE: DN_JSONBuilder_F64Named  /////////////////////////////////////////////////////////////
-  // NOTE: DN_JSONBuilder_Bool      /////////////////////////////////////////////////////////////
-  // NOTE: DN_JSONBuilder_BoolNamed /////////////////////////////////////////////////////////////
+  // NOTE: DN_JSONBuilder_U64      
+  // NOTE: DN_JSONBuilder_U64Named 
+  // NOTE: DN_JSONBuilder_I64      
+  // NOTE: DN_JSONBuilder_I64Named 
+  // NOTE: DN_JSONBuilder_F64      
+  // NOTE: DN_JSONBuilder_F64Named 
+  // NOTE: DN_JSONBuilder_Bool     
+  // NOTE: DN_JSONBuilder_BoolNamed
   //
   // Add the named JSON data type as a key-value object. The named variants
   // generates internally the key-value pair, e.g.
@@ -382,7 +382,7 @@ void DN_Docs_Demo()
   //
   // And the non-named version emit just the 'value' portion
 
-  // NOTE: DN_List_Iterate //////////////////////////////////////////////////////////////////////
+  // NOTE: DN_List_Iterate
   {
     DN_OSTLSTMem   tmem = DN_OS_TLSTMem(nullptr);
     DN_List<int> list = DN_List_Init<int>(/*chunk_size*/ 128);
@@ -392,13 +392,13 @@ void DN_Docs_Demo()
     }
   }
 
-  // NOTE: DN_LOGProc ///////////////////////////////////////////////////////////////////////////
+  // NOTE: DN_LOGProc
   //
   // Function prototype of the logging interface exposed by this library. Logs
   // emitted using the DN_LOG_* family of functions are routed through this
   // routine.
 
-  // NOTE: DN_FNV1A /////////////////////////////////////////////////////////////////////////////
+  // NOTE: DN_FNV1A
 #if 0
   {
     // Using the default hash as defined by DN_FNV1A32_SEED and
@@ -422,15 +422,7 @@ void DN_Docs_Demo()
   }
 #endif
 
-  // NOTE: DN_FmtBuffer3DotTruncate //////////////////////////////////////////////////////////////
-  {
-    char buffer[8]            = {};
-    int  buffer_chars_written = DN_CVT_FmtBuffer3DotTruncate(buffer, sizeof(buffer), "This string is longer than %d characters", DN_CAST(int)(sizeof(buffer) - 1));
-    if (0) // Prints "This ..." which is exactly 8 characters long
-      printf("%.*s", buffer_chars_written, buffer);
-  }
-
-  // NOTE: DN_MurmurHash3 ///////////////////////////////////////////////////////////////////////
+  // NOTE: DN_MurmurHash3
   // MurmurHash3 was written by Austin Appleby, and is placed in the public
   // domain. The author (Austin Appleby) hereby disclaims copyright to this source
   // code.
@@ -448,11 +440,11 @@ void DN_Docs_Demo()
     (void)now;
   }
 
-  // NOTE: DN_OS_DirIterate /////////////////////////////////////////////////////////////////////
+  // NOTE: DN_OS_DirIterate
   //
   // Iterate the files within the passed in folder
-  for (DN_OSDirIterator it = {}; DN_OS_PathIterateDir(DN_STR8("."), &it);) {
-    // printf("%.*s\n", DN_STR_FMT(it.file_name));
+  for (DN_OSDirIterator it = {}; DN_OS_PathIterateDir(DN_Str8Lit("."), &it);) {
+    // printf("%.*s\n", DN_Str8PrintFmt(it.file_name));
   }
 
   // NOTE: DN_OS_FileDelete
@@ -473,11 +465,11 @@ void DN_Docs_Demo()
   if (0) {
     DN_OSTLSTMem  tmem  = DN_OS_TLSTMem(nullptr);
     DN_OSErrSink *error = DN_OS_ErrSinkBegin(DN_OSErrSinkMode_Nil);
-    DN_OS_FileWriteAllSafe(/*path*/ DN_STR8("C:/Home/my.txt"), /*buffer*/ DN_STR8("Hello world"), error);
+    DN_OS_FileWriteAllSafe(/*path*/ DN_Str8Lit("C:/Home/my.txt"), /*buffer*/ DN_Str8Lit("Hello world"), error);
     DN_OS_ErrSinkEndAndLogErrorF(error, "");
   }
 
-  // NOTE: DN_OS_EstimateTSCPerSecond ///////////////////////////////////////////////////////////
+  // NOTE: DN_OS_EstimateTSCPerSecond
   //
   // Estimate how many timestamp count's (TSC) there are per second. TSC
   // is evaluated by calling __rdtsc() or the equivalent on the platform. This
@@ -491,18 +483,18 @@ void DN_Docs_Demo()
   // This may return 0 if querying the CPU timestamp counter is not supported
   // on the platform (e.g. __rdtsc() or __builtin_readcyclecounter() returns 0).
 
-  // NOTE: DN_OS_EXEDir /////////////////////////////////////////////////////////////////////////
+  // NOTE: DN_OS_EXEDir
   //
   // Retrieve the executable directory without the trailing '/' or ('\' for
   // windows). If this fails an empty string is returned.
 
-  // NOTE: DN_OS_PerfCounterFrequency ///////////////////////////////////////////////////////////
+  // NOTE: DN_OS_PerfCounterFrequency
   //
   // Get the number of ticks in the performance counter per second for the
   // operating system you're running on. This value can be used to calculate
   // duration from OS performance counter ticks.
 
-  // NOTE: DN_OS_Path* //////////////////////////////////////////////////////////////////////////
+  // NOTE: DN_OS_Path*
   // Construct paths ensuring the native OS path separators are used in the
   // string. In 99% of cases you can use 'PathConvertF' which converts the
   // given path in one shot ensuring native path separators in the string.
@@ -531,12 +523,12 @@ void DN_Docs_Demo()
   //   path:        path/to/your/desired/folder
   //   popped_path: path/to/your/desired
 
-  // NOTE: DN_OS_SecureRNGBytes /////////////////////////////////////////////////////////////////
+  // NOTE: DN_OS_SecureRNGBytes
   //
   // Generate cryptographically secure bytes
 
 #if 0
-  // NOTE: DN_PCG32 /////////////////////////////////////////////////////////////////////////////
+  // NOTE: DN_PCG32
   //
   // Random number generator of the PCG family. Implementation taken from
   // Martins Mmozeiko from Handmade Network.
@@ -544,20 +536,20 @@ void DN_Docs_Demo()
   {
     DN_PCG32 rng = DN_PCG32_Init(0xb917'a66c'1d9b'3bd8);
 
-    // NOTE: DN_PCG32_Range ///////////////////////////////////////////////////////////////////
+    // NOTE: DN_PCG32_Range
     //
     // Generate a value in the [low, high) interval
     uint32_t u32_value = DN_PCG32_Range(&rng, 32, 64);
     DN_Assert(u32_value >= 32 && u32_value < 64);
 
-    // NOTE: DN_PCG32_NextF32 /////////////////////////////////////////////////////////////////
-    // NOTE: DN_PCG32_NextF64 /////////////////////////////////////////////////////////////////
+    // NOTE: DN_PCG32_NextF32
+    // NOTE: DN_PCG32_NextF64
     //
     // Generate a float/double in the [0, 1) interval
     DN_F64 f64_value = DN_PCG32_NextF64(&rng);
     DN_Assert(f64_value >= 0.f && f64_value < 1.f);
 
-    // NOTE: DN_PCG32_Advance /////////////////////////////////////////////////////////////////
+    // NOTE: DN_PCG32_Advance
     //
     // Step the random number generator by 'delta' steps
     DN_PCG32_Advance(&rng, /*delta*/ 5);
@@ -566,7 +558,7 @@ void DN_Docs_Demo()
 
 #if 0
 #if !defined(DN_NO_PROFILER)
-  // NOTE: DN_Profiler /////////////////////////////////////////////////////////////////////////////
+  // NOTE: DN_Profiler
   //
   // A profiler based off Casey Muratori's Computer Enhance course, Performance
   // Aware Programming. This profiler measures function elapsed time using the
@@ -587,7 +579,7 @@ void DN_Docs_Demo()
 
     DN_ProfilerZone profiler_zone_main_update = DN_Profiler_BeginZone(Zone_MainLoop);
 
-    // NOTE: DN_Profiler_AnchorBuffer /////////////////////////////////////////////////////
+    // NOTE: DN_Profiler_AnchorBuffer
     //
     // Retrieve the requested buffer from the profiler for
     // writing/reading profiling metrics. Pass in the enum to specify
@@ -601,7 +593,7 @@ void DN_Docs_Demo()
     // the front buffer which contain the metrics that you can visualise
     // regarding the most profiling metrics recorded.
 
-    // NOTE: DN_Profiler_ReadBuffer ///////////////////////////////////////////////////////////
+    // NOTE: DN_Profiler_ReadBuffer
     //
     // Retrieve the buffer of anchors of which there are
     // `DN_PROFILER_ANCHOR_BUFFER_SIZE` anchors from the most recent run
@@ -610,19 +602,19 @@ void DN_Docs_Demo()
     DN_ProfilerAnchor *read_anchors = DN_Profiler_ReadBuffer();
     for (DN_USize index = 0; index < DN_PROFILER_ANCHOR_BUFFER_SIZE; index++) {
       DN_ProfilerAnchor *anchor = read_anchors + index;
-      if (DN_Str8_HasData(anchor->name)) {
+      if (DN_Str8HasData(anchor->name)) {
         // ...
       }
     }
 
-    // NOTE: DN_Profiler_WriteBuffer //////////////////////////////////////////////////////////
+    // NOTE: DN_Profiler_WriteBuffer
     //
     // Same as `ReadBuffer` however we return the buffer that the profiler
     // is currently writing anchors into.
     DN_ProfilerAnchor *write_anchors = DN_Profiler_WriteBuffer();
     for (DN_USize index = 0; index < DN_PROFILER_ANCHOR_BUFFER_SIZE; index++) {
       DN_ProfilerAnchor *anchor = write_anchors + index;
-      if (DN_Str8_HasData(anchor->name)) {
+      if (DN_Str8HasData(anchor->name)) {
         // ...
       }
     }
@@ -634,7 +626,7 @@ void DN_Docs_Demo()
 #endif // !defined(DN_NO_PROFILER)
 #endif
 
-  // NOTE: DN_Raycast_LineIntersectV2 ///////////////////////////////////////////////////////////
+  // NOTE: DN_Raycast_LineIntersectV2
   // Calculate the intersection point of 2 rays returning a `t` value
   // which is how much along the direction of the 'ray' did the intersection
   // occur.
@@ -642,14 +634,14 @@ void DN_Docs_Demo()
   // The arguments passed in do not need to be normalised for the function to
   // work.
 
-  // NOTE: DN_Safe_* ////////////////////////////////////////////////////////////////////////////
+  // NOTE: DN_Safe_*
   //
   // Performs the arithmetic operation and uses DN_Check on the operation to
   // check if it overflows. If it overflows the MAX value of the integer is
   // returned in add and multiply operations, and, the minimum is returned in
   // subtraction and division.
 
-  // NOTE: DN_SaturateCast* ////////////////////////////////////////////////////////////////
+  // NOTE: DN_SaturateCast*
   //
   // Truncate the passed in value to the return type clamping the resulting
   // value to the max value of the desired data type. It DN_Check's the
@@ -696,7 +688,7 @@ void DN_Docs_Demo()
   // Int -> U32:    0         or UINT32_MAX
   // Int -> U64:    0         or UINT64_MAX
 
-  // NOTE: DN_StackTrace ////////////////////////////////////////////////////////////////////////
+  // NOTE: DN_StackTrace
   // Emit stack traces at the calling site that these functions are invoked
   // from.
   //
@@ -715,7 +707,7 @@ void DN_Docs_Demo()
   {
     DN_OSTLSTMem tmem = DN_OS_TLSTMem(nullptr);
 
-    // NOTE: DN_StackTrace_Walk ///////////////////////////////////////////////////////////////
+    // NOTE: DN_StackTrace_Walk
     //
     // Generate a stack trace as a series of addresses to the base of the
     // functions on the call-stack at the current instruction pointer. The
@@ -725,7 +717,7 @@ void DN_Docs_Demo()
 
     // Loop over the addresses produced in the stack trace
     for (DN_StackTraceWalkResultIterator it = {}; DN_StackTrace_WalkResultIterate(&it, &walk);) {
-      // NOTE: DN_StackTrace_RawFrameToFrame ////////////////////////////////////////////////
+      // NOTE: DN_StackTrace_RawFrameToFrame
       //
       // Converts the base address into a human readable stack trace
       // entry (e.g. address, line number, file and function name).
@@ -733,7 +725,7 @@ void DN_Docs_Demo()
 
       // You may then print out the frame like so
       if (0)
-        printf("%.*s(%" PRIu64 "): %.*s\n", DN_STR_FMT(frame.file_name), frame.line_number, DN_STR_FMT(frame.function_name));
+        printf("%.*s(%" PRIu64 "): %.*s\n", DN_Str8PrintFmt(frame.file_name), frame.line_number, DN_Str8PrintFmt(frame.function_name));
     }
 
     // If you load new shared-libraries into the address space it maybe
@@ -741,7 +733,7 @@ void DN_Docs_Demo()
     // to resolve the new addresses.
     DN_StackTrace_ReloadSymbols();
 
-    // NOTE: DN_StackTrace_GetFrames //////////////////////////////////////////////////////////
+    // NOTE: DN_StackTrace_GetFrames
     //
     // Helper function to create a stack trace and automatically convert the
     // raw frames into human readable frames. This function effectively
@@ -750,7 +742,7 @@ void DN_Docs_Demo()
     (void)frames;
   }
 
-  // NOTE: DN_Str8_Alloc ////////////////////////////////////////////////////////////////////////
+  // NOTE: DN_Str8FromArena
   //
   // Allocates a string with the requested 'size'. An additional byte is
   // always requested from the allocator to null-terminate the buffer. This
@@ -760,33 +752,33 @@ void DN_Docs_Demo()
   // additional null-terminating byte.
   {
     DN_OSTLSTMem tmem   = DN_OS_TLSTMem(nullptr);
-    DN_Str8      string = DN_Str8_Alloc(tmem.arena, /*size*/ 1, DN_ZeroMem_Yes);
+    DN_Str8      string = DN_Str8FromArena(tmem.arena, /*size*/ 1, DN_ZMem_Yes);
     DN_Assert(string.size == 1);
     DN_Assert(string.data[string.size] == 0); // It is null-terminated!
   }
 
-  // NOTE: DN_Str8_BSplit //////////////////////////////////////////////////////////////////
+  // NOTE: DN_Str8BSplit
   //
   // Splits a string into 2 substrings occuring prior and after the first
   // occurence of the delimiter. Neither strings include the matched
   // delimiter. If no delimiter is found, the 'rhs' of the split will be
   // empty.
   {
-    DN_Str8BSplitResult dot_split   = DN_Str8_BSplit(/*string*/ DN_STR8("abc.def.ghi"), /*delimiter*/ DN_STR8("."));
-    DN_Str8BSplitResult slash_split = DN_Str8_BSplit(/*string*/ DN_STR8("abc.def.ghi"), /*delimiter*/ DN_STR8("/"));
-    DN_Assert(dot_split.lhs == DN_STR8("abc") && dot_split.rhs == DN_STR8("def.ghi"));
-    DN_Assert(slash_split.lhs == DN_STR8("abc.def.ghi") && slash_split.rhs == DN_STR8(""));
+    DN_Str8BSplitResult dot_split   = DN_Str8BSplit(/*string*/ DN_Str8Lit("abc.def.ghi"), /*delimiter*/ DN_Str8Lit("."));
+    DN_Str8BSplitResult slash_split = DN_Str8BSplit(/*string*/ DN_Str8Lit("abc.def.ghi"), /*delimiter*/ DN_Str8Lit("/"));
+    DN_Assert(DN_Str8Eq(dot_split.lhs, DN_Str8Lit("abc")) && DN_Str8Eq(dot_split.rhs, DN_Str8Lit("def.ghi")));
+    DN_Assert(DN_Str8Eq(slash_split.lhs, DN_Str8Lit("abc.def.ghi")) && DN_Str8Eq(slash_split.rhs, DN_Str8Lit("")));
 
     // Loop that walks the string and produces ("abc", "def", "ghi")
-    for (DN_Str8 it = DN_STR8("abc.def.ghi"); it.size;) {
-      DN_Str8BSplitResult split = DN_Str8_BSplit(it, DN_STR8("."));
+    for (DN_Str8 it = DN_Str8Lit("abc.def.ghi"); it.size;) {
+      DN_Str8BSplitResult split = DN_Str8BSplit(it, DN_Str8Lit("."));
       DN_Str8                  chunk = split.lhs; // "abc", "def", ...
       it                             = split.rhs;
       (void)chunk;
     }
   }
 
-  // NOTE: DN_Str8_FileNameFromPath /////////////////////////////////////////////////////////////
+  // NOTE: DN_Str8FileNameFromPath
   //
   // Takes a slice to the file name from a file path. The file name is
   // evaluated by searching from the end of the string backwards to the first
@@ -795,41 +787,41 @@ void DN_Docs_Demo()
   // if there were any.
   {
     {
-      DN_Str8 string = DN_Str8_FileNameFromPath(DN_STR8("C:/Folder/item.txt"));
-      DN_Assert(string == DN_STR8("item.txt"));
+      DN_Str8 string = DN_Str8FileNameFromPath(DN_Str8Lit("C:/Folder/item.txt"));
+      DN_Assert(DN_Str8Eq(string, DN_Str8Lit("item.txt")));
     }
     {
       // TODO(doyle): Intuitively this seems incorrect. Empty string instead?
-      DN_Str8 string = DN_Str8_FileNameFromPath(DN_STR8("C:/Folder/"));
-      DN_Assert(string == DN_STR8("C:/Folder"));
+      DN_Str8 string = DN_Str8FileNameFromPath(DN_Str8Lit("C:/Folder/"));
+      DN_Assert(DN_Str8Eq(string, DN_Str8Lit("C:/Folder")));
     }
     {
-      DN_Str8 string = DN_Str8_FileNameFromPath(DN_STR8("C:/Folder"));
-      DN_Assert(string == DN_STR8("Folder"));
+      DN_Str8 string = DN_Str8FileNameFromPath(DN_Str8Lit("C:/Folder"));
+      DN_Assert(DN_Str8Eq(string, DN_Str8Lit("Folder")));
     }
   }
 
-  // NOTE: DN_Str8_FilePathNoExtension //////////////////////////////////////////////////////////
+  // NOTE: DN_Str8FilePathNoExtension
   //
   // This function preserves the original string if no extension was found.
   // An extension is defined as the substring after the last '.' encountered
   // in the string.
   {
-    DN_Str8 string = DN_Str8_FilePathNoExtension(DN_STR8("C:/Folder/item.txt.bak"));
-    DN_Assert(string == DN_STR8("C:/Folder/item.txt"));
+    DN_Str8 string = DN_Str8FilePathNoExtension(DN_Str8Lit("C:/Folder/item.txt.bak"));
+    DN_Assert(DN_Str8Eq(string, DN_Str8Lit("C:/Folder/item.txt")));
   }
 
-  // NOTE: DN_Str8_FileNameNoExtension //////////////////////////////////////////////////////////
+  // NOTE: DN_Str8FileNameNoExtension
   //
   // This function is the same as calling 'FileNameFromPath' followed by
   // 'FilePathNoExtension'
   {
-    DN_Str8 string = DN_Str8_FileNameNoExtension(DN_STR8("C:/Folder/item.txt.bak"));
-    DN_Assert(string == DN_STR8("item.txt"));
+    DN_Str8 string = DN_Str8FileNameNoExtension(DN_Str8Lit("C:/Folder/item.txt.bak"));
+    DN_Assert(DN_Str8Eq(string, DN_Str8Lit("item.txt")));
   }
 
-  // NOTE: DN_Str8_Replace            ///////////////////////////////////////////////////////////
-  // NOTE: DN_Str8_ReplaceInsensitive ///////////////////////////////////////////////////////////
+  // NOTE: DN_Str8Replace           
+  // NOTE: DN_Str8ReplaceInsensitive
   //
   // Replace any matching substring 'find' with 'replace' in the passed in
   // 'string'. The 'start_index' may be specified to offset which index the
@@ -840,16 +832,16 @@ void DN_Docs_Demo()
   // were done or not.
   {
     DN_OSTLSTMem tmem   = DN_OS_TLSTMem(nullptr);
-    DN_Str8      string = DN_Str8_Replace(/*string*/ DN_STR8("Foo Foo Bar"),
-                                     /*find*/ DN_STR8("Foo"),
-                                     /*replace*/ DN_STR8("Moo"),
+    DN_Str8      string = DN_Str8Replace(/*string*/ DN_Str8Lit("Foo Foo Bar"),
+                                     /*find*/ DN_Str8Lit("Foo"),
+                                     /*replace*/ DN_Str8Lit("Moo"),
                                      /*start_index*/ 1,
                                      /*arena*/ tmem.arena,
                                      /*eq_case*/ DN_Str8EqCase_Sensitive);
-    DN_Assert(string == DN_STR8("Foo Moo Bar"));
+    DN_Assert(DN_Str8Eq(string, DN_Str8Lit("Foo Moo Bar")));
   }
 
-  // NOTE: DN_Str8_Segment //////////////////////////////////////////////////////////////////////
+  // NOTE: DN_Str8Segment
   //
   // Add a delimiting 'segment_char' every 'segment_size' number of characters
   // in the string.
@@ -858,38 +850,42 @@ void DN_Docs_Demo()
   // of the string.
   {
     DN_OSTLSTMem tmem   = DN_OS_TLSTMem(nullptr);
-    DN_Str8      string = DN_Str8_Segment(tmem.arena, /*string*/ DN_STR8("123456789"), /*segment_size*/ 3, /*segment_char*/ ',');
-    DN_Assert(string == DN_STR8("123,456,789"));
+    DN_Str8      string = DN_Str8Segment(tmem.arena, /*string*/ DN_Str8Lit("123456789"), /*segment_size*/ 3, /*segment_char*/ ',');
+    DN_Assert(DN_Str8Eq(string, DN_Str8Lit("123,456,789")));
   }
 
-  // NOTE: DN_Str8_Split ////////////////////////////////////////////////////////////////////////
+  // NOTE: DN_Str8Split
   {
     // Splits the string at each delimiter into substrings occuring prior and
     // after until the next delimiter.
     DN_OSTLSTMem tmem = DN_OS_TLSTMem(nullptr);
     {
-      DN_Slice<DN_Str8> splits = DN_Str8_SplitAlloc(/*arena*/ tmem.arena,
-                                                    /*string*/ DN_STR8("192.168.8.1"),
-                                                    /*delimiter*/ DN_STR8("."),
+      DN_Str8SplitResult splits = DN_Str8SplitArena(/*arena*/ tmem.arena,
+                                                    /*string*/ DN_Str8Lit("192.168.8.1"),
+                                                    /*delimiter*/ DN_Str8Lit("."),
                                                     /*mode*/ DN_Str8SplitIncludeEmptyStrings_No);
-      DN_Assert(splits.size == 4);
-      DN_Assert(splits.data[0] == DN_STR8("192") && splits.data[1] == DN_STR8("168") && splits.data[2] == DN_STR8("8") && splits.data[3] == DN_STR8("1"));
+      DN_Assert(splits.count == 4);
+      DN_Assert(DN_Str8Eq(splits.data[0], DN_Str8Lit("192")) &&
+                DN_Str8Eq(splits.data[1], DN_Str8Lit("168")) &&
+                DN_Str8Eq(splits.data[2], DN_Str8Lit("8")) &&
+                DN_Str8Eq(splits.data[3], DN_Str8Lit("1")));
     }
 
     // You can include empty strings that occur when splitting by setting
     // the split mode to include empty strings.
     {
-      DN_Slice<DN_Str8> splits = DN_Str8_SplitAlloc(/*arena*/ tmem.arena,
-                                                    /*string*/ DN_STR8("a--b"),
-                                                    /*delimiter*/ DN_STR8("-"),
+      DN_Str8SplitResult splits = DN_Str8SplitArena(/*arena*/ tmem.arena,
+                                                    /*string*/ DN_Str8Lit("a--b"),
+                                                    /*delimiter*/ DN_Str8Lit("-"),
                                                     /*mode*/ DN_Str8SplitIncludeEmptyStrings_Yes);
-      DN_Assert(splits.size == 3);
-      DN_Assert(splits.data[0] == DN_STR8("a") && splits.data[1] == DN_STR8("") && splits.data[2] == DN_STR8("b"));
+      DN_Assert(splits.count == 3);
+      DN_Assert(DN_Str8Eq(splits.data[0], DN_Str8Lit("a")) &&
+                DN_Str8Eq(splits.data[1], DN_Str8Lit("")) &&
+                DN_Str8Eq(splits.data[2], DN_Str8Lit("b")));
     }
   }
 
-  // NOTE: DN_Str8_ToI64 ////////////////////////////////////////////////////////////////////////
-  // NOTE: DN_Str8_ToU64 ////////////////////////////////////////////////////////////////////////
+  // NOTE: DN_I64FromStr8, DN_U64FromStr8
   //
   // Convert a number represented as a string to a signed 64 bit number.
   //
@@ -909,31 +905,31 @@ void DN_Docs_Demo()
   // 'ToI64' either '+' or '-' prefix is permitted
   {
     {
-      DN_Str8ToI64Result result = DN_Str8_ToI64(DN_STR8("-1,234"), /*separator*/ ',');
+      DN_I64FromResult result = DN_I64FromStr8(DN_Str8Lit("-1,234"), /*separator*/ ',');
       DN_Assert(result.success && result.value == -1234);
     }
     {
-      DN_Str8ToI64Result result = DN_Str8_ToI64(DN_STR8("-1,234"), /*separator*/ 0);
+      DN_I64FromResult result = DN_I64FromStr8(DN_Str8Lit("-1,234"), /*separator*/ 0);
       DN_Assert(!result.success && result.value == 1); // 1 because it's a greedy conversion
     }
   }
 
-  // NOTE: DN_Str8_TrimByteOrderMark ////////////////////////////////////////////////////////////
+  // NOTE: DN_Str8TrimByteOrderMark
   //
   // Removes a leading UTF8, UTF16 BE/LE, UTF32 BE/LE byte order mark from the
   // string if it's present.
 
-  // NOTE: DN_STR_FMT ///////////////////////////////////////////////////////////////////////////
+  // NOTE: DN_Str8PrintFmt
   //
   // Unpacks a string struct that has the fields {.data, .size} for printing a
   // pointer and length style string using the printf format specifier "%.*s"
   //
-  //   printf("%.*s\n", DN_STR_FMT(DN_STR8("Hello world")));
+  //   printf("%.*s\n", DN_Str8PrintFmt(DN_Str8Lit("Hello world")));
 
-  // NOTE: DN_Str8Builder_AppendF    ////////////////////////////////////////////////////////////
-  // NOTE: DN_Str8Builder_AppendFV   ////////////////////////////////////////////////////////////
-  // NOTE: DN_Str8Builder_AppendRef  ////////////////////////////////////////////////////////////
-  // NOTE: DN_Str8Builder_AppendCopy ////////////////////////////////////////////////////////////
+  // NOTE: DN_Str8BuilderAppendF   
+  // NOTE: DN_Str8BuilderAppendFV  
+  // NOTE: DN_Str8BuilderAppendRef 
+  // NOTE: DN_Str8BuilderAppendCopy
   //
   // - Appends a string to the string builder as follows
   //
@@ -941,8 +937,8 @@ void DN_Docs_Demo()
   //     AppendCopy: Stores the string slice by copy (with builder's arena)
   //     AppendF/V:  Constructs a format string and calls 'AppendRef'
 
-  // NOTE: DN_Str8Builder_Build    ///////////////////////////////////////////////////////////
-  // NOTE: DN_Str8Builder_BuildCRT ///////////////////////////////////////////////////////////
+  // NOTE: DN_Str8BuilderBuild   
+  // NOTE: DN_Str8BuilderBuildCRT
   //
   // Constructs the final string by merging all the appended strings into
   // one merged string.
@@ -950,11 +946,11 @@ void DN_Docs_Demo()
   // The CRT variant calls into 'malloc' and the string *must* be released
   // using 'free'.
 
-  // NOTE: DN_Str8Builder_BuildSlice  ///////////////////////////////////////////////////////////
+  // NOTE: DN_Str8BuilderBuildSlice 
   //
   // Constructs the final string into an array of strings (e.g. a slice)
 
-  // NOTE: DN_TicketMutex ///////////////////////////////////////////////////////////////////////
+  // NOTE: DN_TicketMutex
   //
   // A mutex implemented using an atomic compare and swap on tickets handed
   // out for each critical section.
@@ -974,13 +970,13 @@ void DN_Docs_Demo()
     DN_TicketMutex_Begin(&mutex); // Simple procedural mutual exclusion lock
     DN_TicketMutex_End(&mutex);
 
-    // NOTE: DN_TicketMutex_MakeTicket ////////////////////////////////////////////////////////
+    // NOTE: DN_TicketMutex_MakeTicket
     //
     // Request the next available ticket for locking from the mutex.
     DN_UInt ticket = DN_TicketMutex_MakeTicket(&mutex);
 
     if (DN_TicketMutex_CanLock(&mutex, ticket)) {
-      // NOTE: DN_TicketMutex_BeginTicket ///////////////////////////////////////////////////
+      // NOTE: DN_TicketMutex_BeginTicket
       //
       // Locks the mutex using the given ticket if possible. If it's not
       // the next ticket to be locked the executing thread will block
@@ -991,7 +987,7 @@ void DN_Docs_Demo()
     }
   }
 
-  // NOTE: DN_ThreadContext /////////////////////////////////////////////////////////////////////
+  // NOTE: DN_ThreadContext
   //
   // Each thread is assigned in their thread-local storage (TLS) tmem and
   // permanent arena allocators. These can be used for allocations with a
@@ -1041,21 +1037,21 @@ void DN_Docs_Demo()
   //   @param[in] conflict_arena A pointer to the arena currently being used in the
   //   function
 
-  // NOTE: DN_CVT_Str8FromU64 /////////////////////////////////////////////////////////////////////////
+  // NOTE: DN_Str8x32FromFmt
   {
-    DN_CVTU64Str8 string = DN_CVT_Str8FromU64(123123, ',');
-    if (0) // Prints "123,123"
-      printf("%.*s", DN_STR_FMT(string));
+    DN_Str8x32 string = DN_Str8x32FromFmt("%" PRIu64, 123123);
+    if (0) // Prints "123123"
+      printf("%.*s", DN_Str8PrintFmt(string));
   }
 
-  // NOTE: DN_CVT_AgeFromU64 //////////////////////////////////////////////////////////////////////////
+  // NOTE: DN_CVT_AgeFromU64
   {
     DN_OSTLSTMem tmem   = DN_OS_TLSTMem(nullptr);
-    DN_Str8      string = DN_CVT_AgeFromU64(tmem.arena, DN_HoursToSec(2) + DN_MinutesToSec(30), DN_CVTU64AgeUnit_All);
-    DN_Assert(DN_Str8_Eq(string, DN_STR8("2h 30m")));
+    DN_Str8x128  string = DN_AgeStr8FromSecF64(DN_SecFromHours(2) + DN_SecFromMins(30), DN_AgeUnit_All);
+    DN_Assert(DN_Str8Eq(DN_Str8FromStruct(&string), DN_Str8Lit("2h 30m")));
   }
 
-  // NOTE: DN_VArray ////////////////////////////////////////////////////////////////////////////
+  // NOTE: DN_VArray
   //
   // An array that is backed by virtual memory by reserving addressing space
   // and comitting pages as items are allocated in the array. This array never
@@ -1079,8 +1075,8 @@ void DN_Docs_Demo()
   // In addition to no realloc on expansion or shrinking.
   //
   {
-    // NOTE: DN_VArray_Init         ///////////////////////////////////////////////////////////
-    // NOTE: DN_VArray_InitByteSize ///////////////////////////////////////////////////////////
+    // NOTE: DN_VArray_Init        
+    // NOTE: DN_VArray_InitByteSize
     //
     // Initialise an array with the requested byte size or item capacity
     // respectively. The returned array may have a higher capacity than the
@@ -1090,10 +1086,10 @@ void DN_Docs_Demo()
     DN_VArray<int> array = DN_VArray_Init<int>(1024);
     DN_Assert(array.size == 0 && array.max >= 1024);
 
-    // NOTE: DN_VArray_Make      //////////////////////////////////////////////////////////////
-    // NOTE: DN_VArray_Add       //////////////////////////////////////////////////////////////
-    // NOTE: DN_VArray_MakeArray //////////////////////////////////////////////////////////////
-    // NOTE: DN_VArray_AddArray  //////////////////////////////////////////////////////////////
+    // NOTE: DN_VArray_Make     
+    // NOTE: DN_VArray_Add      
+    // NOTE: DN_VArray_MakeArray
+    // NOTE: DN_VArray_AddArray 
     //
     // Allocate items from the array where:
     //
@@ -1105,7 +1101,7 @@ void DN_Docs_Demo()
     int *item = DN_VArray_Add(&array, 0xCAFE);
     DN_Assert(*item == 0xCAFE && array.size == 1);
 
-    // NOTE: DN_VArray_AddCArray  /////////////////////////////////////////////////////////////
+    // NOTE: DN_VArray_AddCArray 
     DN_VArray_AddCArray(&array, {1, 2, 3});
     DN_Assert(array.size == 4);
 
@@ -1116,7 +1112,7 @@ void DN_Docs_Demo()
           if (index != 1)
               continue;
 
-          // NOTE: DN_VArray_EraseRange /////////////////////////////////////////////////////////
+          // NOTE: DN_VArray_EraseRange
           //
           // Erase the next 'count' items at 'begin_index' in the array.
           // 'count' can be positive or negative which dictates the if we
@@ -1151,7 +1147,7 @@ void DN_Docs_Demo()
                 array.data[2] == 3);
 #endif
 
-    // NOTE: DN_VArray_Reserve ////////////////////////////////////////////////////////////////////
+    // NOTE: DN_VArray_Reserve
     //
     // Ensure that the requested number of items are backed by physical pages
     // from the OS. Calling this pre-emptively will minimise syscalls into the
@@ -1164,31 +1160,31 @@ void DN_Docs_Demo()
     DN_VArray_Deinit(&array);
   }
 
-  // NOTE: DN_W32_LastError         /////////////////////////////////////////////////////////////
-  // NOTE: DN_W32_ErrorCodeToMsg    /////////////////////////////////////////////////////////////
+  // NOTE: DN_W32_LastError        
+  // NOTE: DN_W32_ErrorCodeToMsg   
   #if defined(DN_PLATFORM_WIN32)
     if (0) {
       // Generate the error string for the last Win32 API called that return
       // an error value.
       DN_OSTLSTMem  tmem           = DN_OS_TLSTMem(nullptr);
       DN_W32Error get_last_error = DN_W32_LastError(tmem.arena);
-      printf("Error (%lu): %.*s", get_last_error.code, DN_STR_FMT(get_last_error.msg));
+      printf("Error (%lu): %.*s", get_last_error.code, DN_Str8PrintFmt(get_last_error.msg));
 
       // Alternatively, pass in the error code directly
       DN_W32Error error_msg_for_code = DN_W32_ErrorCodeToMsg(tmem.arena, /*error_code*/ 0);
-      printf("Error (%lu): %.*s", error_msg_for_code.code, DN_STR_FMT(error_msg_for_code.msg));
+      printf("Error (%lu): %.*s", error_msg_for_code.code, DN_Str8PrintFmt(error_msg_for_code.msg));
     }
 
-  // NOTE: DN_W32_MakeProcessDPIAware ///////////////////////////////////////////////////////////
+  // NOTE: DN_W32_MakeProcessDPIAware
   //
   // Call once at application start-up to ensure that the application is DPI
   // aware on Windows and ensure that application UI is scaled up
   // appropriately for the monitor.
 
-  // NOTE: DN_W32_Str8ToStr16       /////////////////////////////////////////////////////////////
-  // NOTE: DN_W32_Str8ToStr16Buffer /////////////////////////////////////////////////////////////
-  // NOTE: DN_W32_Str16ToStr8       /////////////////////////////////////////////////////////////
-  // NOTE: DN_W32_Str16ToStr8Buffer /////////////////////////////////////////////////////////////
+  // NOTE: DN_W32_Str8ToStr16      
+  // NOTE: DN_W32_Str8ToStr16Buffer
+  // NOTE: DN_W32_Str16ToStr8      
+  // NOTE: DN_W32_Str16ToStr8Buffer
   //
   // Convert a UTF8 <-> UTF16 string.
   //

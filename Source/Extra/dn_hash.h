@@ -40,6 +40,6 @@ DN_API uint64_t       DN_FNV1A64_Iterate         (void const *bytes, DN_USize si
 DN_API uint32_t       DN_MurmurHash3_x86U32      (void const *key, int len, uint32_t seed);
 DN_API DN_MurmurHash3 DN_MurmurHash3_x64U128     (void const *key, int len, uint32_t seed);
 #define               DN_MurmurHash3_x64U128AsU64(key, len, seed) (DN_MurmurHash3_x64U128(key, len, seed).e[0])
-#define               DN_MurmurHash3_x64U128AsU32(key, len, seed) (DN_CAST(uint32_t)DN_MurmurHash3_x64U128(key, len, seed).e[0])
+#define               DN_MurmurHash3_x64U128AsU32(key, len, seed) (DN_Cast(uint32_t)DN_MurmurHash3_x64U128(key, len, seed).e[0])
 
 #endif // !defined(DN_HASH_H)

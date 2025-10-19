@@ -7,8 +7,8 @@ void *DN_JSON_ArenaAllocFunc(void *user_data, size_t count)
     if (!user_data)
         return result;
 
-    DN_Arena *arena = DN_CAST(DN_Arena*)user_data;
-    result = DN_Arena_Alloc(arena, count, alignof(json_value_s), DN_ZeroMem_No);
+    DN_Arena *arena = DN_Cast(DN_Arena*)user_data;
+    result = DN_ArenaAlloc(arena, count, alignof(json_value_s), DN_ZMem_No);
     return result;
 }
 
@@ -30,9 +30,9 @@ char const *DN_JSON_TypeEnumCString(json_type_e type, size_t *size)
 bool DN_JSON_String8Cmp(json_string_s const *lhs, DN_Str8 key)
 {
     bool result = false;
-    if (lhs && DN_Str8_HasData(key)) {
-        DN_Str8 lhs_string = DN_Str8_Init(lhs->string, lhs->string_size);
-        result              = DN_Str8_Eq(lhs_string, key);
+    if (lhs && key.size) {
+        DN_Str8 lhs_string = DN_Str8FromPtr(lhs->string, lhs->string_size);
+        result              = DN_Str8Eq(lhs_string, key);
     }
     return result;
 }
@@ -42,7 +42,7 @@ DN_JSONIt DN_JSON_LoadFileToIt(DN_Arena *arena, DN_Str8 json)
 {
     json_parse_result_s parse_result = {};
     json_value_ex_s    *ex_value     =
-        DN_CAST(json_value_ex_s *) json_parse_ex(json.data,
+        DN_Cast(json_value_ex_s *) json_parse_ex(json.data,
                                                   json.size,
                                                   json_parse_flags_allow_location_information,
                                                   DN_JSON_ArenaAllocFunc,
@@ -124,13 +124,13 @@ json_value_s *DN_JSON_ItPushCurrValue(DN_JSONIt *it)
         return result;
 
     if (curr->type == DN_JSON_ItEntryTypeObjElement) {
-        json_object_element_s *element = DN_CAST(json_object_element_s *) curr->value;
+        json_object_element_s *element = DN_Cast(json_object_element_s *) curr->value;
         result                         = element->value;
     } else if (curr->type == DN_JSON_ItEntryTypeArrayElement) {
-        json_array_element_s *element = DN_CAST(json_array_element_s *) curr->value;
+        json_array_element_s *element = DN_Cast(json_array_element_s *) curr->value;
         result                        = element->value;
     } else {
-        result = DN_CAST(json_value_s *) curr->value;
+        result = DN_Cast(json_value_s *) curr->value;
     }
 
     if (result->type == json_type_array) {
@@ -155,18 +155,18 @@ bool DN_JSON_ItNext(DN_JSONIt *it)
     json_object_element_s *obj_element   = nullptr;
     json_array_element_s  *array_element = nullptr;
     if (curr->type == DN_JSON_ItEntryTypeObj) {
-        auto *obj   = DN_CAST(json_object_s *) curr->value;
+        auto *obj   = DN_Cast(json_object_s *) curr->value;
         obj_element = obj->start;
     } else if (curr->type == DN_JSON_ItEntryTypeObjElement) {
-        auto *element = DN_CAST(json_object_element_s *) curr->value;
+        auto *element = DN_Cast(json_object_element_s *) curr->value;
         obj_element   = element->next;
         DN_JSON_ItPop(it);
     } else if (curr->type == DN_JSON_ItEntryTypeArray) {
-        auto *value   = DN_CAST(json_value_s *) curr->value;
+        auto *value   = DN_Cast(json_value_s *) curr->value;
         auto *array   = json_value_as_array(value);
         array_element = array->start;
     } else if (curr->type == DN_JSON_ItEntryTypeArrayElement) {
-        auto *element = DN_CAST(json_array_element_s *) curr->value;
+        auto *element = DN_Cast(json_array_element_s *) curr->value;
         array_element = element->next;
         DN_JSON_ItPop(it);
     } else {
@@ -201,17 +201,17 @@ json_value_s *DN_JSON_ItCurrValue(DN_JSONIt *it)
         return result;
 
     if (curr->type == DN_JSON_ItEntryTypeObjElement) {
-        auto *element = DN_CAST(json_object_element_s *)curr->value;
+        auto *element = DN_Cast(json_object_element_s *)curr->value;
         result = element->value;
     } else if (curr->type == DN_JSON_ItEntryTypeArrayElement) {
-        auto *element = DN_CAST(json_array_element_s *)curr->value;
+        auto *element = DN_Cast(json_array_element_s *)curr->value;
         result = element->value;
     } else if (curr->type == DN_JSON_ItEntryTypeString ||
                curr->type == DN_JSON_ItEntryTypeNumber ||
                curr->type == DN_JSON_ItEntryTypeObj    ||
                curr->type == DN_JSON_ItEntryTypeArray)
     {
-        result = DN_CAST(json_value_s *)curr->value;
+        result = DN_Cast(json_value_s *)curr->value;
     }
 
     return result;
@@ -221,7 +221,7 @@ json_object_element_s *DN_JSON_ItCurrObjElement(DN_JSONIt *it)
 {
     DN_JSONItEntry *curr   = DN_JSON_ItCurr(it);
     auto                  *result = (curr && curr->type == DN_JSON_ItEntryTypeObjElement)
-                                        ? DN_CAST(json_object_element_s *) curr->value
+                                        ? DN_Cast(json_object_element_s *) curr->value
                                         : nullptr;
     return result;
 }
@@ -291,7 +291,7 @@ DN_Str8 DN_JSON_ItKey(DN_JSONIt *it)
     json_object_element_s *curr = DN_JSON_ItCurrObjElement(it);
     DN_Str8 result = {};
     if (curr) {
-        result.data = DN_CAST(char *)curr->name->string;
+        result.data = DN_Cast(char *)curr->name->string;
         result.size = curr->name->string_size;
     }
     return result;
@@ -364,7 +364,7 @@ DN_Str8 DN_JSON_ItValueToString(DN_JSONIt *it)
 {
     DN_Str8 result = {};
     if (json_string_s *curr = DN_JSON_ItValueIsString(it))
-        result = DN_Str8_Init(curr->string, curr->string_size);
+        result = DN_Str8FromPtr(curr->string, curr->string_size);
     return result;
 }
 
@@ -372,7 +372,7 @@ int64_t DN_JSON_ItValueToI64(DN_JSONIt *it)
 {
     int64_t result = {};
     if (json_number_s *curr = DN_JSON_ItValueIsNumber(it))
-        result = DN_Str8_ToI64(DN_Str8_Init(curr->number, curr->number_size), 0 /*separator*/).value;
+        result = DN_I64FromStr8(DN_Str8FromPtr(curr->number, curr->number_size), 0 /*separator*/).value;
     return result;
 }
 
@@ -380,7 +380,7 @@ uint64_t DN_JSON_ItValueToU64(DN_JSONIt *it)
 {
     uint64_t result = {};
     if (json_number_s *curr = DN_JSON_ItValueIsNumber(it))
-        result = DN_Str8_ToU64(DN_Str8_Init(curr->number, curr->number_size), 0 /*separator*/).value;
+        result = DN_U64FromStr8(DN_Str8FromPtr(curr->number, curr->number_size), 0 /*separator*/).value;
     return result;
 }
 
@@ -402,27 +402,27 @@ void DN_JSON_ItErrorUnknownKeyValue_(DN_JSONIt *it, DN_CallSite call_site)
         return;
 
     size_t value_type_size = 0;
-    char const *value_type = DN_JSON_TypeEnumCString(DN_CAST(json_type_e)curr->value->type, &value_type_size);
+    char const *value_type = DN_JSON_TypeEnumCString(DN_Cast(json_type_e)curr->value->type, &value_type_size);
 
     json_string_s const *key = curr->name;
     if (it->flags & json_parse_flags_allow_location_information) {
-        json_string_ex_s const *info = DN_CAST(json_string_ex_s const *)key;
+        json_string_ex_s const *info = DN_Cast(json_string_ex_s const *)key;
         DN_LOG_EmitFromType(DN_LOG_MakeU32LogTypeParam(DN_LOGType_Warning),
                             call_site,
                             "Unknown key-value pair in object [loc=%zu:%zu, key=%.*s, value=%.*s]",
                             info->line_no,
                             info->row_no,
-                            DN_CAST(int) key->string_size,
+                            DN_Cast(int) key->string_size,
                             key->string,
-                            DN_CAST(int) value_type_size,
+                            DN_Cast(int) value_type_size,
                             value_type);
     } else {
       DN_LOG_EmitFromType(DN_LOG_MakeU32LogTypeParam(DN_LOGType_Warning),
                            call_site,
                            "Unknown key-value pair in object [key=%.*s, value=%.*s]",
-                           DN_CAST(int) key->string_size,
+                           DN_Cast(int) key->string_size,
                            key->string,
-                           DN_CAST(int) value_type_size,
+                           DN_Cast(int) value_type_size,
                            value_type);
     }
 }

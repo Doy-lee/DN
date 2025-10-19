@@ -13,7 +13,7 @@ static DN_OSCore *g_dn_os_core_;
 static void DN_OS_LOGEmitFromTypeTypeFV_(DN_LOGTypeParam type, void *user_data, DN_CallSite call_site, DN_FMT_ATTRIB char const *fmt, va_list args)
 {
   DN_Assert(user_data);
-  DN_OSCore *core = DN_CAST(DN_OSCore *)user_data;
+  DN_OSCore *core = DN_Cast(DN_OSCore *)user_data;
 
   // NOTE: Open log file for appending if requested ////////////////////////////////////////////////
   DN_TicketMutex_Begin(&core->log_file_mutex);
@@ -71,17 +71,17 @@ static void DN_OS_LOGEmitFromTypeTypeFV_(DN_LOGTypeParam type, void *user_data, 
   va_copy(args_copy, args);
   DN_TicketMutex_Begin(&core->log_file_mutex);
   {
-    DN_OS_FileWrite(&core->log_file, DN_Str8_Init(prefix_buffer, prefix_size.size), nullptr);
-    DN_OS_FileWriteF(&core->log_file, nullptr, "%*s ", DN_CAST(int)prefix_size.padding, "");
+    DN_OS_FileWrite(&core->log_file, DN_Str8FromPtr(prefix_buffer, prefix_size.size), nullptr);
+    DN_OS_FileWriteF(&core->log_file, nullptr, "%*s ", DN_Cast(int)prefix_size.padding, "");
     DN_OS_FileWriteFV(&core->log_file, nullptr, fmt, args_copy);
-    DN_OS_FileWrite(&core->log_file, DN_STR8("\n"), nullptr);
+    DN_OS_FileWrite(&core->log_file, DN_Str8Lit("\n"), nullptr);
   }
   DN_TicketMutex_End(&core->log_file_mutex);
   va_end(args_copy);
 
   DN_OSPrintDest dest = (type.is_u32_enum && type.u32 == DN_LOGType_Error) ? DN_OSPrintDest_Err : DN_OSPrintDest_Out;
-  DN_OS_Print(dest, DN_Str8_Init(prefix_buffer, prefix_size.size));
-  DN_OS_PrintF(dest, "%*s ", DN_CAST(int)prefix_size.padding, "");
+  DN_OS_Print(dest, DN_Str8FromPtr(prefix_buffer, prefix_size.size));
+  DN_OS_PrintF(dest, "%*s ", DN_Cast(int)prefix_size.padding, "");
   DN_OS_PrintLnFV(dest, fmt, args);
 }
 
@@ -114,24 +114,24 @@ DN_API void DN_OS_Init(DN_OSCore *os, DN_OSInitArgs *args)
 
   {
     #if defined(DN_PLATFORM_EMSCRIPTEN)
-    os->arena = DN_Arena_FromHeap(DN_Megabytes(1), DN_ArenaFlags_NoAllocTrack);
+    os->arena = DN_ArenaFromHeap(DN_Megabytes(1), DN_ArenaFlags_NoAllocTrack);
     #else
-    os->arena = DN_Arena_FromVMem(DN_Megabytes(1), DN_Kilobytes(4), DN_ArenaFlags_NoAllocTrack);
+    os->arena = DN_ArenaFromVMem(DN_Megabytes(1), DN_Kilobytes(4), DN_ArenaFlags_NoAllocTrack);
     #endif
 
     #if defined(DN_PLATFORM_WIN32)
-    os->platform_context = DN_Arena_New(&os->arena, DN_W32Core, DN_ZeroMem_Yes);
+    os->platform_context = DN_ArenaNew(&os->arena, DN_W32Core, DN_ZMem_Yes);
     #elif defined(DN_PLATFORM_POSIX) || defined(DN_PLATFORM_EMSCRIPTEN)
-    os->platform_context = DN_Arena_New(&os->arena, DN_POSIXCore, DN_ZeroMem_Yes);
+    os->platform_context = DN_ArenaNew(&os->arena, DN_POSIXCore, DN_ZMem_Yes);
     #endif
 
     #if defined(DN_PLATFORM_WIN32)
-    DN_W32Core *w32 = DN_CAST(DN_W32Core *) os->platform_context;
+    DN_W32Core *w32 = DN_Cast(DN_W32Core *) os->platform_context;
     InitializeCriticalSection(&w32->sync_primitive_free_list_mutex);
 
     QueryPerformanceFrequency(&w32->qpc_frequency);
     HMODULE module              = LoadLibraryA("kernel32.dll");
-    w32->set_thread_description = DN_CAST(DN_W32SetThreadDescriptionFunc *) GetProcAddress(module, "SetThreadDescription");
+    w32->set_thread_description = DN_Cast(DN_W32SetThreadDescriptionFunc *) GetProcAddress(module, "SetThreadDescription");
     FreeLibrary(module);
 
     // NOTE: win32 bcrypt
@@ -142,7 +142,7 @@ DN_API void DN_OS_Init(DN_OSCore *os, DN_OSInitArgs *args)
     else
       DN_LOG_ErrorF("Failed to initialise Windows secure random number generator, error: %d", init_status);
     #else
-    DN_Posix_Init(DN_CAST(DN_POSIXCore *)os->platform_context);
+    DN_Posix_Init(DN_Cast(DN_POSIXCore *)os->platform_context);
     #endif
   }
 
@@ -163,7 +163,7 @@ DN_API void DN_OS_Init(DN_OSCore *os, DN_OSInitArgs *args)
   DN_OS_TLSSetCurrentThreadTLS(&os->tls);
   os->cpu_report = DN_CPUGetReport();
 
-  #define DN_CPU_FEAT_XENTRY(label) g_dn_cpu_feature_decl[DN_CPUFeature_##label] = {DN_CPUFeature_##label, DN_STR8(#label)};
+  #define DN_CPU_FEAT_XENTRY(label) g_dn_cpu_feature_decl[DN_CPUFeature_##label] = {DN_CPUFeature_##label, DN_Str8Lit(#label)};
   DN_CPU_FEAT_XMACRO
   #undef DN_CPU_FEAT_XENTRY
   DN_Assert(g_dn_os_core_);
@@ -182,7 +182,7 @@ DN_API void DN_OS_DumpThreadContextArenaStat(DN_Str8 file_path)
   FILE *file = nullptr;
   fopen_s(&file, file_path.data, "a+b");
   if (file) {
-    DN_LOG_ErrorF("Failed to dump thread context arenas [file=%.*s]", DN_STR_FMT(file_path));
+    DN_LOG_ErrorF("Failed to dump thread context arenas [file=%.*s]", DN_Str8PrintFmt(file_path));
     return;
   }
 
@@ -223,29 +223,56 @@ DN_API void DN_OS_DumpThreadContextArenaStat(DN_Str8 file_path)
       stat.blocks_hwm   = DN_Max(stat.blocks_hwm, current->blocks_hwm);
     }
 
-    DN_ArenaStatStr stats_string = DN_Arena_StatStr(&stat);
+    DN_ArenaStatStr stats_string = DN_ArenaStatStr(&stat);
     fprintf(file, "  [ALL] CURR %.*s\n", stats_string.size, stats_string.data);
   }
 
   // NOTE: Print individual thread arena data
   for (DN_USize index = 0; index < stats_size; index++) {
     DN_ArenaStat const *current        = stats + index;
-    DN_ArenaStatStr     current_string = DN_Arena_StatStr(current);
-    fprintf(file, "  [%03d] CURR %.*s\n", DN_CAST(int) index, current_string.size, current_string.data);
+    DN_ArenaStatStr     current_string = DN_ArenaStatStr(current);
+    fprintf(file, "  [%03d] CURR %.*s\n", DN_Cast(int) index, current_string.size, current_string.data);
   }
 
   fclose(file);
-  DN_LOG_InfoF("Dumped thread context arenas [file=%.*s]", DN_STR_FMT(file_path));
+  DN_LOG_InfoF("Dumped thread context arenas [file=%.*s]", DN_Str8PrintFmt(file_path));
 #else
   (void)file_path;
 #endif // #if defined(DN_DEBUG_THREAD_CONTEXT)
+}
+
+DN_API DN_Str8 DN_OS_BytesFromHexPtrArenaFrame(void const *hex, DN_USize hex_count)
+{
+  DN_Arena *frame_arena = DN_OS_TLSFrameArena();
+  DN_Str8   result      = DN_BytesFromHexPtrArena(hex, hex_count, frame_arena);
+  return result;
+}
+
+DN_API DN_Str8 DN_OS_BytesFromHexStr8ArenaFrame(DN_Str8 hex)
+{
+  DN_Str8 result = DN_OS_BytesFromHexPtrArenaFrame(hex.data, hex.size);
+  return result;
+}
+
+DN_API DN_Str8 DN_OS_HexFromBytesPtrArenaFrame(void const *bytes, DN_USize bytes_count)
+{
+  DN_Arena *frame_arena = DN_OS_TLSFrameArena();
+  DN_Str8   result      = DN_HexFromBytesPtrArena(bytes, bytes_count, frame_arena);
+  return result;
+}
+
+DN_API DN_Str8 DN_OS_HexFromBytesPtrArenaTLS(void const *bytes, DN_USize bytes_count)
+{
+  DN_Arena *tls_arena = DN_OS_TLSArena();
+  DN_Str8   result    = DN_HexFromBytesPtrArena(bytes, bytes_count, tls_arena);
+  return result;
 }
 
 // NOTE: Date //////////////////////////////////////////////////////////////////////////////////////
 DN_API DN_OSDateTimeStr8 DN_OS_DateLocalTimeStr8(DN_OSDateTime time, char date_separator, char hms_separator)
 {
   DN_OSDateTimeStr8 result = {};
-  result.hms_size          = DN_CAST(uint8_t) DN_SNPrintF(result.hms,
+  result.hms_size          = DN_Cast(uint8_t) DN_SNPrintF(result.hms,
                                                  DN_ArrayCountI(result.hms),
                                                  "%02hhu%c%02hhu%c%02hhu",
                                                  time.hour,
@@ -254,7 +281,7 @@ DN_API DN_OSDateTimeStr8 DN_OS_DateLocalTimeStr8(DN_OSDateTime time, char date_s
                                                  hms_separator,
                                                  time.seconds);
 
-  result.date_size = DN_CAST(uint8_t) DN_SNPrintF(result.date,
+  result.date_size = DN_Cast(uint8_t) DN_SNPrintF(result.date,
                                                   DN_ArrayCountI(result.date),
                                                   "%hu%c%02hhu%c%02hhu",
                                                   time.year,
@@ -300,9 +327,9 @@ DN_API DN_Str8 DN_OS_EXEDir(DN_Arena *arena)
     return result;
   DN_OSTLSTMem               tmem         = DN_OS_TLSTMem(arena);
   DN_Str8                  exe_path     = DN_OS_EXEPath(tmem.arena);
-  DN_Str8                  separators[] = {DN_STR8("/"), DN_STR8("\\")};
-  DN_Str8BSplitResult split        = DN_Str8_BSplitLastArray(exe_path, separators, DN_ArrayCountU(separators));
-  result                                = DN_Str8_FromStr8(arena, split.lhs);
+  DN_Str8                  separators[] = {DN_Str8Lit("/"), DN_Str8Lit("\\")};
+  DN_Str8BSplitResult split        = DN_Str8BSplitLastArray(exe_path, separators, DN_ArrayCountU(separators));
+  result                                = DN_Str8FromStr8Arena(arena, split.lhs);
   return result;
 }
 
@@ -311,7 +338,7 @@ DN_API DN_F64 DN_OS_PerfCounterS(uint64_t begin, uint64_t end)
 {
   uint64_t frequency = DN_OS_PerfCounterFrequency();
   uint64_t ticks     = end - begin;
-  DN_F64   result    = ticks / DN_CAST(DN_F64) frequency;
+  DN_F64   result    = ticks / DN_Cast(DN_F64) frequency;
   return result;
 }
 
@@ -319,7 +346,7 @@ DN_API DN_F64 DN_OS_PerfCounterMs(uint64_t begin, uint64_t end)
 {
   uint64_t frequency = DN_OS_PerfCounterFrequency();
   uint64_t ticks     = end - begin;
-  DN_F64   result    = (ticks * 1'000) / DN_CAST(DN_F64) frequency;
+  DN_F64   result    = (ticks * 1'000) / DN_Cast(DN_F64) frequency;
   return result;
 }
 
@@ -327,7 +354,7 @@ DN_API DN_F64 DN_OS_PerfCounterUs(uint64_t begin, uint64_t end)
 {
   uint64_t frequency = DN_OS_PerfCounterFrequency();
   uint64_t ticks     = end - begin;
-  DN_F64   result    = (ticks * 1'000'000) / DN_CAST(DN_F64) frequency;
+  DN_F64   result    = (ticks * 1'000'000) / DN_Cast(DN_F64) frequency;
   return result;
 }
 
@@ -335,7 +362,7 @@ DN_API DN_F64 DN_OS_PerfCounterNs(uint64_t begin, uint64_t end)
 {
   uint64_t frequency = DN_OS_PerfCounterFrequency();
   uint64_t ticks     = end - begin;
-  DN_F64   result    = (ticks * 1'000'000'000) / DN_CAST(DN_F64) frequency;
+  DN_F64   result    = (ticks * 1'000'000'000) / DN_Cast(DN_F64) frequency;
   return result;
 }
 
@@ -415,9 +442,9 @@ struct DN_OSFileWriteChunker_
 
 static char *DN_OS_FileWriteChunker_(const char *buf, void *user, int len)
 {
-  DN_OSFileWriteChunker_ *chunker = DN_CAST(DN_OSFileWriteChunker_ *)user;
+  DN_OSFileWriteChunker_ *chunker = DN_Cast(DN_OSFileWriteChunker_ *)user;
   chunker->success                = DN_OS_FileWritePtr(chunker->file, buf, len, chunker->err);
-  char *result                    = chunker->success ? DN_CAST(char *) buf : nullptr;
+  char *result                    = chunker->success ? DN_Cast(char *) buf : nullptr;
   return result;
 }
 
@@ -452,24 +479,24 @@ DN_API DN_Str8 DN_OS_FileReadAll(DN_Allocator alloc_type, void *allocator, DN_St
   DN_Str8       result    = {};
   DN_OSPathInfo path_info = DN_OS_PathInfo(path);
   if (!path_info.exists) {
-    DN_OS_ErrSinkAppendF(err, 1, "File does not exist/could not be queried for reading '%.*s'", DN_STR_FMT(path));
+    DN_OS_ErrSinkAppendF(err, 1, "File does not exist/could not be queried for reading '%.*s'", DN_Str8PrintFmt(path));
     return result;
   }
 
   // NOTE: Allocate
   DN_ArenaTempMem arena_tmp = {};
   if (alloc_type == DN_Allocator_Arena) {
-    DN_Arena *arena = DN_CAST(DN_Arena *) allocator;
-    arena_tmp       = DN_Arena_TempMemBegin(arena);
-    result          = DN_Str8_Alloc(arena, path_info.size, DN_ZeroMem_No);
+    DN_Arena *arena = DN_Cast(DN_Arena *) allocator;
+    arena_tmp       = DN_ArenaTempMemBegin(arena);
+    result          = DN_Str8FromArena(arena, path_info.size, DN_ZMem_No);
   } else {
-    DN_Pool *pool = DN_CAST(DN_Pool *) allocator;
-    result        = DN_Str8_AllocPool(pool, path_info.size);
+    DN_Pool *pool = DN_Cast(DN_Pool *) allocator;
+    result        = DN_Str8FromPool(pool, path_info.size);
   }
 
   if (!result.data) {
-    DN_CVTU64Bytes bytes_str = DN_CVT_BytesFromU64Auto(path_info.size);
-    DN_OS_ErrSinkAppendF(err, 1 /*err_code*/, "Failed to allocate %.1f %.*s for reading file '%.*s'", bytes_str.bytes, DN_STR_FMT(bytes_str.suffix), DN_STR_FMT(path));
+    DN_Str8x32 bytes_str = DN_ByteCountStr8x32(path_info.size);
+    DN_OS_ErrSinkAppendF(err, 1 /*err_code*/, "Failed to allocate %.*s for reading file '%.*s'", DN_Str8PrintFmt(bytes_str), DN_Str8PrintFmt(path));
     return result;
   }
 
@@ -478,10 +505,10 @@ DN_API DN_Str8 DN_OS_FileReadAll(DN_Allocator alloc_type, void *allocator, DN_St
   DN_OSFileRead read = DN_OS_FileRead(&file, result.data, result.size, err);
   if (file.error || !read.success) {
     if (alloc_type == DN_Allocator_Arena) {
-      DN_Arena_TempMemEnd(arena_tmp);
+      DN_ArenaTempMemEnd(arena_tmp);
     } else {
-      DN_Pool *pool = DN_CAST(DN_Pool *) allocator;
-      DN_Pool_Dealloc(pool, result.data);
+      DN_Pool *pool = DN_Cast(DN_Pool *) allocator;
+      DN_PoolDealloc(pool, result.data);
     }
     result = {};
   }
@@ -519,7 +546,7 @@ DN_API bool DN_OS_FileWriteAll(DN_Str8 path, DN_Str8 buffer, DN_OSErrSink *error
 DN_API bool DN_OS_FileWriteAllFV(DN_Str8 file_path, DN_OSErrSink *error, DN_FMT_ATTRIB char const *fmt, va_list args)
 {
   DN_OSTLSTMem tmem   = DN_OS_TLSTMem(nullptr);
-  DN_Str8      buffer = DN_Str8_FromFV(tmem.arena, fmt, args);
+  DN_Str8      buffer = DN_Str8FromFmtVArena(tmem.arena, fmt, args);
   bool         result = DN_OS_FileWriteAll(file_path, buffer, error);
   return result;
 }
@@ -536,7 +563,7 @@ DN_API bool DN_OS_FileWriteAllF(DN_Str8 file_path, DN_OSErrSink *error, DN_FMT_A
 DN_API bool DN_OS_FileWriteAllSafe(DN_Str8 path, DN_Str8 buffer, DN_OSErrSink *error)
 {
   DN_OSTLSTMem tmem     = DN_OS_TLSTMem(nullptr);
-  DN_Str8      tmp_path = DN_Str8_FromF(tmem.arena, "%.*s.tmp", DN_STR_FMT(path));
+  DN_Str8      tmp_path = DN_Str8FromFmtArena(tmem.arena, "%.*s.tmp", DN_Str8PrintFmt(path));
   if (!DN_OS_FileWriteAll(tmp_path, buffer, error))
     return false;
   if (!DN_OS_FileCopy(tmp_path, path, true /*overwrite*/, error))
@@ -549,7 +576,7 @@ DN_API bool DN_OS_FileWriteAllSafe(DN_Str8 path, DN_Str8 buffer, DN_OSErrSink *e
 DN_API bool DN_OS_FileWriteAllSafeFV(DN_Str8 path, DN_OSErrSink *error, DN_FMT_ATTRIB char const *fmt, va_list args)
 {
   DN_OSTLSTMem tmem   = DN_OS_TLSTMem(nullptr);
-  DN_Str8    buffer = DN_Str8_FromFV(tmem.arena, fmt, args);
+  DN_Str8    buffer = DN_Str8FromFmtVArena(tmem.arena, fmt, args);
   bool       result = DN_OS_FileWriteAllSafe(path, buffer, error);
   return result;
 }
@@ -564,26 +591,26 @@ DN_API bool DN_OS_FileWriteAllSafeF(DN_Str8 path, DN_OSErrSink *error, DN_FMT_AT
 
 DN_API bool DN_OS_PathAddRef(DN_Arena *arena, DN_OSPath *fs_path, DN_Str8 path)
 {
-  if (!arena || !fs_path || !DN_Str8_HasData(path))
+  if (!arena || !fs_path || path.size == 0)
     return false;
 
   if (path.size <= 0)
     return true;
 
   DN_Str8 const delimiter_array[] = {
-      DN_STR8("\\"),
-      DN_STR8("/")};
+      DN_Str8Lit("\\"),
+      DN_Str8Lit("/")};
 
   if (fs_path->links_size == 0)
     fs_path->has_prefix_path_separator = (path.data[0] == '/');
 
   for (;;) {
-    DN_Str8BSplitResult delimiter = DN_Str8_BSplitArray(path, delimiter_array, DN_ArrayCountU(delimiter_array));
-    for (; delimiter.lhs.data; delimiter = DN_Str8_BSplitArray(delimiter.rhs, delimiter_array, DN_ArrayCountU(delimiter_array))) {
+    DN_Str8BSplitResult delimiter = DN_Str8BSplitArray(path, delimiter_array, DN_ArrayCountU(delimiter_array));
+    for (; delimiter.lhs.data; delimiter = DN_Str8BSplitArray(delimiter.rhs, delimiter_array, DN_ArrayCountU(delimiter_array))) {
       if (delimiter.lhs.size <= 0)
         continue;
 
-      DN_OSPathLink *link = DN_Arena_New(arena, DN_OSPathLink, DN_ZeroMem_Yes);
+      DN_OSPathLink *link = DN_ArenaNew(arena, DN_OSPathLink, DN_ZMem_Yes);
       if (!link)
         return false;
 
@@ -619,8 +646,8 @@ DN_API bool DN_OS_PathAddRefFrame(DN_OSPath *fs_path, DN_Str8 path)
 
 DN_API bool DN_OS_PathAdd(DN_Arena *arena, DN_OSPath *fs_path, DN_Str8 path)
 {
-  DN_Str8 copy   = DN_Str8_FromStr8(arena, path);
-  bool    result = DN_Str8_HasData(copy) ? true : DN_OS_PathAddRef(arena, fs_path, copy);
+  DN_Str8 copy   = DN_Str8FromStr8Arena(arena, path);
+  bool    result = copy.size ? true : DN_OS_PathAddRef(arena, fs_path, copy);
   return result;
 }
 
@@ -628,7 +655,7 @@ DN_API bool DN_OS_PathAddF(DN_Arena *arena, DN_OSPath *fs_path, DN_FMT_ATTRIB ch
 {
   va_list args;
   va_start(args, fmt);
-  DN_Str8 path = DN_Str8_FromFV(arena, fmt, args);
+  DN_Str8 path = DN_Str8FromFmtVArena(arena, fmt, args);
   va_end(args);
   bool result = DN_OS_PathAddRef(arena, fs_path, path);
   return result;
@@ -668,7 +695,7 @@ DN_API DN_Str8 DN_OS_PathToF(DN_Arena *arena, DN_Str8 path_separator, DN_FMT_ATT
   DN_OSTLSTMem tmem = DN_OS_TLSTMem(arena);
   va_list    args;
   va_start(args, fmt);
-  DN_Str8 path = DN_Str8_FromFV(tmem.arena, fmt, args);
+  DN_Str8 path = DN_Str8FromFmtVArena(tmem.arena, fmt, args);
   va_end(args);
   DN_Str8 result = DN_OS_PathTo(arena, path, path_separator);
   return result;
@@ -685,7 +712,7 @@ DN_API DN_Str8 DN_OS_PathF(DN_Arena *arena, DN_FMT_ATTRIB char const *fmt, ...)
   DN_OSTLSTMem tmem = DN_OS_TLSTMem(arena);
   va_list    args;
   va_start(args, fmt);
-  DN_Str8 path = DN_Str8_FromFV(tmem.arena, fmt, args);
+  DN_Str8 path = DN_Str8FromFmtVArena(tmem.arena, fmt, args);
   va_end(args);
   DN_Str8 result = DN_OS_Path(arena, path);
   return result;
@@ -699,7 +726,7 @@ DN_API DN_Str8 DN_OS_PathBuildWithSeparator(DN_Arena *arena, DN_OSPath const *fs
 
   // NOTE: Each link except the last one needs the path separator appended to it, '/' or '\\'
   DN_USize string_size = (fs_path->has_prefix_path_separator ? path_separator.size : 0) + fs_path->string_size + ((fs_path->links_size - 1) * path_separator.size);
-  result               = DN_Str8_Alloc(arena, string_size, DN_ZeroMem_No);
+  result               = DN_Str8FromArena(arena, string_size, DN_ZMem_No);
   if (result.data) {
     char *dest = result.data;
     if (fs_path->has_prefix_path_separator) {
@@ -750,7 +777,7 @@ DN_API DN_OSExecResult DN_OS_ExecOrAbort(DN_Slice<DN_Str8> cmd_line, DN_OSExecAr
 // NOTE: DN_OSThread ///////////////////////////////////////////////////////////////////////////////
 static void DN_OS_ThreadExecute_(void *user_context)
 {
-  DN_OSThread *thread = DN_CAST(DN_OSThread *) user_context;
+  DN_OSThread *thread = DN_Cast(DN_OSThread *) user_context;
   DN_OS_TLSInit(&thread->tls, thread->tls_init_args);
   DN_OS_TLSSetCurrentThreadTLS(&thread->tls);
   DN_OS_SemaphoreWait(&thread->init_semaphore, DN_OS_SEMAPHORE_INFINITE_TIMEOUT);
@@ -760,7 +787,7 @@ static void DN_OS_ThreadExecute_(void *user_context)
 DN_API void DN_OS_ThreadSetName(DN_Str8 name)
 {
   DN_OSTLS *tls  = DN_OS_TLSGet();
-  tls->name_size = DN_CAST(uint8_t) DN_Min(name.size, sizeof(tls->name) - 1);
+  tls->name_size = DN_Cast(uint8_t) DN_Min(name.size, sizeof(tls->name) - 1);
   DN_Memcpy(tls->name, name.data, tls->name_size);
   tls->name[tls->name_size] = 0;
 

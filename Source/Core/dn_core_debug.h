@@ -76,7 +76,7 @@ struct DN_Profiler
 };
 
 #define DN_Profiler_ZoneLoop(prof, name, index)                                                                         \
-  DN_ProfilerZone DN_UniqueName(zone_) = DN_Profiler_BeginZone(prof, DN_STR8(name), index), DN_UniqueName(dummy_) = {}; \
+  DN_ProfilerZone DN_UniqueName(zone_) = DN_Profiler_BeginZone(prof, DN_Str8Lit(name), index), DN_UniqueName(dummy_) = {}; \
   DN_UniqueName(dummy_).begin_tsc == 0;                                                                                 \
   DN_Profiler_EndZone(prof, DN_UniqueName(zone_)), DN_UniqueName(dummy_).begin_tsc = 1
 
@@ -84,7 +84,7 @@ struct DN_Profiler
 
 DN_API DN_Profiler            DN_Profiler_Init                      (DN_ProfilerAnchor *anchors, DN_USize count, DN_USize anchors_per_frame, DN_ProfilerTSC tsc, DN_U64 tsc_frequency);
 DN_API DN_ProfilerZone        DN_Profiler_BeginZone                 (DN_Profiler *profiler, DN_Str8 name, DN_U16 anchor_index);
-#define                       DN_Profiler_BeginZoneAuto(prof, name) DN_Profiler_BeginZone(prof, DN_STR8(name), __COUNTER__ + 1)
+#define                       DN_Profiler_BeginZoneAuto(prof, name) DN_Profiler_BeginZone(prof, DN_Str8Lit(name), __COUNTER__ + 1)
 DN_API void                   DN_Profiler_EndZone                   (DN_Profiler *profiler, DN_ProfilerZone zone);
 DN_API DN_USize               DN_Profiler_FrameCount                (DN_Profiler const *profiler);
 DN_API DN_ProfilerAnchorArray DN_Profiler_FrameAnchorsFromIndex     (DN_Profiler *profiler, DN_USize frame_index);

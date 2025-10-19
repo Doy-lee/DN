@@ -21,7 +21,7 @@
 // Default values recommended by: http://isthe.com/chongo/tech/comp/fnv/
 DN_API uint32_t DN_FNV1A32_Iterate(void const *bytes, DN_USize size, uint32_t hash)
 {
-    auto buffer = DN_CAST(uint8_t const *)bytes;
+    auto buffer = DN_Cast(uint8_t const *)bytes;
     for (DN_USize i = 0; i < size; i++)
         hash = (buffer[i] ^ hash) * 16777619 /*FNV Prime*/;
     return hash;
@@ -35,7 +35,7 @@ DN_API uint32_t DN_FNV1A32_Hash(void const *bytes, DN_USize size)
 
 DN_API uint64_t DN_FNV1A64_Iterate(void const *bytes, DN_USize size, uint64_t hash)
 {
-    auto buffer = DN_CAST(uint8_t const *)bytes;
+    auto buffer = DN_Cast(uint8_t const *)bytes;
     for (DN_USize i = 0; i < size; i++)
         hash = (buffer[i] ^ hash) * 1099511628211 /*FNV Prime*/;
     return hash;

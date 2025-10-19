@@ -6,7 +6,7 @@ DN_API DN_Str8FindResult DN_SIMD_Str8FindAVX512F(DN_Str8 string, DN_Str8 find)
 {
   // NOTE: Algorithm as described in http://0x80.pl/articles/simd-strfind.html
   DN_Str8FindResult result = {};
-  if (!DN_Str8_HasData(string) || !DN_Str8_HasData(find) || find.size > string.size)
+  if (string.size == 0 || find.size == 0 || find.size > string.size)
     return result;
 
   __m512i const find_first_ch = _mm512_set1_epi8(find.data[0]);
@@ -77,10 +77,10 @@ DN_API DN_Str8FindResult DN_SIMD_Str8FindAVX512F(DN_Str8 string, DN_Str8 find)
       }
 
       if (result.found) {
-        result.start_to_before_match        = DN_Str8_Init(string.data, result.index);
-        result.match                        = DN_Str8_Init(string.data + result.index, find.size);
-        result.match_to_end_of_buffer       = DN_Str8_Init(result.match.data, string.size - result.index);
-        result.after_match_to_end_of_buffer = DN_Str8_Advance(result.match_to_end_of_buffer, find.size);
+        result.start_to_before_match        = DN_Str8FromPtr(string.data, result.index);
+        result.match                        = DN_Str8FromPtr(string.data + result.index, find.size);
+        result.match_to_end_of_buffer       = DN_Str8FromPtr(result.match.data, string.size - result.index);
+        result.after_match_to_end_of_buffer = DN_Str8Advance(result.match_to_end_of_buffer, find.size);
         return result;
       }
 
@@ -91,14 +91,14 @@ DN_API DN_Str8FindResult DN_SIMD_Str8FindAVX512F(DN_Str8 string, DN_Str8 find)
   }
 
   for (DN_USize index = ptr - string.data; index < string.size; index++) {
-    DN_Str8 string_slice = DN_Str8_Slice(string, index, find.size);
-    if (DN_Str8_Eq(string_slice, find)) {
+    DN_Str8 string_slice = DN_Str8Slice(string, index, find.size);
+    if (DN_Str8Eq(string_slice, find)) {
       result.found                        = true;
       result.index                        = index;
-      result.start_to_before_match        = DN_Str8_Init(string.data, index);
-      result.match                        = DN_Str8_Init(string.data + index, find.size);
-      result.match_to_end_of_buffer       = DN_Str8_Init(result.match.data, string.size - index);
-      result.after_match_to_end_of_buffer = DN_Str8_Advance(result.match_to_end_of_buffer, find.size);
+      result.start_to_before_match        = DN_Str8FromPtr(string.data, index);
+      result.match                        = DN_Str8FromPtr(string.data + index, find.size);
+      result.match_to_end_of_buffer       = DN_Str8FromPtr(result.match.data, string.size - index);
+      result.after_match_to_end_of_buffer = DN_Str8Advance(result.match_to_end_of_buffer, find.size);
       return result;
     }
   }
@@ -110,7 +110,7 @@ DN_API DN_Str8FindResult DN_SIMD_Str8FindLastAVX512F(DN_Str8 string, DN_Str8 fin
 {
   // NOTE: Algorithm as described in http://0x80.pl/articles/simd-strfind.html
   DN_Str8FindResult result = {};
-  if (!DN_Str8_HasData(string) || !DN_Str8_HasData(find) || find.size > string.size)
+  if (string.size == 0 || find.size == 0 || find.size > string.size)
     return result;
 
   __m512i const find_first_ch = _mm512_set1_epi8(find.data[0]);
@@ -182,9 +182,9 @@ DN_API DN_Str8FindResult DN_SIMD_Str8FindLastAVX512F(DN_Str8 string, DN_Str8 fin
       }
 
       if (result.found) {
-        result.start_to_before_match  = DN_Str8_Init(string.data, result.index);
-        result.match                  = DN_Str8_Init(string.data + result.index, find.size);
-        result.match_to_end_of_buffer = DN_Str8_Init(result.match.data, string.size - result.index);
+        result.start_to_before_match  = DN_Str8FromPtr(string.data, result.index);
+        result.match                  = DN_Str8FromPtr(string.data + result.index, find.size);
+        result.match_to_end_of_buffer = DN_Str8FromPtr(result.match.data, string.size - result.index);
         return result;
       }
 
@@ -193,13 +193,13 @@ DN_API DN_Str8FindResult DN_SIMD_Str8FindLastAVX512F(DN_Str8 string, DN_Str8 fin
   }
 
   for (DN_USize index = ptr - string.data - 1; index < string.size; index--) {
-    DN_Str8 string_slice = DN_Str8_Slice(string, index, find.size);
-    if (DN_Str8_Eq(string_slice, find)) {
+    DN_Str8 string_slice = DN_Str8Slice(string, index, find.size);
+    if (DN_Str8Eq(string_slice, find)) {
       result.found                  = true;
       result.index                  = index;
-      result.start_to_before_match  = DN_Str8_Init(string.data, index);
-      result.match                  = DN_Str8_Init(string.data + index, find.size);
-      result.match_to_end_of_buffer = DN_Str8_Init(result.match.data, string.size - index);
+      result.start_to_before_match  = DN_Str8FromPtr(string.data, index);
+      result.match                  = DN_Str8FromPtr(string.data + index, find.size);
+      result.match_to_end_of_buffer = DN_Str8FromPtr(result.match.data, string.size - index);
       return result;
     }
   }
@@ -214,7 +214,7 @@ DN_API DN_Str8BSplitResult DN_SIMD_Str8BSplitAVX512F(DN_Str8 string, DN_Str8 fin
   if (find_result.found) {
     result.lhs.data = string.data;
     result.lhs.size = find_result.index;
-    result.rhs      = DN_Str8_Advance(find_result.match_to_end_of_buffer, find.size);
+    result.rhs      = DN_Str8Advance(find_result.match_to_end_of_buffer, find.size);
   } else {
     result.lhs = string;
   }
@@ -229,7 +229,7 @@ DN_API DN_Str8BSplitResult DN_SIMD_Str8BSplitLastAVX512F(DN_Str8 string, DN_Str8
   if (find_result.found) {
     result.lhs.data = string.data;
     result.lhs.size = find_result.index;
-    result.rhs      = DN_Str8_Advance(find_result.match_to_end_of_buffer, find.size);
+    result.rhs      = DN_Str8Advance(find_result.match_to_end_of_buffer, find.size);
   } else {
     result.lhs = string;
   }
@@ -240,7 +240,7 @@ DN_API DN_Str8BSplitResult DN_SIMD_Str8BSplitLastAVX512F(DN_Str8 string, DN_Str8
 DN_API DN_USize DN_SIMD_Str8SplitAVX512F(DN_Str8 string, DN_Str8 delimiter, DN_Str8 *splits, DN_USize splits_count, DN_Str8SplitIncludeEmptyStrings mode)
 {
   DN_USize result = 0; // The number of splits in the actual string.
-  if (!DN_Str8_HasData(string) || !DN_Str8_HasData(delimiter) || delimiter.size <= 0)
+  if (string.size == 0 || delimiter.size == 0 || delimiter.size <= 0)
     return result;
 
   DN_Str8BSplitResult split = {};
@@ -262,7 +262,7 @@ DN_API DN_Slice<DN_Str8> DN_SIMD_Str8SplitAllocAVX512F(DN_Arena *arena, DN_Str8 
 {
   DN_Slice<DN_Str8> result          = {};
   DN_USize          splits_required = DN_SIMD_Str8SplitAVX512F(string, delimiter, /*splits*/ nullptr, /*count*/ 0, mode);
-  result.data                       = DN_Arena_NewArray(arena, DN_Str8, splits_required, DN_ZeroMem_No);
+  result.data                       = DN_ArenaNewArray(arena, DN_Str8, splits_required, DN_ZMem_No);
   if (result.data) {
     result.size = DN_SIMD_Str8SplitAVX512F(string, delimiter, result.data, splits_required, mode);
     DN_Assert(splits_required == result.size);

@@ -65,10 +65,10 @@ DN_API int DN_OS_MemProtect(void *ptr, DN_USize size, DN_U32 page_flags)
   if (!ptr || size == 0)
     return 0;
 
-  static DN_Str8 const ALIGNMENT_ERROR_MSG = DN_STR8(
+  static DN_Str8 const ALIGNMENT_ERROR_MSG = DN_Str8Lit(
       "Page protection requires pointers to be page aligned because we "
       "can only guard memory at a multiple of the page boundary.");
-  DN_AssertF(DN_IsPowerOfTwoAligned(DN_CAST(uintptr_t) ptr, g_dn_os_core_->page_size),
+  DN_AssertF(DN_IsPowerOfTwoAligned(DN_Cast(uintptr_t) ptr, g_dn_os_core_->page_size),
              "%s",
              ALIGNMENT_ERROR_MSG.data);
   DN_AssertF(
@@ -80,9 +80,9 @@ DN_API int DN_OS_MemProtect(void *ptr, DN_USize size, DN_U32 page_flags)
   return result;
 }
 
-DN_API void *DN_OS_MemAlloc(DN_USize size, DN_ZeroMem zero_mem)
+DN_API void *DN_OS_MemAlloc(DN_USize size, DN_ZMem z_mem)
 {
-  void *result = zero_mem == DN_ZeroMem_Yes ? calloc(1, size) : malloc(size);
+  void *result = z_mem == DN_ZMem_Yes ? calloc(1, size) : malloc(size);
   return result;
 }
 
@@ -113,9 +113,9 @@ DN_API DN_OSDateTime DN_OS_DateLocalTimeNow()
   result.minutes = time.tm_min;
   result.seconds = time.tm_sec;
 
-  result.day   = DN_CAST(uint8_t) time.tm_mday;
-  result.month = DN_CAST(uint8_t) time.tm_mon + 1;
-  result.year  = 1900 + DN_CAST(int16_t) time.tm_year;
+  result.day   = DN_Cast(uint8_t) time.tm_mday;
+  result.month = DN_Cast(uint8_t) time.tm_mon + 1;
+  result.year  = 1900 + DN_Cast(int16_t) time.tm_year;
   return result;
 }
 
@@ -150,7 +150,7 @@ DN_API uint64_t DN_OS_DateToUnixTimeS(DN_OSDateTime date)
 
 DN_API DN_OSDateTime DN_OS_DateUnixTimeSToDate(uint64_t time)
 {
-  time_t        posix_time = DN_CAST(time_t) time;
+  time_t        posix_time = DN_Cast(time_t) time;
   struct tm     posix_date = *gmtime(&posix_time);
   DN_OSDateTime result     = {};
   result.year              = posix_date.tm_year + 1900;
@@ -196,7 +196,7 @@ DN_API DN_OSDiskSpace DN_OS_DiskSpace(DN_Str8 path)
 {
   DN_OSTLSTMem   tmem              = DN_OS_TLSPushTMem(nullptr);
   DN_OSDiskSpace result            = {};
-  DN_Str8        path_z_terminated = DN_Str8_FromStr8(tmem.arena, path);
+  DN_Str8        path_z_terminated = DN_Str8FromStr8(tmem.arena, path);
 
   struct statvfs info = {};
   if (statvfs(path_z_terminated.data, &info) != 0)
@@ -217,7 +217,7 @@ DN_API DN_Str8 DN_OS_EXEPath(DN_Arena *arena)
   int required_size_wo_null_terminator = 0;
   for (int try_size = 128;; try_size *= 2) {
     auto  scoped_arena  = DN_ArenaTempMemScope(arena);
-    char *try_buf       = DN_Arena_NewArray(arena, char, try_size, DN_ZeroMem_No);
+    char *try_buf       = DN_ArenaNewArray(arena, char, try_size, DN_ZMem_No);
     int   bytes_written = readlink("/proc/self/exe", try_buf, try_size);
     if (bytes_written == -1) {
       // Failed, we're unable to determine the executable directory
@@ -245,9 +245,9 @@ DN_API DN_Str8 DN_OS_EXEPath(DN_Arena *arena)
   }
 
   if (required_size_wo_null_terminator) {
-    DN_ArenaTempMem temp_mem = DN_Arena_TempMemBegin(arena);
+    DN_ArenaTempMem temp_mem = DN_ArenaTempMemBegin(arena);
     char           *exe_path =
-        DN_Arena_NewArray(arena, char, required_size_wo_null_terminator + 1, DN_ZeroMem_No);
+        DN_ArenaNewArray(arena, char, required_size_wo_null_terminator + 1, DN_ZMem_No);
     exe_path[required_size_wo_null_terminator] = 0;
 
     int bytes_written = readlink("/proc/self/exe", exe_path, required_size_wo_null_terminator);
@@ -255,9 +255,9 @@ DN_API DN_Str8 DN_OS_EXEPath(DN_Arena *arena)
       // Note that if read-link fails again can be because there's
       // a potential race condition here, our exe or directory could have
       // been deleted since the last call, so we need to be careful.
-      DN_Arena_TempMemEnd(temp_mem);
+      DN_ArenaTempMemEnd(temp_mem);
     } else {
-      result = DN_Str8_Init(exe_path, required_size_wo_null_terminator);
+      result = DN_Str8FromPtr(exe_path, required_size_wo_null_terminator);
     }
   }
   return result;
@@ -284,7 +284,7 @@ DN_API DN_U64 DN_OS_PerfCounterFrequency()
 static DN_POSIXCore *DN_OS_GetPOSIXCore_()
 {
   DN_Assert(g_dn_os_core_ && g_dn_os_core_->platform_context);
-  DN_POSIXCore *result = DN_CAST(DN_POSIXCore *)g_dn_os_core_->platform_context;
+  DN_POSIXCore *result = DN_Cast(DN_POSIXCore *)g_dn_os_core_->platform_context;
   return result;
 }
 
@@ -293,7 +293,7 @@ DN_API DN_U64 DN_OS_PerfCounterNow()
   DN_POSIXCore *posix = DN_OS_GetPOSIXCore_();
   struct timespec ts;
   clock_gettime(posix->clock_monotonic_raw ? CLOCK_MONOTONIC_RAW : CLOCK_MONOTONIC, &ts);
-  DN_U64 result = DN_CAST(DN_U64) ts.tv_sec * 1'000'000'000 + DN_CAST(DN_U64) ts.tv_nsec;
+  DN_U64 result = DN_Cast(DN_U64) ts.tv_sec * 1'000'000'000 + DN_Cast(DN_U64) ts.tv_nsec;
   return result;
 }
 
@@ -309,7 +309,7 @@ DN_API bool DN_OS_FileCopy(DN_Str8 src, DN_Str8 dest, bool overwrite, DN_OSErrSi
     DN_OS_ErrSinkAppendF(error,
                        error_code,
                        "Failed to open file '%.*s' for copying: (%d) %s",
-                       DN_STR_FMT(src),
+                       DN_Str8PrintFmt(src),
                        error_code,
                        strerror(error_code));
     return result;
@@ -326,7 +326,7 @@ DN_API bool DN_OS_FileCopy(DN_Str8 src, DN_Str8 dest, bool overwrite, DN_OSErrSi
     DN_OS_ErrSinkAppendF(error,
                        error_code,
                        "Failed to open file destination '%.*s' for copying to: (%d) %s",
-                       DN_STR_FMT(src),
+                       DN_Str8PrintFmt(src),
                        error_code,
                        strerror(error_code));
     return result;
@@ -343,7 +343,7 @@ DN_API bool DN_OS_FileCopy(DN_Str8 src, DN_Str8 dest, bool overwrite, DN_OSErrSi
     DN_OS_ErrSinkAppendF(error,
                        error_code,
                        "Failed to query file size of '%.*s' for copying: (%d) %s",
-                       DN_STR_FMT(src),
+                       DN_Str8PrintFmt(src),
                        error_code,
                        strerror(error_code));
     return result;
@@ -354,16 +354,16 @@ DN_API bool DN_OS_FileCopy(DN_Str8 src, DN_Str8 dest, bool overwrite, DN_OSErrSi
   if (!result) {
     int        error_code = errno;
     DN_OSTLSTMem tmem               = DN_OS_TLSTMem(nullptr);
-    DN_Str8      file_size_str8     = DN_CVT_BytesStr8FromU64(tmem.arena, stat_existing.st_size, DN_CVTBytesType_Auto);
-    DN_Str8      bytes_written_str8 = DN_CVT_BytesStr8FromU64(tmem.arena, bytes_written, DN_CVTBytesType_Auto);
+    DN_Str8      file_size_str8     = DN_Str8FromByteCount(tmem.arena, stat_existing.st_size, DN_ByteCountType_Auto);
+    DN_Str8      bytes_written_str8 = DN_Str8FromByteCount(tmem.arena, bytes_written, DN_ByteCountType_Auto);
     DN_OS_ErrSinkAppendF(error,
                        error_code,
                        "Failed to copy file '%.*s' to '%.*s', we copied %.*s but the file "
                        "size is %.*s: (%d) %s",
-                       DN_STR_FMT(src),
-                       DN_STR_FMT(dest),
-                       DN_STR_FMT(bytes_written_str8),
-                       DN_STR_FMT(file_size_str8),
+                       DN_Str8PrintFmt(src),
+                       DN_Str8PrintFmt(dest),
+                       DN_Str8PrintFmt(bytes_written_str8),
+                       DN_Str8PrintFmt(file_size_str8),
                        error_code,
                        strerror(error_code));
   }
@@ -392,7 +392,7 @@ DN_API bool DN_OS_FileMove(DN_Str8 src, DN_Str8 dest, bool overwrite, DN_OSErrSi
           error,
           error_code,
           "File '%.*s' was moved but failed to be unlinked from old location: (%d) %s",
-          DN_STR_FMT(src),
+          DN_Str8PrintFmt(src),
           error_code,
           strerror(error_code));
     }
@@ -406,7 +406,7 @@ DN_API DN_OSFile DN_OS_FileOpen(DN_Str8         path,
                                 DN_OSErrSink     *error)
 {
   DN_OSFile result = {};
-  if (!DN_Str8_HasData(path) || path.size <= 0)
+  if (path.size == 0 || path.size <= 0)
     return result;
 
   if ((access & ~(DN_OSFileAccess_All) || ((access & DN_OSFileAccess_All) == 0))) {
@@ -420,7 +420,7 @@ DN_API DN_OSFile DN_OS_FileOpen(DN_Str8         path,
         error,
         1,
         "Failed to open file '%.*s': File access flag 'execute' is not supported",
-        DN_STR_FMT(path));
+        DN_Str8PrintFmt(path));
     DN_InvalidCodePath; // TODO: Not supported via fopen
     return result;
   }
@@ -444,7 +444,7 @@ DN_API DN_OSFile DN_OS_FileOpen(DN_Str8         path,
                          1,
                          "Failed to open file '%.*s': File could not be opened in requested "
                          "mode 'DN_OSFileOpen' flag %d",
-                         DN_STR_FMT(path),
+                         DN_Str8PrintFmt(path),
                          open_mode);
       return result;
     }
@@ -480,10 +480,10 @@ DN_API DN_OSFileRead DN_OS_FileRead(DN_OSFile *file, void *buffer, DN_USize size
   if (!file || !file->handle || file->error || !buffer || size <= 0)
     return result;
 
-  result.bytes_read = fread(buffer, 1, size, DN_CAST(FILE *) file->handle);
-  if (feof(DN_CAST(FILE*)file->handle)) {
+  result.bytes_read = fread(buffer, 1, size, DN_Cast(FILE *) file->handle);
+  if (feof(DN_Cast(FILE*)file->handle)) {
     DN_OSTLSTMem tmem             = DN_OS_TLSTMem(nullptr);
-    DN_Str8      buffer_size_str8 = DN_CVT_BytesStr8FromU64AutoTLS(size);
+    DN_Str8      buffer_size_str8 = DN_ByteCountStr8x32TLS(size);
     DN_OS_ErrSinkAppendF(err, 1, "Failed to read %S from file", buffer_size_str8);
     return result;
   }
@@ -497,12 +497,12 @@ DN_API bool DN_OS_FileWritePtr(DN_OSFile *file, void const *buffer, DN_USize siz
   if (!file || !file->handle || file->error || !buffer || size <= 0)
     return false;
   bool result =
-      fwrite(buffer, DN_CAST(DN_USize) size, 1 /*count*/, DN_CAST(FILE *) file->handle) ==
+      fwrite(buffer, DN_Cast(DN_USize) size, 1 /*count*/, DN_Cast(FILE *) file->handle) ==
       1 /*count*/;
   if (!result) {
     DN_OSTLSTMem tmem             = DN_OS_TLSTMem(nullptr);
-    DN_Str8      buffer_size_str8 = DN_CVT_BytesStr8FromU64AutoTLS(size);
-    DN_OS_ErrSinkAppendF(err, 1, "Failed to write buffer (%s) to file handle", DN_STR_FMT(buffer_size_str8));
+    DN_Str8      buffer_size_str8 = DN_ByteCountStr8x32TLS(size);
+    DN_OS_ErrSinkAppendF(err, 1, "Failed to write buffer (%s) to file handle", DN_Str8PrintFmt(buffer_size_str8));
   }
   return result;
 }
@@ -510,7 +510,7 @@ DN_API bool DN_OS_FileWritePtr(DN_OSFile *file, void const *buffer, DN_USize siz
 DN_API bool DN_OS_FileFlush(DN_OSFile *file, DN_OSErrSink *err)
 {
   // TODO: errno is not thread safe
-  int fd = fileno(DN_CAST(FILE *) file->handle);
+  int fd = fileno(DN_Cast(FILE *) file->handle);
   if (fd == -1) {
     DN_OS_ErrSinkAppendF(err, errno, "Failed to flush file buffer to disk, file handle could not be converted to descriptor (%d): %s", fd, strerror(errno));
     return false;
@@ -528,14 +528,14 @@ DN_API void DN_OS_FileClose(DN_OSFile *file)
 {
   if (!file || !file->handle || file->error)
     return;
-  fclose(DN_CAST(FILE *) file->handle);
+  fclose(DN_Cast(FILE *) file->handle);
   *file = {};
 }
 
 DN_API DN_OSPathInfo DN_OS_PathInfo(DN_Str8 path)
 {
   DN_OSPathInfo result = {};
-  if (!DN_Str8_HasData(path))
+  if (path.size == 0)
     return result;
 
   struct stat file_stat;
@@ -559,7 +559,7 @@ DN_API DN_OSPathInfo DN_OS_PathInfo(DN_Str8 path)
 DN_API bool DN_OS_PathDelete(DN_Str8 path)
 {
   bool result = false;
-  if (DN_Str8_HasData(path))
+  if (path.size)
     result = remove(path.data) == 0;
   return result;
 }
@@ -567,7 +567,7 @@ DN_API bool DN_OS_PathDelete(DN_Str8 path)
 DN_API bool DN_OS_PathIsFile(DN_Str8 path)
 {
   bool result = false;
-  if (!DN_Str8_HasData(path))
+  if (path.size == 0)
     return result;
 
   struct stat stat_result;
@@ -579,7 +579,7 @@ DN_API bool DN_OS_PathIsFile(DN_Str8 path)
 DN_API bool DN_OS_PathIsDir(DN_Str8 path)
 {
   bool result = false;
-  if (!DN_Str8_HasData(path))
+  if (path.size == 0)
     return result;
 
   struct stat stat_result;
@@ -598,7 +598,7 @@ DN_API bool DN_OS_PathMakeDir(DN_Str8 path)
   DN_USize path_indexes_size = 0;
   uint16_t path_indexes[64]  = {};
 
-  DN_Str8 copy = DN_Str8_FromStr8(tmem.arena, path);
+  DN_Str8 copy = DN_Str8FromStr8(tmem.arena, path);
   for (DN_USize index = copy.size - 1; index < copy.size; index--) {
     bool first_char = index == (copy.size - 1);
     char ch         = copy.data[index];
@@ -626,7 +626,7 @@ DN_API bool DN_OS_PathMakeDir(DN_Str8 path)
       } else {
         // NOTE: There's nothing that exists at this path, we can
         // create a directory here
-        path_indexes[path_indexes_size++] = DN_CAST(uint16_t) index;
+        path_indexes[path_indexes_size++] = DN_Cast(uint16_t) index;
       }
     }
   }
@@ -654,23 +654,23 @@ DN_API bool DN_OS_PathIterateDir(DN_Str8 path, DN_OSDirIterator *it)
 
   struct dirent *entry;
   for (;;) {
-    entry = readdir(DN_CAST(DIR *) it->handle);
+    entry = readdir(DN_Cast(DIR *) it->handle);
     if (entry == NULL)
       break;
 
     if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
       continue;
 
-    DN_USize name_size    = DN_CStr8_Size(entry->d_name);
+    DN_USize name_size    = DN_CStrSize(entry->d_name);
     DN_USize clamped_size = DN_Min(sizeof(it->buffer) - 1, name_size);
     DN_AssertF(name_size == clamped_size, "name: %s, name_size: %zu, clamped_size: %zu", entry->d_name, name_size, clamped_size);
     DN_Memcpy(it->buffer, entry->d_name, clamped_size);
     it->buffer[clamped_size] = 0;
-    it->file_name            = DN_Str8_Init(it->buffer, clamped_size);
+    it->file_name            = DN_Str8FromPtr(it->buffer, clamped_size);
     return true;
   }
 
-  closedir(DN_CAST(DIR *) it->handle);
+  closedir(DN_Cast(DIR *) it->handle);
   it->handle    = NULL;
   it->file_name = {};
   it->buffer[0] = 0;
@@ -679,7 +679,7 @@ DN_API bool DN_OS_PathIterateDir(DN_Str8 path, DN_OSDirIterator *it)
 
 DN_API void DN_OS_Exit(int32_t exit_code)
 {
-  exit(DN_CAST(int) exit_code);
+  exit(DN_Cast(int) exit_code);
 }
 
 enum DN_OSPipeType_
@@ -757,30 +757,30 @@ DN_API DN_OSExecResult DN_OS_ExecWait(DN_OSExecAsyncHandle handle,
     DN_OSTLSTMem tmem = DN_OS_TLSTMem(arena);
     if (arena && handle.stdout_read) {
       char           buffer[4096];
-      DN_Str8Builder builder = DN_Str8Builder_FromArena(tmem.arena);
+      DN_Str8Builder builder = DN_Str8BuilderFromArena(tmem.arena);
       for (;;) {
         ssize_t bytes_read =
             read(stdout_pipe[DN_OSPipeType__Read], buffer, sizeof(buffer));
         if (bytes_read <= 0)
           break;
-        DN_Str8Builder_AppendF(&builder, "%.*s", bytes_read, buffer);
+        DN_Str8BuilderAppendF(&builder, "%.*s", bytes_read, buffer);
       }
 
-      result.stdout_text = DN_Str8Builder_Build(&builder, arena);
+      result.stdout_text = DN_Str8BuilderBuild(&builder, arena);
     }
 
     if (arena && handle.stderr_read) {
       char           buffer[4096];
-      DN_Str8Builder builder = DN_Str8Builder_FromArena(tmem.arena);
+      DN_Str8Builder builder = DN_Str8BuilderFromArena(tmem.arena);
       for (;;) {
         ssize_t bytes_read =
             read(stderr_pipe[DN_OSPipeType__Read], buffer, sizeof(buffer));
         if (bytes_read <= 0)
           break;
-        DN_Str8Builder_AppendF(&builder, "%.*s", bytes_read, buffer);
+        DN_Str8BuilderAppendF(&builder, "%.*s", bytes_read, buffer);
       }
 
-      result.stderr_text = DN_Str8Builder_Build(&builder, arena);
+      result.stderr_text = DN_Str8BuilderBuild(&builder, arena);
     }
   }
 
@@ -803,7 +803,7 @@ DN_API DN_OSExecAsyncHandle DN_OS_ExecAsync(DN_Slice<DN_Str8> cmd_line,
     return result;
 
   DN_OSTLSTMem tmem                              = DN_OS_TLSTMem(nullptr);
-  DN_Str8    cmd_rendered                      = DN_Slice_Str8Render(tmem.arena, cmd_line, DN_STR8(" "));
+  DN_Str8    cmd_rendered                      = DN_Slice_Str8Render(tmem.arena, cmd_line, DN_Str8Lit(" "));
   int        stdout_pipe[DN_OSPipeType__Count] = {};
   int        stderr_pipe[DN_OSPipeType__Count] = {};
 
@@ -815,7 +815,7 @@ DN_API DN_OSExecAsyncHandle DN_OS_ExecAsync(DN_Slice<DN_Str8> cmd_line,
           error,
           result.os_error_code,
           "Failed to create stdout pipe to redirect the output of the command '%.*s': %s",
-          DN_STR_FMT(cmd_rendered),
+          DN_Str8PrintFmt(cmd_rendered),
           strerror(result.os_error_code));
       return result;
     }
@@ -842,7 +842,7 @@ DN_API DN_OSExecAsyncHandle DN_OS_ExecAsync(DN_Slice<DN_Str8> cmd_line,
           error,
           result.os_error_code,
           "Failed to create stderr pipe to redirect the output of the command '%.*s': %s",
-          DN_STR_FMT(cmd_rendered),
+          DN_Str8PrintFmt(cmd_rendered),
           strerror(result.os_error_code));
       return result;
     }
@@ -865,7 +865,7 @@ DN_API DN_OSExecAsyncHandle DN_OS_ExecAsync(DN_Slice<DN_Str8> cmd_line,
         error,
         result.os_error_code,
         "Failed to fork process to execute the command '%.*s': %s",
-        DN_STR_FMT(cmd_rendered),
+        DN_Str8PrintFmt(cmd_rendered),
         strerror(result.os_error_code));
     return result;
   }
@@ -878,7 +878,7 @@ DN_API DN_OSExecAsyncHandle DN_OS_ExecAsync(DN_Slice<DN_Str8> cmd_line,
           error,
           result.os_error_code,
           "Failed to redirect stdout 'write' pipe for output of command '%.*s': %s",
-          DN_STR_FMT(cmd_rendered),
+          DN_Str8PrintFmt(cmd_rendered),
           strerror(result.os_error_code));
       return result;
     }
@@ -890,27 +890,27 @@ DN_API DN_OSExecAsyncHandle DN_OS_ExecAsync(DN_Slice<DN_Str8> cmd_line,
           error,
           result.os_error_code,
           "Failed to redirect stderr 'read' pipe for output of command '%.*s': %s",
-          DN_STR_FMT(cmd_rendered),
+          DN_Str8PrintFmt(cmd_rendered),
           strerror(result.os_error_code));
       return result;
     }
 
     // NOTE: Convert the command into something suitable for execvp
     char **argv =
-        DN_Arena_NewArray(tmem.arena, char *, cmd_line.size + 1 /*null*/, DN_ZeroMem_Yes);
+        DN_ArenaNewArray(tmem.arena, char *, cmd_line.size + 1 /*null*/, DN_ZMem_Yes);
     if (!argv) {
       result.exit_code = -1;
       DN_OS_ErrSinkAppendF(
           error,
           result.os_error_code,
           "Failed to create argument values from command line '%.*s': Out of memory",
-          DN_STR_FMT(cmd_rendered));
+          DN_Str8PrintFmt(cmd_rendered));
       return result;
     }
 
     for (DN_ForIndexU(arg_index, cmd_line.size)) {
       DN_Str8 arg     = cmd_line.data[arg_index];
-      argv[arg_index] = DN_Str8_FromStr8(tmem.arena, arg).data; // NOTE: Copy string to guarantee it is null-terminated
+      argv[arg_index] = DN_Str8FromStr8(tmem.arena, arg).data; // NOTE: Copy string to guarantee it is null-terminated
     }
 
     // NOTE: Change the working directory if there is one
@@ -928,14 +928,14 @@ DN_API DN_OSExecAsyncHandle DN_OS_ExecAsync(DN_Slice<DN_Str8> cmd_line,
 
     if (args->working_dir.size) {
       prev_working_dir    = get_current_dir_name();
-      DN_Str8 working_dir = DN_Str8_FromStr8(tmem.arena, args->working_dir);
+      DN_Str8 working_dir = DN_Str8FromStr8(tmem.arena, args->working_dir);
       if (chdir(working_dir.data) == -1) {
         result.os_error_code = errno;
         DN_OS_ErrSinkAppendF(
             error,
             result.os_error_code,
             "Failed to create argument values from command line '%.*s': %s",
-            DN_STR_FMT(cmd_rendered),
+            DN_Str8PrintFmt(cmd_rendered),
             strerror(result.os_error_code));
         return result;
       }
@@ -949,7 +949,7 @@ DN_API DN_OSExecAsyncHandle DN_OS_ExecAsync(DN_Slice<DN_Str8> cmd_line,
           error,
           result.os_error_code,
           "Failed to execute command'%.*s': %s",
-          DN_STR_FMT(cmd_rendered),
+          DN_Str8PrintFmt(cmd_rendered),
           strerror(result.os_error_code));
       return result;
     }
@@ -1016,7 +1016,7 @@ static DN_POSIXSyncPrimitive *DN_POSIX_AllocSyncPrimitive_()
       result->next                    = nullptr;
     } else {
       DN_OSCore *os = g_dn_os_core_;
-      result        = DN_Arena_New(&os->arena, DN_POSIXSyncPrimitive, DN_ZeroMem_Yes);
+      result        = DN_ArenaNew(&os->arena, DN_POSIXSyncPrimitive, DN_ZMem_Yes);
     }
   }
   pthread_mutex_unlock(&posix->sync_primitive_free_list_mutex);
@@ -1272,7 +1272,7 @@ DN_API DN_U32 DN_OS_ThreadID()
 {
   pid_t result = gettid();
   DN_Assert(gettid() >= 0);
-  return DN_CAST(DN_U32) result;
+  return DN_Cast(DN_U32) result;
 }
 
 DN_API void DN_Posix_Init(DN_POSIXCore *posix)
@@ -1294,7 +1294,7 @@ DN_API void DN_Posix_ThreadSetName(DN_Str8 name)
   (void)name;
 #else
   DN_OSTLSTMem tmem   = DN_OS_TLSPushTMem(nullptr);
-  DN_Str8      copy   = DN_Str8_FromStr8(tmem.arena, name);
+  DN_Str8      copy   = DN_Str8FromStr8(tmem.arena, name);
   pthread_t    thread = pthread_self();
   pthread_setname_np(thread, (char *)copy.data);
 #endif
@@ -1313,49 +1313,49 @@ DN_API DN_POSIXProcSelfStatus DN_Posix_ProcSelfStatus()
   //  ...
   //
   // VmSize is the total virtual memory used
-  DN_OSFile              file   = DN_OS_FileOpen(DN_STR8("/proc/self/status"), DN_OSFileOpen_OpenIfExist, DN_OSFileAccess_Read, nullptr);
+  DN_OSFile              file   = DN_OS_FileOpen(DN_Str8Lit("/proc/self/status"), DN_OSFileOpen_OpenIfExist, DN_OSFileAccess_Read, nullptr);
   DN_OSTLSTMem           tmem   = DN_OS_TLSPushTMem(nullptr);
 
   if (!file.error) {
     char           buf[256];
-    DN_Str8Builder builder = DN_Str8Builder_FromTLS();
+    DN_Str8Builder builder = DN_Str8BuilderFromTLS();
     for (;;) {
       DN_OSFileRead read = DN_OS_FileRead(&file, buf, sizeof(buf), nullptr);
       if (!read.success || read.bytes_read == 0)
         break;
-      DN_Str8Builder_AppendF(&builder, "%.*s", DN_CAST(int)read.bytes_read, buf);
+      DN_Str8BuilderAppendF(&builder, "%.*s", DN_Cast(int)read.bytes_read, buf);
     }
 
-    DN_Str8 const          NAME       = DN_STR8("Name:");
-    DN_Str8 const          PID        = DN_STR8("Pid:");
-    DN_Str8 const          VM_PEAK    = DN_STR8("VmPeak:");
-    DN_Str8 const          VM_SIZE    = DN_STR8("VmSize:");
-    DN_Str8                status_buf = DN_Str8Builder_BuildFromTLS(&builder);
-    DN_Slice<DN_Str8>      lines      = DN_Str8_SplitFromTLS(status_buf, DN_STR8("\n"), DN_Str8SplitIncludeEmptyStrings_No);
+    DN_Str8 const          NAME       = DN_Str8Lit("Name:");
+    DN_Str8 const          PID        = DN_Str8Lit("Pid:");
+    DN_Str8 const          VM_PEAK    = DN_Str8Lit("VmPeak:");
+    DN_Str8 const          VM_SIZE    = DN_Str8Lit("VmSize:");
+    DN_Str8                status_buf = DN_Str8BuilderBuildFromTLS(&builder);
+    DN_Slice<DN_Str8>      lines      = DN_Str8SplitFromTLS(status_buf, DN_Str8Lit("\n"), DN_Str8SplitIncludeEmptyStrings_No);
 
     for (DN_ForIt(line_it, DN_Str8, &lines)) {
-      DN_Str8       line    = DN_Str8_TrimWhitespaceAround(*line_it.data);
-      if (DN_Str8_StartsWith(line, NAME, DN_Str8EqCase_Insensitive)) {
-        DN_Str8 str8     = DN_Str8_TrimWhitespaceAround(DN_Str8_Slice(line, NAME.size, line.size));
+      DN_Str8       line    = DN_Str8TrimWhitespaceAround(*line_it.data);
+      if (DN_Str8StartsWith(line, NAME, DN_Str8EqCase_Insensitive)) {
+        DN_Str8 str8     = DN_Str8TrimWhitespaceAround(DN_Str8Slice(line, NAME.size, line.size));
         result.name_size = DN_Min(str8.size, sizeof(result.name));
         DN_Memcpy(result.name, str8.data, result.name_size);
-      } else if (DN_Str8_StartsWith(line, PID, DN_Str8EqCase_Insensitive)) {
-        DN_Str8            str8   = DN_Str8_TrimWhitespaceAround(DN_Str8_Slice(line, PID.size, line.size));
-        DN_Str8ToU64Result to_u64 = DN_Str8_ToU64(str8, 0);
+      } else if (DN_Str8StartsWith(line, PID, DN_Str8EqCase_Insensitive)) {
+        DN_Str8            str8   = DN_Str8TrimWhitespaceAround(DN_Str8Slice(line, PID.size, line.size));
+        DN_Str8ToU64Result to_u64 = DN_Str8ToU64(str8, 0);
         result.pid                = to_u64.value;
         DN_Assert(to_u64.success);
-      } else if (DN_Str8_StartsWith(line, VM_SIZE, DN_Str8EqCase_Insensitive)) {
-        DN_Str8 size_with_kb = DN_Str8_TrimWhitespaceAround(DN_Str8_Slice(line, VM_SIZE.size, line.size));
-        DN_Assert(DN_Str8_EndsWith(size_with_kb, DN_STR8("kB")));
-        DN_Str8            vm_size = DN_Str8_BSplit(size_with_kb, DN_STR8(" ")).lhs;
-        DN_Str8ToU64Result to_u64  = DN_Str8_ToU64(vm_size, 0);
+      } else if (DN_Str8StartsWith(line, VM_SIZE, DN_Str8EqCase_Insensitive)) {
+        DN_Str8 size_with_kb = DN_Str8TrimWhitespaceAround(DN_Str8Slice(line, VM_SIZE.size, line.size));
+        DN_Assert(DN_Str8EndsWith(size_with_kb, DN_Str8Lit("kB")));
+        DN_Str8            vm_size = DN_Str8BSplit(size_with_kb, DN_Str8Lit(" ")).lhs;
+        DN_Str8ToU64Result to_u64  = DN_Str8ToU64(vm_size, 0);
         result.vm_size             = DN_Kilobytes(to_u64.value);
         DN_Assert(to_u64.success);
-      } else if (DN_Str8_StartsWith(line, VM_PEAK, DN_Str8EqCase_Insensitive)) {
-        DN_Str8 size_with_kb = DN_Str8_TrimWhitespaceAround(DN_Str8_Slice(line, VM_PEAK.size, line.size));
-        DN_Assert(DN_Str8_EndsWith(size_with_kb, DN_STR8("kB")));
-        DN_Str8            vm_size = DN_Str8_BSplit(size_with_kb, DN_STR8(" ")).lhs;
-        DN_Str8ToU64Result to_u64  = DN_Str8_ToU64(vm_size, 0);
+      } else if (DN_Str8StartsWith(line, VM_PEAK, DN_Str8EqCase_Insensitive)) {
+        DN_Str8 size_with_kb = DN_Str8TrimWhitespaceAround(DN_Str8Slice(line, VM_PEAK.size, line.size));
+        DN_Assert(DN_Str8EndsWith(size_with_kb, DN_Str8Lit("kB")));
+        DN_Str8            vm_size = DN_Str8BSplit(size_with_kb, DN_Str8Lit(" ")).lhs;
+        DN_Str8ToU64Result to_u64  = DN_Str8ToU64(vm_size, 0);
         result.vm_peak             = DN_Kilobytes(to_u64.value);
         DN_Assert(to_u64.success);
       }
@@ -1411,12 +1411,12 @@ static EM_BOOL EMWebSocketOnCloseCallback(int type, const EmscriptenWebSocketClo
 #if defined(DN_PLATFORM_EMSCRIPTEN)
 static void DN_OS_HttpRequestEMFetchOnSuccessCallback(emscripten_fetch_t *fetch)
 {
-  DN_OSHttpResponse *response = DN_CAST(DN_OSHttpResponse *) fetch->userData;
+  DN_OSHttpResponse *response = DN_Cast(DN_OSHttpResponse *) fetch->userData;
   if (!DN_Check(response))
     return;
 
-  response->http_status = DN_CAST(DN_U32) fetch->status;
-  response->body        = DN_Str8_Alloc(response->arena, fetch->numBytes, DN_ZeroMem_No);
+  response->http_status = DN_Cast(DN_U32) fetch->status;
+  response->body        = DN_Str8FromArena(response->arena, fetch->numBytes, DN_ZMem_No);
   if (response->body.data)
     DN_Memcpy(response->body.data, fetch->data, fetch->numBytes);
 
@@ -1426,12 +1426,12 @@ static void DN_OS_HttpRequestEMFetchOnSuccessCallback(emscripten_fetch_t *fetch)
 
 static void DN_OS_HttpRequestEMFetchOnErrorCallback(emscripten_fetch_t *fetch)
 {
-  DN_OSHttpResponse *response = DN_CAST(DN_OSHttpResponse *) fetch->userData;
+  DN_OSHttpResponse *response = DN_Cast(DN_OSHttpResponse *) fetch->userData;
   if (!DN_Check(response))
     return;
 
-  response->http_status = DN_CAST(DN_U32) fetch->status;
-  response->body        = DN_Str8_Alloc(response->arena, fetch->numBytes, DN_ZeroMem_No);
+  response->http_status = DN_Cast(DN_U32) fetch->status;
+  response->body        = DN_Str8FromArena(response->arena, fetch->numBytes, DN_ZMem_No);
   if (response->body.size)
     DN_Memcpy(response->body.data, fetch->data, fetch->numBytes);
 
@@ -1467,15 +1467,15 @@ DN_API void DN_OS_HttpRequestAsync(DN_OSHttpResponse     *response,
 
   if (method.size >= sizeof(fetch_attribs.requestMethod)) {
     response->error_msg =
-        DN_Str8_FromF(arena,
+        DN_Str8FromFmtArena(arena,
                       "Request method in EM has a size limit of 31 characters, method was "
                       "'%.*s' which is %zu characters long",
-                      DN_STR_FMT(method),
+                      DN_Str8PrintFmt(method),
                       method.size);
     DN_CheckF(method.size < sizeof(fetch_attribs.requestMethod),
               "%.*s",
-              DN_STR_FMT(response->error_msg));
-    response->error_code = DN_CAST(DN_U32) - 1;
+              DN_Str8PrintFmt(response->error_msg));
+    response->error_code = DN_Cast(DN_U32) - 1;
     DN_AtomicAddU32(&response->done, 1);
     return;
   }
@@ -1489,11 +1489,11 @@ DN_API void DN_OS_HttpRequestAsync(DN_OSHttpResponse     *response,
   fetch_attribs.onerror         = DN_OS_HttpRequestEMFetchOnErrorCallback;
   fetch_attribs.userData        = response;
 
-  DN_Str8 url = DN_Str8_FromF(tmem, "%.*s%.*s", DN_STR_FMT(host), DN_STR_FMT(path));
+  DN_Str8 url = DN_Str8FromFmtArena(tmem, "%.*s%.*s", DN_Str8PrintFmt(host), DN_Str8PrintFmt(path));
   DN_LOG_InfoF("Initiating HTTP '%s' request to '%.*s' with payload '%.*s'",
                fetch_attribs.requestMethod,
-               DN_STR_FMT(url),
-               DN_STR_FMT(body));
+               DN_Str8PrintFmt(url),
+               DN_Str8PrintFmt(body));
   response->on_complete_semaphore = DN_OS_SemaphoreInit(0);
   response->em_handle             = emscripten_fetch(&fetch_attribs, url.data);
 #else // #elif defined(DN_OS_WIN32)
@@ -1511,7 +1511,7 @@ DN_API void DN_OS_HttpRequestFree(DN_OSHttpResponse *response)
   }
 #endif // #elif defined(DN_OS_WIN32)
 
-  DN_Arena_Deinit(&response->tmp_arena);
+  DN_ArenaDeinit(&response->tmp_arena);
   DN_OS_SemaphoreDeinit(&response->on_complete_semaphore);
   *response = {};
 }
