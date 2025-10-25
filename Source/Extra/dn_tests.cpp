@@ -303,6 +303,35 @@ static DN_UTCore DN_Tests_Base()
             DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_XSAVE)       == DN_RefImplCPUReport::XSAVE());
   #endif
     }
+#endif // defined(DN_PLATFORM_WIN32) && defined(DN_COMPILER_MSVC)
+
+    for (DN_UT_Test(&result, "String")) {
+      char     buffer[512];
+      DN_Arena arena = DN_ArenaFromBuffer(buffer, sizeof(buffer), DN_ArenaFlags_NoPoison | DN_ArenaFlags_AllocCanLeak);
+
+      // NOTE: Str8FromFmtArena
+      {
+        DN_Str8 str8   = DN_Str8FromFmtArena(&arena, "Foo Bar %d", 5);
+        DN_Str8 expect = DN_Str8Lit("Foo Bar 5");
+        DN_UT_AssertF(&result, DN_Str8Eq(str8, expect), "str8=%.*s", DN_Str8PrintFmt(str8), DN_Str8PrintFmt(expect));
+      }
+
+      // NOTE: Str8FromFmtPool
+      {
+        DN_Pool pool   = DN_PoolFromArena(&arena, 0);
+        DN_Str8 str8   = DN_Str8FromFmtPool(&pool, "Foo Bar %d", 5);
+        DN_Str8 expect = DN_Str8Lit("Foo Bar 5");
+        DN_UT_AssertF(&result, DN_Str8Eq(str8, expect), "str8=%.*s", DN_Str8PrintFmt(str8), DN_Str8PrintFmt(expect));
+      }
+
+
+      // NOTE: Str8x32FromU64
+      {
+        DN_Str8x32 str8   = DN_Str8x32FromU64(123456, ' ');
+        DN_Str8    expect = DN_Str8Lit("123 456");
+        DN_UT_AssertF(&result, DN_Str8Eq(DN_Str8FromStruct(&str8), expect), "buf_str8=%.*s, expect=%.*s", DN_Str8PrintFmt(str8), DN_Str8PrintFmt(expect));
+      }
+    }
 
     for (DN_UT_Test(&result, "Age")) {
       // NOTE: Seconds and milliseconds
@@ -320,14 +349,6 @@ static DN_UTCore DN_Tests_Base()
       }
     }
 
-    for (DN_UT_Test(&result, "String")) {
-      {
-        DN_Str8x32 str8   = DN_Str8x32FromU64(123456, ' ');
-        DN_Str8    expect = DN_Str8Lit("123 456");
-        DN_UT_AssertF(&result, DN_Str8Eq(DN_Str8FromStruct(&str8), expect), "buf_str8=%.*s, expect=%.*s", DN_Str8PrintFmt(str8), DN_Str8PrintFmt(expect));
-      }
-    }
-
     for (DN_UT_Test(&result, "Misc")) {
       {
         char               buf[8]   = {};
@@ -339,7 +360,6 @@ static DN_UTCore DN_Tests_Base()
       }
     }
   }
-#endif // defined(DN_PLATFORM_WIN32) && defined(DN_COMPILER_MSVC)
   return result;
 }
 

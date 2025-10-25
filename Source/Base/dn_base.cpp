@@ -1653,8 +1653,11 @@ DN_API DN_Str8 DN_Str8FromFmtPool(DN_Pool *pool, DN_FMT_ATTRIB char const *fmt, 
   va_start(args, fmt);
   DN_USize size   = DN_FmtVSize(fmt, args);
   DN_Str8  result = DN_Str8FromPool(pool, size);
-  if (result.data)
-    DN_FmtVAppend(result.data, &result.size, result.size + 1, fmt, args);
+  if (result.data) {
+    DN_USize written = 0;
+    DN_FmtVAppend(result.data, &written, result.size + 1, fmt, args);
+    DN_Assert(written == result.size);
+  }
   va_end(args);
   return result;
 }
@@ -1664,6 +1667,36 @@ DN_API DN_Str8x32 DN_Str8x32FromFmt(DN_FMT_ATTRIB char const *fmt, ...)
   va_list args;
   va_start(args, fmt);
   DN_Str8x32 result = {};
+  DN_FmtVAppend(result.data, &result.size, sizeof(result.data), fmt, args);
+  va_end(args);
+  return result;
+}
+
+DN_API DN_Str8x64 DN_Str8x64FromFmt(DN_FMT_ATTRIB char const *fmt, ...)
+{
+  va_list args;
+  va_start(args, fmt);
+  DN_Str8x64 result = {};
+  DN_FmtVAppend(result.data, &result.size, sizeof(result.data), fmt, args);
+  va_end(args);
+  return result;
+}
+
+DN_API DN_Str8x128 DN_Str8x128FromFmt(DN_FMT_ATTRIB char const *fmt, ...)
+{
+  va_list args;
+  va_start(args, fmt);
+  DN_Str8x128 result = {};
+  DN_FmtVAppend(result.data, &result.size, sizeof(result.data), fmt, args);
+  va_end(args);
+  return result;
+}
+
+DN_API DN_Str8x256 DN_Str8x256FromFmt(DN_FMT_ATTRIB char const *fmt, ...)
+{
+  va_list args;
+  va_start(args, fmt);
+  DN_Str8x256 result = {};
   DN_FmtVAppend(result.data, &result.size, sizeof(result.data), fmt, args);
   va_end(args);
   return result;

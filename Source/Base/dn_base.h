@@ -18,12 +18,13 @@
 #include <stdlib.h> // exit()
 #endif
 
-#define DN_ForIndexU(index, size)        DN_USize index = 0; index < size; index++
-#define DN_ForIndexI(index, size)        DN_ISize index = 0; index < size; index++
-#define DN_ForItSize(it, T, array, size) struct { DN_USize index; T *data; } it = {0, &(array)[0]};       it.index < (size);                it.index++, it.data = (array)         + it.index
-#define DN_ForIt(it, T, array)           struct { DN_USize index; T *data; } it = {0, &(array)->data[0]}; it.index < (array)->size;         it.index++, it.data = ((array)->data) + it.index
-#define DN_ForLinkedListIt(it, T, list)  struct { DN_USize index; T *data; } it = {0, list};              it.data;                          it.index++, it.data = ((it).data->next)
-#define DN_ForItCArray(it, T, array)     struct { DN_USize index; T *data; } it = {0, &(array)[0]};       it.index < DN_ArrayCountU(array); it.index++, it.data = (array)         + it.index
+#define DN_ForIndexU(index, size)               DN_USize index = 0; index < size; index++
+#define DN_ForIndexI(index, size)               DN_ISize index = 0; index < size; index++
+#define DN_ForItSize(it, T, array, size)        struct { DN_USize index; T *data; } it = {0,          &(array)[0]};        it.index < (size);                it.index++, it.data = (array)         + it.index
+#define DN_ForItSizeReverse(it, T, array, size) struct { DN_USize index; T *data; } it = {(size) - 1, &(array)[size - 1]}; it.index < (size);                it.index--, it.data = (array)         + it.index
+#define DN_ForIt(it, T, array)                  struct { DN_USize index; T *data; } it = {0,          &(array)->data[0]};  it.index < (array)->size;         it.index++, it.data = ((array)->data) + it.index
+#define DN_ForLinkedListIt(it, T, list)         struct { DN_USize index; T *data; } it = {0,          list};               it.data;                          it.index++, it.data = ((it).data->next)
+#define DN_ForItCArray(it, T, array)            struct { DN_USize index; T *data; } it = {0,          &(array)[0]};        it.index < DN_ArrayCountU(array); it.index++, it.data = (array)         + it.index
 
 #define DN_AlignUpPowerOfTwo(value, pot)   (((uintptr_t)(value) + ((uintptr_t)(pot) - 1)) & ~((uintptr_t)(pot) - 1))
 #define DN_AlignDownPowerOfTwo(value, pot) ((uintptr_t)(value) & ~((uintptr_t)(pot) - 1))
@@ -948,6 +949,10 @@ DN_API DN_Str8                  DN_Str8FromFmtVArena        (DN_Arena *arena, DN
 DN_API DN_Str8                  DN_Str8FromFmtPool          (DN_Pool *pool, DN_FMT_ATTRIB char const *fmt, ...);
 DN_API DN_Str8                  DN_Str8FromByteCountType    (DN_ByteCountType type);
 DN_API DN_Str8x32               DN_Str8x32FromFmt           (DN_FMT_ATTRIB char const *fmt, ...);
+DN_API DN_Str8x64               DN_Str8x64FromFmt           (DN_FMT_ATTRIB char const *fmt, ...);
+DN_API DN_Str8x128              DN_Str8x128FromFmt          (DN_FMT_ATTRIB char const *fmt, ...);
+DN_API DN_Str8x256              DN_Str8x256FromFmt          (DN_FMT_ATTRIB char const *fmt, ...);
+DN_API DN_Str8x32               DN_Str8x32FromU64           (DN_U64 val, char separator);
 DN_API bool                     DN_Str8IsAll                (DN_Str8 string, DN_Str8IsAllType is_all);
 DN_API char *                   DN_Str8End                  (DN_Str8 string);
 DN_API DN_Str8                  DN_Str8Slice                (DN_Str8 string, DN_USize offset, DN_USize size);
