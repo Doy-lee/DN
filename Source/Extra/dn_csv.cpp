@@ -17,7 +17,7 @@ static bool DN_CSV_TokeniserValid(DN_CSVTokeniser *tokeniser)
 static bool DN_CSV_TokeniserNextRow(DN_CSVTokeniser *tokeniser)
 {
   bool result = false;
-  if (DN_CSV_TokeniserValid(tokeniser) && DN_Str8HasData(tokeniser->string)) {
+  if (DN_CSV_TokeniserValid(tokeniser) && tokeniser->string.size) {
     // NOTE: First time querying row iterator is nil, let tokeniser advance
     if (tokeniser->it) {
       // NOTE: Only advance the tokeniser if we're at the end of the line and
@@ -39,7 +39,7 @@ static DN_Str8 DN_CSV_TokeniserNextField(DN_CSVTokeniser *tokeniser)
   if (!DN_CSV_TokeniserValid(tokeniser))
     return result;
 
-  if (!DN_Str8HasData(tokeniser->string)) {
+  if (tokeniser->string.size == 0) {
     tokeniser->bad = true;
     return result;
   }
@@ -146,7 +146,7 @@ static int DN_CSV_TokeniserNextN(DN_CSVTokeniser *tokeniser, DN_Str8 *fields, in
   int result = 0;
   for (; result < fields_size; result++) {
     fields[result] = column_iterator ? DN_CSV_TokeniserNextColumn(tokeniser) : DN_CSV_TokeniserNextField(tokeniser);
-    if (!DN_CSV_TokeniserValid(tokeniser) || !DN_Str8HasData(fields[result]))
+    if (!DN_CSV_TokeniserValid(tokeniser) || fields[result].size == 0)
       break;
   }
 
@@ -176,8 +176,8 @@ static void DN_CSV_TokeniserSkipLineN(DN_CSVTokeniser *tokeniser, int count)
 static void DN_CSV_PackU64(DN_CSVPack *pack, DN_CSVSerialise serialise, DN_U64 *value)
 {
   if (serialise == DN_CSVSerialise_Read) {
-    DN_Str8            csv_value = DN_CSV_TokeniserNextColumn(&pack->read_tokeniser);
-    DN_Str8ToU64Result to_u64    = DN_Str8ToU64(csv_value, 0);
+    DN_Str8          csv_value = DN_CSV_TokeniserNextColumn(&pack->read_tokeniser);
+    DN_U64FromResult to_u64    = DN_U64FromStr8(csv_value, 0);
     DN_Assert(to_u64.success);
     *value = to_u64.value;
   } else {
@@ -188,8 +188,8 @@ static void DN_CSV_PackU64(DN_CSVPack *pack, DN_CSVSerialise serialise, DN_U64 *
 static void DN_CSV_PackI64(DN_CSVPack *pack, DN_CSVSerialise serialise, DN_I64 *value)
 {
   if (serialise == DN_CSVSerialise_Read) {
-    DN_Str8            csv_value = DN_CSV_TokeniserNextColumn(&pack->read_tokeniser);
-    DN_Str8ToI64Result to_i64    = DN_Str8ToI64(csv_value, 0);
+    DN_Str8          csv_value = DN_CSV_TokeniserNextColumn(&pack->read_tokeniser);
+    DN_I64FromResult to_i64    = DN_I64FromStr8(csv_value, 0);
     DN_Assert(to_i64.success);
     *value = to_i64.value;
   } else {
@@ -250,7 +250,7 @@ static void DN_CSV_PackStr8(DN_CSVPack *pack, DN_CSVSerialise serialise, DN_Str8
 {
   if (serialise == DN_CSVSerialise_Read) {
     DN_Str8 csv_value = DN_CSV_TokeniserNextColumn(&pack->read_tokeniser);
-    *str8             = DN_Str8FromStr8(arena, csv_value);
+    *str8             = DN_Str8FromStr8Arena(arena, csv_value);
   } else {
     DN_Str8BuilderAppendF(&pack->write_builder, "%s%.*s", pack->write_column++ ? "," : "", DN_Str8PrintFmt(*str8));
   }

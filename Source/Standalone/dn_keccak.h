@@ -227,7 +227,7 @@ DN_KCBytes32 DN_KC_Keccak256(void const *src, uint64_t size);
 DN_KCBytes48 DN_KC_Keccak384(void const *src, uint64_t size);
 DN_KCBytes64 DN_KC_Keccak512(void const *src, uint64_t size);
 
-#if defined(DN_BASE_STRING_H)
+#if defined(DN_BASE_H)
 // NOTE: SHA3 - Helpers for DN data structures ////////////////////////////////////////////////////
 DN_KCBytes28 DN_KC_SHA3_224Str8(DN_Str8 string);
 DN_KCBytes32 DN_KC_SHA3_256Str8(DN_Str8 string);
@@ -239,7 +239,7 @@ DN_KCBytes28 DN_KC_Keccak224Str8(DN_Str8 string);
 DN_KCBytes32 DN_KC_Keccak256Str8(DN_Str8 string);
 DN_KCBytes48 DN_KC_Keccak384Str8(DN_Str8 string);
 DN_KCBytes64 DN_KC_Keccak512Str8(DN_Str8 string);
-#endif // DN_BASE_STRING_H
+#endif // DN_BASE_H
 
 // NOTE: Helper functions //////////////////////////////////////////////////////////////////////////
 // Convert a binary buffer into its hex representation into dest. The dest
@@ -262,13 +262,13 @@ int DN_KC_Bytes32Equals(DN_KCBytes32 const *a, DN_KCBytes32 const *b);
 int DN_KC_Bytes48Equals(DN_KCBytes48 const *a, DN_KCBytes48 const *b);
 int DN_KC_Bytes64Equals(DN_KCBytes64 const *a, DN_KCBytes64 const *b);
 
-#if defined(DN_BASE_STRING_H)
+#if defined(DN_BASE_H)
 // NOTE: Other helper functions for DN data structures ////////////////////////////////////////////
 // Converts a 64 character hex string into the 32 byte binary representation.
 // Invalid hex characters in the string will be represented as 0.
 // hex: Must be exactly a 64 character hex string.
 DN_KCBytes32 DN_KC_Hex64ToBytes(DN_Str8 hex);
-#endif // DN_BASE_STRING_H
+#endif // DN_BASE_H
 #endif // DN_KC_H
 
 #if defined(DN_KC_IMPLEMENTATION)
@@ -518,7 +518,7 @@ DN_KCBytes64 DN_KC_Keccak512(void const *src, size_t size)
     return result;
 }
 
-#if defined(DN_BASE_STRING_H)
+#if defined(DN_BASE_H)
 // NOTE: SHA3 - Helpers for DN data structures ////////////////////////////////////////////////////
 DN_KCBytes28 DN_KC_SHA3_224Str8(DN_Str8 string)
 {
@@ -547,9 +547,9 @@ DN_KCBytes64 DN_KC_SHA3_512Str8(DN_Str8 string)
     DN_KC_SHA3_512Ptr(string.data, string.size, result.data, sizeof(result));
     return result;
 }
-#endif // DN_BASE_STRING_H
+#endif // DN_BASE_H
 
-#if defined(DN_BASE_STRING_H)
+#if defined(DN_BASE_H)
 // NOTE: Keccak - Helpers for DN data structures //////////////////////////////////////////////////
 DN_KCBytes28 DN_KC_Keccak224Str8(DN_Str8 string)
 {
@@ -578,7 +578,7 @@ DN_KCBytes64 DN_KC_Keccak512Str8(DN_Str8 string)
     DN_KC_Keccak512Ptr(string.data, string.size, result.data, sizeof(result));
     return result;
 }
-#endif // DN_BASE_STRING_H
+#endif // DN_BASE_H
 
 // NOTE: Helper functions //////////////////////////////////////////////////////////////////////////
 void DN_KC_HexFromBytes(void const *src, size_t src_size, char *dest, size_t dest_size)
@@ -653,14 +653,14 @@ int DN_KC_Bytes64Equals(DN_KCBytes64 const *a, DN_KCBytes64 const *b)
     return result;
 }
 
-#if defined(DN_BASE_STRING_H)
+#if defined(DN_BASE_H)
 // NOTE: Other helper functions for DN data structures ////////////////////////////////////////////
 DN_KCBytes32 DN_KC_Hex64ToBytes(DN_Str8 hex)
 {
     DN_KC_ASSERT(hex.size == 64);
     DN_KCBytes32 result;
-    DN_CVT_BytesFromHexPtr(hex, result.data, sizeof(result));
+    DN_BytesFromHexStr8(hex, result.data, sizeof(result));
     return result;
 }
-#endif // DN_BASE_STRING_H
+#endif // DN_BASE_H
 #endif // DN_KC_IMPLEMENTATION

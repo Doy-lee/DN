@@ -1550,20 +1550,16 @@ DN_API DN_USize DN_FmtVSize(DN_FMT_ATTRIB char const *fmt, va_list args)
 DN_API DN_USize DN_CStr8Size(char const *src)
 {
   DN_USize result = 0;
-  for (;src && src[0] != 0; src++, result++) {
-    src++;
-    result++;
-  }
+  for (; src && src[0] != 0; src++, result++)
+    ;
   return result;
 }
 
 DN_API DN_USize DN_CStr16Size(wchar_t const *src)
 {
   DN_USize result = 0;
-  while (src && src[0] != 0) {
-    src++;
-    result++;
-  }
+  for (; src && src[0] != 0; src++, result++)
+    ;
   return result;
 }
 

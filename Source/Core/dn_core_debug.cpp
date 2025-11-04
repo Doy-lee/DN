@@ -394,7 +394,7 @@ DN_API DN_ProfilerZone DN_Profiler_BeginZone(DN_Profiler *profiler, DN_Str8 name
   // TODO: We need per-thread-local-storage profiler so that we can use these apis
   // across threads. For now, we let them overwrite each other but this is not tenable.
   #if 0
-    if (DN_Str8HasData(anchor->name) && anchor->name != name)
+    if (anchor->name.size && anchor->name != name)
         DN_AssertF(name == anchor->name, "Potentially overwriting a zone by accident? Anchor is '%.*s', name is '%.*s'", DN_Str8PrintFmt(anchor->name), DN_Str8PrintFmt(name));
   #endif
 

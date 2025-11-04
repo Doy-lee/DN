@@ -602,7 +602,7 @@ void DN_Docs_Demo()
     DN_ProfilerAnchor *read_anchors = DN_Profiler_ReadBuffer();
     for (DN_USize index = 0; index < DN_PROFILER_ANCHOR_BUFFER_SIZE; index++) {
       DN_ProfilerAnchor *anchor = read_anchors + index;
-      if (DN_Str8HasData(anchor->name)) {
+      if (anchor->name.size) {
         // ...
       }
     }
@@ -614,7 +614,7 @@ void DN_Docs_Demo()
     DN_ProfilerAnchor *write_anchors = DN_Profiler_WriteBuffer();
     for (DN_USize index = 0; index < DN_PROFILER_ANCHOR_BUFFER_SIZE; index++) {
       DN_ProfilerAnchor *anchor = write_anchors + index;
-      if (DN_Str8HasData(anchor->name)) {
+      if (anchor->name.size) {
         // ...
       }
     }
@@ -1039,7 +1039,7 @@ void DN_Docs_Demo()
 
   // NOTE: DN_Str8x32FromFmt
   {
-    DN_Str8x32 string = DN_Str8x32FromFmt("%" PRIu64, 123123);
+    DN_Str8x32 string = DN_Str8x32FromFmt("%d", 123123);
     if (0) // Prints "123123"
       printf("%.*s", DN_Str8PrintFmt(string));
   }

@@ -196,7 +196,7 @@ DN_API DN_OSDiskSpace DN_OS_DiskSpace(DN_Str8 path)
 {
   DN_OSTLSTMem   tmem              = DN_OS_TLSPushTMem(nullptr);
   DN_OSDiskSpace result            = {};
-  DN_Str8        path_z_terminated = DN_Str8FromStr8(tmem.arena, path);
+  DN_Str8        path_z_terminated = DN_Str8FromStr8Arena(tmem.arena, path);
 
   struct statvfs info = {};
   if (statvfs(path_z_terminated.data, &info) != 0)
@@ -598,7 +598,7 @@ DN_API bool DN_OS_PathMakeDir(DN_Str8 path)
   DN_USize path_indexes_size = 0;
   uint16_t path_indexes[64]  = {};
 
-  DN_Str8 copy = DN_Str8FromStr8(tmem.arena, path);
+  DN_Str8 copy = DN_Str8FromStr8Arena(tmem.arena, path);
   for (DN_USize index = copy.size - 1; index < copy.size; index--) {
     bool first_char = index == (copy.size - 1);
     char ch         = copy.data[index];
@@ -910,7 +910,7 @@ DN_API DN_OSExecAsyncHandle DN_OS_ExecAsync(DN_Slice<DN_Str8> cmd_line,
 
     for (DN_ForIndexU(arg_index, cmd_line.size)) {
       DN_Str8 arg     = cmd_line.data[arg_index];
-      argv[arg_index] = DN_Str8FromStr8(tmem.arena, arg).data; // NOTE: Copy string to guarantee it is null-terminated
+      argv[arg_index] = DN_Str8FromStr8Arena(tmem.arena, arg).data; // NOTE: Copy string to guarantee it is null-terminated
     }
 
     // NOTE: Change the working directory if there is one
@@ -928,7 +928,7 @@ DN_API DN_OSExecAsyncHandle DN_OS_ExecAsync(DN_Slice<DN_Str8> cmd_line,
 
     if (args->working_dir.size) {
       prev_working_dir    = get_current_dir_name();
-      DN_Str8 working_dir = DN_Str8FromStr8(tmem.arena, args->working_dir);
+      DN_Str8 working_dir = DN_Str8FromStr8Arena(tmem.arena, args->working_dir);
       if (chdir(working_dir.data) == -1) {
         result.os_error_code = errno;
         DN_OS_ErrSinkAppendF(
@@ -1294,7 +1294,7 @@ DN_API void DN_Posix_ThreadSetName(DN_Str8 name)
   (void)name;
 #else
   DN_OSTLSTMem tmem   = DN_OS_TLSPushTMem(nullptr);
-  DN_Str8      copy   = DN_Str8FromStr8(tmem.arena, name);
+  DN_Str8      copy   = DN_Str8FromStr8Arena(tmem.arena, name);
   pthread_t    thread = pthread_self();
   pthread_setname_np(thread, (char *)copy.data);
 #endif
@@ -1340,23 +1340,23 @@ DN_API DN_POSIXProcSelfStatus DN_Posix_ProcSelfStatus()
         result.name_size = DN_Min(str8.size, sizeof(result.name));
         DN_Memcpy(result.name, str8.data, result.name_size);
       } else if (DN_Str8StartsWith(line, PID, DN_Str8EqCase_Insensitive)) {
-        DN_Str8            str8   = DN_Str8TrimWhitespaceAround(DN_Str8Slice(line, PID.size, line.size));
-        DN_Str8ToU64Result to_u64 = DN_Str8ToU64(str8, 0);
-        result.pid                = to_u64.value;
+        DN_Str8          str8   = DN_Str8TrimWhitespaceAround(DN_Str8Slice(line, PID.size, line.size));
+        DN_U64FromResult to_u64 = DN_U64FromStr8(str8, 0);
+        result.pid              = to_u64.value;
         DN_Assert(to_u64.success);
       } else if (DN_Str8StartsWith(line, VM_SIZE, DN_Str8EqCase_Insensitive)) {
         DN_Str8 size_with_kb = DN_Str8TrimWhitespaceAround(DN_Str8Slice(line, VM_SIZE.size, line.size));
         DN_Assert(DN_Str8EndsWith(size_with_kb, DN_Str8Lit("kB")));
-        DN_Str8            vm_size = DN_Str8BSplit(size_with_kb, DN_Str8Lit(" ")).lhs;
-        DN_Str8ToU64Result to_u64  = DN_Str8ToU64(vm_size, 0);
-        result.vm_size             = DN_Kilobytes(to_u64.value);
+        DN_Str8          vm_size = DN_Str8BSplit(size_with_kb, DN_Str8Lit(" ")).lhs;
+        DN_U64FromResult to_u64  = DN_U64FromStr8(vm_size, 0);
+        result.vm_size           = DN_Kilobytes(to_u64.value);
         DN_Assert(to_u64.success);
       } else if (DN_Str8StartsWith(line, VM_PEAK, DN_Str8EqCase_Insensitive)) {
         DN_Str8 size_with_kb = DN_Str8TrimWhitespaceAround(DN_Str8Slice(line, VM_PEAK.size, line.size));
         DN_Assert(DN_Str8EndsWith(size_with_kb, DN_Str8Lit("kB")));
-        DN_Str8            vm_size = DN_Str8BSplit(size_with_kb, DN_Str8Lit(" ")).lhs;
-        DN_Str8ToU64Result to_u64  = DN_Str8ToU64(vm_size, 0);
-        result.vm_peak             = DN_Kilobytes(to_u64.value);
+        DN_Str8          vm_size = DN_Str8BSplit(size_with_kb, DN_Str8Lit(" ")).lhs;
+        DN_U64FromResult to_u64  = DN_U64FromStr8(vm_size, 0);
+        result.vm_peak           = DN_Kilobytes(to_u64.value);
         DN_Assert(to_u64.success);
       }
     }
