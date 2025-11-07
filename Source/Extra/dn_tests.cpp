@@ -241,8 +241,8 @@ static DN_UTCore DN_Tests_Base()
   DN_UTCore result = DN_UT_Init();
   DN_UT_LogF(&result, "DN_Base\n");
   {
-#if defined(DN_PLATFORM_WIN32) && defined(DN_COMPILER_MSVC)
-  DN_RefImplCPUReport ref_cpu_report = DN_RefImplCPUReport_Init();
+    #if defined(DN_PLATFORM_WIN32) && defined(DN_COMPILER_MSVC)
+    DN_RefImplCPUReport ref_cpu_report = DN_RefImplCPUReport_Init();
     for (DN_UT_Test(&result, "Query CPUID")) {
       DN_CPUReport cpu_report = DN_CPUGetReport();
 
@@ -279,67 +279,34 @@ static DN_UTCore DN_Tests_Base()
       DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_SSSE3) == ref_cpu_report.SSSE3());
 
       // NOTE: Feature flags we haven't bothered detecting yet but are in MSDN's example /////////////
-      #if 0
-        DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_ADX)         == DN_RefImplCPUReport::ADX());
-        DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_BMI1)        == DN_RefImplCPUReport::BMI1());
-        DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_BMI2)        == DN_RefImplCPUReport::BMI2());
-        DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_CLFSH)       == DN_RefImplCPUReport::CLFSH());
-        DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_CX8)         == DN_RefImplCPUReport::CX8());
-        DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_ERMS)        == DN_RefImplCPUReport::ERMS());
-        DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_FSGSBASE)    == DN_RefImplCPUReport::FSGSBASE());
-        DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_FXSR)        == DN_RefImplCPUReport::FXSR());
-        DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_HLE)         == DN_RefImplCPUReport::HLE());
-        DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_INVPCID)     == DN_RefImplCPUReport::INVPCID());
-        DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_LAHF)        == DN_RefImplCPUReport::LAHF());
-        DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_LZCNT)       == DN_RefImplCPUReport::LZCNT());
-        DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_MSR)         == DN_RefImplCPUReport::MSR());
-        DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_OSXSAVE)     == DN_RefImplCPUReport::OSXSAVE());
-        DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_PREFETCHWT1) == DN_RefImplCPUReport::PREFETCHWT1());
-        DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_RTM)         == DN_RefImplCPUReport::RTM());
-        DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_SEP)         == DN_RefImplCPUReport::SEP());
-        DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_SYSCALL)     == DN_RefImplCPUReport::SYSCALL());
-        DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_TBM)         == DN_RefImplCPUReport::TBM());
-        DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_XOP)         == DN_RefImplCPUReport::XOP());
-        DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_XSAVE)       == DN_RefImplCPUReport::XSAVE());
-      #endif
+      /*
+      DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_ADX)         == DN_RefImplCPUReport::ADX());
+      DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_BMI1)        == DN_RefImplCPUReport::BMI1());
+      DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_BMI2)        == DN_RefImplCPUReport::BMI2());
+      DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_CLFSH)       == DN_RefImplCPUReport::CLFSH());
+      DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_CX8)         == DN_RefImplCPUReport::CX8());
+      DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_ERMS)        == DN_RefImplCPUReport::ERMS());
+      DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_FSGSBASE)    == DN_RefImplCPUReport::FSGSBASE());
+      DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_FXSR)        == DN_RefImplCPUReport::FXSR());
+      DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_HLE)         == DN_RefImplCPUReport::HLE());
+      DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_INVPCID)     == DN_RefImplCPUReport::INVPCID());
+      DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_LAHF)        == DN_RefImplCPUReport::LAHF());
+      DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_LZCNT)       == DN_RefImplCPUReport::LZCNT());
+      DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_MSR)         == DN_RefImplCPUReport::MSR());
+      DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_OSXSAVE)     == DN_RefImplCPUReport::OSXSAVE());
+      DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_PREFETCHWT1) == DN_RefImplCPUReport::PREFETCHWT1());
+      DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_RTM)         == DN_RefImplCPUReport::RTM());
+      DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_SEP)         == DN_RefImplCPUReport::SEP());
+      DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_SYSCALL)     == DN_RefImplCPUReport::SYSCALL());
+      DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_TBM)         == DN_RefImplCPUReport::TBM());
+      DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_XOP)         == DN_RefImplCPUReport::XOP());
+      DN_UT_Assert(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_XSAVE)       == DN_RefImplCPUReport::XSAVE());
+      */
     }
-#endif // defined(DN_PLATFORM_WIN32) && defined(DN_COMPILER_MSVC)
-
-    for (DN_UT_Test(&result, "String")) {
-      char     buffer[512];
-      DN_Arena arena = DN_ArenaFromBuffer(buffer, sizeof(buffer), DN_ArenaFlags_NoPoison | DN_ArenaFlags_AllocCanLeak);
-
-      // NOTE: CStr8Size
-      {
-        DN_USize size = DN_CStr8Size("hello");
-        DN_UT_AssertF(&result, size == 5, "size=%zu", size);
-      }
-
-      // NOTE: Str8FromFmtArena
-      {
-        DN_Str8 str8   = DN_Str8FromFmtArena(&arena, "Foo Bar %d", 5);
-        DN_Str8 expect = DN_Str8Lit("Foo Bar 5");
-        DN_UT_AssertF(&result, DN_Str8Eq(str8, expect), "str8=%.*s", DN_Str8PrintFmt(str8), DN_Str8PrintFmt(expect));
-      }
-
-      // NOTE: Str8FromFmtPool
-      {
-        DN_Pool pool   = DN_PoolFromArena(&arena, 0);
-        DN_Str8 str8   = DN_Str8FromFmtPool(&pool, "Foo Bar %d", 5);
-        DN_Str8 expect = DN_Str8Lit("Foo Bar 5");
-        DN_UT_AssertF(&result, DN_Str8Eq(str8, expect), "str8=%.*s", DN_Str8PrintFmt(str8), DN_Str8PrintFmt(expect));
-      }
+    #endif // defined(DN_PLATFORM_WIN32) && defined(DN_COMPILER_MSVC)
 
 
-      // NOTE: Str8x32FromU64
-      {
-        DN_Str8x32 str8   = DN_Str8x32FromU64(123456, ' ');
-        DN_Str8    expect = DN_Str8Lit("123 456");
-        DN_UT_AssertF(&result, DN_Str8Eq(DN_Str8FromStruct(&str8), expect), "buf_str8=%.*s, expect=%.*s", DN_Str8PrintFmt(str8), DN_Str8PrintFmt(expect));
-      }
-    }
-
-    for (DN_UT_Test(&result, "Age")) {
+    for (DN_UT_Test(&result, "DN_Age")) {
       // NOTE: Seconds and milliseconds
       {
         DN_Str8x128 str8   = DN_AgeStr8FromMsU64(1001, DN_AgeUnit_Sec | DN_AgeUnit_Ms);
@@ -356,14 +323,12 @@ static DN_UTCore DN_Tests_Base()
     }
 
     for (DN_UT_Test(&result, "Misc")) {
-      {
-        char               buf[8]   = {};
-        DN_USize           buf_size = 0;
-        DN_FmtAppendResult buf_str8 = DN_FmtAppendTruncate(buf, &buf_size, sizeof(buf), DN_Str8Lit("..."), "This string is longer than %d characters", DN_Cast(int)(sizeof(buf) - 1));
-        DN_Str8            expect   = DN_Str8Lit("This..."); // 7 characters long, 1 byte reserved for null-terminator
-        DN_UT_Assert(&result, buf_str8.truncated);
-        DN_UT_AssertF(&result, DN_Str8Eq(buf_str8.str8, expect), "buf_str8=%.*s, expect=%.*s", DN_Str8PrintFmt(buf_str8.str8), DN_Str8PrintFmt(expect));
-      }
+      char               buf[8]   = {};
+      DN_USize           buf_size = 0;
+      DN_FmtAppendResult buf_str8 = DN_FmtAppendTruncate(buf, &buf_size, sizeof(buf), DN_Str8Lit("..."), "This string is longer than %d characters", DN_Cast(int)(sizeof(buf) - 1));
+      DN_Str8            expect   = DN_Str8Lit("This..."); // 7 characters long, 1 byte reserved for null-terminator
+      DN_UT_Assert(&result, buf_str8.truncated);
+      DN_UT_AssertF(&result, DN_Str8Eq(buf_str8.str8, expect), "buf_str8=%.*s, expect=%.*s", DN_Str8PrintFmt(buf_str8.str8), DN_Str8PrintFmt(expect));
     }
   }
   return result;
@@ -1789,29 +1754,31 @@ void DN_Tests_KeccakDispatch_(DN_UTCore *test, int hash_type, DN_Str8 input)
     } break;
   }
 }
+#endif // defined(DN_UNIT_TESTS_WITH_KECCAK)
 
 DN_UTCore DN_Tests_Keccak()
 {
-  DN_UTCore     test     = DN_UT_Init();
+  DN_UTCore result = DN_UT_Init();
+  #if defined(DN_UNIT_TESTS_WITH_KECCAK)
   DN_Str8 const INPUTS[] = {
       DN_Str8Lit("abc"),
       DN_Str8Lit(""),
       DN_Str8Lit("abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq"),
       DN_Str8Lit("abcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmnoijklmnopjklmnopqklmnopqrlmnopqrsmno"
-              "pqrstnopqrstu"),
+                 "pqrstnopqrstu"),
   };
 
-  DN_UT_LogF(&test, "DN_KC\n");
+  DN_UT_LogF(&result, "DN_KC\n");
   {
     for (int hash_type = 0; hash_type < Hash_Count; hash_type++) {
       DN_PCG32 rng = DN_PCG32_Init(0xd48e'be21'2af8'733d);
       for (DN_Str8 input : INPUTS) {
-        DN_UT_BeginF(&test, "%.*s - Input: %.*s", DN_Str8PrintFmt(DN_UT_HASH_STRING_[hash_type]), DN_Cast(int) DN_Min(input.size, 54), input.data);
-        DN_Tests_KeccakDispatch_(&test, hash_type, input);
-        DN_UT_End(&test);
+        DN_UT_BeginF(&result, "%.*s - Input: %.*s", DN_Str8PrintFmt(DN_UT_HASH_STRING_[hash_type]), DN_Cast(int) DN_Min(input.size, 54), input.data);
+        DN_Tests_KeccakDispatch_(&result, hash_type, input);
+        DN_UT_End(&result);
       }
 
-      DN_UT_BeginF(&test, "%.*s - Deterministic random inputs", DN_Str8PrintFmt(DN_UT_HASH_STRING_[hash_type]));
+      DN_UT_BeginF(&result, "%.*s - Deterministic random inputs", DN_Str8PrintFmt(DN_UT_HASH_STRING_[hash_type]));
       for (DN_USize index = 0; index < 128; index++) {
         char     src[4096] = {};
         uint32_t src_size  = DN_PCG32_Range(&rng, 0, sizeof(src));
@@ -1820,14 +1787,14 @@ DN_UTCore DN_Tests_Keccak()
           src[src_index] = DN_Cast(char) DN_PCG32_Range(&rng, 0, 255);
 
         DN_Str8 input = DN_Str8FromPtr(src, src_size);
-        DN_Tests_KeccakDispatch_(&test, hash_type, input);
+        DN_Tests_KeccakDispatch_(&result, hash_type, input);
       }
-      DN_UT_End(&test);
+      DN_UT_End(&result);
     }
   }
-  return test;
+  #endif
+  return result;
 }
-#endif // defined(DN_UNIT_TESTS_WITH_KECCAK)
 
 static DN_UTCore DN_Tests_M4()
 {
@@ -2140,11 +2107,38 @@ static DN_UTCore DN_Tests_Str8()
   DN_UTCore result = DN_UT_Init();
   DN_UT_LogF(&result, "DN_Str8\n");
   {
-    for (DN_UT_Test(&result, "Initialise with string literal w/ macro")) {
+    for (DN_UT_Test(&result, "Str8 literal")) {
       DN_Str8 string = DN_Str8Lit("AB");
       DN_UT_AssertF(&result, string.size == 2, "size: %zu", string.size);
       DN_UT_AssertF(&result, string.data[0] == 'A', "string[0]: %c", string.data[0]);
       DN_UT_AssertF(&result, string.data[1] == 'B', "string[1]: %c", string.data[1]);
+    }
+
+    for (DN_UT_Test(&result, "C-string length")) {
+      DN_USize size = DN_CStr8Size("hello");
+      DN_UT_AssertF(&result, size == 5, "size=%zu", size);
+    }
+
+    char arena_base[256];
+    for (DN_UT_Test(&result, "Str8 format from arena")) {
+      DN_Arena arena  = DN_ArenaFromBuffer(arena_base, sizeof(arena_base), DN_ArenaFlags_Nil);
+      DN_Str8  str8   = DN_Str8FromFmtArena(&arena, "Foo Bar %d", 5);
+      DN_Str8  expect = DN_Str8Lit("Foo Bar 5");
+      DN_UT_AssertF(&result, DN_Str8Eq(str8, expect), "str8=%.*s", DN_Str8PrintFmt(str8), DN_Str8PrintFmt(expect));
+    }
+
+    for (DN_UT_Test(&result, "Str8 format from pool")) {
+      DN_Arena arena  = DN_ArenaFromBuffer(arena_base, sizeof(arena_base), DN_ArenaFlags_Nil);
+      DN_Pool  pool   = DN_PoolFromArena(&arena, 0);
+      DN_Str8  str8   = DN_Str8FromFmtPool(&pool, "Foo Bar %d", 5);
+      DN_Str8  expect = DN_Str8Lit("Foo Bar 5");
+      DN_UT_AssertF(&result, DN_Str8Eq(str8, expect), "str8=%.*s", DN_Str8PrintFmt(str8), DN_Str8PrintFmt(expect));
+    }
+
+    for (DN_UT_Test(&result, "Str8x32 from U64")) {
+      DN_Str8x32 str8   = DN_Str8x32FromU64(123456, ' ');
+      DN_Str8    expect = DN_Str8Lit("123 456");
+      DN_UT_AssertF(&result, DN_Str8Eq(DN_Str8FromStruct(&str8), expect), "buf_str8=%.*s, expect=%.*s", DN_Str8PrintFmt(str8), DN_Str8PrintFmt(expect));
     }
 
     for (DN_UT_Test(&result, "Initialise with format string")) {
@@ -2443,10 +2437,10 @@ static DN_UTCore DN_Tests_TicketMutex()
   return result;
 }
 
-#if defined(DN_PLATFORM_WIN32)
 static DN_UTCore DN_Tests_Win()
 {
   DN_UTCore result = DN_UT_Init();
+  #if defined(DN_PLATFORM_WIN32)
   DN_UT_LogF(&result, "OS Win32\n");
   {
     DN_OSTLSTMem tmem    = DN_OS_TLSTMem(nullptr);
@@ -2488,9 +2482,90 @@ static DN_UTCore DN_Tests_Win()
       DN_UT_Assert(&result, DN_Memcmp(EXPECTED, string8.data, sizeof(EXPECTED)) == 0);
     }
   }
+  #endif // DN_PLATFORM_WIN32
   return result;
 }
-#endif // DN_PLATFORM_WIN32
+
+static DN_UTCore DN_Tests_Net()
+{
+  DN_Str8          label         = {};
+  DN_NET2Interface net_interface = {};
+#if defined(DN_PLATFORM_EMSCRIPTEN)
+  net_interface = DN_NET2_EmcInterface();
+  label         = DN_Str8Lit("Emscripten");
+#elif defined(DN_UNIT_TESTS_WITH_CURL)
+  net_interface = DN_NET2_CurlInterface();
+  label         = DN_Str8Lit("CURL");
+#endif
+
+  DN_UTCore result = DN_UT_Init();
+  if (label.size) {
+    DN_UT_LogF(&result, "DN_NET\n");
+
+    DN_Arena arena                  = DN_ArenaFromHeap(DN_Megabytes(4), DN_ArenaFlags_Nil);
+    DN_Str8  remote_ws_server_url   = DN_Str8Lit("wss://echo.websocket.org");
+    DN_Str8  remote_http_server_url = DN_Str8Lit("https://google.com");
+
+    char        net_base[DN_Kilobytes(16)] = {};
+    DN_NET2Core net                        = {};
+    net_interface.init(&net, net_base, sizeof(net_base));
+
+    for (DN_UT_Test(&result, "%.*s WaitForResponse HTTP GET request", DN_Str8PrintFmt(label))) {
+      DN_NET2Request  request  = net_interface.do_http(&net, remote_http_server_url, DN_Str8Lit("GET"), nullptr);
+      DN_NET2Response response = net_interface.wait_for_response(request, &arena, UINT32_MAX);
+      DN_UT_AssertF(&result, response.http_status == 200, "http_status=%u", response.http_status);
+      DN_UT_AssertF(&result, response.state == DN_NET2ResponseState_HTTP, "state=%u", response.state);
+      DN_UT_AssertF(&result, response.error_str8.size == 0, "%.*s", DN_Str8PrintFmt(response.error_str8));
+      DN_UT_Assert(&result, response.body.size);
+    }
+
+    for (DN_UT_Test(&result, "%.*s WaitForResponse HTTP POST request", DN_Str8PrintFmt(label))) {
+      DN_NET2Request  request  = net_interface.do_http(&net, remote_http_server_url, DN_Str8Lit("POST"), nullptr);
+      DN_NET2Response response = net_interface.wait_for_any_response(&net, &arena, UINT32_MAX);
+      DN_UT_AssertF(&result, response.http_status == 200, "http_status=%u", response.http_status);
+      DN_UT_AssertF(&result, response.state == DN_NET2ResponseState_HTTP, "state=%u", response.state);
+      DN_UT_AssertF(&result, response.error_str8.size == 0, "error=%.*s", DN_Str8PrintFmt(response.error_str8));
+      DN_UT_Assert(&result, response.body.size);
+    }
+
+    for (DN_UT_Test(&result, "%.*s WaitForResponse WS request", DN_Str8PrintFmt(label))) {
+      DN_NET2Request request       = net_interface.do_ws(&net, remote_ws_server_url);
+      DN_USize const WS_TIMEOUT_MS = 2000;
+
+      // NOTE: Wait for WS connection to open
+      for (bool done = false; !done; DN_ArenaPopTo(&arena, 0)) {
+        DN_NET2Response response = net_interface.wait_for_response(request, &arena, WS_TIMEOUT_MS);
+        if (response.state == DN_NET2ResponseState_Nil) // NOTE: Timeout
+          continue;
+        DN_UT_Assert(&result, response.state == DN_NET2ResponseState_WSOpen);
+        done = true;
+      }
+
+      // NOTE: Receive the initial text from the echo server
+      for (bool done = false; !done; DN_ArenaPopTo(&arena, 0)) {
+        DN_NET2Response response = net_interface.wait_for_response(request, &arena, WS_TIMEOUT_MS);
+        if (response.state == DN_NET2ResponseState_Nil) // NOTE: Timeout
+          continue;
+        DN_UT_Assert(&result, response.state == DN_NET2ResponseState_WSText);
+
+        // NOTE: Send the close signal
+        net_interface.do_ws_send(request, DN_Str8Lit(""), DN_NET2WSSend_Close);
+        done = true;
+      }
+
+      // NOTE: Expect to hear the close
+      for (bool done = false; !done; DN_ArenaPopTo(&arena, 0)) {
+        DN_NET2Response response = net_interface.wait_for_response(request, &arena, WS_TIMEOUT_MS);
+        if (response.state == DN_NET2ResponseState_Nil) // NOTE: Timeout
+          continue;
+        DN_UT_Assert(&result, response.state == DN_NET2ResponseState_WSClose);
+        done = true;
+      }
+    }
+    DN_ArenaDeinit(&arena);
+  }
+  return result;
+}
 
 DN_TestsResult DN_Tests_RunSuite(DN_TestsPrint print)
 {
@@ -2498,21 +2573,18 @@ DN_TestsResult DN_Tests_RunSuite(DN_TestsPrint print)
       {
           DN_Tests_Base(),
           DN_Tests_Arena(),
+          DN_Tests_Str8(),
           DN_Tests_Bin(),
+          DN_Tests_TicketMutex(),
           DN_Tests_BinarySearch(),
           DN_Tests_BaseContainers(),
           DN_Tests_Intrinsics(),
-#if defined(DN_UNIT_TESTS_WITH_KECCAK)
           DN_Tests_Keccak(),
-#endif
           DN_Tests_M4(),
           DN_Tests_OS(),
           DN_Tests_Rect(),
-          DN_Tests_Str8(),
-          DN_Tests_TicketMutex(),
-#if defined(DN_PLATFORM_WIN32)
           DN_Tests_Win(),
-#endif
+          DN_Tests_Net(),
       };
 
   DN_TestsResult result = {};
@@ -2524,6 +2596,8 @@ DN_TestsResult DN_Tests_RunSuite(DN_TestsPrint print)
 
   bool print_summary = false;
   for (DN_UTCore &test : tests) {
+    if (test.num_tests_in_group <= 0)
+      continue;
     bool do_print = print == DN_TestsPrint_Yes;
     if (print == DN_TestsPrint_OnFailure && test.num_tests_ok_in_group != test.num_tests_in_group)
       do_print = true;

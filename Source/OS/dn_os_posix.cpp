@@ -483,7 +483,7 @@ DN_API DN_OSFileRead DN_OS_FileRead(DN_OSFile *file, void *buffer, DN_USize size
   result.bytes_read = fread(buffer, 1, size, DN_Cast(FILE *) file->handle);
   if (feof(DN_Cast(FILE*)file->handle)) {
     DN_OSTLSTMem tmem             = DN_OS_TLSTMem(nullptr);
-    DN_Str8      buffer_size_str8 = DN_ByteCountStr8x32TLS(size);
+    DN_Str8x32   buffer_size_str8 = DN_ByteCountStr8x32(size);
     DN_OS_ErrSinkAppendF(err, 1, "Failed to read %S from file", buffer_size_str8);
     return result;
   }
@@ -501,7 +501,7 @@ DN_API bool DN_OS_FileWritePtr(DN_OSFile *file, void const *buffer, DN_USize siz
       1 /*count*/;
   if (!result) {
     DN_OSTLSTMem tmem             = DN_OS_TLSTMem(nullptr);
-    DN_Str8      buffer_size_str8 = DN_ByteCountStr8x32TLS(size);
+    DN_Str8x32   buffer_size_str8 = DN_ByteCountStr8x32(size);
     DN_OS_ErrSinkAppendF(err, 1, "Failed to write buffer (%s) to file handle", DN_Str8PrintFmt(buffer_size_str8));
   }
   return result;
@@ -661,7 +661,7 @@ DN_API bool DN_OS_PathIterateDir(DN_Str8 path, DN_OSDirIterator *it)
     if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
       continue;
 
-    DN_USize name_size    = DN_CStrSize(entry->d_name);
+    DN_USize name_size    = DN_CStr8Size(entry->d_name);
     DN_USize clamped_size = DN_Min(sizeof(it->buffer) - 1, name_size);
     DN_AssertF(name_size == clamped_size, "name: %s, name_size: %zu, clamped_size: %zu", entry->d_name, name_size, clamped_size);
     DN_Memcpy(it->buffer, entry->d_name, clamped_size);
@@ -1313,8 +1313,8 @@ DN_API DN_POSIXProcSelfStatus DN_Posix_ProcSelfStatus()
   //  ...
   //
   // VmSize is the total virtual memory used
-  DN_OSFile              file   = DN_OS_FileOpen(DN_Str8Lit("/proc/self/status"), DN_OSFileOpen_OpenIfExist, DN_OSFileAccess_Read, nullptr);
-  DN_OSTLSTMem           tmem   = DN_OS_TLSPushTMem(nullptr);
+  DN_OSFile    file = DN_OS_FileOpen(DN_Str8Lit("/proc/self/status"), DN_OSFileOpen_OpenIfExist, DN_OSFileAccess_Read, nullptr);
+  DN_OSTLSTMem tmem = DN_OS_TLSPushTMem(nullptr);
 
   if (!file.error) {
     char           buf[256];
@@ -1326,14 +1326,14 @@ DN_API DN_POSIXProcSelfStatus DN_Posix_ProcSelfStatus()
       DN_Str8BuilderAppendF(&builder, "%.*s", DN_Cast(int)read.bytes_read, buf);
     }
 
-    DN_Str8 const          NAME       = DN_Str8Lit("Name:");
-    DN_Str8 const          PID        = DN_Str8Lit("Pid:");
-    DN_Str8 const          VM_PEAK    = DN_Str8Lit("VmPeak:");
-    DN_Str8 const          VM_SIZE    = DN_Str8Lit("VmSize:");
-    DN_Str8                status_buf = DN_Str8BuilderBuildFromTLS(&builder);
-    DN_Slice<DN_Str8>      lines      = DN_Str8SplitFromTLS(status_buf, DN_Str8Lit("\n"), DN_Str8SplitIncludeEmptyStrings_No);
+    DN_Str8 const      NAME       = DN_Str8Lit("Name:");
+    DN_Str8 const      PID        = DN_Str8Lit("Pid:");
+    DN_Str8 const      VM_PEAK    = DN_Str8Lit("VmPeak:");
+    DN_Str8 const      VM_SIZE    = DN_Str8Lit("VmSize:");
+    DN_Str8            status_buf = DN_Str8BuilderBuildFromTLS(&builder);
+    DN_Str8SplitResult lines      = DN_Str8SplitFromTLS(status_buf, DN_Str8Lit("\n"), DN_Str8SplitIncludeEmptyStrings_No);
 
-    for (DN_ForIt(line_it, DN_Str8, &lines)) {
+    for (DN_ForItSize(line_it, DN_Str8, lines.data, lines.count)) {
       DN_Str8       line    = DN_Str8TrimWhitespaceAround(*line_it.data);
       if (DN_Str8StartsWith(line, NAME, DN_Str8EqCase_Insensitive)) {
         DN_Str8 str8     = DN_Str8TrimWhitespaceAround(DN_Str8Slice(line, NAME.size, line.size));

@@ -147,4 +147,5 @@ static void            DN_NET2_Init              (DN_NET2Core *net, char *ring_b
 static DN_NET2Request  DN_NET2_DoHTTP            (DN_NET2Core *net, DN_Str8 url, DN_Str8 method, DN_NET2DoHTTPArgs const *args);
 static DN_NET2Request  DN_NET2_OpenWS            (DN_NET2Core *net, DN_Str8 url, DN_NET2DoHTTPArgs const *args);
 static void            DN_NET2_SendWS            (DN_NET2Core *net, DN_NET2Request request, DN_Str8 payload, DN_NET2WSType type);
+
 #endif // DN_NET2_CURL_H

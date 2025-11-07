@@ -1110,6 +1110,16 @@ DN_API bool DN_ArenaOwnsPtr(DN_Arena const *arena, void *ptr)
   return result;
 }
 
+DN_API DN_Str8x64 DN_ArenaInfoStr8x64(DN_ArenaInfo info)
+{
+  DN_Str8x64 result  = {};
+  DN_Str8x32 used    = DN_ByteCountStr8x32(info.used);
+  DN_Str8x32 commit  = DN_ByteCountStr8x32(info.commit);
+  DN_Str8x32 reserve = DN_ByteCountStr8x32(info.reserve);
+  result             = DN_Str8x64FromFmt("Blks/Used/Comm/Resv (%u/%.*s/%.*s/%.*s)", DN_Cast(DN_U32)info.blocks, DN_Str8PrintFmt(used), DN_Str8PrintFmt(commit), DN_Str8PrintFmt(reserve));
+  return result;
+}
+
 DN_API DN_ArenaStats DN_ArenaSumStatsArray(DN_ArenaStats const *array, DN_USize size)
 {
   DN_ArenaStats result = {};
@@ -1595,6 +1605,22 @@ DN_API DN_Str8 DN_Str8FromPool(DN_Pool *pool, DN_USize size)
   if (result.data)
     result.size = size;
   result.data[result.size] = 0;
+  return result;
+}
+
+DN_API DN_Str8 DN_Str8FromPtrArena(DN_Arena *arena, void const *data, DN_USize size)
+{
+  DN_Str8 result = DN_Str8FromArena(arena, size, DN_ZMem_No);
+  if (result.size)
+    DN_Memcpy(result.data, data, size);
+  return result;
+}
+
+DN_API DN_Str8 DN_Str8FromPtrPool(DN_Pool *pool, void const *data, DN_USize size)
+{
+  DN_Str8 result = DN_Str8FromPool(pool, size);
+  if (result.size)
+    DN_Memcpy(result.data, data, size);
   return result;
 }
 

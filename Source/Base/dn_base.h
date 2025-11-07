@@ -137,19 +137,20 @@
                               ((((u64) >> 0)  & 0xFF) << 56))
 
 // NOTE: Types
-typedef intptr_t  DN_ISize;
-typedef uintptr_t DN_USize;
+typedef intptr_t     DN_ISize;
+typedef uintptr_t    DN_USize;
 
-typedef int8_t  DN_I8;
-typedef int16_t DN_I16;
-typedef int32_t DN_I32;
-typedef int64_t DN_I64;
+typedef int8_t       DN_I8;
+typedef int16_t      DN_I16;
+typedef int32_t      DN_I32;
+typedef int64_t      DN_I64;
 
-typedef uint8_t  DN_U8;
-typedef uint16_t DN_U16;
-typedef uint32_t DN_U32;
-typedef uint64_t DN_U64;
+typedef uint8_t      DN_U8;
+typedef uint16_t     DN_U16;
+typedef uint32_t     DN_U32;
+typedef uint64_t     DN_U64;
 
+typedef uintptr_t    DN_UPtr;
 typedef float        DN_F32;
 typedef double       DN_F64;
 typedef unsigned int DN_UInt;
@@ -532,6 +533,12 @@ struct DN_ArenaStats
   DN_ArenaInfo hwm;
 };
 
+struct DN_ArenaStatsStr8x64
+{
+  DN_Str8x64 info;
+  DN_Str8x64 hwm;
+};
+
 enum DN_ArenaMemFuncType
 {
   DN_ArenaMemFuncType_Nil,
@@ -880,6 +887,7 @@ DN_API void                     DN_ArenaPop                 (DN_Arena *arena, DN
 DN_API DN_U64                   DN_ArenaPos                 (DN_Arena const *arena);
 DN_API void                     DN_ArenaClear               (DN_Arena *arena);
 DN_API bool                     DN_ArenaOwnsPtr             (DN_Arena const *arena, void *ptr);
+DN_API DN_Str8x64               DN_ArenaInfoStr8x64         (DN_ArenaInfo info);
 DN_API DN_ArenaStats            DN_ArenaSumStatsArray       (DN_ArenaStats const *array, DN_USize size);
 DN_API DN_ArenaStats            DN_ArenaSumStats            (DN_ArenaStats lhs, DN_ArenaStats rhs);
 DN_API DN_ArenaStats            DN_ArenaSumArenaArrayToStats(DN_Arena const *array, DN_USize size);
@@ -942,6 +950,8 @@ DN_API DN_USize                 DN_CStr16Size               (wchar_t const *src)
 DN_API DN_Str8                  DN_Str8FromCStr8            (char const *src);
 DN_API DN_Str8                  DN_Str8FromArena            (DN_Arena *arena, DN_USize size, DN_ZMem z_mem);
 DN_API DN_Str8                  DN_Str8FromPool             (DN_Pool *pool, DN_USize size);
+DN_API DN_Str8                  DN_Str8FromPtrArena         (DN_Arena *arena, void const *data, DN_USize size);
+DN_API DN_Str8                  DN_Str8FromPtrPool          (DN_Pool *pool, void const *data, DN_USize size);
 DN_API DN_Str8                  DN_Str8FromStr8Arena        (DN_Arena *pool, DN_Str8 string);
 DN_API DN_Str8                  DN_Str8FromStr8Pool         (DN_Pool *pool, DN_Str8 string);
 DN_API DN_Str8                  DN_Str8FromFmtArena         (DN_Arena *arena, DN_FMT_ATTRIB char const *fmt, ...);

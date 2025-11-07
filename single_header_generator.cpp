@@ -1,7 +1,7 @@
 #define USE_SINGLE_HEADER 1
 
 #if USE_SINGLE_HEADER
-#include "Single_Header/dn_single_header.h"
+#include "Single-Header/dn_single_header.h"
 #else
 #include "Source/dn_base_inc.h"
 #include "Source/dn_os_inc.h"
@@ -9,7 +9,7 @@
 #endif
 
 #if USE_SINGLE_HEADER
-#include "Single_Header/dn_single_header.cpp"
+#include "Single-Header/dn_single_header.cpp"
 #else
 #include "Source/dn_base_inc.cpp"
 #include "Source/dn_os_inc.cpp"
