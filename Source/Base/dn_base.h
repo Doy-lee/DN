@@ -952,7 +952,7 @@ DN_API DN_Str8                  DN_Str8FromArena            (DN_Arena *arena, DN
 DN_API DN_Str8                  DN_Str8FromPool             (DN_Pool *pool, DN_USize size);
 DN_API DN_Str8                  DN_Str8FromPtrArena         (DN_Arena *arena, void const *data, DN_USize size);
 DN_API DN_Str8                  DN_Str8FromPtrPool          (DN_Pool *pool, void const *data, DN_USize size);
-DN_API DN_Str8                  DN_Str8FromStr8Arena        (DN_Arena *pool, DN_Str8 string);
+DN_API DN_Str8                  DN_Str8FromStr8Arena        (DN_Arena *arena, DN_Str8 string);
 DN_API DN_Str8                  DN_Str8FromStr8Pool         (DN_Pool *pool, DN_Str8 string);
 DN_API DN_Str8                  DN_Str8FromFmtArena         (DN_Arena *arena, DN_FMT_ATTRIB char const *fmt, ...);
 DN_API DN_Str8                  DN_Str8FromFmtVArena        (DN_Arena *arena, DN_FMT_ATTRIB char const *fmt, va_list args);

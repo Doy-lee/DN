@@ -52,26 +52,17 @@ struct DN_NETDoHTTPArgs
   DN_Str8             payload;
 };
 
-struct DN_NETRequest
+struct DN_NETRequestHandle
 {
   DN_UPtr handle;
   DN_U64  gen;
-};
-
-struct DN_NETResponseInternal
-{
-  DN_NETResponseState state;
-  bool                ws_has_more;
-  DN_Str8Builder      body;
-  DN_U32              http_status;
-  DN_Str8             error_str8;
 };
 
 struct DN_NETResponse
 {
   // NOTE: Common to WS and HTTP responses
   DN_NETResponseState state;
-  DN_NETRequest       request;
+  DN_NETRequestHandle request;
   DN_Str8             error_str8;
   DN_Str8             body;
 
@@ -79,39 +70,38 @@ struct DN_NETResponse
   DN_U32              http_status;
 };
 
-struct DN_NETRequestInternal
+struct DN_NETRequest
 {
-  // NOTE: Initialised in user thread, then read-only and shared to networking thread until reset
-  DN_Arena               arena;
-  DN_USize               start_response_arena_pos;
-  DN_NETRequestType      type;
-  DN_U64                 gen;
-  DN_Str8                url;
-  DN_Str8                method;
-  DN_OSSemaphore         completion_sem;
-  DN_NETDoHTTPArgs       args;
-  DN_NETResponseInternal response;
-  DN_NETRequestInternal *next;
-  DN_NETRequestInternal *prev;
-  DN_U64                 context[2];
+  DN_Arena          arena;
+  DN_USize          start_response_arena_pos;
+  DN_NETRequestType type;
+  DN_U64            gen;
+  DN_Str8           url;
+  DN_Str8           method;
+  DN_OSSemaphore    completion_sem;
+  DN_NETDoHTTPArgs  args;
+  DN_NETResponse    response;
+  DN_NETRequest    *next;
+  DN_NETRequest    *prev;
+  DN_U64            context[2];
 };
 
 struct DN_NETCore
 {
-  char                  *base;
-  DN_U64                 base_size;
-  DN_Arena               arena;
-  DN_OSSemaphore         completion_sem;
-  void                  *context;
+  char          *base;
+  DN_U64         base_size;
+  DN_Arena       arena;
+  DN_OSSemaphore completion_sem;
+  void          *context;
 };
 
-typedef void           (DN_NETInitFunc)              (DN_NETCore *net, char *base, DN_U64 base_size);
-typedef void           (DN_NETDeinitFunc)            (DN_NETCore *net);
-typedef DN_NETRequest  (DN_NETDoHTTPFunc)            (DN_NETCore *net, DN_Str8 url, DN_Str8 method, DN_NETDoHTTPArgs const *args);
-typedef DN_NETRequest  (DN_NETDoWSFunc)              (DN_NETCore *net, DN_Str8 url);
-typedef void           (DN_NETDoWSSendFunc)          (DN_NETRequest request, DN_Str8 data, DN_NETWSSend send);
-typedef DN_NETResponse (DN_NETWaitForResponseFunc)   (DN_NETRequest request, DN_Arena *arena, DN_U32 timeout_ms);
-typedef DN_NETResponse (DN_NETWaitForAnyResponseFunc)(DN_NETCore *net, DN_Arena *arena, DN_U32 timeout_ms);
+typedef void               (DN_NETInitFunc)              (DN_NETCore *net, char *base, DN_U64 base_size);
+typedef void               (DN_NETDeinitFunc)            (DN_NETCore *net);
+typedef DN_NETRequestHandle(DN_NETDoHTTPFunc)            (DN_NETCore *net, DN_Str8 url, DN_Str8 method, DN_NETDoHTTPArgs const *args);
+typedef DN_NETRequestHandle(DN_NETDoWSFunc)              (DN_NETCore *net, DN_Str8 url);
+typedef void               (DN_NETDoWSSendFunc)          (DN_NETRequestHandle handle, DN_Str8 data, DN_NETWSSend send);
+typedef DN_NETResponse     (DN_NETWaitForResponseFunc)   (DN_NETRequestHandle handle, DN_Arena *arena, DN_U32 timeout_ms);
+typedef DN_NETResponse     (DN_NETWaitForAnyResponseFunc)(DN_NETCore *net, DN_Arena *arena, DN_U32 timeout_ms);
 
 struct DN_NETInterface
 {
@@ -124,13 +114,12 @@ struct DN_NETInterface
   DN_NETWaitForAnyResponseFunc* wait_for_any_response;
 };
 
-DN_NETRequestInternal *DN_NET_RequestFromHandle               (DN_NETRequest request);
-DN_NETRequest          DN_NET_HandleFromRequest               (DN_NETRequestInternal *request);
+DN_NETRequest *     DN_NET_RequestFromHandle               (DN_NETRequestHandle handle);
+DN_NETRequestHandle DN_NET_HandleFromRequest               (DN_NETRequest *request);
 
 // NOTE: Internal functions for different networking implementations to use
-void                   DN_NET_BaseInit_                       (DN_NETCore *net, char *base, DN_U64 base_size);
-DN_NETRequest          DN_NET_SetupRequest_                   (DN_NETRequestInternal *request, DN_Str8 url, DN_Str8 method, DN_NETDoHTTPArgs const *args, DN_NETRequestType type);
-DN_NETResponse         DN_NET_MakeResponseFromFinishedRequest_(DN_NETRequest request, DN_Arena *arena);
-void                   DN_NET_EndFinishedRequest_             (DN_NETRequestInternal *request);
+void                DN_NET_BaseInit_                       (DN_NETCore *net, char *base, DN_U64 base_size);
+DN_NETRequestHandle DN_NET_SetupRequest_                   (DN_NETRequest *request, DN_Str8 url, DN_Str8 method, DN_NETDoHTTPArgs const *args, DN_NETRequestType type);
+void                DN_NET_EndFinishedRequest_             (DN_NETRequest *request);
 
 #endif // DN_NET_H

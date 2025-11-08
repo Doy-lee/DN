@@ -2513,8 +2513,8 @@ static DN_UTCore DN_Tests_Net()
 
     DN_U64 arena_reset_p = DN_ArenaPos(&arena);
     for (DN_UT_Test(&result, "%.*s WaitForResponse HTTP GET request", DN_Str8PrintFmt(label))) {
-      DN_NETRequest  request  = net_interface.do_http(&net, remote_http_server_url, DN_Str8Lit("GET"), nullptr);
-      DN_NETResponse response = net_interface.wait_for_response(request, &arena, UINT32_MAX);
+      DN_NETRequestHandle request  = net_interface.do_http(&net, remote_http_server_url, DN_Str8Lit("GET"), nullptr);
+      DN_NETResponse      response = net_interface.wait_for_response(request, &arena, UINT32_MAX);
       DN_UT_AssertF(&result, response.http_status == 200, "http_status=%u", response.http_status);
       DN_UT_AssertF(&result, response.state == DN_NETResponseState_HTTP, "state=%u", response.state);
       DN_UT_AssertF(&result, response.error_str8.size == 0, "%.*s", DN_Str8PrintFmt(response.error_str8));
@@ -2531,8 +2531,8 @@ static DN_UTCore DN_Tests_Net()
     }
 
     for (DN_UT_Test(&result, "%.*s WaitForResponse WS request", DN_Str8PrintFmt(label))) {
-      DN_NETRequest  request       = net_interface.do_ws(&net, remote_ws_server_url);
-      DN_USize const WS_TIMEOUT_MS = 16;
+      DN_NETRequestHandle request       = net_interface.do_ws(&net, remote_ws_server_url);
+      DN_USize const      WS_TIMEOUT_MS = 16;
 
       // NOTE: Wait for WS connection to open
       for (bool done = false; result.state != DN_UTState_TestFailed && !done; DN_ArenaPopTo(&arena, arena_reset_p)) {
