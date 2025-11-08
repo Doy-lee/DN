@@ -16,8 +16,8 @@
 #include "../Extra/dn_math.cpp"
 #include "../Extra/dn_helpers.cpp"
 
-#include "../Extra/dn_net2.h"
-#include "../Extra/dn_net2.cpp"
+#include "../Extra/dn_net.h"
+#include "../Extra/dn_net.cpp"
 
 #if defined(DN_UNIT_TESTS_WITH_CURL)
   #define CURL_STATICLIB

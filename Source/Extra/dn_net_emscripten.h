@@ -1,14 +1,15 @@
 #if !defined(DN_NET_EMSCRIPTEN_H)
 #define DN_NET_EMSCRIPTEN_H
 
-#include "dn_net2.h"
+#include "dn_net.h"
 
-DN_NET2Interface DN_NET2_EmcInterface();
-void             DN_NET2_EmcInit              (DN_NET2Core *net, char *base, DN_U64 base_size);
-DN_NET2Request   DN_NET2_EmcDoHTTP            (DN_NET2Core *net, DN_Str8 url, DN_Str8 method, DN_NET2DoHTTPArgs const *args);
-DN_NET2Request   DN_NET2_EmcDoWS              (DN_NET2Core *net, DN_Str8 url);
-void             DN_NET2_EmcDoWSSend          (DN_NET2Request request, DN_Str8 data, DN_NET2WSSend send);
-DN_NET2Response  DN_NET2_EmcWaitForResponse   (DN_NET2Request request, DN_Arena *arena, DN_U32 timeout_ms);
-DN_NET2Response  DN_NET2_EmcWaitForAnyResponse(DN_NET2Core *net, DN_Arena *arena, DN_U32 timeout_ms);
+DN_NETInterface DN_NET_EmcInterface();
+void            DN_NET_EmcInit              (DN_NETCore *net, char *base, DN_U64 base_size);
+void            DN_NET_EmcDeinit            (DN_NETCore *net);
+DN_NETRequest   DN_NET_EmcDoHTTP            (DN_NETCore *net, DN_Str8 url, DN_Str8 method, DN_NETDoHTTPArgs const *args);
+DN_NETRequest   DN_NET_EmcDoWS              (DN_NETCore *net, DN_Str8 url);
+void            DN_NET_EmcDoWSSend          (DN_NETRequest request, DN_Str8 data, DN_NETWSSend send);
+DN_NETResponse  DN_NET_EmcWaitForResponse   (DN_NETRequest request, DN_Arena *arena, DN_U32 timeout_ms);
+DN_NETResponse  DN_NET_EmcWaitForAnyResponse(DN_NETCore *net, DN_Arena *arena, DN_U32 timeout_ms);
 
 #endif // DN_NET_EMSCRIPTEN_H

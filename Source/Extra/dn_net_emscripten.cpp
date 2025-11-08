@@ -2,45 +2,49 @@
 #include <emscripten/fetch.h>
 #include <emscripten/websocket.h>
 
-#include "dn_net2.h"
+#include "dn_net.h"
 #include "dn_net_emscripten.h"
 
-struct DN_NET2EmcWSEvent
+struct DN_NETEmcWSEvent
 {
-  DN_NET2ResponseState state;
-  DN_Str8              payload;
-  DN_NET2EmcWSEvent   *next;
+  DN_NETResponseState state;
+  DN_Str8             payload;
+  DN_NETEmcWSEvent   *next;
 };
 
-struct DN_NET2EmcCore
+struct DN_NETEmcCore
 {
-  DN_Pool pool;
+  DN_Pool                pool;
+  DN_NETRequestInternal *request_list;  // Current requests being executed
+  DN_NETRequestInternal *response_list; // Responses received that are to be deqeued via wait for response
+  DN_NETRequestInternal *free_list;     // Request pool that new requests will use before allocating
 };
 
-struct DN_NET2EmcRequest
+struct DN_NETEmcRequest
 {
-  int                socket;
-  DN_NET2EmcWSEvent *first_event;
-  DN_NET2EmcWSEvent *last_event;
+  int               socket;
+  DN_NETEmcWSEvent *first_event;
+  DN_NETEmcWSEvent *last_event;
 };
 
-DN_NET2Interface DN_NET2_EmcInterface()
+DN_NETInterface DN_NET_EmcInterface()
 {
-  DN_NET2Interface result      = {};
-  result.init                  = DN_NET2_EmcInit;
-  result.do_http               = DN_NET2_EmcDoHTTP;
-  result.do_ws                 = DN_NET2_EmcDoWS;
-  result.do_ws_send            = DN_NET2_EmcDoWSSend;
-  result.wait_for_response     = DN_NET2_EmcWaitForResponse;
-  result.wait_for_any_response = DN_NET2_EmcWaitForAnyResponse;
+  DN_NETInterface result      = {};
+  result.init                  = DN_NET_EmcInit;
+  result.deinit                = DN_NET_EmcDeinit;
+  result.do_http               = DN_NET_EmcDoHTTP;
+  result.do_ws                 = DN_NET_EmcDoWS;
+  result.do_ws_send            = DN_NET_EmcDoWSSend;
+  result.wait_for_response     = DN_NET_EmcWaitForResponse;
+  result.wait_for_any_response = DN_NET_EmcWaitForAnyResponse;
   return result;
 }
 
-static DN_NET2EmcWSEvent *DN_NET2_EmcAllocWSEvent_(DN_NET2RequestInternal *request)
+static DN_NETEmcWSEvent *DN_NET_EmcAllocWSEvent_(DN_NETRequestInternal *request)
 {
   // NOTE: Allocate the event and attach to the request
-  DN_NET2EmcRequest *emc_request = DN_Cast(DN_NET2EmcRequest *) request->context[1];
-  DN_NET2EmcWSEvent *result      = DN_ArenaNew(&request->arena, DN_NET2EmcWSEvent, DN_ZMem_Yes);
+  DN_NETEmcRequest *emc_request = DN_Cast(DN_NETEmcRequest *) request->context[1];
+  DN_NETEmcWSEvent *result      = DN_ArenaNew(&request->arena, DN_NETEmcWSEvent, DN_ZMem_Yes);
   if (result) {
     if (!emc_request->first_event)
       emc_request->first_event = result;
@@ -51,110 +55,116 @@ static DN_NET2EmcWSEvent *DN_NET2_EmcAllocWSEvent_(DN_NET2RequestInternal *reque
   return result;
 }
 
-static void DN_NET2_EmcOnRequestDone_(DN_NET2Core *net, DN_NET2RequestInternal *request)
+static void DN_NET_EmcOnRequestDone_(DN_NETCore *net, DN_NETRequestInternal *request)
 {
   // NOTE: This may be call multiple times if we get multiple responses when we yield to the javascript event loop
   if (!request->next) {
-    request->next  = net->done_list;
-    net->done_list = request;
+    DN_NETEmcCore *emc = DN_Cast(DN_NETEmcCore *) net->context;
+    request->next      = emc->response_list;
+    emc->response_list = request;
   }
   DN_OS_SemaphoreIncrement(&net->completion_sem, 1);
   DN_OS_SemaphoreIncrement(&request->completion_sem, 1);
 }
 
 // TODO: Need to enqueue the results since they can accumulate when you yield to the javascript event loop
-static bool DN_NET2_EmcWSOnOpen(int eventType, EmscriptenWebSocketOpenEvent const *event, void *user_data)
+static bool DN_NET_EmcWSOnOpen(int eventType, EmscriptenWebSocketOpenEvent const *event, void *user_data)
 {
-  DN_NET2RequestInternal *request   = DN_Cast(DN_NET2RequestInternal *) user_data;
-  DN_NET2Core            *net       = DN_Cast(DN_NET2Core *) request->context[0];
-  DN_NET2EmcCore         *emc       = DN_Cast(DN_NET2EmcCore *) net->context;
-  DN_NET2EmcWSEvent      *net_event = DN_NET2_EmcAllocWSEvent_(request);
-  net_event->state                  = DN_NET2ResponseState_WSOpen;
-  DN_NET2_EmcOnRequestDone_(net, request);
+  DN_NETRequestInternal *request   = DN_Cast(DN_NETRequestInternal *) user_data;
+  DN_NETCore            *net       = DN_Cast(DN_NETCore *) request->context[0];
+  DN_NETEmcWSEvent      *net_event = DN_NET_EmcAllocWSEvent_(request);
+  net_event->state                  = DN_NETResponseState_WSOpen;
+  DN_NET_EmcOnRequestDone_(net, request);
   return true;
 }
 
-static bool DN_NET2_EmcWSOnMessage(int eventType, const EmscriptenWebSocketMessageEvent *event, void *user_data)
+static bool DN_NET_EmcWSOnMessage(int eventType, const EmscriptenWebSocketMessageEvent *event, void *user_data)
 {
-  DN_NET2RequestInternal *request   = DN_Cast(DN_NET2RequestInternal *) user_data;
-  DN_NET2Core            *net       = DN_Cast(DN_NET2Core *) request->context[0];
-  DN_NET2EmcWSEvent      *net_event = DN_NET2_EmcAllocWSEvent_(request);
-  net_event->state                   = event->isText ? DN_NET2ResponseState_WSText : DN_NET2ResponseState_WSBinary;
+  DN_NETRequestInternal *request   = DN_Cast(DN_NETRequestInternal *) user_data;
+  DN_NETCore            *net       = DN_Cast(DN_NETCore *) request->context[0];
+  DN_NETEmcWSEvent      *net_event = DN_NET_EmcAllocWSEvent_(request);
+  net_event->state                   = event->isText ? DN_NETResponseState_WSText : DN_NETResponseState_WSBinary;
   if (event->numBytes > 0) {
-    DN_NET2EmcCore *emc = DN_Cast(DN_NET2EmcCore *) net->context;
+    DN_NETEmcCore *emc = DN_Cast(DN_NETEmcCore *) net->context;
     net_event->payload  = DN_Str8FromPtrPool(&emc->pool, event->data, event->numBytes);
   }
-  DN_NET2_EmcOnRequestDone_(net, request);
+  DN_NET_EmcOnRequestDone_(net, request);
   return true;
 }
 
-static bool DN_NET2_EmcWSOnError(int eventType, EmscriptenWebSocketErrorEvent const *event, void *user_data)
+static bool DN_NET_EmcWSOnError(int eventType, EmscriptenWebSocketErrorEvent const *event, void *user_data)
 {
-  DN_NET2RequestInternal *request   = DN_Cast(DN_NET2RequestInternal *) user_data;
-  DN_NET2Core            *net       = DN_Cast(DN_NET2Core *) request->context[0];
-  DN_NET2EmcCore         *emc       = DN_Cast(DN_NET2EmcCore *) net->context;
-  DN_NET2EmcWSEvent      *net_event = DN_NET2_EmcAllocWSEvent_(request);
-  net_event->state                   = DN_NET2ResponseState_Error;
-  DN_NET2_EmcOnRequestDone_(net, request);
+  DN_NETRequestInternal *request   = DN_Cast(DN_NETRequestInternal *) user_data;
+  DN_NETCore            *net       = DN_Cast(DN_NETCore *) request->context[0];
+  DN_NETEmcWSEvent      *net_event = DN_NET_EmcAllocWSEvent_(request);
+  net_event->state                   = DN_NETResponseState_Error;
+  DN_NET_EmcOnRequestDone_(net, request);
   return true;
 }
 
-static bool DN_NET2_EmcWSOnClose(int eventType, EmscriptenWebSocketCloseEvent const *event, void *user_data)
+static bool DN_NET_EmcWSOnClose(int eventType, EmscriptenWebSocketCloseEvent const *event, void *user_data)
 {
-  DN_NET2RequestInternal *request   = DN_Cast(DN_NET2RequestInternal *) user_data;
-  DN_NET2Core            *net       = DN_Cast(DN_NET2Core *) request->context[0];
-  DN_NET2EmcCore         *emc       = DN_Cast(DN_NET2EmcCore *) net->context;
-  DN_NET2EmcWSEvent      *net_event = DN_NET2_EmcAllocWSEvent_(request);
-  net_event->state                  = DN_NET2ResponseState_WSClose;
+  DN_NETRequestInternal *request   = DN_Cast(DN_NETRequestInternal *) user_data;
+  DN_NETCore            *net       = DN_Cast(DN_NETCore *) request->context[0];
+  DN_NETEmcCore         *emc       = DN_Cast(DN_NETEmcCore *) net->context;
+  DN_NETEmcWSEvent      *net_event = DN_NET_EmcAllocWSEvent_(request);
+  net_event->state                  = DN_NETResponseState_WSClose;
   net_event->payload                = DN_Str8FromFmtPool(&emc->pool, "Websocket closed '%.*s': (%u) %s (was %s close)", DN_Str8PrintFmt(request->url), event->code, event->reason, event->wasClean ? "clean" : "unclean");
-  DN_NET2_EmcOnRequestDone_(net, request);
+  DN_NET_EmcOnRequestDone_(net, request);
   return true;
 }
 
-static void DN_NET2_EmcHTTPSuccessCallback(emscripten_fetch_t *fetch)
+static void DN_NET_EmcHTTPSuccessCallback(emscripten_fetch_t *fetch)
 {
-  DN_NET2RequestInternal *request = DN_Cast(DN_NET2RequestInternal *) fetch->userData;
-  DN_NET2Core            *net     = DN_Cast(DN_NET2Core *) request->context[0];
+  DN_NETRequestInternal *request = DN_Cast(DN_NETRequestInternal *) fetch->userData;
+  DN_NETCore            *net     = DN_Cast(DN_NETCore *) request->context[0];
   request->response.http_status   = fetch->status;
-  request->response.state         = DN_NET2ResponseState_HTTP;
+  request->response.state         = DN_NETResponseState_HTTP;
   DN_Str8BuilderAppendCopy(&request->response.body, DN_Str8FromPtr(fetch->data, fetch->numBytes - 1));
-  DN_NET2_EmcOnRequestDone_(net, request);
+  DN_NET_EmcOnRequestDone_(net, request);
 }
 
-static void DN_NET2_EmcHTTPFailCallback(emscripten_fetch_t *fetch)
+static void DN_NET_EmcHTTPFailCallback(emscripten_fetch_t *fetch)
 {
-  DN_NET2RequestInternal *request = DN_Cast(DN_NET2RequestInternal *) fetch->userData;
-  DN_NET2Core            *net     = DN_Cast(DN_NET2Core *) request->context[0];
+  DN_NETRequestInternal *request = DN_Cast(DN_NETRequestInternal *) fetch->userData;
+  DN_NETCore            *net     = DN_Cast(DN_NETCore *) request->context[0];
 
   request->response.http_status = fetch->status;
-  request->response.state       = DN_NET2ResponseState_Error;
-  DN_NET2_EmcOnRequestDone_(net, request);
+  request->response.state       = DN_NETResponseState_Error;
+  DN_NET_EmcOnRequestDone_(net, request);
 }
 
-static void DN_NET2_EmcHTTPProgressCallback(emscripten_fetch_t *fetch)
+static void DN_NET_EmcHTTPProgressCallback(emscripten_fetch_t *fetch)
 {
 }
 
-void DN_NET2_EmcInit(DN_NET2Core *net, char *base, DN_U64 base_size)
+void DN_NET_EmcInit(DN_NETCore *net, char *base, DN_U64 base_size)
 {
-  DN_NET2_BaseInit_(net, base, base_size);
-  DN_NET2EmcCore *emc = DN_ArenaNew(&net->arena, DN_NET2EmcCore, DN_ZMem_Yes);
+  DN_NET_BaseInit_(net, base, base_size);
+  DN_NETEmcCore *emc = DN_ArenaNew(&net->arena, DN_NETEmcCore, DN_ZMem_Yes);
   emc->pool           = DN_PoolFromArena(&net->arena, 0);
   net->context        = emc;
 }
 
-DN_NET2Request DN_NET2_EmcDoHTTP(DN_NET2Core *net, DN_Str8 url, DN_Str8 method, DN_NET2DoHTTPArgs const *args)
+void DN_NET_EmcDeinit(DN_NETCore *net)
+{
+  (void)net;
+  // TODO: Track all the request handles and clean it up
+}
+
+DN_NETRequest DN_NET_EmcDoHTTP(DN_NETCore *net, DN_Str8 url, DN_Str8 method, DN_NETDoHTTPArgs const *args)
 {
   // NOTE: Allocate request
-  DN_NET2RequestInternal *request = net->free_list;
+  DN_NETEmcCore         *emc     = DN_Cast(DN_NETEmcCore *) net->context;
+  DN_NETRequestInternal *request = emc->free_list;
   if (request) {
-    net->free_list = net->free_list->next;
+    emc->free_list = emc->free_list->next;
     request->next  = nullptr;
   } else {
-    request = DN_ArenaNew(&net->arena, DN_NET2RequestInternal, DN_ZMem_Yes);
+    request = DN_ArenaNew(&net->arena, DN_NETRequestInternal, DN_ZMem_Yes);
   }
 
-  DN_NET2Request result = DN_NET2_SetupRequest_(request, url, method, args, DN_NET2RequestType_HTTP);
+  DN_NETRequest result = DN_NET_SetupRequest_(request, url, method, args, DN_NETRequestType_HTTP);
 
   // NOTE: Setup some emscripten specific data into our request context
   request->context[0] = DN_Cast(DN_UPtr) net;
@@ -185,7 +195,7 @@ DN_NET2Request DN_NET2_EmcDoHTTP(DN_NET2Core *net, DN_Str8 url, DN_Str8 method, 
     }
 
     // NOTE: Handle basic auth
-    if (request->args.flags & DN_NET2DoHTTPFlags_BasicAuth) {
+    if (request->args.flags & DN_NETDoHTTPFlags_BasicAuth) {
       if (request->args.username.size && request->args.password.size) {
         DN_Assert(request->args.username.data[request->args.username.size] == 0);
         DN_Assert(request->args.password.data[request->args.password.size] == 0);
@@ -204,9 +214,9 @@ DN_NET2Request DN_NET2_EmcDoHTTP(DN_NET2Core *net, DN_Str8 url, DN_Str8 method, 
     //   > be called, but without data bytes.  Note: Firefox only as it depends on
     //   > 'moz-chunked-arraybuffer'.
     fetch_attribs.attributes = EMSCRIPTEN_FETCH_LOAD_TO_MEMORY;
-    fetch_attribs.onsuccess  = DN_NET2_EmcHTTPSuccessCallback;
-    fetch_attribs.onerror    = DN_NET2_EmcHTTPFailCallback;
-    fetch_attribs.onprogress = DN_NET2_EmcHTTPProgressCallback;
+    fetch_attribs.onsuccess  = DN_NET_EmcHTTPSuccessCallback;
+    fetch_attribs.onerror    = DN_NET_EmcHTTPFailCallback;
+    fetch_attribs.onprogress = DN_NET_EmcHTTPProgressCallback;
     fetch_attribs.userData   = request;
   }
 
@@ -218,27 +228,27 @@ DN_NET2Request DN_NET2_EmcDoHTTP(DN_NET2Core *net, DN_Str8 url, DN_Str8 method, 
   return result;
 }
 
-DN_NET2Request DN_NET2_EmcDoWS(DN_NET2Core *net, DN_Str8 url)
+DN_NETRequest DN_NET_EmcDoWS(DN_NETCore *net, DN_Str8 url)
 {
   DN_Assert(emscripten_websocket_is_supported());
 
   // NOTE: Allocate request
-  DN_NET2RequestInternal *request = net->free_list;
+  DN_NETEmcCore         *emc     = DN_Cast(DN_NETEmcCore *) net->context;
+  DN_NETRequestInternal *request = emc->free_list;
   if (request) {
-    net->free_list = net->free_list->next;
+    emc->free_list = emc->free_list->next;
     request->next  = nullptr;
   } else {
-    request = DN_ArenaNew(&net->arena, DN_NET2RequestInternal, DN_ZMem_Yes);
+    request = DN_ArenaNew(&net->arena, DN_NETRequestInternal, DN_ZMem_Yes);
   }
 
-  DN_NET2Request result = DN_NET2_SetupRequest_(request, url, /*method=*/ DN_Str8Lit(""), /*args=*/nullptr, DN_NET2RequestType_WS);
+  DN_NETRequest result = DN_NET_SetupRequest_(request, url, /*method=*/ DN_Str8Lit(""), /*args=*/nullptr, DN_NETRequestType_WS);
   if (!request)
     return result;
 
   // NOTE: Setup some emscripten specific data into our request context
-  DN_NET2EmcCore *emc               = DN_Cast(DN_NET2EmcCore *) net->context;
   request->context[0]               = DN_Cast(DN_UPtr) net;
-  request->context[1]               = DN_Cast(DN_UPtr) DN_ArenaNew(&request->arena, DN_NET2EmcRequest, DN_ZMem_Yes);
+  request->context[1]               = DN_Cast(DN_UPtr) DN_ArenaNew(&request->arena, DN_NETEmcRequest, DN_ZMem_Yes);
   request->start_response_arena_pos = DN_ArenaPos(&request->arena);
 
   // NOTE: Create the websocket request and dispatch it via emscripten
@@ -246,62 +256,63 @@ DN_NET2Request DN_NET2_EmcDoWS(DN_NET2Core *net, DN_Str8 url)
   emscripten_websocket_init_create_attributes(&attr);
   attr.url = request->url.data;
 
-  DN_NET2EmcRequest *emc_request = DN_Cast(DN_NET2EmcRequest *) request->context[1];
+  DN_NETEmcRequest *emc_request = DN_Cast(DN_NETEmcRequest *) request->context[1];
   emc_request->socket            = emscripten_websocket_new(&attr);
   DN_Assert(emc_request->socket > 0);
-  emscripten_websocket_set_onopen_callback(emc_request->socket,    /*userData=*/ request, DN_NET2_EmcWSOnOpen);
-  emscripten_websocket_set_onmessage_callback(emc_request->socket, /*userData=*/ request, DN_NET2_EmcWSOnMessage);
-  emscripten_websocket_set_onerror_callback(emc_request->socket,   /*userData=*/ request, DN_NET2_EmcWSOnError);
-  emscripten_websocket_set_onclose_callback(emc_request->socket,   /*userData=*/ request, DN_NET2_EmcWSOnClose);
+  emscripten_websocket_set_onopen_callback(emc_request->socket,    /*userData=*/ request, DN_NET_EmcWSOnOpen);
+  emscripten_websocket_set_onmessage_callback(emc_request->socket, /*userData=*/ request, DN_NET_EmcWSOnMessage);
+  emscripten_websocket_set_onerror_callback(emc_request->socket,   /*userData=*/ request, DN_NET_EmcWSOnError);
+  emscripten_websocket_set_onclose_callback(emc_request->socket,   /*userData=*/ request, DN_NET_EmcWSOnClose);
 
   return result;
 }
 
-void DN_NET2_EmcDoWSSend(DN_NET2Request request, DN_Str8 data, DN_NET2WSSend send)
+void DN_NET_EmcDoWSSend(DN_NETRequest request, DN_Str8 data, DN_NETWSSend send)
 {
-  DN_AssertF(send == DN_NET2WSSend_Binary || send == DN_NET2WSSend_Text || send == DN_NET2WSSend_Close,
+  DN_AssertF(send == DN_NETWSSend_Binary || send == DN_NETWSSend_Text || send == DN_NETWSSend_Close,
              "Unimplemented, Emscripten only supports some of the available operations");
 
-  bool                    result      = false;
-  DN_NET2RequestInternal *request_ptr = DN_Cast(DN_NET2RequestInternal *) request.handle;
+  int                    result      = 0;
+  DN_NETRequestInternal *request_ptr = DN_Cast(DN_NETRequestInternal *) request.handle;
   if (request_ptr && request_ptr->gen == request.gen) {
-    DN_Assert(request_ptr->type == DN_NET2RequestType_WS);
-    DN_NET2EmcRequest *emc_request = DN_Cast(DN_NET2EmcRequest *) request_ptr->context[1];
+    DN_Assert(request_ptr->type == DN_NETRequestType_WS);
+    DN_NETEmcRequest *emc_request = DN_Cast(DN_NETEmcRequest *) request_ptr->context[1];
     switch (send) {
       default: DN_InvalidCodePath; break;
-      case DN_NET2WSSend_Text: {
+      case DN_NETWSSend_Text: {
         DN_U64  pos                  = DN_ArenaPos(&request_ptr->arena);
         DN_Str8 data_null_terminated = DN_Str8FromStr8Arena(&request_ptr->arena, data);
         result                       = emscripten_websocket_send_utf8_text(emc_request->socket, data_null_terminated.data);
         DN_ArenaPopTo(&request_ptr->arena, pos);
       } break;
 
-      case DN_NET2WSSend_Binary: {
+      case DN_NETWSSend_Binary: {
         result = emscripten_websocket_send_binary(emc_request->socket, data.data, data.size);
       } break;
 
-      case DN_NET2WSSend_Close: {
+      case DN_NETWSSend_Close: {
         result = emscripten_websocket_close(emc_request->socket, 0, nullptr);
       } break;
     }
   }
-  // TODO: Handle result
+  // TODO: Handle result, the header file doesn't really elucidate what this result value is
+  (void)result;
 }
 
-static DN_NET2Response DN_NET2_EmcHandleFinishedRequest_(DN_NET2Core *net, DN_NET2EmcCore *emc, DN_NET2Request request, DN_NET2RequestInternal *request_ptr, DN_Arena *arena)
+static DN_NETResponse DN_NET_EmcHandleFinishedRequest_(DN_NETCore *net, DN_NETEmcCore *emc, DN_NETRequest request, DN_NETRequestInternal *request_ptr, DN_Arena *arena)
 {
-  DN_NET2Response result      = {};
+  DN_NETResponse result      = {};
   bool            end_request = true;
-  if (request_ptr->type == DN_NET2RequestType_HTTP) {
-    result = DN_NET2_MakeResponseFromFinishedRequest_(request, arena);
+  if (request_ptr->type == DN_NETRequestType_HTTP) {
+    result = DN_NET_MakeResponseFromFinishedRequest_(request, arena);
   } else {
     // NOTE: Get emscripten contexts
-    DN_NET2EmcRequest *emc_request = DN_Cast(DN_NET2EmcRequest *) request_ptr->context[1];
-    DN_NET2EmcWSEvent *emc_event   = emc_request->first_event;
+    DN_NETEmcRequest *emc_request = DN_Cast(DN_NETEmcRequest *) request_ptr->context[1];
+    DN_NETEmcWSEvent *emc_event   = emc_request->first_event;
     emc_request->first_event       = emc_event->next; // Advance the list pointer
     DN_Assert(emc_event);
-    DN_Assert((emc_event->state >= DN_NET2ResponseState_WSOpen && emc_event->state <= DN_NET2ResponseState_WSPong) ||
-              emc_event->state == DN_NET2ResponseState_Error);
+    DN_Assert((emc_event->state >= DN_NETResponseState_WSOpen && emc_event->state <= DN_NETResponseState_WSPong) ||
+              emc_event->state == DN_NETResponseState_Error);
 
     // NOTE: Build the result
     result.state   = emc_event->state;
@@ -315,7 +326,7 @@ static DN_NET2Response DN_NET2_EmcHandleFinishedRequest_(DN_NET2Core *net, DN_NE
       emc_event->payload = {};
     }
 
-    if (result.state != DN_NET2ResponseState_WSClose)
+    if (result.state != DN_NETResponseState_WSClose)
       end_request = false;
   }
 
@@ -324,18 +335,19 @@ static DN_NET2Response DN_NET2_EmcHandleFinishedRequest_(DN_NET2Core *net, DN_NE
   request_ptr->response.body = DN_Str8BuilderFromArena(&request_ptr->arena);
 
   if (end_request) {
-    DN_NET2_EndFinishedRequest_(net, request_ptr);
-    DN_NET2EmcCore    *emc         = DN_Cast(DN_NET2EmcCore *) net->context;
-    DN_NET2EmcRequest *emc_request = DN_Cast(DN_NET2EmcRequest *) request_ptr->context[1];
+    DN_NET_EndFinishedRequest_(request_ptr);
+    DN_NETEmcRequest *emc_request = DN_Cast(DN_NETEmcRequest *) request_ptr->context[1];
     emscripten_websocket_delete(emc_request->socket);
-    request_ptr->next = net->free_list;
-    net->free_list    = request_ptr;
+
+    DN_NETEmcCore *emc = DN_Cast(DN_NETEmcCore *) net->context;
+    request_ptr->next  = emc->free_list;
+    emc->free_list     = request_ptr;
   }
 
   return result;
 }
 
-static DN_OSSemaphoreWaitResult DN_NET2_EmcSemaphoreWait_(DN_OSSemaphore *sem, DN_U32 timeout_ms)
+static DN_OSSemaphoreWaitResult DN_NET_EmcSemaphoreWait_(DN_OSSemaphore *sem, DN_U32 timeout_ms)
 {
   // NOTE: In emscripten you can't just block on the semaphore with 'timeout_ms' because it needs
   // to yield to the javascript's event loop otherwise the fetching step cannot progress. Instead
@@ -363,22 +375,22 @@ static DN_OSSemaphoreWaitResult DN_NET2_EmcSemaphoreWait_(DN_OSSemaphore *sem, D
   return result;
 }
 
-DN_NET2Response DN_NET2_EmcWaitForResponse(DN_NET2Request request, DN_Arena *arena, DN_U32 timeout_ms)
+DN_NETResponse DN_NET_EmcWaitForResponse(DN_NETRequest request, DN_Arena *arena, DN_U32 timeout_ms)
 {
-  DN_NET2Response         result      = {};
-  DN_NET2RequestInternal *request_ptr = DN_Cast(DN_NET2RequestInternal *) request.handle;
+  DN_NETResponse         result      = {};
+  DN_NETRequestInternal *request_ptr = DN_Cast(DN_NETRequestInternal *) request.handle;
   if (request_ptr && request_ptr->gen == request.gen) {
-    DN_NET2Core    *net = DN_Cast(DN_NET2Core *) request_ptr->context[0];
-    DN_NET2EmcCore *emc = DN_Cast(DN_NET2EmcCore *) net->context;
+    DN_NETCore    *net = DN_Cast(DN_NETCore *) request_ptr->context[0];
+    DN_NETEmcCore *emc = DN_Cast(DN_NETEmcCore *) net->context;
     DN_Assert(emc);
-    DN_OSSemaphoreWaitResult wait = DN_NET2_EmcSemaphoreWait_(&request_ptr->completion_sem, timeout_ms);
+    DN_OSSemaphoreWaitResult wait = DN_NET_EmcSemaphoreWait_(&request_ptr->completion_sem, timeout_ms);
     if (wait != DN_OSSemaphoreWaitResult_Success)
       return result;
 
     // NOTE: Remove request from the done list
-    request_ptr->next = nullptr;
-    net->done_list    = net->done_list->next;
-    result            = DN_NET2_EmcHandleFinishedRequest_(net, emc, request, request_ptr, arena);
+    request_ptr->next  = nullptr;
+    emc->response_list = emc->response_list->next;
+    result             = DN_NET_EmcHandleFinishedRequest_(net, emc, request, request_ptr, arena);
 
     // NOTE: Decrement the global 'request done' completion semaphore since the user consumed the
     // request individually.
@@ -388,33 +400,33 @@ DN_NET2Response DN_NET2_EmcWaitForResponse(DN_NET2Request request, DN_Arena *are
   return result;
 }
 
-DN_NET2Response DN_NET2_EmcWaitForAnyResponse(DN_NET2Core *net, DN_Arena *arena, DN_U32 timeout_ms)
+DN_NETResponse DN_NET_EmcWaitForAnyResponse(DN_NETCore *net, DN_Arena *arena, DN_U32 timeout_ms)
 {
-  DN_NET2EmcCore *emc = DN_Cast(DN_NET2EmcCore *) net->context;
+  DN_NETEmcCore *emc = DN_Cast(DN_NETEmcCore *) net->context;
   DN_Assert(emc);
 
-  DN_NET2Response          result = {};
-  DN_OSSemaphoreWaitResult wait   = DN_NET2_EmcSemaphoreWait_(&net->completion_sem, timeout_ms);
+  DN_NETResponse          result = {};
+  DN_OSSemaphoreWaitResult wait   = DN_NET_EmcSemaphoreWait_(&net->completion_sem, timeout_ms);
   if (wait != DN_OSSemaphoreWaitResult_Success)
       return result;
 
   // NOTE: Dequeue the request that is done from the done list
-  DN_AssertF(net->done_list,
+  DN_AssertF(emc->response_list,
              "This should be set otherwise we bumped the completion sem without queueing into the "
              "done list or we forgot to wait on the global semaphore after a request finished");
-  DN_NET2RequestInternal *request_ptr = net->done_list;
-  DN_Assert(request_ptr == net->done_list);
+  DN_NETRequestInternal *request_ptr = emc->response_list;
+  DN_Assert(request_ptr == emc->response_list);
   request_ptr->next = nullptr;
-  net->done_list    = net->done_list->next;
+  emc->response_list    = emc->response_list->next;
 
   // NOTE: Decrement the request's completion semaphore since the user consumed the global semaphore
   DN_OSSemaphoreWaitResult net_wait_result = DN_OS_SemaphoreWait(&request_ptr->completion_sem, 0 /*timeout_ms*/);
   DN_AssertF(net_wait_result == DN_OSSemaphoreWaitResult_Success, "Wait result was: %zu", DN_Cast(DN_USize) net_wait_result);
 
-  DN_NET2Request request = {};
+  DN_NETRequest request = {};
   request.handle         = DN_Cast(DN_UPtr) request_ptr;
   request.gen            = request_ptr->gen;
-  result                 = DN_NET2_EmcHandleFinishedRequest_(net, emc, request, request_ptr, arena);
+  result                 = DN_NET_EmcHandleFinishedRequest_(net, emc, request, request_ptr, arena);
 
   return result;
 }

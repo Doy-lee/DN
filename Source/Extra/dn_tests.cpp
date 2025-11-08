@@ -2488,13 +2488,13 @@ static DN_UTCore DN_Tests_Win()
 
 static DN_UTCore DN_Tests_Net()
 {
-  DN_Str8          label         = {};
-  DN_NET2Interface net_interface = {};
+  DN_Str8         label         = {};
+  DN_NETInterface net_interface = {};
 #if defined(DN_PLATFORM_EMSCRIPTEN)
-  net_interface = DN_NET2_EmcInterface();
+  net_interface = DN_NET_EmcInterface();
   label         = DN_Str8Lit("Emscripten");
 #elif defined(DN_UNIT_TESTS_WITH_CURL)
-  net_interface = DN_NET2_CurlInterface();
+  net_interface = DN_NET_CurlInterface();
   label         = DN_Str8Lit("CURL");
 #endif
 
@@ -2506,59 +2506,66 @@ static DN_UTCore DN_Tests_Net()
     DN_Str8  remote_ws_server_url   = DN_Str8Lit("wss://echo.websocket.org");
     DN_Str8  remote_http_server_url = DN_Str8Lit("https://google.com");
 
-    char        net_base[DN_Kilobytes(16)] = {};
-    DN_NET2Core net                        = {};
-    net_interface.init(&net, net_base, sizeof(net_base));
+    DN_USize   net_base_size = DN_Megabytes(1);
+    char      *net_base      = DN_ArenaNewArray(&arena, char, net_base_size, DN_ZMem_Yes);
+    DN_NETCore net           = {};
+    net_interface.init(&net, net_base, net_base_size);
 
+    DN_U64 arena_reset_p = DN_ArenaPos(&arena);
     for (DN_UT_Test(&result, "%.*s WaitForResponse HTTP GET request", DN_Str8PrintFmt(label))) {
-      DN_NET2Request  request  = net_interface.do_http(&net, remote_http_server_url, DN_Str8Lit("GET"), nullptr);
-      DN_NET2Response response = net_interface.wait_for_response(request, &arena, UINT32_MAX);
+      DN_NETRequest  request  = net_interface.do_http(&net, remote_http_server_url, DN_Str8Lit("GET"), nullptr);
+      DN_NETResponse response = net_interface.wait_for_response(request, &arena, UINT32_MAX);
       DN_UT_AssertF(&result, response.http_status == 200, "http_status=%u", response.http_status);
-      DN_UT_AssertF(&result, response.state == DN_NET2ResponseState_HTTP, "state=%u", response.state);
+      DN_UT_AssertF(&result, response.state == DN_NETResponseState_HTTP, "state=%u", response.state);
       DN_UT_AssertF(&result, response.error_str8.size == 0, "%.*s", DN_Str8PrintFmt(response.error_str8));
       DN_UT_Assert(&result, response.body.size);
     }
 
     for (DN_UT_Test(&result, "%.*s WaitForResponse HTTP POST request", DN_Str8PrintFmt(label))) {
-      DN_NET2Request  request  = net_interface.do_http(&net, remote_http_server_url, DN_Str8Lit("POST"), nullptr);
-      DN_NET2Response response = net_interface.wait_for_any_response(&net, &arena, UINT32_MAX);
+      net_interface.do_http(&net, remote_http_server_url, DN_Str8Lit("POST"), nullptr);
+      DN_NETResponse response = net_interface.wait_for_any_response(&net, &arena, UINT32_MAX);
       DN_UT_AssertF(&result, response.http_status == 200, "http_status=%u", response.http_status);
-      DN_UT_AssertF(&result, response.state == DN_NET2ResponseState_HTTP, "state=%u", response.state);
+      DN_UT_AssertF(&result, response.state == DN_NETResponseState_HTTP, "state=%u", response.state);
       DN_UT_AssertF(&result, response.error_str8.size == 0, "error=%.*s", DN_Str8PrintFmt(response.error_str8));
       DN_UT_Assert(&result, response.body.size);
     }
 
     for (DN_UT_Test(&result, "%.*s WaitForResponse WS request", DN_Str8PrintFmt(label))) {
-      DN_NET2Request request       = net_interface.do_ws(&net, remote_ws_server_url);
-      DN_USize const WS_TIMEOUT_MS = 2000;
+      DN_NETRequest  request       = net_interface.do_ws(&net, remote_ws_server_url);
+      DN_USize const WS_TIMEOUT_MS = 16;
 
       // NOTE: Wait for WS connection to open
-      for (bool done = false; !done; DN_ArenaPopTo(&arena, 0)) {
-        DN_NET2Response response = net_interface.wait_for_response(request, &arena, WS_TIMEOUT_MS);
-        if (response.state == DN_NET2ResponseState_Nil) // NOTE: Timeout
+      for (bool done = false; result.state != DN_UTState_TestFailed && !done; DN_ArenaPopTo(&arena, arena_reset_p)) {
+        DN_NETResponse response = net_interface.wait_for_response(request, &arena, WS_TIMEOUT_MS);
+        if (response.state == DN_NETResponseState_Nil) // NOTE: Timeout
           continue;
-        DN_UT_Assert(&result, response.state == DN_NET2ResponseState_WSOpen);
+        if (response.state == DN_NETResponseState_Error)
+            DN_UT_Log(&result, "ERROR: %.*s", DN_Str8PrintFmt(response.error_str8));
+        DN_UT_AssertF(&result, response.state == DN_NETResponseState_WSOpen, "state=%d", response.state);
         done = true;
       }
 
       // NOTE: Receive the initial text from the echo server
-      for (bool done = false; !done; DN_ArenaPopTo(&arena, 0)) {
-        DN_NET2Response response = net_interface.wait_for_response(request, &arena, WS_TIMEOUT_MS);
-        if (response.state == DN_NET2ResponseState_Nil) // NOTE: Timeout
+      for (bool done = false; result.state != DN_UTState_TestFailed && !done; DN_ArenaPopTo(&arena, arena_reset_p)) {
+        DN_NETResponse response = net_interface.wait_for_response(request, &arena, WS_TIMEOUT_MS);
+        if (response.state == DN_NETResponseState_Nil) // NOTE: Timeout
           continue;
-        DN_UT_Assert(&result, response.state == DN_NET2ResponseState_WSText);
-
+        if (response.state == DN_NETResponseState_Error)
+          DN_UT_Log(&result, "ERROR: %.*s", DN_Str8PrintFmt(response.error_str8));
+        DN_UT_AssertF(&result, response.state == DN_NETResponseState_WSText, "state=%d", response.state);
         // NOTE: Send the close signal
-        net_interface.do_ws_send(request, DN_Str8Lit(""), DN_NET2WSSend_Close);
+        net_interface.do_ws_send(request, DN_Str8Lit(""), DN_NETWSSend_Close);
         done = true;
       }
 
       // NOTE: Expect to hear the close
-      for (bool done = false; !done; DN_ArenaPopTo(&arena, 0)) {
-        DN_NET2Response response = net_interface.wait_for_response(request, &arena, WS_TIMEOUT_MS);
-        if (response.state == DN_NET2ResponseState_Nil) // NOTE: Timeout
+      for (bool done = false; result.state != DN_UTState_TestFailed && !done; DN_ArenaPopTo(&arena, arena_reset_p)) {
+        DN_NETResponse response = net_interface.wait_for_response(request, &arena, WS_TIMEOUT_MS);
+        if (response.state == DN_NETResponseState_Nil) // NOTE: Timeout
           continue;
-        DN_UT_Assert(&result, response.state == DN_NET2ResponseState_WSClose);
+        if (response.state == DN_NETResponseState_Error)
+          DN_UT_Log(&result, "ERROR: %.*s", DN_Str8PrintFmt(response.error_str8));
+        DN_UT_AssertF(&result, response.state == DN_NETResponseState_WSClose, "state=%d");
         done = true;
       }
     }

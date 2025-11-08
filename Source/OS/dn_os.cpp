@@ -130,9 +130,11 @@ DN_API void DN_OS_Init(DN_OSCore *os, DN_OSInitArgs *args)
     InitializeCriticalSection(&w32->sync_primitive_free_list_mutex);
 
     QueryPerformanceFrequency(&w32->qpc_frequency);
-    HMODULE module              = LoadLibraryA("kernel32.dll");
-    w32->set_thread_description = DN_Cast(DN_W32SetThreadDescriptionFunc *) GetProcAddress(module, "SetThreadDescription");
-    FreeLibrary(module);
+    HMODULE module = LoadLibraryA("kernel32.dll");
+    if (module) {
+      w32->set_thread_description = DN_Cast(DN_W32SetThreadDescriptionFunc *) GetProcAddress(module, "SetThreadDescription");
+      FreeLibrary(module);
+    }
 
     // NOTE: win32 bcrypt
     wchar_t const     BCRYPT_ALGORITHM[] = L"RNG";
