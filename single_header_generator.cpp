@@ -78,10 +78,8 @@ static void AppendCppFileLineByLine(DN_Str8Builder *dest, DN_Str8 cpp_path)
 
 int main(int argc, char **argv)
 {
-  DN_Core   dn      = {};
-  DN_OSCore os      = {};
-  DN_OS_Init(&os, nullptr);
-  DN_Core_Init(&dn, DN_CoreOnInit_Nil);
+  DN_Core dn = {};
+  DN_Init(&dn, DN_InitFlags_Nil, nullptr);
 
   if (argc != 3) {
     DN_OS_PrintErrF("USAGE: %s <path/to/dn/Source> <output_dir>", argv[0]);
