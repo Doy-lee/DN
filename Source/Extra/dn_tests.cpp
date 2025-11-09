@@ -2488,6 +2488,8 @@ static DN_UTCore DN_Tests_Win()
 
 static DN_UTCore DN_Tests_Net()
 {
+  DN_UTCore result = DN_UT_Init();
+#if defined(DN_UNIT_TESTS_WITH_NET)
   DN_Str8         label         = {};
   DN_NETInterface net_interface = {};
 #if defined(DN_PLATFORM_EMSCRIPTEN)
@@ -2498,7 +2500,6 @@ static DN_UTCore DN_Tests_Net()
   label         = DN_Str8Lit("CURL");
 #endif
 
-  DN_UTCore result = DN_UT_Init();
   if (label.size) {
     DN_UT_LogF(&result, "DN_NET\n");
 
@@ -2571,6 +2572,7 @@ static DN_UTCore DN_Tests_Net()
     }
     DN_ArenaDeinit(&arena);
   }
+#endif // defined(DN_UNIT_TESTS_WITH_NET)
   return result;
 }
 

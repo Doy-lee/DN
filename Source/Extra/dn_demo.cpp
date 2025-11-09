@@ -544,7 +544,7 @@ void DN_Demo()
     DN_ProfilerTSCNowFunc *tsc_now       = DN_OS_PerfCounterNow;
     DN_U64                 tsc_frequency = DN_OS_PerfCounterFrequency();
   #else
-    DN_ProfilerTSCNowFunc *tsc_now       = __rdtsc;
+    DN_ProfilerTSCNowFunc *tsc_now       = nullptr;
     DN_U64                 tsc_frequency = DN_OS_EstimateTSCPerSecond(100);
   #endif
 
@@ -644,21 +644,21 @@ void DN_Demo()
   {
     DN_OSTLSTMem tmem = DN_OS_TLSTMem(nullptr);
 
-    // NOTE: DN_StackTrace_Walk
+    // NOTE: DN_StackTraceWalk
     //
     // Generate a stack trace as a series of addresses to the base of the
     // functions on the call-stack at the current instruction pointer. The
     // addresses are stored in order from the current executing function
     // first to the most ancestor function last in the walk.
-    DN_StackTraceWalkResult walk = DN_StackTrace_Walk(tmem.arena, /*depth limit*/ 128);
+    DN_StackTraceWalkResult walk = DN_StackTraceWalk(tmem.arena, /*depth limit*/ 128);
 
     // Loop over the addresses produced in the stack trace
-    for (DN_StackTraceWalkResultIterator it = {}; DN_StackTrace_WalkResultIterate(&it, &walk);) {
-      // NOTE: DN_StackTrace_RawFrameToFrame
+    for (DN_StackTraceWalkResultIterator it = {}; DN_StackTraceWalkResultIterate(&it, &walk);) {
+      // NOTE: DN_StackTraceRawFrameToFrame
       //
       // Converts the base address into a human readable stack trace
       // entry (e.g. address, line number, file and function name).
-      DN_StackTraceFrame frame = DN_StackTrace_RawFrameToFrame(tmem.arena, it.raw_frame);
+      DN_StackTraceFrame frame = DN_StackTraceRawFrameToFrame(tmem.arena, it.raw_frame);
 
       // You may then print out the frame like so
       if (0)
@@ -668,14 +668,14 @@ void DN_Demo()
     // If you load new shared-libraries into the address space it maybe
     // necessary to call into 'ReloadSymbols' to ensure that the OS is able
     // to resolve the new addresses.
-    DN_StackTrace_ReloadSymbols();
+    DN_StackTraceReloadSymbols();
 
-    // NOTE: DN_StackTrace_GetFrames
+    // NOTE: DN_StackTraceGetFrames
     //
     // Helper function to create a stack trace and automatically convert the
     // raw frames into human readable frames. This function effectively
     // calls 'Walk' followed by 'RawFrameToFrame'.
-    DN_Slice<DN_StackTraceFrame> frames = DN_StackTrace_GetFrames(tmem.arena, /*depth limit*/ 128);
+    DN_Slice<DN_StackTraceFrame> frames = DN_StackTraceGetFrames(tmem.arena, /*depth limit*/ 128);
     (void)frames;
   }
 

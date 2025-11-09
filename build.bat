@@ -34,7 +34,7 @@ pushd %build_dir%
   :: GR-  Disable C RTTI
   :: Oi   Use CPU Intrinsics
   :: Z7   Combine multi-debug files to one debug file
-  set flags=%flags% -D DN_UNIT_TESTS_WITH_KECCAK %script_dir%\Source\Extra\dn_tests_main.cpp
+  set flags=%flags% -D DN_UNIT_TESTS_WITH_KECCAK -D DN_UNIT_TESTS_WITH_NET %script_dir%\Source\Extra\dn_tests_main.cpp
   set msvc_driver_flags=-EHa -GR- -Od -Oi -Z7 -wd4201 -W4 -nologo %flags% -fsanitize=address
 
   where /q emcc && (

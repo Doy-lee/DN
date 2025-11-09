@@ -1049,7 +1049,7 @@ void DN_INI_UnitTests()
     DN_INI_Assert(parse.total_sections_count == 1);
     DN_INI_Assert(parse.total_fields_count == 2);
 
-    char parse_memory[300];
+    char parse_memory[350];
     DN_INI_Assert(parse.memory_required <= sizeof(parse_memory));
 
     parse = DN_INI_ParseFromPtr(EXAMPLE, sizeof(EXAMPLE) - 1, parse_memory, sizeof(parse_memory));
