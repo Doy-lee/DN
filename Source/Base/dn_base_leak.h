@@ -35,7 +35,7 @@ DN_API void DN_LeakDump_        (DN_LeakTracker *leak);
 #if defined(DN_LEAK_TRACKING)
 #define     DN_LeakTrackAlloc(leak, ptr, size, alloc_can_leak) DN_LeakTrackAlloc_(leak, ptr, size, alloc_can_leak)
 #define     DN_LeakTrackDealloc(leak, ptr)                     DN_LeakTrackDealloc_(leak, ptr)
-#define     DN_LeakDump(leak)                                  DN_LeakDump(leak);
+#define     DN_LeakDump(leak)                                  DN_LeakDump_(leak)
 #else
 #define     DN_LeakTrackAlloc(leak, ptr, size, alloc_can_leak) do { (void)ptr; (void)size; (void)alloc_can_leak; } while (0)
 #define     DN_LeakTrackDealloc(leak, ptr)                     do { (void)ptr;                                   } while (0)

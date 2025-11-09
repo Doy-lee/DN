@@ -23,8 +23,9 @@ enum DN_InitFlags_
 {
   DN_InitFlags_Nil            = 0,
   DN_InitFlags_OS             = 1 << 0,
-  DN_InitFlags_LogLibFeatures = 1 << 1,
-  DN_InitFlags_LogCPUFeatures = 1 << 2,
+  DN_InitFlags_OSLeakTracker  = 1 << 1,
+  DN_InitFlags_LogLibFeatures = 1 << 2,
+  DN_InitFlags_LogCPUFeatures = 1 << 3,
   DN_InitFlags_LogAllFeatures = DN_InitFlags_LogLibFeatures | DN_InitFlags_LogCPUFeatures,
 };
 

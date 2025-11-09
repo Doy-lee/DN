@@ -822,7 +822,7 @@ static DN_ArenaBlock *DN_ArenaBlockFromMemFuncs_(DN_U64 reserve, DN_U64 commit, 
   }
 
   if (track_alloc && result)
-    DN_LeakTrackAlloc(dn->leak, result, result->reserve, alloc_can_leak);
+    DN_LeakTrackAlloc(&g_dn_->leak, result, result->reserve, alloc_can_leak);
 
   return result;
 }
@@ -1507,14 +1507,15 @@ DN_API DN_I64 DN_I64FromPtrUnsafe(void const *data, DN_USize size, char separato
 
 DN_API DN_FmtAppendResult DN_FmtVAppend(char *buf, DN_USize *buf_size, DN_USize buf_max, char const *fmt, va_list args)
 {
-  DN_FmtAppendResult result  = {};
-  result.size_req            = DN_VSNPrintF(buf + *buf_size, DN_Cast(int)(buf_max - *buf_size), fmt, args);
-  *buf_size                 += result.size_req;
+  DN_FmtAppendResult result         = {};
+  DN_USize           starting_size  = *buf_size;
+  result.size_req                   = DN_VSNPrintF(buf + *buf_size, DN_Cast(int)(buf_max - *buf_size), fmt, args);
+  *buf_size                        += result.size_req;
   if (*buf_size >= (buf_max - 1))
     *buf_size = buf_max - 1;
   DN_Assert(*buf_size <= (buf_max - 1));
   result.str8      = DN_Str8FromPtr(buf, *buf_size);
-  result.truncated = result.str8.size != result.size_req;
+  result.truncated = result.str8.size != (starting_size + result.size_req);
   return result;
 }
 

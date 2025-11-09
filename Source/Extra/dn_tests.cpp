@@ -2119,7 +2119,7 @@ static DN_UTCore DN_Tests_Str8()
       DN_UT_AssertF(&result, size == 5, "size=%zu", size);
     }
 
-    char arena_base[256];
+    char arena_base[512];
     for (DN_UT_Test(&result, "Str8 format from arena")) {
       DN_Arena arena  = DN_ArenaFromBuffer(arena_base, sizeof(arena_base), DN_ArenaFlags_Nil);
       DN_Str8  str8   = DN_Str8FromFmtArena(&arena, "Foo Bar %d", 5);
