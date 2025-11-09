@@ -5,7 +5,7 @@
 #else
 #include "Source/dn_base_inc.h"
 #include "Source/dn_os_inc.h"
-#include "Source/dn_core_inc.h"
+#include "Source/dn_inc.h"
 #endif
 
 #if USE_SINGLE_HEADER
@@ -13,7 +13,7 @@
 #else
 #include "Source/dn_base_inc.cpp"
 #include "Source/dn_os_inc.cpp"
-#include "Source/dn_core_inc.cpp"
+#include "Source/dn_inc.cpp"
 #endif
 
 enum FileType
@@ -98,10 +98,10 @@ int main(int argc, char **argv)
   File const FILES[] = {
       {FileType_Header, DN_Str8Lit("dn_base_inc.h")},
       {FileType_Header, DN_Str8Lit("dn_os_inc.h")},
-      {FileType_Header, DN_Str8Lit("dn_core_inc.h")},
+      {FileType_Header, DN_Str8Lit("dn_inc.h")},
       {FileType_Impl, DN_Str8Lit("dn_base_inc.cpp")},
       {FileType_Impl, DN_Str8Lit("dn_os_inc.cpp")},
-      {FileType_Impl, DN_Str8Lit("dn_core_inc.cpp")},
+      {FileType_Impl, DN_Str8Lit("dn_inc.cpp")},
   };
 
   for (DN_ForIndexU(type, FileType_Count)) {

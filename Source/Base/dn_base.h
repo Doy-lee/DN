@@ -765,6 +765,50 @@ struct DN_FmtAppendResult
   bool     truncated;
 };
 
+struct DN_ProfilerAnchor
+{
+  // Inclusive refers to the time spent to complete the function call
+  // including all children functions.
+  //
+  // Exclusive refers to the time spent in the function, not including any
+  // time spent in children functions that we call that are also being
+  // profiled. If we recursively call into ourselves, the time we spent in
+  // our function is accumulated.
+  DN_U64  tsc_inclusive;
+  DN_U64  tsc_exclusive;
+  DN_U16  hit_count;
+  DN_Str8 name;
+};
+
+struct DN_ProfilerZone
+{
+  DN_U16 anchor_index;
+  DN_U64 begin_tsc;
+  DN_U16 parent_zone;
+  DN_U64 elapsed_tsc_at_zone_start;
+};
+
+struct DN_ProfilerAnchorArray
+{
+  DN_ProfilerAnchor *data;
+  DN_USize           count;
+};
+
+typedef DN_U64 (DN_ProfilerTSCNowFunc)();
+struct DN_Profiler
+{
+  DN_USize               frame_index;
+  DN_ProfilerAnchor     *anchors;
+  DN_USize               anchors_count;
+  DN_USize               anchors_per_frame;
+  DN_U16                 parent_zone;
+  bool                   paused;
+  DN_ProfilerTSCNowFunc *tsc_now;
+  DN_U64                 tsc_frequency;
+  DN_ProfilerZone        frame_zone;
+  DN_F64                 frame_avg_tsc;
+};
+
 #if !defined(DN_STB_SPRINTF_HEADER_ONLY)
   #define STB_SPRINTF_IMPLEMENTATION
   #define STB_SPRINTF_STATIC
@@ -777,6 +821,8 @@ DN_GCC_WARNING_DISABLE(-Wunused-function)
 #include "../External/stb_sprintf.h"
 DN_GCC_WARNING_POP
 DN_MSVC_WARNING_POP
+
+DN_API void                     DN_BeginFrame               ();
 
 #define                         DN_SPrintF(...)             STB_SPRINTF_DECORATE(sprintf)(__VA_ARGS__)
 #define                         DN_SNPrintF(...)            STB_SPRINTF_DECORATE(snprintf)(__VA_ARGS__)
@@ -1068,5 +1114,23 @@ DN_API DN_ByteCountResult       DN_ByteCountFromType        (DN_U64 bytes, DN_By
 #define                         DN_ByteCount(bytes)         DN_ByteCountFromType(bytes, DN_ByteCountType_Auto)
 DN_API DN_Str8x32               DN_ByteCountStr8x32FromType (DN_U64 bytes, DN_ByteCountType type);
 #define                         DN_ByteCountStr8x32(bytes)  DN_ByteCountStr8x32FromType(bytes, DN_ByteCountType_Auto)
+
+#define DN_ProfilerZoneLoop(prof, name, index)                                                                            \
+  DN_ProfilerZone DN_UniqueName(zone_) = DN_ProfilerBeginZone(prof, DN_Str8Lit(name), index), DN_UniqueName(dummy_) = {}; \
+  DN_UniqueName(dummy_).begin_tsc == 0;                                                                                    \
+  DN_ProfilerEndZone(prof, DN_UniqueName(zone_)), DN_UniqueName(dummy_).begin_tsc = 1
+
+#define                       DN_ProfilerZoneLoopAuto(prof, name)   DN_ProfilerZoneLoop(prof, name, __COUNTER__ + 1)
+DN_API DN_Profiler            DN_ProfilerInit                      (DN_ProfilerAnchor *anchors, DN_USize count, DN_USize anchors_per_frame, DN_ProfilerTSCNowFunc *tsc_now, DN_U64 tsc_frequency);
+DN_API DN_ProfilerZone        DN_ProfilerBeginZone                 (DN_Profiler *profiler, DN_Str8 name, DN_U16 anchor_index);
+#define                       DN_ProfilerBeginZoneAuto(prof, name) DN_ProfilerBeginZone(prof, DN_Str8Lit(name), __COUNTER__ + 1)
+DN_API void                   DN_ProfilerEndZone                   (DN_Profiler *profiler, DN_ProfilerZone zone);
+DN_API DN_USize               DN_ProfilerFrameCount                (DN_Profiler const *profiler);
+DN_API DN_ProfilerAnchorArray DN_ProfilerFrameAnchorsFromIndex     (DN_Profiler *profiler, DN_USize frame_index);
+DN_API DN_ProfilerAnchorArray DN_ProfilerFrameAnchors              (DN_Profiler *profiler);
+DN_API void                   DN_ProfilerNewFrame                  (DN_Profiler *profiler);
+DN_API void                   DN_ProfilerDump                      (DN_Profiler *profiler);
+DN_API DN_F64                 DN_ProfilerSecFromTSC                (DN_Profiler *profiler, DN_U64 duration_tsc);
+DN_API DN_F64                 DN_ProfilerMsFromTSC                 (DN_Profiler *profiler, DN_U64 duration_tsc);
 
 #endif // !defined(DN_BASE_H)

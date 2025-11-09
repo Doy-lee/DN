@@ -259,14 +259,6 @@ struct DN_OSHttpResponse
   #endif
 };
 
-struct DN_OSInitArgs
-{
-  DN_U64 tls_reserve;
-  DN_U64 tls_commit;
-  DN_U64 tls_err_sink_reserve;
-  DN_U64 tls_err_sink_commit;
-};
-
 struct DN_OSCore
 {
   DN_CPUReport                    cpu_report;
@@ -305,7 +297,6 @@ struct DN_OSDiskSpace
   DN_U64 size;
 };
 
-DN_API void                      DN_OS_Init                                   (DN_OSCore *os, DN_OSInitArgs *args);
 DN_API void                      DN_OS_EmitLogsWithOSPrintFunctions           (DN_OSCore *os);
 DN_API void                      DN_OS_DumpThreadContextArenaStat             (DN_Str8 file_path);
 

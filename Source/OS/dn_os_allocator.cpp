@@ -23,7 +23,7 @@ DN_API DN_Arena DN_ArenaFromVMem(DN_U64 reserve, DN_U64 commit, DN_ArenaFlags fl
 {
   DN_ArenaMemFuncs mem_funcs = {};
   mem_funcs.type             = DN_ArenaMemFuncType_VMem;
-  mem_funcs.vmem_page_size   = g_dn_os_core_->page_size;
+  mem_funcs.vmem_page_size   = g_dn_->os.page_size;
   mem_funcs.vmem_reserve     = DN_OS_MemReserve;
   mem_funcs.vmem_commit      = DN_OS_MemCommit;
   mem_funcs.vmem_release     = DN_OS_MemRelease;

@@ -1,36 +1,6 @@
-/*
-////////////////////////////////////////////////////////////////////////////////////////////////////
-//
-//   $$$$$$$\   $$$$$$\   $$$$$$\   $$$$$$\
-//   $$  __$$\ $$  __$$\ $$  __$$\ $$  __$$\
-//   $$ |  $$ |$$ /  $$ |$$ /  \__|$$ /  \__|
-//   $$ |  $$ |$$ |  $$ |$$ |      \$$$$$$\
-//   $$ |  $$ |$$ |  $$ |$$ |       \____$$\
-//   $$ |  $$ |$$ |  $$ |$$ |  $$\ $$\   $$ |
-//   $$$$$$$  | $$$$$$  |\$$$$$$  |\$$$$$$  |
-//   \_______/  \______/  \______/  \______/
-//
-//   dn_docs.cpp -- Library documentation via real code examples
-//
-////////////////////////////////////////////////////////////////////////////////////////////////////
-//
-// Use this file for documentation and examples of the various APIs in this
-// library. Normally docs are written as inline comments in header files,
-// however, these quickly go out of date as APIs change. Instead, I provide
-// some example code that compiles here that serves to also document the API.
-//
-// The library header files then become a very minimal reference of exactly the
-// function prototypes and definitions instead of massive reams of inline
-// comments that visually space out the functions and hinders discoverability
-// and/or conciseness of being able to learn the breadth of the APIs.
-//
-////////////////////////////////////////////////////////////////////////////////////////////////////
-*/
-
 DN_MSVC_WARNING_PUSH
 DN_MSVC_WARNING_DISABLE(4702) // unreachable code
-
-void DN_Docs_Demo()
+void DN_Demo()
 {
 // NOTE: Before using anything in the library, DN_Core_Init() must be
 // called, for example:
@@ -556,75 +526,42 @@ void DN_Docs_Demo()
   }
 #endif
 
-#if 0
-#if !defined(DN_NO_PROFILER)
   // NOTE: DN_Profiler
   //
   // A profiler based off Casey Muratori's Computer Enhance course, Performance
   // Aware Programming. This profiler measures function elapsed time using the
   // CPU's time stamp counter (e.g. rdtsc) providing a rough cycle count
   // that can be converted into a duration.
-  //
-  // This profiler uses a double buffer scheme for storing profiling markers.
-  // After an application's typical update/frame cycle you can swap the
-  // profiler's buffer whereby the front buffer contains the previous frames
-  // profiling metrics and the back buffer will be populated with the new
-  // frame's profiling metrics.
+  #if defined(DN_OS_CPP)
   {
-    enum Zone
+    enum DemoZone
     {
-      Zone_MainLoop,
-      Zone_Count
+      DemoZone_MainLoop,
+      DemoZone_Count
     };
 
-    DN_ProfilerZone profiler_zone_main_update = DN_Profiler_BeginZone(Zone_MainLoop);
+  #if defined(DN_PLATFORM_EMSCRIPTEN)
+    DN_ProfilerTSCNowFunc *tsc_now       = DN_OS_PerfCounterNow;
+    DN_U64                 tsc_frequency = DN_OS_PerfCounterFrequency();
+  #else
+    DN_ProfilerTSCNowFunc *tsc_now       = __rdtsc;
+    DN_U64                 tsc_frequency = DN_OS_EstimateTSCPerSecond(100);
+  #endif
 
-    // NOTE: DN_Profiler_AnchorBuffer
-    //
-    // Retrieve the requested buffer from the profiler for
-    // writing/reading profiling metrics. Pass in the enum to specify
-    // which buffer to grab from the profiler.
-    //
-    // The front buffer contains the previous frame's profiling metrics
-    // and the back buffer is where the profiler is currently writing
-    // to.
-    //
-    // For end user intents and purposes, you likely only need to read
-    // the front buffer which contain the metrics that you can visualise
-    // regarding the most profiling metrics recorded.
+    DN_ProfilerAnchor anchors[4]        = {};
+    DN_USize          anchors_count     = DN_ArrayCountU(anchors);
+    DN_USize          anchors_per_frame = anchors_count / 2;
+    DN_Profiler       profiler          = DN_ProfilerInit(anchors, anchors_count, anchors_per_frame, tsc_now, tsc_frequency);
 
-    // NOTE: DN_Profiler_ReadBuffer
-    //
-    // Retrieve the buffer of anchors of which there are
-    // `DN_PROFILER_ANCHOR_BUFFER_SIZE` anchors from the most recent run
-    // of the profiler after you have called `SwapAnchorBuffer` to trigger
-    // the double buffer
-    DN_ProfilerAnchor *read_anchors = DN_Profiler_ReadBuffer();
-    for (DN_USize index = 0; index < DN_PROFILER_ANCHOR_BUFFER_SIZE; index++) {
-      DN_ProfilerAnchor *anchor = read_anchors + index;
-      if (anchor->name.size) {
-        // ...
-      }
+    for (DN_USize it = 0; it < 1; it++) {
+      DN_ProfilerNewFrame(&profiler);
+      DN_ProfilerZone zone = DN_ProfilerBeginZone(&profiler, DN_Str8Lit("Main Loop"), DemoZone_MainLoop);
+      DN_OS_SleepMs(100);
+      DN_ProfilerEndZone(&profiler, zone);
+      DN_ProfilerDump(&profiler);
     }
-
-    // NOTE: DN_Profiler_WriteBuffer
-    //
-    // Same as `ReadBuffer` however we return the buffer that the profiler
-    // is currently writing anchors into.
-    DN_ProfilerAnchor *write_anchors = DN_Profiler_WriteBuffer();
-    for (DN_USize index = 0; index < DN_PROFILER_ANCHOR_BUFFER_SIZE; index++) {
-      DN_ProfilerAnchor *anchor = write_anchors + index;
-      if (anchor->name.size) {
-        // ...
-      }
-    }
-
-    DN_Profiler_EndZone(profiler_zone_main_update);
-    DN_Profiler_SwapAnchorBuffer(); // Should occur after all profiling zones are ended!
-    DN_Memset(g_dn_core->profiler, 0, sizeof(*g_dn_core->profiler));
   }
-#endif // !defined(DN_NO_PROFILER)
-#endif
+  #endif
 
   // NOTE: DN_Raycast_LineIntersectV2
   // Calculate the intersection point of 2 rays returning a `t` value
@@ -1199,5 +1136,4 @@ void DN_Docs_Demo()
   // queried using 'DN_W32_LastError'
   #endif
 }
-
 DN_MSVC_WARNING_POP

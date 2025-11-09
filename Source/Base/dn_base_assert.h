@@ -4,7 +4,7 @@
 #define DN_HardAssertF(expr, fmt, ...)                                                  \
   do {                                                                                  \
     if (!(expr)) {                                                                      \
-      DN_Str8 stack_trace_ = DN_StackTrace_WalkStr8FromHeap(128 /*limit*/, 2 /*skip*/); \
+      DN_Str8 stack_trace_ = DN_StackTraceWalkStr8FromHeap(128 /*limit*/, 2 /*skip*/); \
       DN_LOG_ErrorF("Hard assertion [" #expr "], stack trace was:\n\n%.*s\n\n" fmt,     \
                     DN_Str8PrintFmt(stack_trace_),                                           \
                     ##__VA_ARGS__);                                                     \
@@ -22,7 +22,7 @@
   #define DN_AssertF(expr, fmt, ...)                                                      \
     do {                                                                                  \
       if (!(expr)) {                                                                      \
-        DN_Str8 stack_trace_ = DN_StackTrace_WalkStr8FromHeap(128 /*limit*/, 2 /*skip*/); \
+        DN_Str8 stack_trace_ = DN_StackTraceWalkStr8FromHeap(128 /*limit*/, 2 /*skip*/); \
         DN_LOG_ErrorF("Assertion [" #expr "], stack trace was:\n\n%.*s\n\n" fmt,          \
                       DN_Str8PrintFmt(stack_trace_),                                           \
                       ##__VA_ARGS__);                                                     \
@@ -35,7 +35,7 @@
       static bool once = true;                                                            \
       if (!(expr) && once) {                                                              \
         once                 = false;                                                     \
-        DN_Str8 stack_trace_ = DN_StackTrace_WalkStr8FromHeap(128 /*limit*/, 2 /*skip*/); \
+        DN_Str8 stack_trace_ = DN_StackTraceWalkStr8FromHeap(128 /*limit*/, 2 /*skip*/); \
         DN_LOG_ErrorF("Assertion [" #expr "], stack trace was:\n\n%.*s\n\n" fmt,          \
                       DN_Str8PrintFmt(stack_trace_),                                           \
                       ##__VA_ARGS__);                                                     \
@@ -61,7 +61,7 @@
     ((expr) ? true : (DN_LOG_WarningF(fmt, ##__VA_ARGS__), false))
 #else
   #define DN_CheckF(expr, fmt, ...) \
-    ((expr) ? true : (DN_LOG_ErrorF(fmt, ##__VA_ARGS__), DN_StackTrace_Print(128 /*limit*/), DN_DebugBreak, false))
+    ((expr) ? true : (DN_LOG_ErrorF(fmt, ##__VA_ARGS__), DN_StackTracePrint(128 /*limit*/), DN_DebugBreak, false))
 #endif
 
 #endif

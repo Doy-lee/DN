@@ -8,8 +8,6 @@
 #include <unistd.h>      // getpagesize
 #endif
 
-static DN_OSCore *g_dn_os_core_;
-
 static void DN_OS_LOGEmitFromTypeTypeFV_(DN_LOGTypeParam type, void *user_data, DN_CallSite call_site, DN_FMT_ATTRIB char const *fmt, va_list args)
 {
   DN_Assert(user_data);
@@ -83,92 +81,6 @@ static void DN_OS_LOGEmitFromTypeTypeFV_(DN_LOGTypeParam type, void *user_data, 
   DN_OS_Print(dest, DN_Str8FromPtr(prefix_buffer, prefix_size.size));
   DN_OS_PrintF(dest, "%*s ", DN_Cast(int)prefix_size.padding, "");
   DN_OS_PrintLnFV(dest, fmt, args);
-}
-
-DN_API void DN_OS_Init(DN_OSCore *os, DN_OSInitArgs *args)
-{
-  g_dn_os_core_ = os;
-
-  // NOTE: OS
-  {
-    #if defined(DN_PLATFORM_WIN32)
-    SYSTEM_INFO system_info = {};
-    GetSystemInfo(&system_info);
-
-    os->logical_processor_count = system_info.dwNumberOfProcessors;
-    os->page_size               = system_info.dwPageSize;
-    os->alloc_granularity       = system_info.dwAllocationGranularity;
-    #else
-      #if defined(DN_PLATFORM_EMSCRIPTEN)
-      os->logical_processor_count = 1;
-      #else
-      os->logical_processor_count = get_nprocs();
-      #endif
-    os->page_size               = getpagesize();
-    os->alloc_granularity       = os->page_size;
-    #endif
-  }
-
-  // NOTE: Setup logging
-  DN_OS_EmitLogsWithOSPrintFunctions(os);
-
-  {
-    #if defined(DN_PLATFORM_EMSCRIPTEN)
-    os->arena = DN_ArenaFromHeap(DN_Megabytes(1), DN_ArenaFlags_NoAllocTrack);
-    #else
-    os->arena = DN_ArenaFromVMem(DN_Megabytes(1), DN_Kilobytes(4), DN_ArenaFlags_NoAllocTrack);
-    #endif
-
-    #if defined(DN_PLATFORM_WIN32)
-    os->platform_context = DN_ArenaNew(&os->arena, DN_W32Core, DN_ZMem_Yes);
-    #elif defined(DN_PLATFORM_POSIX) || defined(DN_PLATFORM_EMSCRIPTEN)
-    os->platform_context = DN_ArenaNew(&os->arena, DN_POSIXCore, DN_ZMem_Yes);
-    #endif
-
-    #if defined(DN_PLATFORM_WIN32)
-    DN_W32Core *w32 = DN_Cast(DN_W32Core *) os->platform_context;
-    InitializeCriticalSection(&w32->sync_primitive_free_list_mutex);
-
-    QueryPerformanceFrequency(&w32->qpc_frequency);
-    HMODULE module = LoadLibraryA("kernel32.dll");
-    if (module) {
-      w32->set_thread_description = DN_Cast(DN_W32SetThreadDescriptionFunc *) GetProcAddress(module, "SetThreadDescription");
-      FreeLibrary(module);
-    }
-
-    // NOTE: win32 bcrypt
-    wchar_t const     BCRYPT_ALGORITHM[] = L"RNG";
-    long /*NTSTATUS*/ init_status        = BCryptOpenAlgorithmProvider(&w32->bcrypt_rng_handle, BCRYPT_ALGORITHM, nullptr /*implementation*/, 0 /*flags*/);
-    if (w32->bcrypt_rng_handle && init_status == 0)
-      w32->bcrypt_init_success = true;
-    else
-      DN_LOG_ErrorF("Failed to initialise Windows secure random number generator, error: %d", init_status);
-    #else
-    DN_Posix_Init(DN_Cast(DN_POSIXCore *)os->platform_context);
-    #endif
-  }
-
-  // NOTE: Initialise tmem arenas which allocate memory and will be
-  // recorded to the now initialised allocation table. The initialisation
-  // of tmem memory may request tmem memory itself in leak tracing mode.
-  // This is supported as the tmem arenas defer allocation tracking until
-  // initialisation is done.
-  DN_OSTLSInitArgs tls_init_args = {};
-  if (args) {
-    tls_init_args.commit           = args->tls_commit;
-    tls_init_args.reserve          = args->tls_reserve;
-    tls_init_args.err_sink_reserve = args->tls_err_sink_reserve;
-    tls_init_args.err_sink_commit  = args->tls_err_sink_commit;
-  }
-
-  DN_OS_TLSInit(&os->tls, tls_init_args);
-  DN_OS_TLSSetCurrentThreadTLS(&os->tls);
-  os->cpu_report = DN_CPUGetReport();
-
-  #define DN_CPU_FEAT_XENTRY(label) g_dn_cpu_feature_decl[DN_CPUFeature_##label] = {DN_CPUFeature_##label, DN_Str8Lit(#label)};
-  DN_CPU_FEAT_XMACRO
-  #undef DN_CPU_FEAT_XENTRY
-  DN_Assert(g_dn_os_core_);
 }
 
 DN_API void DN_OS_EmitLogsWithOSPrintFunctions(DN_OSCore *os)
@@ -321,7 +233,7 @@ DN_API bool DN_OS_DateIsValid(DN_OSDateTime date)
   return true;
 }
 
-// NOTE: Other /////////////////////////////////////////////////////////////////////////////////////
+// NOTE: Other
 DN_API DN_Str8 DN_OS_EXEDir(DN_Arena *arena)
 {
   DN_Str8 result = {};
@@ -335,7 +247,7 @@ DN_API DN_Str8 DN_OS_EXEDir(DN_Arena *arena)
   return result;
 }
 
-// NOTE: Counters //////////////////////////////////////////////////////////////////////////////////
+// NOTE: Counters
 DN_API DN_F64 DN_OS_PerfCounterS(uint64_t begin, uint64_t end)
 {
   uint64_t frequency = DN_OS_PerfCounterFrequency();

@@ -193,7 +193,7 @@ bool DN_VArray_Reserve(DN_VArray<T> *array, DN_USize count)
     return false;
 
   DN_USize real_commit    = (array->size + count) * sizeof(T);
-  DN_USize aligned_commit = DN_AlignUpPowerOfTwo(real_commit, g_dn_os_core_->page_size);
+  DN_USize aligned_commit = DN_AlignUpPowerOfTwo(real_commit, g_dn_->os.page_size);
   if (array->commit >= aligned_commit)
     return true;
   bool result   = DN_OS_MemCommit(array->data, aligned_commit, DN_MemPage_ReadWrite);

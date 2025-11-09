@@ -776,7 +776,6 @@ DN_API DN_F32 DN_EpsilonClampF32(DN_F32 value, DN_F32 target, DN_F32 epsilon)
   return result;
 }
 
-
 static DN_ArenaBlock *DN_ArenaBlockFromMemFuncs_(DN_U64 reserve, DN_U64 commit, bool track_alloc, bool alloc_can_leak, DN_ArenaMemFuncs mem_funcs)
 {
   DN_ArenaBlock *result = nullptr;
@@ -823,7 +822,7 @@ static DN_ArenaBlock *DN_ArenaBlockFromMemFuncs_(DN_U64 reserve, DN_U64 commit, 
   }
 
   if (track_alloc && result)
-    DN_DBGTrackAlloc(result, result->reserve, alloc_can_leak);
+    DN_LeakTrackAlloc(dn->leak, result, result->reserve, alloc_can_leak);
 
   return result;
 }
@@ -890,7 +889,7 @@ static void DN_ArenaBlockDeinit_(DN_Arena const *arena, DN_ArenaBlock *block)
 {
   DN_USize release_size = block->reserve;
   if (DN_BitIsNotSet(arena->flags, DN_ArenaFlags_NoAllocTrack))
-    DN_DBGTrackDealloc(block);
+    DN_LeakTrackDealloc(&g_dn_->leak, block);
   DN_ASanUnpoisonMemoryRegion(block, block->commit);
   if (arena->flags & DN_ArenaFlags_MemFuncs) {
     if (arena->mem_funcs.type == DN_ArenaMemFuncType_Basic)
@@ -2899,5 +2898,172 @@ DN_API DN_Str8x32 DN_ByteCountStr8x32FromType(DN_U64 bytes, DN_ByteCountType typ
 {
   DN_ByteCountResult byte_count = DN_ByteCountFromType(bytes, type);
   DN_Str8x32         result     = DN_Str8x32FromFmt("%.2f%.*s", byte_count.bytes, DN_Str8PrintFmt(byte_count.suffix));
+  return result;
+}
+
+DN_API DN_Profiler DN_ProfilerInit(DN_ProfilerAnchor *anchors, DN_USize count, DN_USize anchors_per_frame, DN_ProfilerTSCNowFunc *tsc_now, DN_U64 tsc_frequency)
+{
+  DN_Profiler result       = {};
+  result.anchors           = anchors;
+  result.anchors_count     = count;
+  result.anchors_per_frame = anchors_per_frame;
+  result.tsc_now           = tsc_now;
+  result.tsc_frequency     = tsc_frequency;
+
+  DN_AssertF(result.tsc_frequency != 0,
+             "You must set this to the frequency of the timestamp counter function (TSC) (e.g. how "
+             "many ticks occur between timestamps). We use this to determine the duration between "
+             "each zone's recorded TSC. For example if the 'tsc_now' was set to Window's "
+             "QueryPerformanceCounter then 'tsc_frequency' would be set to the value of "
+             "QueryPerformanceFrequency which is typically 10mhz (e.g. The duration between two "
+             "consecutive TSC's is 10mhz)."
+             ""
+             "Hence frequency can't be zero otherwise it's a divide by 0. If you don't have a TSC "
+             "function and pass in null, the profiler defaults to rdtsc() and you must measure the "
+             "frequency of rdtsc yourself. The reason for this is that measuring rdtsc requires "
+             "having some alternate timing mechanism to measure the duration between the TSCs "
+             "provided by rdtsc and this profiler makes no assumption about what timing primitives "
+             "are available other than rdtsc which is a CPU builtin available on basically all "
+             "platforms or have an equivalent (e.g. __builtin_readcyclecounter)"
+             ""
+             "This codebase provides DN_OS_EstimateTSCPerSecond() as an example of how to that for "
+             "convenience and is available if compiling with the OS layer. Some platforms like "
+             "Emscripten don't support rdtsc() so you should use an alternative method like "
+             "emscripten_get_now() or clock_gettime with CLOCK_MONOTONIC.");
+  return result;
+}
+
+DN_API DN_USize DN_ProfilerFrameCount(DN_Profiler const *profiler)
+{
+  DN_USize result = profiler->anchors_count / profiler->anchors_per_frame;
+  return result;
+}
+
+DN_API DN_ProfilerAnchorArray DN_ProfilerFrameAnchorsFromIndex(DN_Profiler *profiler, DN_USize frame_index)
+{
+  DN_ProfilerAnchorArray result        = {};
+  DN_USize               anchor_offset = frame_index * profiler->anchors_per_frame;
+  result.data                          = profiler->anchors + anchor_offset;
+  result.count                         = profiler->anchors_per_frame;
+  return result;
+}
+
+DN_API DN_ProfilerAnchorArray DN_ProfilerFrameAnchors(DN_Profiler *profiler)
+{
+  DN_ProfilerAnchorArray result = DN_ProfilerFrameAnchorsFromIndex(profiler, profiler->frame_index);
+  return result;
+}
+
+DN_API DN_ProfilerZone DN_ProfilerBeginZone(DN_Profiler *profiler, DN_Str8 name, DN_U16 anchor_index)
+{
+  DN_ProfilerZone result = {};
+  if (profiler->paused)
+    return result;
+
+  DN_Assert(anchor_index < profiler->anchors_per_frame);
+  DN_ProfilerAnchor *anchor = DN_ProfilerFrameAnchors(profiler).data + anchor_index;
+  anchor->name              = name;
+
+  // TODO: We need per-thread-local-storage profiler so that we can use these apis
+  // across threads. For now, we let them overwrite each other but this is not tenable.
+  #if 0
+    if (anchor->name.size && anchor->name != name)
+        DN_AssertF(name == anchor->name, "Potentially overwriting a zone by accident? Anchor is '%.*s', name is '%.*s'", DN_Str8PrintFmt(anchor->name), DN_Str8PrintFmt(name));
+  #endif
+
+  result.begin_tsc                 = profiler->tsc_now ? profiler->tsc_now() : DN_CPUGetTSC();
+  result.anchor_index              = anchor_index;
+  result.parent_zone               = profiler->parent_zone;
+  result.elapsed_tsc_at_zone_start = anchor->tsc_inclusive;
+  profiler->parent_zone            = anchor_index;
+  return result;
+}
+
+DN_API void DN_ProfilerEndZone(DN_Profiler *profiler, DN_ProfilerZone zone)
+{
+  if (profiler->paused)
+    return;
+
+  DN_Assert(zone.anchor_index < profiler->anchors_per_frame);
+  DN_Assert(zone.parent_zone < profiler->anchors_per_frame);
+
+  DN_ProfilerAnchorArray array       = DN_ProfilerFrameAnchors(profiler);
+  DN_ProfilerAnchor     *anchor      = array.data + zone.anchor_index;
+  DN_U64                 tsc_now     = profiler->tsc_now ? profiler->tsc_now() : DN_CPUGetTSC();
+  DN_U64                 elapsed_tsc = tsc_now - zone.begin_tsc;
+
+  anchor->hit_count++;
+  anchor->tsc_inclusive             = zone.elapsed_tsc_at_zone_start + elapsed_tsc;
+  anchor->tsc_exclusive            += elapsed_tsc;
+
+  if (zone.parent_zone != zone.anchor_index) {
+    DN_ProfilerAnchor *parent_anchor  = array.data + zone.parent_zone;
+    parent_anchor->tsc_exclusive     -= elapsed_tsc;
+  }
+  profiler->parent_zone = zone.parent_zone;
+}
+
+DN_API void DN_ProfilerNewFrame(DN_Profiler *profiler)
+{
+  if (profiler->paused)
+    return;
+
+  // NOTE: End the frame's zone
+  DN_ProfilerEndZone(profiler, profiler->frame_zone);
+  DN_ProfilerAnchorArray old_frame_anchors = DN_ProfilerFrameAnchors(profiler);
+  DN_ProfilerAnchor      old_frame_anchor  = old_frame_anchors.data[0];
+  profiler->frame_avg_tsc                  = (profiler->frame_avg_tsc + old_frame_anchor.tsc_inclusive) / 2.f;
+
+  // NOTE: Bump to the next frame
+  DN_USize frame_count                = profiler->anchors_count / profiler->anchors_per_frame;
+  profiler->frame_index               = (profiler->frame_index + 1) % frame_count;
+
+  // NOTE: Zero out the anchors
+  DN_ProfilerAnchorArray next_anchors = DN_ProfilerFrameAnchors(profiler);
+  DN_Memset(next_anchors.data, 0, sizeof(*profiler->anchors) * next_anchors.count);
+
+  // NOTE: Start the frame's zone
+  profiler->frame_zone = DN_ProfilerBeginZone(profiler, DN_Str8Lit("Profiler Frame"), 0);
+}
+
+DN_API void DN_ProfilerDump(DN_Profiler *profiler)
+{
+  if (profiler->frame_index == 0)
+    return;
+
+  DN_USize frame_index = profiler->frame_index - 1;
+  DN_Assert(profiler->frame_index < profiler->anchors_per_frame);
+
+  DN_ProfilerAnchor *anchors = profiler->anchors + (frame_index * profiler->anchors_per_frame);
+  for (DN_USize index = 1; index < profiler->anchors_per_frame; index++) {
+    DN_ProfilerAnchor const *anchor = anchors + index;
+    if (!anchor->hit_count)
+      continue;
+
+    DN_U64 tsc_exclusive              = anchor->tsc_exclusive;
+    DN_U64 tsc_inclusive              = anchor->tsc_inclusive;
+    DN_F64 tsc_exclusive_milliseconds = tsc_exclusive * 1000 / DN_Cast(DN_F64) profiler->tsc_frequency;
+    if (tsc_exclusive == tsc_inclusive) {
+      DN_OS_PrintOutLnF("%.*s[%u]: %.1fms", DN_Str8PrintFmt(anchor->name), anchor->hit_count, tsc_exclusive_milliseconds);
+    } else {
+      DN_F64 tsc_inclusive_milliseconds = tsc_inclusive * 1000 / DN_Cast(DN_F64) profiler->tsc_frequency;
+      DN_OS_PrintOutLnF("%.*s[%u]: %.1f/%.1fms",
+                        DN_Str8PrintFmt(anchor->name),
+                        anchor->hit_count,
+                        tsc_exclusive_milliseconds,
+                        tsc_inclusive_milliseconds);
+    }
+  }
+}
+
+DN_API DN_F64 DN_ProfilerSecFromTSC(DN_Profiler *profiler, DN_U64 duration_tsc)
+{
+  DN_F64 result = DN_Cast(DN_F64)duration_tsc / profiler->tsc_frequency;
+  return result;
+}
+
+DN_API DN_F64 DN_ProfilerMsFromTSC(DN_Profiler *profiler, DN_U64 duration_tsc)
+{
+  DN_F64 result = DN_Cast(DN_F64)duration_tsc / profiler->tsc_frequency * 1000.0;
   return result;
 }

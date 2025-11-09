@@ -58,5 +58,6 @@
 #include "Base/dn_base_assert.h"
 #include "Base/dn_base_log.h"
 #include "Base/dn_base_containers.h"
+#include "Base/dn_base_leak.h"
 
 #endif // !defined(DN_BASE_INC_H)

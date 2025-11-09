@@ -34,25 +34,25 @@ struct DN_StackTraceWalkResultIterator
 
 
 #if defined(DN_FREESTANDING)
-#define                             DN_StackTrace_WalkStr8FromHeap(...) DN_Str8Lit("N/A")
-#define                             DN_StackTrace_Walk(...)
-#define                             DN_StackTrace_WalkResultIterate(...)
-#define                             DN_StackTrace_WalkResultToStr8(...) DN_Str8Lit("N/A")
-#define                             DN_StackTrace_WalkStr8(...) DN_Str8Lit("N/A")
-#define                             DN_StackTrace_WalkStr8FromHeap(...) DN_Str8Lit("N/A")
-#define                             DN_StackTrace_GetFrames(...)
-#define                             DN_StackTrace_RawFrameToFrame(...)
-#define                             DN_StackTrace_Print(...)
-#define                             DN_StackTrace_ReloadSymbols(...)
+#define                             DN_StackTraceWalkStr8FromHeap(...) DN_Str8Lit("N/A")
+#define                             DN_StackTraceWalk(...)
+#define                             DN_StackTraceWalkResultIterate(...)
+#define                             DN_StackTraceWalkResultToStr8(...) DN_Str8Lit("N/A")
+#define                             DN_StackTraceWalkStr8(...) DN_Str8Lit("N/A")
+#define                             DN_StackTraceWalkStr8FromHeap(...) DN_Str8Lit("N/A")
+#define                             DN_StackTraceGetFrames(...)
+#define                             DN_StackTraceRawFrameToFrame(...)
+#define                             DN_StackTracePrint(...)
+#define                             DN_StackTraceReloadSymbols(...)
 #else
-DN_API DN_StackTraceWalkResult      DN_StackTrace_Walk             (struct DN_Arena *arena, DN_U16 limit);
-DN_API bool                         DN_StackTrace_WalkResultIterate(DN_StackTraceWalkResultIterator *it, DN_StackTraceWalkResult const *walk);
-DN_API DN_Str8                      DN_StackTrace_WalkResultToStr8 (struct DN_Arena *arena, DN_StackTraceWalkResult const *walk, DN_U16 skip);
-DN_API DN_Str8                      DN_StackTrace_WalkStr8         (struct DN_Arena *arena, DN_U16 limit, DN_U16 skip);
-DN_API DN_Str8                      DN_StackTrace_WalkStr8FromHeap (DN_U16 limit, DN_U16 skip);
-DN_API DN_Slice<DN_StackTraceFrame> DN_StackTrace_GetFrames        (struct DN_Arena *arena, DN_U16 limit);
-DN_API DN_StackTraceFrame           DN_StackTrace_RawFrameToFrame  (struct DN_Arena *arena, DN_StackTraceRawFrame raw_frame);
-DN_API void                         DN_StackTrace_Print            (DN_U16 limit);
-DN_API void                         DN_StackTrace_ReloadSymbols    ();
+DN_API DN_StackTraceWalkResult      DN_StackTraceWalk             (struct DN_Arena *arena, DN_U16 limit);
+DN_API bool                         DN_StackTraceWalkResultIterate(DN_StackTraceWalkResultIterator *it, DN_StackTraceWalkResult const *walk);
+DN_API DN_Str8                      DN_StackTraceWalkResultToStr8 (struct DN_Arena *arena, DN_StackTraceWalkResult const *walk, DN_U16 skip);
+DN_API DN_Str8                      DN_StackTraceWalkStr8         (struct DN_Arena *arena, DN_U16 limit, DN_U16 skip);
+DN_API DN_Str8                      DN_StackTraceWalkStr8FromHeap (DN_U16 limit, DN_U16 skip);
+DN_API DN_Slice<DN_StackTraceFrame> DN_StackTraceGetFrames        (struct DN_Arena *arena, DN_U16 limit);
+DN_API DN_StackTraceFrame           DN_StackTraceRawFrameToFrame  (struct DN_Arena *arena, DN_StackTraceRawFrame raw_frame);
+DN_API void                         DN_StackTracePrint            (DN_U16 limit);
+DN_API void                         DN_StackTraceReloadSymbols    ();
 #endif
 #endif // !defined(DN_BASE_OS_H)

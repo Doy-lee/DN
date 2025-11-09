@@ -29,8 +29,8 @@ DN_API void *DN_OS_MemReserve(DN_USize size, DN_MemCommit commit, DN_U32 page_fl
     os_page_flags |= (PROT_READ | PROT_WRITE);
 
   void *result = mmap(nullptr, size, os_page_flags, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-  DN_AtomicAddU64(&g_dn_os_core_->mem_allocs_total, 1);
-  DN_AtomicAddU64(&g_dn_os_core_->mem_allocs_frame, 1);
+  DN_AtomicAddU64(&g_dn_->os.mem_allocs_total, 1);
+  DN_AtomicAddU64(&g_dn_->os.mem_allocs_frame, 1);
   if (result == MAP_FAILED)
     result = nullptr;
   return result;
@@ -44,8 +44,8 @@ DN_API bool DN_OS_MemCommit(void *ptr, DN_USize size, DN_U32 page_flags)
 
   unsigned long os_page_flags = DN_OS_MemConvertPageToOSFlags_(page_flags);
   result                      = mprotect(ptr, size, os_page_flags) == 0;
-  DN_AtomicAddU64(&g_dn_os_core_->mem_allocs_total, 1);
-  DN_AtomicAddU64(&g_dn_os_core_->mem_allocs_frame, 1);
+  DN_AtomicAddU64(&g_dn_->os.mem_allocs_total, 1);
+  DN_AtomicAddU64(&g_dn_->os.mem_allocs_frame, 1);
   return result;
 }
 
@@ -68,11 +68,11 @@ DN_API int DN_OS_MemProtect(void *ptr, DN_USize size, DN_U32 page_flags)
   static DN_Str8 const ALIGNMENT_ERROR_MSG = DN_Str8Lit(
       "Page protection requires pointers to be page aligned because we "
       "can only guard memory at a multiple of the page boundary.");
-  DN_AssertF(DN_IsPowerOfTwoAligned(DN_Cast(uintptr_t) ptr, g_dn_os_core_->page_size),
+  DN_AssertF(DN_IsPowerOfTwoAligned(DN_Cast(uintptr_t) ptr, g_dn_->os.page_size),
              "%s",
              ALIGNMENT_ERROR_MSG.data);
   DN_AssertF(
-      DN_IsPowerOfTwoAligned(size, g_dn_os_core_->page_size), "%s", ALIGNMENT_ERROR_MSG.data);
+      DN_IsPowerOfTwoAligned(size, g_dn_->os.page_size), "%s", ALIGNMENT_ERROR_MSG.data);
 
   unsigned long os_page_flags = DN_OS_MemConvertPageToOSFlags_(page_flags);
   int           result        = mprotect(ptr, size, os_page_flags);
@@ -283,8 +283,8 @@ DN_API DN_U64 DN_OS_PerfCounterFrequency()
 
 static DN_POSIXCore *DN_OS_GetPOSIXCore_()
 {
-  DN_Assert(g_dn_os_core_ && g_dn_os_core_->platform_context);
-  DN_POSIXCore *result = DN_Cast(DN_POSIXCore *)g_dn_os_core_->platform_context;
+  DN_Assert(g_dn_ && g_dn_->os.platform_context);
+  DN_POSIXCore *result = DN_Cast(DN_POSIXCore *)g_dn_->os.platform_context;
   return result;
 }
 
@@ -1015,7 +1015,7 @@ static DN_POSIXSyncPrimitive *DN_POSIX_AllocSyncPrimitive_()
       posix->sync_primitive_free_list = posix->sync_primitive_free_list->next;
       result->next                    = nullptr;
     } else {
-      DN_OSCore *os = g_dn_os_core_;
+      DN_OSCore *os = &g_dn_->os;
       result        = DN_ArenaNew(&os->arena, DN_POSIXSyncPrimitive, DN_ZMem_Yes);
     }
   }
