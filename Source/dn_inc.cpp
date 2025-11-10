@@ -93,7 +93,8 @@ static void DN_InitOS_(DN_OSCore *os, DN_InitArgs *args)
 
 DN_API void DN_Init(DN_Core *dn, DN_InitFlags flags, DN_InitArgs *args)
 {
-  g_dn_ = dn;
+  g_dn_          = dn;
+  dn->init_flags = flags;
 
   if (flags & DN_InitFlags_OS) {
     #if defined(DN_OS_H) && defined(DN_OS_CPP)

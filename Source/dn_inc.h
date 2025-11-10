@@ -1,15 +1,6 @@
 #if !defined(DN_INC_H)
 #define DN_INC_H
 
-struct DN_Core
-{
-  DN_USize       mem_allocs_frame;
-  DN_LeakTracker leak;
-  #if defined(DN_OS_H)
-  DN_OSCore os;
-  #endif
-};
-
 struct DN_InitArgs
 {
   DN_U64 os_tls_reserve;
@@ -27,6 +18,16 @@ enum DN_InitFlags_
   DN_InitFlags_LogLibFeatures = 1 << 2,
   DN_InitFlags_LogCPUFeatures = 1 << 3,
   DN_InitFlags_LogAllFeatures = DN_InitFlags_LogLibFeatures | DN_InitFlags_LogCPUFeatures,
+};
+
+struct DN_Core
+{
+  DN_InitFlags   init_flags;
+  DN_USize       mem_allocs_frame;
+  DN_LeakTracker leak;
+  #if defined(DN_OS_H)
+  DN_OSCore os;
+  #endif
 };
 
 extern DN_Core *g_dn_;

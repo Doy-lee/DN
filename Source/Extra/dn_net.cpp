@@ -3,6 +3,23 @@
 #include "../dn_base_inc.h"
 #include "../dn_os_inc.h"
 
+DN_Str8 DN_NET_Str8FromResponseState(DN_NETResponseState state)
+{
+  DN_Str8 result = {};
+  switch (state) {
+      case DN_NETResponseState_Nil:      result = DN_Str8Lit("Nil");       break;
+      case DN_NETResponseState_Error:    result = DN_Str8Lit("Error");     break;
+      case DN_NETResponseState_HTTP:     result = DN_Str8Lit("HTTP");      break;
+      case DN_NETResponseState_WSOpen:   result = DN_Str8Lit("WS Open");   break;
+      case DN_NETResponseState_WSText:   result = DN_Str8Lit("WS Text");   break;
+      case DN_NETResponseState_WSBinary: result = DN_Str8Lit("WS Binary"); break;
+      case DN_NETResponseState_WSClose:  result = DN_Str8Lit("WS Close");  break;
+      case DN_NETResponseState_WSPing:   result = DN_Str8Lit("WS Ping");   break;
+      case DN_NETResponseState_WSPong:   result = DN_Str8Lit("WS Pong");   break;
+  }
+  return result;
+}
+
 DN_NETRequest *DN_NET_RequestFromHandle(DN_NETRequestHandle handle)
 {
   DN_NETRequest *ptr    = DN_Cast(DN_NETRequest *) handle.handle;

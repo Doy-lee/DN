@@ -114,12 +114,13 @@ struct DN_NETInterface
   DN_NETWaitForAnyResponseFunc* wait_for_any_response;
 };
 
-DN_NETRequest *     DN_NET_RequestFromHandle               (DN_NETRequestHandle handle);
-DN_NETRequestHandle DN_NET_HandleFromRequest               (DN_NETRequest *request);
+DN_Str8             DN_NET_Str8FromResponseState(DN_NETResponseState state);
+DN_NETRequest *     DN_NET_RequestFromHandle    (DN_NETRequestHandle handle);
+DN_NETRequestHandle DN_NET_HandleFromRequest    (DN_NETRequest *request);
 
 // NOTE: Internal functions for different networking implementations to use
-void                DN_NET_BaseInit_                       (DN_NETCore *net, char *base, DN_U64 base_size);
-DN_NETRequestHandle DN_NET_SetupRequest_                   (DN_NETRequest *request, DN_Str8 url, DN_Str8 method, DN_NETDoHTTPArgs const *args, DN_NETRequestType type);
-void                DN_NET_EndFinishedRequest_             (DN_NETRequest *request);
+void                DN_NET_BaseInit_            (DN_NETCore *net, char *base, DN_U64 base_size);
+DN_NETRequestHandle DN_NET_SetupRequest_        (DN_NETRequest *request, DN_Str8 url, DN_Str8 method, DN_NETDoHTTPArgs const *args, DN_NETRequestType type);
+void                DN_NET_EndFinishedRequest_  (DN_NETRequest *request);
 
 #endif // DN_NET_H

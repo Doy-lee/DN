@@ -1,7 +1,7 @@
 #if !defined(DN_BASE_COMPILER_H)
 #define DN_BASE_COMPILER_H
 
-// NOTE: Compiler identification ///////////////////////////////////////////////////////////////////
+// NOTE: Compiler identification
 // Warning! Order is important here, clang-cl on Windows defines _MSC_VER
 #if defined(_MSC_VER)
   #if defined(__clang__)
@@ -16,7 +16,7 @@
   #define DN_COMPILER_GCC
 #endif
 
-// NOTE: __has_feature /////////////////////////////////////////////////////////////////////////////
+// NOTE: __has_feature
 // MSVC for example does not support the feature detection macro for instance so we compile it out
 #if defined(__has_feature)
   #define DN_HAS_FEATURE(expr) __has_feature(expr)
@@ -24,7 +24,7 @@
   #define DN_HAS_FEATURE(expr) 0
 #endif
 
-// NOTE: __has_builtin /////////////////////////////////////////////////////////////////////////////
+// NOTE: __has_builtin
 // MSVC for example does not support the feature detection macro for instance so we compile it out
 #if defined(__has_builtin)
   #define DN_HAS_BUILTIN(expr) __has_builtin(expr)
@@ -32,7 +32,7 @@
   #define DN_HAS_BUILTIN(expr) 0
 #endif
 
-// NOTE: Warning suppression macros ////////////////////////////////////////////////////////////////
+// NOTE: Warning suppression macros
 #if defined(DN_COMPILER_MSVC)
   #define DN_MSVC_WARNING_PUSH         __pragma(warning(push))
   #define DN_MSVC_WARNING_DISABLE(...) __pragma(warning(disable :##__VA_ARGS__))
@@ -55,14 +55,14 @@
   #define DN_GCC_WARNING_POP
 #endif
 
-// NOTE: Host OS identification ////////////////////////////////////////////////////////////////////
+// NOTE: Host OS identification
 #if defined(_WIN32)
   #define DN_OS_WIN32
 #elif defined(__gnu_linux__) || defined(__linux__)
   #define DN_OS_UNIX
 #endif
 
-// NOTE: Platform identification ///////////////////////////////////////////////////////////////////
+// NOTE: Platform identification
 #if !defined(DN_PLATFORM_EMSCRIPTEN) && \
     !defined(DN_PLATFORM_POSIX) &&      \
     !defined(DN_PLATFORM_WIN32)
@@ -77,7 +77,7 @@
   #endif
 #endif
 
-// NOTE: Windows crap //////////////////////////////////////////////////////////////////////////////
+// NOTE: Windows crap
 #if defined(DN_COMPILER_MSVC) || defined(DN_COMPILER_CLANG_CL)
   #if defined(_CRT_SECURE_NO_WARNINGS)
     #define DN_CRT_SECURE_NO_WARNINGS_PREVIOUSLY_DEFINED
@@ -86,21 +86,21 @@
   #endif
 #endif
 
-// NOTE: Force Inline //////////////////////////////////////////////////////////////////////////////
+// NOTE: Force Inline
 #if defined(DN_COMPILER_MSVC) || defined(DN_COMPILER_CLANG_CL)
   #define DN_FORCE_INLINE __forceinline
 #else
   #define DN_FORCE_INLINE inline __attribute__((always_inline))
 #endif
 
-// NOTE: Function/Variable Annotations /////////////////////////////////////////////////////////////
+// NOTE: Function/Variable Annotations
 #if defined(DN_STATIC_API)
   #define DN_API static
 #else
   #define DN_API
 #endif
 
-// NOTE: C/CPP Literals ////////////////////////////////////////////////////////////////////////////
+// NOTE: C/CPP Literals
 // Declare struct literals that work in both C and C++ because the syntax is different between
 // languages.
 #if 0
@@ -114,14 +114,14 @@
   #define DN_Literal(T) (T)
 #endif
 
-// NOTE: Thread Locals /////////////////////////////////////////////////////////////////////////////
+// NOTE: Thread Locals
 #if defined(__cplusplus)
   #define DN_THREAD_LOCAL thread_local
 #else
   #define DN_THREAD_LOCAL _Thread_local
 #endif
 
-// NOTE: C variadic argument annotations ///////////////////////////////////////////////////////////
+// NOTE: C variadic argument annotations
 // TODO: Other compilers
 #if defined(DN_COMPILER_MSVC)
   #define DN_FMT_ATTRIB _Printf_format_string_
@@ -129,17 +129,17 @@
   #define DN_FMT_ATTRIB
 #endif
 
-// NOTE: Type Cast /////////////////////////////////////////////////////////////////////////////////
+// NOTE: Type Cast
 #define DN_Cast(val) (val)
 
-// NOTE: Zero initialisation macro /////////////////////////////////////////////////////////////////
+// NOTE: Zero initialisation macro
 #if defined(__cplusplus)
   #define DN_ZeroInit {}
 #else
   #define DN_ZeroInit {0}
 #endif
 
-// NOTE: Address sanitizer /////////////////////////////////////////////////////////////////////////
+// NOTE: Address sanitizer
 #if !defined(DN_ASAN_POISON)
   #define DN_ASAN_POISON 0
 #endif

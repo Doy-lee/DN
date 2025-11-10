@@ -110,6 +110,7 @@ DN_API int DN_OS_MemProtect(void *ptr, DN_USize size, DN_U32 page_flags)
 
 DN_API void *DN_OS_MemAlloc(DN_USize size, DN_ZMem z_mem)
 {
+  DN_RawAssert(g_dn_->init_flags & DN_InitFlags_OS && "DN must be initialised with the OS flag");
   DN_U32 flags = z_mem == DN_ZMem_Yes ? HEAP_ZERO_MEMORY : 0;
   DN_Assert(size <= DN_Cast(DWORD)(-1));
   void *result = HeapAlloc(GetProcessHeap(), flags, DN_Cast(DWORD) size);
