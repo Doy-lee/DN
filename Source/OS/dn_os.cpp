@@ -1,7 +1,9 @@
 #define DN_OS_CPP
 
-#include "../dn_base_inc.h"
-#include "../dn_os_inc.h"
+#if defined(_CLANGD)
+  #include "../dn_base_inc.h"
+  #include "../dn_os_inc.h"
+#endif
 
 #if defined(DN_PLATFORM_POSIX)
 #include <sys/sysinfo.h> // get_nprocs

@@ -1,6 +1,10 @@
 #if !defined(DN_BIN_PACK_H)
 #define DN_BIN_PACK_H
 
+#if defined(_CLANGD)
+  #include "../dn_base_inc.h"
+#endif
+
 #if !defined(DN_BASE_INC_H)
   #error dn_base_inc.h must be included before this
 #endif

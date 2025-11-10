@@ -1,5 +1,9 @@
-#include "dn_net.h"
-#include "dn_net_curl.h"
+#define DN_NET_CURL_CPP
+
+#if defined(_CLANGD)
+  #include "dn_net.h"
+  #include "dn_net_curl.h"
+#endif
 
 struct DN_NETCurlRequest
 {

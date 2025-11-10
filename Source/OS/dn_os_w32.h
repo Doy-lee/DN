@@ -1,6 +1,11 @@
 #if !defined(DN_OS_WIN32_H)
 #define DN_OS_WIN32_H
 
+#if defined(_CLANGD)
+  #include "../dn_base_inc.h"
+  #include "dn_os_windows.h"
+#endif
+
 struct DN_W32Error
 {
   unsigned long code;

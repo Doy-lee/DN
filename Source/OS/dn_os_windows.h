@@ -1,6 +1,10 @@
 #if !defined(DN_OS_WINDOWS_H)
 #define DN_OS_WINDOWS_H
 
+#if defined(_CLANGD)
+  #include "../dn_base_inc.h"
+#endif
+
 #if defined(DN_COMPILER_MSVC) || defined(DN_COMPILER_CLANG_CL)
   #pragma comment(lib, "bcrypt")
   #pragma comment(lib, "winhttp")

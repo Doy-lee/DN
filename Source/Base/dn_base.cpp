@@ -1,6 +1,8 @@
 #define DN_BASE_CPP
 
-#include "../dn_base_inc.h"
+#if defined(_CLANGD)
+  #include "../dn_base_inc.h"
+#endif
 
 DN_API bool DN_MemEq(void const *lhs, DN_USize lhs_size, void const *rhs, DN_USize rhs_size)
 {
@@ -16,7 +18,7 @@ DN_API bool DN_MemEq(void const *lhs, DN_USize lhs_size, void const *rhs, DN_USi
   #include <cpuid.h>
 #endif
 
-static DN_CPUFeatureDecl g_dn_cpu_feature_decl[DN_CPUFeature_Count];
+DN_CPUFeatureDecl g_dn_cpu_feature_decl[DN_CPUFeature_Count];
 
 DN_API DN_U64 DN_AtomicSetValue64(DN_U64 volatile *target, DN_U64 value)
 {

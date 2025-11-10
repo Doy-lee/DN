@@ -6,8 +6,10 @@
 #include <emscripten/fetch.h>
 #include <emscripten/websocket.h>
 
-#include "dn_net.h"
-#include "dn_net_emscripten.h"
+#if defined(_CLANGD)
+  #include "dn_net.h"
+  #include "dn_net_emscripten.h"
+#endif
 
 struct DN_NETEmcWSEvent
 {

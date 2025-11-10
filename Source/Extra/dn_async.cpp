@@ -1,8 +1,10 @@
 #define DN_ASYNC_CPP
 
-#include "../dn_base_inc.h"
-#include "../dn_os_inc.h"
-#include "dn_async.h"
+#if defined(_CLANGD)
+  #include "../dn_base_inc.h"
+  #include "../dn_os_inc.h"
+  #include "dn_async.h"
+#endif
 
 static DN_I32 DN_ASYNC_ThreadEntryPoint_(DN_OSThread *thread)
 {

@@ -1,3 +1,8 @@
+#if defined(_CLANGD)
+  #include "../dn_base_inc.h"
+  #include "../dn_os_inc.h"
+#endif
+
 #if !defined(DN_UT_H)
   #error dn_utest.h must be included before this
 #endif

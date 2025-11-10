@@ -1,7 +1,9 @@
 #if !defined(DN_BASE_H)
 #define DN_BASE_H
 
-#include "../dn_base_inc.h"
+#if defined(_CLANGD)
+  #include "../dn_base_inc.h"
+#endif
 
 // NOTE: Macros
 #define DN_Stringify(x) #x

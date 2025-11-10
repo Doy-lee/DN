@@ -1,3 +1,8 @@
+#if defined(_CLANGD)
+  #include "../dn_base_inc.h"
+  #include "../dn_os_inc.h"
+#endif
+
 DN_MSVC_WARNING_PUSH
 DN_MSVC_WARNING_DISABLE(4702) // unreachable code
 void DN_Demo()

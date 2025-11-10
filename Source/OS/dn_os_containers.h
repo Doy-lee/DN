@@ -1,7 +1,11 @@
 #if !defined(DN_OS_CONTAINERS_H)
 #define DN_OS_CONTAINERS_H
 
-// NOTE: DN_VArray /////////////////////////////////////////////////////////////////////////////////
+#if defined(_CLANGD)
+  #include "../dn_base_inc.h"
+#endif
+
+// NOTE: DN_VArray
 // TODO(doyle): Add an API for shrinking the array by decomitting pages back to the OS.
 template <typename T> struct DN_VArray
 {

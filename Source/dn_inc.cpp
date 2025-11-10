@@ -1,6 +1,8 @@
 #define DN_INC_CPP
 
-#include "dn_inc.h"
+#if defined(_CLANGD)
+  #include "dn_inc.h"
+#endif
 
 DN_Core *g_dn_;
 

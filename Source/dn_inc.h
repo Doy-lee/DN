@@ -1,6 +1,11 @@
 #if !defined(DN_INC_H)
 #define DN_INC_H
 
+#if defined(_CLANGD)
+  #include "dn_base_inc.h"
+  #include "dn_os_inc.h"
+#endif
+
 struct DN_InitArgs
 {
   DN_U64 os_tls_reserve;

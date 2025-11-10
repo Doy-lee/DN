@@ -1,7 +1,9 @@
 #if !defined(DN_NET_EMSCRIPTEN_H)
 #define DN_NET_EMSCRIPTEN_H
 
-#include "dn_net.h"
+#if defined(_CLANGD)
+  #include "dn_net.h"
+#endif
 
 DN_NETInterface     DN_NET_EmcInterface();
 void                DN_NET_EmcInit              (DN_NETCore *net, char *base, DN_U64 base_size);

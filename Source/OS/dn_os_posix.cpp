@@ -1,9 +1,14 @@
 #define DN_OS_POSIX_CPP
 
+#if defined(_CLANGD)
+  #include "../dn_base_inc.h"
+  #include "../dn_os_inc.h"
+#endif
+
 #include <dirent.h> // readdir, opendir, closedir
 #include <sys/statvfs.h>
 
-// NOTE: DN_OSMem //////////////////////////////////////////////////////////////////////////////////
+// NOTE: DN_OSMem
 static DN_U32 DN_OS_MemConvertPageToOSFlags_(DN_U32 protect)
 {
   DN_Assert((protect & ~DN_MemPage_All) == 0);

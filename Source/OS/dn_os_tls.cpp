@@ -1,5 +1,9 @@
 #define DN_OS_TLSCPP
 
+#if defined(_CLANGD)
+  #include "dn_os_tls.h"
+#endif
+
 // NOTE: DN_OSTLS ////////////////////////////////////////////////////////////////////////////////////
 DN_OSTLSTMem::DN_OSTLSTMem(DN_OSTLS *tls, DN_U8 arena_index, DN_OSTLSPushTMem push_tmem)
 {

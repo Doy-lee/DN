@@ -1,6 +1,10 @@
 #if !defined(DN_CSV_H)
 #define DN_CSV_H
 
+#if defined(_CLANGD)
+  #include "../dn_base_inc.h"
+#endif
+
 enum DN_CSVSerialise
 {
   DN_CSVSerialise_Read,

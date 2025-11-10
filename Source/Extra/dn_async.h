@@ -1,8 +1,10 @@
 #if !defined(DN_ASYNC_H)
 #define DN_ASYNC_H
 
-#include "../dn_base_inc.h"
-#include "../dn_os_inc.h"
+#if defined(_CLANGD)
+  #include "../dn_base_inc.h"
+  #include "../dn_os_inc.h"
+#endif
 
 enum DN_ASYNCPriority
 {

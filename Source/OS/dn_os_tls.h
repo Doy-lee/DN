@@ -1,10 +1,12 @@
 #if !defined(DN_OS_TLS_H)
 #define DN_OS_TLS_H
 
-#include "../dn_base_inc.h"
-#include "../dn_os_inc.h"
+#if defined(_CLANGD)
+  #include "../dn_base_inc.h"
+  #include "../dn_os_inc.h"
+#endif
 
-// NOTE: DN_OSErrSink /////////////////////////////////////////////////////////////////////////////
+// NOTE: DN_OSErrSink
 enum DN_OSErrSinkMode
 {
   DN_OSErrSinkMode_Nil,                   // Default behaviour to accumulate errors into the sink

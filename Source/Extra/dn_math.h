@@ -1,7 +1,9 @@
 #if !defined(DN_MATH_H)
 #define DN_MATH_H
 
-#include "../dn_base_inc.h"
+#if defined(_CLANGD)
+  #include "../dn_base_inc.h"
+#endif
 
 DN_MSVC_WARNING_PUSH
 DN_MSVC_WARNING_DISABLE(4201) // warning C4201: nonstandard extension used: nameless struct/union

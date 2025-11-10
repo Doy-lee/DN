@@ -1,6 +1,11 @@
 #if !defined(DN_HELPERS_H)
 #define DN_HELPERS_H
 
+#if defined(_CLANGD)
+  #include "../dn_base_inc.h"
+  #include "dn_math.h"
+#endif
+
 #if !defined(DN_BASE_H)
   #error dn_base_inc.h must be included before this
 #endif

@@ -1,3 +1,9 @@
+#define DN_BIN_PACK_CPP
+
+#if defined(_CLANGD)
+  #include "dn_bin_pack.h"
+#endif
+
 DN_API void DN_BinPack_U64(DN_BinPack *pack, DN_BinPackMode mode, DN_U64 *item)
 {
   DN_U64 const VALUE_MASK   = 0b0111'1111;

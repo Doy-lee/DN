@@ -1,7 +1,8 @@
 #define DN_NET_CURL_CPP
 
-#include "../dn_base_inc.h"
-#include "../dn_os_inc.h"
+#if defined(_CLANGD)
+  #include "dn_net.h"
+#endif
 
 DN_Str8 DN_NET_Str8FromResponseState(DN_NETResponseState state)
 {

@@ -7,7 +7,7 @@ enum DN_OSPrintDest
   DN_OSPrintDest_Err,
 };
 
-// NOTE: Print Macros //////////////////////////////////////////////////////////////////////////////
+// NOTE: Print Macros
 #define DN_OS_PrintOut(string)                       DN_OS_Print(DN_OSPrintDest_Out, string)
 #define DN_OS_PrintOutF(fmt, ...)                    DN_OS_PrintF(DN_OSPrintDest_Out, fmt, ##__VA_ARGS__)
 #define DN_OS_PrintOutFV(fmt, args)                  DN_OS_PrintFV(DN_OSPrintDest_Out, fmt, args)
@@ -40,7 +40,7 @@ enum DN_OSPrintDest
 #define DN_OS_PrintErrLnFStyle(style, fmt, ...)      DN_OS_PrintLnFStyle(DN_OSPrintDest_Err, style, fmt, ##__VA_ARGS__)
 #define DN_OS_PrintErrLnFVStyle(style, fmt, args)    DN_OS_PrintLnFVStyle(DN_OSPrintDest_Err, style, fmt, args);
 
-// NOTE: Print /////////////////////////////////////////////////////////////////////////////////////
+// NOTE: Print
 DN_API void DN_OS_Print                (DN_OSPrintDest dest, DN_Str8 string);
 DN_API void DN_OS_PrintF               (DN_OSPrintDest dest, DN_FMT_ATTRIB char const *fmt, ...);
 DN_API void DN_OS_PrintFV              (DN_OSPrintDest dest, DN_FMT_ATTRIB char const *fmt, va_list args);

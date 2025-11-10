@@ -1,10 +1,12 @@
 #if !defined(DN_OS_STRING_H)
 #define DN_OS_STRING_H
 
-#include "../dn_base_inc.h"
-#include "../dn_os_inc.h"
+#if defined(_CLANGD)
+  #include "../dn_base_inc.h"
+  #include "../dn_os_inc.h"
+#endif
 
-// NOTE: DN_Str8 ///////////////////////////////////////////////////////////////////////////////////
+// NOTE: DN_Str8
 
 DN_API DN_Str8                  DN_Str8FromFmtVArenaFrame            (DN_FMT_ATTRIB char const *fmt, va_list args);
 DN_API DN_Str8                  DN_Str8FromFmtArenaFrame             (DN_FMT_ATTRIB char const *fmt, ...);

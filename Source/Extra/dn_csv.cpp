@@ -1,4 +1,8 @@
-#include "dn_csv.h"
+#define DN_CSV_CPP
+
+#if defined(_CLANGD)
+  #include "dn_csv.h"
+#endif
 
 static DN_CSVTokeniser DN_CSV_TokeniserInit(DN_Str8 string, char delimiter)
 {

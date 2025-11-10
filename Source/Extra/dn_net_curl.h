@@ -1,7 +1,9 @@
 #if !defined(DN_NET_CURL_H)
 #define DN_NET_CURL_H
 
-#include "dn_net.h"
+#if defined(_CLANGD)
+  #include "dn_net.h"
+#endif
 
 struct DN_NETCurlCore
 {

@@ -1,8 +1,10 @@
 #if !defined(DN_OS_H)
 #define DN_OS_H
 
-#include "../dn_base_inc.h"
-#include "../dn_os_inc.h"
+#if defined(_CLANGD)
+  #include "../dn_base_inc.h"
+  #include "../dn_os_inc.h"
+#endif
 
 #include <new> // operator new
 
@@ -32,6 +34,8 @@
 #if defined(DN_PLATFORM_EMSCRIPTEN)
   #include <emscripten/fetch.h> // emscripten_fetch (for DN_OSHttpResponse)
 #endif
+
+extern DN_CPUFeatureDecl g_dn_cpu_feature_decl[DN_CPUFeature_Count];
 
 // NOTE: DN_OSDate /////////////////////////////////////////////////////////////////////////////////
 struct DN_OSDateTimeStr8

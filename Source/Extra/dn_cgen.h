@@ -1,6 +1,12 @@
 #if !defined(DN_CGEN_H)
 #define DN_CGEN_H
 
+#if defined(_CLANGD)
+  #include "../dn_base_inc.h"
+  #include "../dn_os_inc.h"
+  #include "../Standalone/dn_cpp_file.h"
+#endif
+
 #if !defined(DN_NO_METADESK)
   #if !defined(_CRT_SECURE_NO_WARNINGS)
     #define _CRT_SECURE_NO_WARNINGS

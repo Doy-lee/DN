@@ -1,6 +1,11 @@
 #if !defined(DN_JSON_H)
 #define DN_JSON_H
 
+#if defined(_CLANGD)
+  #include "../dn_base_inc.h"
+  #include "../External/json.h"
+#endif
+
 #if !defined(SHEREDOM_JSON_H_INCLUDED)
     #error Sheredom json.h (github.com/sheredom/json.h) must be included before this file
 #endif

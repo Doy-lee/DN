@@ -1,6 +1,8 @@
 #define DN_MATH_CPP
 
-#include "dn_math.h"
+#if defined(_CLANGD)
+  #include "dn_math.h"
+#endif
 
 DN_API bool operator==(DN_V2I32 lhs, DN_V2I32 rhs)
 {

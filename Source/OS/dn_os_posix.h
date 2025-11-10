@@ -1,4 +1,9 @@
-#pragma once
+#if !defined(DN_OS_POSIX_H)
+#define DN_OS_POSIX_H
+
+#if defined(_CLANGD)
+  #include "../dn_base_inc.h"
+#endif
 
 #include <pthread.h>
 #include <semaphore.h>
@@ -76,3 +81,4 @@ struct DN_POSIXCore
 DN_API void                   DN_Posix_Init(DN_POSIXCore *posix);
 DN_API void                   DN_Posix_ThreadSetName(DN_Str8 name);
 DN_API DN_POSIXProcSelfStatus DN_Posix_ProcSelfStatus();
+#endif // !defined(DN_OS_POSIX_H)
