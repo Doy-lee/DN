@@ -314,6 +314,8 @@ static int32_t DN_NET_CurlThreadEntryPoint_(DN_OSThread *thread)
         //   > If this is not a complete fragment, the bytesleft field informs about how many
         //     additional bytes are expected to arrive before this fragment is complete.
         curl_req->ws_has_more |= meta && meta->bytesleft > 0;
+        if (!curl_req->ws_has_more)
+          break;
       }
 
       // NOTE: curl_ws_recv returns CURLE_GOT_NOTHING if the associated connection is closed.
