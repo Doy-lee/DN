@@ -1007,9 +1007,13 @@ DN_API DN_Str8                  DN_Str8FromFmtVArena        (DN_Arena *arena, DN
 DN_API DN_Str8                  DN_Str8FromFmtPool          (DN_Pool *pool, DN_FMT_ATTRIB char const *fmt, ...);
 DN_API DN_Str8                  DN_Str8FromByteCountType    (DN_ByteCountType type);
 DN_API DN_Str8x32               DN_Str8x32FromFmt           (DN_FMT_ATTRIB char const *fmt, ...);
+DN_API DN_Str8x32               DN_Str8x32FromFmtV          (DN_FMT_ATTRIB char const *fmt, va_list args);
 DN_API DN_Str8x64               DN_Str8x64FromFmt           (DN_FMT_ATTRIB char const *fmt, ...);
+DN_API DN_Str8x64               DN_Str8x64FromFmtV          (DN_FMT_ATTRIB char const *fmt, va_list args);
 DN_API DN_Str8x128              DN_Str8x128FromFmt          (DN_FMT_ATTRIB char const *fmt, ...);
+DN_API DN_Str8x256              DN_Str8x256FromFmtV         (DN_FMT_ATTRIB char const *fmt, va_list args);
 DN_API DN_Str8x256              DN_Str8x256FromFmt          (DN_FMT_ATTRIB char const *fmt, ...);
+DN_API DN_Str8x256              DN_Str8x256FromFmtV         (DN_FMT_ATTRIB char const *fmt, va_list args);
 DN_API DN_Str8x32               DN_Str8x32FromU64           (DN_U64 val, char separator);
 DN_API bool                     DN_Str8IsAll                (DN_Str8 string, DN_Str8IsAllType is_all);
 DN_API char *                   DN_Str8End                  (DN_Str8 string);

@@ -70,10 +70,10 @@ DN_API void DN_OS_TLSSetCurrentThreadTLS(DN_OSTLS *tls)
 
 DN_API DN_OSTLS *DN_OS_TLSGet()
 {
-  DN_Assert(g_dn_curr_thread_tls &&
-         "DN must be initialised (via DN_Core_Init) before calling any functions depending on "
-         "TLS if this is the main thread, OR, the created thread has not called "
-         "SetCurrentThreadTLS yet so the TLS data structure hasn't been assigned yet");
+  DN_RawAssert(g_dn_curr_thread_tls &&
+               "DN must be initialised (via DN_Core_Init) before calling any functions depending on "
+               "TLS if this is the main thread, OR, the created thread has not called "
+               "SetCurrentThreadTLS yet so the TLS data structure hasn't been assigned yet");
   return g_dn_curr_thread_tls;
 }
 

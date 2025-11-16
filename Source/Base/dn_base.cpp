@@ -1696,6 +1696,13 @@ DN_API DN_Str8x32 DN_Str8x32FromFmt(DN_FMT_ATTRIB char const *fmt, ...)
   return result;
 }
 
+DN_API DN_Str8x32 DN_Str8x32FromFmtV(DN_FMT_ATTRIB char const *fmt, va_list args)
+{
+  DN_Str8x32 result = {};
+  DN_FmtVAppend(result.data, &result.size, sizeof(result.data), fmt, args);
+  return result;
+}
+
 DN_API DN_Str8x64 DN_Str8x64FromFmt(DN_FMT_ATTRIB char const *fmt, ...)
 {
   va_list args;
@@ -1703,6 +1710,13 @@ DN_API DN_Str8x64 DN_Str8x64FromFmt(DN_FMT_ATTRIB char const *fmt, ...)
   DN_Str8x64 result = {};
   DN_FmtVAppend(result.data, &result.size, sizeof(result.data), fmt, args);
   va_end(args);
+  return result;
+}
+
+DN_API DN_Str8x64 DN_Str8x64FromFmtV(DN_FMT_ATTRIB char const *fmt, va_list args)
+{
+  DN_Str8x64 result = {};
+  DN_FmtVAppend(result.data, &result.size, sizeof(result.data), fmt, args);
   return result;
 }
 
@@ -1716,6 +1730,13 @@ DN_API DN_Str8x128 DN_Str8x128FromFmt(DN_FMT_ATTRIB char const *fmt, ...)
   return result;
 }
 
+DN_API DN_Str8x128 DN_Str8x128FromFmtV(DN_FMT_ATTRIB char const *fmt, va_list args)
+{
+  DN_Str8x128 result = {};
+  DN_FmtVAppend(result.data, &result.size, sizeof(result.data), fmt, args);
+  return result;
+}
+
 DN_API DN_Str8x256 DN_Str8x256FromFmt(DN_FMT_ATTRIB char const *fmt, ...)
 {
   va_list args;
@@ -1723,6 +1744,13 @@ DN_API DN_Str8x256 DN_Str8x256FromFmt(DN_FMT_ATTRIB char const *fmt, ...)
   DN_Str8x256 result = {};
   DN_FmtVAppend(result.data, &result.size, sizeof(result.data), fmt, args);
   va_end(args);
+  return result;
+}
+
+DN_API DN_Str8x256 DN_Str8x256FromFmtV(DN_FMT_ATTRIB char const *fmt, va_list args)
+{
+  DN_Str8x256 result = {};
+  DN_FmtVAppend(result.data, &result.size, sizeof(result.data), fmt, args);
   return result;
 }
 
