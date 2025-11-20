@@ -37,33 +37,13 @@
 
 extern DN_CPUFeatureDecl g_dn_cpu_feature_decl[DN_CPUFeature_Count];
 
-// NOTE: DN_OSDate /////////////////////////////////////////////////////////////////////////////////
-struct DN_OSDateTimeStr8
-{
-  char  date[DN_ArrayCountU("YYYY-MM-SS")];
-  DN_U8 date_size;
-  char  hms[DN_ArrayCountU("HH:MM:SS")];
-  DN_U8 hms_size;
-};
-
-struct DN_OSDateTime
-{
-  DN_U8  day;
-  DN_U8  month;
-  DN_U16 year;
-  DN_U8  hour;
-  DN_U8  minutes;
-  DN_U8  seconds;
-};
-
 struct DN_OSTimer /// Record time between two time-points using the OS's performance counter.
 {
   DN_U64 start;
   DN_U64 end;
 };
 
-#if !defined(DN_NO_OS_FILE_API)
-// NOTE: DN_OSFile /////////////////////////////////////////////////////////////////////////////////
+// NOTE: DN_OSFile
 enum DN_OSPathInfoType
 {
   DN_OSPathInfoType_Unknown,
@@ -88,7 +68,7 @@ struct DN_OSDirIterator
   char    buffer[512];
 };
 
-// NOTE: R/W Stream API ////////////////////////////////////////////////////////////////////////////
+// NOTE: R/W Stream API
 struct DN_OSFileRead
 {
   bool     success;
@@ -119,9 +99,8 @@ enum DN_OSFileAccess_
   DN_OSFileAccess_ReadWrite  = DN_OSFileAccess_Read | DN_OSFileAccess_Write,
   DN_OSFileAccess_All        = DN_OSFileAccess_ReadWrite | DN_OSFileAccess_Execute | DN_OSFileAccess_AppendOnly,
 };
-#endif // DN_NO_OS_FILE_API
 
-// NOTE: DN_OSPath ////////////////////////////////////////////////////////////////////////////////
+// NOTE: DN_OSPath
 #if !defined(DN_OSPathSeperator)
   #if defined(DN_OS_WIN32)
     #define DN_OSPathSeperator "\\"
@@ -147,7 +126,7 @@ struct DN_OSPath
   DN_U16       links_size;
 };
 
-// NOTE: DN_OSExec /////////////////////////////////////////////////////////////////////////////////
+// NOTE: DN_OSExec
 typedef DN_U32 DN_OSExecFlags;
 
 enum DN_OSExecFlags_
@@ -187,7 +166,7 @@ struct DN_OSExecArgs
   DN_Slice<DN_Str8> environment;
 };
 
-// NOTE: DN_OSSemaphore ////////////////////////////////////////////////////////////////////////////
+// NOTE: DN_OSSemaphore
 DN_U32 const DN_OS_SEMAPHORE_INFINITE_TIMEOUT = UINT32_MAX;
 
 struct DN_OSSemaphore
@@ -318,17 +297,15 @@ DN_API int                       DN_OS_MemProtect                             (v
 DN_API void *                    DN_OS_MemAlloc                               (DN_USize size, DN_ZMem z_mem);
 DN_API void                      DN_OS_MemDealloc                             (void *ptr);
 
-DN_API DN_OSDateTime             DN_OS_DateLocalTimeNow                       ();
-DN_API DN_OSDateTimeStr8         DN_OS_DateLocalTimeStr8Now                   (char date_separator = '-', char hms_separator = ':');
-DN_API DN_OSDateTimeStr8         DN_OS_DateLocalTimeStr8                      (DN_OSDateTime time, char date_separator = '-', char hms_separator = ':');
+DN_API DN_Date                   DN_OS_DateLocalTimeNow                       ();
+DN_API DN_Str8x32                DN_OS_DateLocalTimeStr8Now                   (char date_separator = '-', char hms_separator = ':');
+DN_API DN_Str8x32                DN_OS_DateLocalTimeStr8                      (DN_Date time, char date_separator = '-', char hms_separator = ':');
 DN_API DN_U64                    DN_OS_DateUnixTimeNs                         ();
 #define                          DN_OS_DateUnixTimeUs()                       (DN_OS_DateUnixTimeNs() / 1000)
 #define                          DN_OS_DateUnixTimeMs()                       (DN_OS_DateUnixTimeNs() / (1000 * 1000))
 #define                          DN_OS_DateUnixTimeS()                        (DN_OS_DateUnixTimeNs() / (1000 * 1000 * 1000))
-DN_API DN_OSDateTime             DN_OS_DateUnixTimeSToDate                    (DN_U64 time);
-DN_API DN_U64                    DN_OS_DateLocalToUnixTimeS                   (DN_OSDateTime date);
-DN_API DN_U64                    DN_OS_DateToUnixTimeS                        (DN_OSDateTime date);
-DN_API bool                      DN_OS_DateIsValid                            (DN_OSDateTime date);
+DN_API DN_U64                    DN_OS_DateUnixTimeSFromLocalDate             (DN_Date date);
+DN_API DN_U64                    DN_OS_DateLocalUnixTimeSFromUnixTimeS        (DN_U64 unix_ts_s);
 
 DN_API void                      DN_OS_GenBytesSecure                         (void *buffer, DN_U32 size);
 DN_API bool                      DN_OS_SetEnvVar                              (DN_Str8 name, DN_Str8 value);

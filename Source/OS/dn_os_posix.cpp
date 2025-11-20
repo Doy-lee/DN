@@ -96,10 +96,10 @@ DN_API void DN_OS_MemDealloc(void *ptr)
   free(ptr);
 }
 
-// NOTE: Date //////////////////////////////////////////////////////////////////////////////////////
-DN_API DN_OSDateTime DN_OS_DateLocalTimeNow()
+// NOTE: Date
+DN_API DN_Date DN_OS_DateLocalTimeNow()
 {
-  DN_OSDateTime   result = {};
+  DN_Date         result = {};
   struct timespec ts;
   clock_gettime(CLOCK_REALTIME, &ts);
 
@@ -114,50 +114,60 @@ DN_API DN_OSDateTime DN_OS_DateLocalTimeNow()
   struct tm time = {};
   localtime_r(&ts.tv_sec, &time);
 
-  result.hour    = time.tm_hour;
-  result.minutes = time.tm_min;
-  result.seconds = time.tm_sec;
+  result.hour         = time.tm_hour;
+  result.minutes      = time.tm_min;
+  result.seconds      = time.tm_sec;
+  result.milliseconds = ts.tv_nsec / (1000 * 1000); // TODO: Verify that getting the milliseconds like this is correct
 
-  result.day   = DN_Cast(uint8_t) time.tm_mday;
-  result.month = DN_Cast(uint8_t) time.tm_mon + 1;
-  result.year  = 1900 + DN_Cast(int16_t) time.tm_year;
+  result.day          = DN_Cast(DN_U8) time.tm_mday;
+  result.month        = DN_Cast(DN_U8) time.tm_mon + 1;
+  result.year         = 1900 + DN_Cast(DN_U16) time.tm_year;
   return result;
 }
 
-DN_API uint64_t DN_OS_DateUnixTimeNs()
+DN_API DN_U64 DN_OS_DateUnixTimeNs()
 {
   struct timespec ts = {};
   clock_gettime(CLOCK_REALTIME, &ts);
-  uint64_t result = (ts.tv_sec * 1000 /*ms*/ * 1000 /*us*/ * 1000 /*ns*/) + ts.tv_nsec;
+  DN_U64 result = (ts.tv_sec * 1000 /*ms*/ * 1000 /*us*/ * 1000 /*ns*/) + ts.tv_nsec;
   return result;
 }
 
-DN_API uint64_t DN_OS_DateLocalToUnixTimeS(DN_OSDateTime)
+DN_API DN_U64 DN_OS_DateUnixTimeSFromLocalDate(DN_Date date)
 {
-  DN_AssertOnce(!"Unimplemented");
-  uint64_t result = 0;
+  struct tm tm_time = {0};
+  tm_time.tm_year   = (int)date.year - 1900;
+  tm_time.tm_mon    = (int)date.month - 1; // month is 1-12 in your struct
+  tm_time.tm_mday   = (int)date.day;       // day of month 1-31
+  tm_time.tm_hour   = (int)date.hour;
+  tm_time.tm_min    = (int)date.minutes;
+  tm_time.tm_sec    = (int)date.seconds;
+  tm_time.tm_isdst  = -1; // tm_isdst = -1 lets mktime() determine whether DST is in effect
+  time_t unix_time  = mktime(&tm_time);
+  DN_U64 result     = DN_Cast(DN_U64) unix_time;
   return result;
 }
 
-DN_API uint64_t DN_OS_DateToUnixTimeS(DN_OSDateTime date)
+DN_API DN_U64 DN_OS_DateLocalUnixTimeSFromUnixTimeS(DN_U64 unix_ts_s)
 {
-  DN_Assert(DN_OS_DateIsValid(date));
-  struct tm timeinfo = {};
-  timeinfo.tm_year   = date.year - 1900;
-  timeinfo.tm_mon    = date.month - 1;
-  timeinfo.tm_mday   = date.day;
-  timeinfo.tm_hour   = date.hour;
-  timeinfo.tm_min    = date.minutes;
-  timeinfo.tm_sec    = date.seconds;
-  uint64_t result    = mktime(&timeinfo);
+  struct tm tm_local;
+  void     *ret = localtime_r(&unix_ts_s, &tm_local);
+  DN_Assert(ret);
+
+  long   local_offset_seconds = tm_local.tm_gmtoff;
+  DN_U64 result               = unix_ts_s;
+  if (local_offset_seconds > 0)
+    result += local_offset_seconds;
+  else
+    result -= local_offset_seconds;
   return result;
 }
 
-DN_API DN_OSDateTime DN_OS_DateUnixTimeSToDate(uint64_t time)
+DN_API DN_Date DN_OS_DateUnixTimeSToDate(DN_U64 time)
 {
   time_t        posix_time = DN_Cast(time_t) time;
   struct tm     posix_date = *gmtime(&posix_time);
-  DN_OSDateTime result     = {};
+  DN_Date       result     = {};
   result.year              = posix_date.tm_year + 1900;
   result.month             = posix_date.tm_mon + 1;
   result.day               = posix_date.tm_mday;

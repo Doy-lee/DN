@@ -55,14 +55,14 @@ static void DN_OS_LOGEmitFromTypeTypeFV_(DN_LOGTypeParam type, void *user_data, 
     }
   }
 
-  DN_OSDateTime os_date  = DN_OS_DateLocalTimeNow();
-  DN_LOGDate    log_date = {};
-  log_date.year          = os_date.year;
-  log_date.month         = os_date.month;
-  log_date.day           = os_date.day;
-  log_date.hour          = os_date.hour;
-  log_date.minute        = os_date.minutes;
-  log_date.second        = os_date.seconds;
+  DN_Date    os_date  = DN_OS_DateLocalTimeNow();
+  DN_LOGDate log_date = {};
+  log_date.year       = os_date.year;
+  log_date.month      = os_date.month;
+  log_date.day        = os_date.day;
+  log_date.hour       = os_date.hour;
+  log_date.minute     = os_date.minutes;
+  log_date.second     = os_date.seconds;
 
   char             prefix_buffer[128] = {};
   DN_LOGPrefixSize prefix_size        = DN_LOG_MakePrefix(style, type, call_site, log_date, prefix_buffer, sizeof(prefix_buffer));
@@ -184,55 +184,28 @@ DN_API DN_Str8 DN_OS_HexFromBytesPtrArenaTLS(void const *bytes, DN_USize bytes_c
   return result;
 }
 
-// NOTE: Date //////////////////////////////////////////////////////////////////////////////////////
-DN_API DN_OSDateTimeStr8 DN_OS_DateLocalTimeStr8(DN_OSDateTime time, char date_separator, char hms_separator)
+// NOTE: Date
+DN_API DN_Str8x32 DN_OS_DateLocalTimeStr8(DN_Date time, char date_separator, char hms_separator)
 {
-  DN_OSDateTimeStr8 result = {};
-  result.hms_size          = DN_Cast(uint8_t) DN_SNPrintF(result.hms,
-                                                 DN_ArrayCountI(result.hms),
-                                                 "%02hhu%c%02hhu%c%02hhu",
-                                                 time.hour,
-                                                 hms_separator,
-                                                 time.minutes,
-                                                 hms_separator,
-                                                 time.seconds);
-
-  result.date_size = DN_Cast(uint8_t) DN_SNPrintF(result.date,
-                                                  DN_ArrayCountI(result.date),
-                                                  "%hu%c%02hhu%c%02hhu",
-                                                  time.year,
-                                                  date_separator,
-                                                  time.month,
-                                                  date_separator,
-                                                  time.day);
-
-  DN_Assert(result.hms_size < DN_ArrayCountU(result.hms));
-  DN_Assert(result.date_size < DN_ArrayCountU(result.date));
+  DN_Str8x32 result = DN_Str8x32FromFmt("%hu%c%02hhu%c%02hhu %02hhu%c%02hhu%c%02hhu",
+                                        time.year,
+                                        date_separator,
+                                        time.month,
+                                        date_separator,
+                                        time.day,
+                                        time.hour,
+                                        hms_separator,
+                                        time.minutes,
+                                        hms_separator,
+                                        time.seconds);
   return result;
 }
 
-DN_API DN_OSDateTimeStr8 DN_OS_DateLocalTimeStr8Now(char date_separator, char hms_separator)
+DN_API DN_Str8x32 DN_OS_DateLocalTimeStr8Now(char date_separator, char hms_separator)
 {
-  DN_OSDateTime     time   = DN_OS_DateLocalTimeNow();
-  DN_OSDateTimeStr8 result = DN_OS_DateLocalTimeStr8(time, date_separator, hms_separator);
+  DN_Date    time   = DN_OS_DateLocalTimeNow();
+  DN_Str8x32 result = DN_OS_DateLocalTimeStr8(time, date_separator, hms_separator);
   return result;
-}
-
-DN_API bool DN_OS_DateIsValid(DN_OSDateTime date)
-{
-  if (date.year < 1970)
-    return false;
-  if (date.month <= 0 || date.month >= 13)
-    return false;
-  if (date.day <= 0 || date.day >= 32)
-    return false;
-  if (date.hour >= 24)
-    return false;
-  if (date.minutes >= 60)
-    return false;
-  if (date.seconds >= 60)
-    return false;
-  return true;
 }
 
 // NOTE: Other

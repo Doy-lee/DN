@@ -529,20 +529,21 @@
 
   extern "C"
   {
-  __declspec(dllimport) BOOL   __stdcall FlushFileBuffers    (HANDLE hFile);
-  __declspec(dllimport) BOOL   __stdcall CreateDirectoryW    (const WCHAR *lpPathName, SECURITY_ATTRIBUTES *lpSecurityAttributes);
-  __declspec(dllimport) BOOL   __stdcall RemoveDirectoryW    (const WCHAR *lpPathName);
-  __declspec(dllimport) BOOL   __stdcall FindNextFileW       (HANDLE hFindFile, WIN32_FIND_DATAW *lpFindFileData);
-  __declspec(dllimport) BOOL   __stdcall FindClose           (HANDLE hFindFile);
+  __declspec(dllimport) BOOL   __stdcall FlushFileBuffers       (HANDLE hFile);
+  __declspec(dllimport) BOOL   __stdcall CreateDirectoryW       (const WCHAR *lpPathName, SECURITY_ATTRIBUTES *lpSecurityAttributes);
+  __declspec(dllimport) BOOL   __stdcall RemoveDirectoryW       (const WCHAR *lpPathName);
+  __declspec(dllimport) BOOL   __stdcall FindNextFileW          (HANDLE hFindFile, WIN32_FIND_DATAW *lpFindFileData);
+  __declspec(dllimport) BOOL   __stdcall FindClose              (HANDLE hFindFile);
+  __declspec(dllimport) BOOL   __stdcall FileTimeToLocalFileTime(const FILETIME *lpFileTime, FILETIME *lpLocalFileTime);
 
-  __declspec(dllimport) HANDLE __stdcall FindFirstFileExW    (const WCHAR *lpFileName, FINDEX_INFO_LEVELS fInfoLevelId, VOID *lpFindFileData, FINDEX_SEARCH_OPS fSearchOp, VOID *lpSearchFilter, DWORD dwAdditionalFlags);
-  __declspec(dllimport) BOOL   __stdcall GetFileAttributesExW(const WCHAR *lpFileName, GET_FILEEX_INFO_LEVELS fInfoLevelId, VOID *lpFileInformation);
-  __declspec(dllimport) BOOL   __stdcall GetFileSizeEx       (HANDLE hFile, LARGE_INTEGER *lpFileSize);
-  __declspec(dllimport) BOOL   __stdcall DeleteFileW         (const WCHAR *lpFileName);
-  __declspec(dllimport) HANDLE __stdcall CreateFileW         (const WCHAR *lpFileName, DWORD dwDesiredAccess, DWORD dwShareMode, SECURITY_ATTRIBUTES *lpSecurityAttributes, DWORD dwCreationDisposition, DWORD dwFlagsAndAttributes, HANDLE hTemplateFile);
-  __declspec(dllimport) BOOL   __stdcall ReadFile            (HANDLE hFile, VOID *lpBuffer, DWORD nNumberOfBytesToRead, DWORD *lpNumberOfBytesRead, OVERLAPPED *lpOverlapped);
-  __declspec(dllimport) BOOL   __stdcall WriteFile           (HANDLE hFile, const VOID *lpBuffer, DWORD nNumberOfBytesToWrite, DWORD *lpNumberOfBytesWritten, OVERLAPPED *lpOverlapped);
-  __declspec(dllimport) BOOL   __stdcall GetDiskFreeSpaceExW (WCHAR const *lpDirectoryName, ULARGE_INTEGER *lpFreeBytesAvailableToCaller, ULARGE_INTEGER *lpTotalNumberOfBytes, ULARGE_INTEGER *lpTotalNumberOfFreeBytes);
+  __declspec(dllimport) HANDLE __stdcall FindFirstFileExW       (const WCHAR *lpFileName, FINDEX_INFO_LEVELS fInfoLevelId, VOID *lpFindFileData, FINDEX_SEARCH_OPS fSearchOp, VOID *lpSearchFilter, DWORD dwAdditionalFlags);
+  __declspec(dllimport) BOOL   __stdcall GetFileAttributesExW   (const WCHAR *lpFileName, GET_FILEEX_INFO_LEVELS fInfoLevelId, VOID *lpFileInformation);
+  __declspec(dllimport) BOOL   __stdcall GetFileSizeEx          (HANDLE hFile, LARGE_INTEGER *lpFileSize);
+  __declspec(dllimport) BOOL   __stdcall DeleteFileW            (const WCHAR *lpFileName);
+  __declspec(dllimport) HANDLE __stdcall CreateFileW            (const WCHAR *lpFileName, DWORD dwDesiredAccess, DWORD dwShareMode, SECURITY_ATTRIBUTES *lpSecurityAttributes, DWORD dwCreationDisposition, DWORD dwFlagsAndAttributes, HANDLE hTemplateFile);
+  __declspec(dllimport) BOOL   __stdcall ReadFile               (HANDLE hFile, VOID *lpBuffer, DWORD nNumberOfBytesToRead, DWORD *lpNumberOfBytesRead, OVERLAPPED *lpOverlapped);
+  __declspec(dllimport) BOOL   __stdcall WriteFile              (HANDLE hFile, const VOID *lpBuffer, DWORD nNumberOfBytesToWrite, DWORD *lpNumberOfBytesWritten, OVERLAPPED *lpOverlapped);
+  __declspec(dllimport) BOOL   __stdcall GetDiskFreeSpaceExW    (WCHAR const *lpDirectoryName, ULARGE_INTEGER *lpFreeBytesAvailableToCaller, ULARGE_INTEGER *lpTotalNumberOfBytes, ULARGE_INTEGER *lpTotalNumberOfFreeBytes);
   }
 
   // NOTE: um/processenv.h ///////////////////////////////////////////////////////////////////////

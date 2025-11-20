@@ -2823,61 +2823,72 @@ DN_API DN_Str8x128 DN_AgeStr8FromMsU64(DN_U64 duration_ms, DN_AgeUnit units)
     units &= ~DN_AgeUnit_Ms;
   }
 
+  DN_Str8 unit_suffix = {};
   if (units & DN_AgeUnit_Year) {
+    unit_suffix             = DN_Str8Lit("y");
     DN_USize   value_usize  = remainder_ms / (DN_SecFromYears(1) * 1000);
     remainder_ms           -= DN_SecFromYears(value_usize) * 1000;
     if (value_usize)
-      DN_FmtAppend(result.data, &result.size, sizeof(result.data), "%s%zuyr", result.size ? " " : "", value_usize);
+      DN_FmtAppend(result.data, &result.size, sizeof(result.data), "%s%zu%.*s", result.size ? " " : "", value_usize, DN_Str8PrintFmt(unit_suffix));
   }
 
   if (units & DN_AgeUnit_Week) {
+    unit_suffix             = DN_Str8Lit("w");
     DN_USize value_usize    = remainder_ms / (DN_SecFromWeeks(1) * 1000);
     remainder_ms           -= DN_SecFromWeeks(value_usize) * 1000;
     if (value_usize)
-      DN_FmtAppend(result.data, &result.size, sizeof(result.data), "%s%zuw", result.size ? " " : "", value_usize);
+      DN_FmtAppend(result.data, &result.size, sizeof(result.data), "%s%zu%.*s", result.size ? " " : "", value_usize, DN_Str8PrintFmt(unit_suffix));
   }
 
   if (units & DN_AgeUnit_Day) {
+    unit_suffix             = DN_Str8Lit("d");
     DN_USize value_usize    = remainder_ms / (DN_SecFromDays(1) * 1000);
     remainder_ms           -= DN_SecFromDays(value_usize) * 1000;
     if (value_usize)
-      DN_FmtAppend(result.data, &result.size, sizeof(result.data), "%s%zud", result.size ? " " : "", value_usize);
+      DN_FmtAppend(result.data, &result.size, sizeof(result.data), "%s%zu%.*s", result.size ? " " : "", value_usize, DN_Str8PrintFmt(unit_suffix));
   }
 
   if (units & DN_AgeUnit_Hr) {
+    unit_suffix             = DN_Str8Lit("h");
     DN_USize value_usize    = remainder_ms / (DN_SecFromHours(1) * 1000);
     remainder_ms           -= DN_SecFromHours(value_usize) * 1000;
     if (value_usize)
-      DN_FmtAppend(result.data, &result.size, sizeof(result.data), "%s%zuh", result.size ? " " : "", value_usize);
+      DN_FmtAppend(result.data, &result.size, sizeof(result.data), "%s%zu%.*s", result.size ? " " : "", value_usize, DN_Str8PrintFmt(unit_suffix));
   }
 
   if (units & DN_AgeUnit_Min) {
+    unit_suffix             = DN_Str8Lit("m");
     DN_USize value_usize    = remainder_ms / (DN_SecFromMins(1) * 1000);
     remainder_ms           -= DN_SecFromMins(value_usize) * 1000;
     if (value_usize)
-      DN_FmtAppend(result.data, &result.size, sizeof(result.data), "%s%zum", result.size ? " " : "", value_usize);
+      DN_FmtAppend(result.data, &result.size, sizeof(result.data), "%s%zu%.*s", result.size ? " " : "", value_usize, DN_Str8PrintFmt(unit_suffix));
   }
 
   if (units & DN_AgeUnit_Sec) {
+    unit_suffix = DN_Str8Lit("s");
     if (units & DN_AgeUnit_FractionalSec) {
-        DN_F64 remainder_s = remainder_ms / 1000.0;
-        DN_FmtAppend(result.data, &result.size, sizeof(result.data), "%s%.3fs", result.size ? " " : "", remainder_s);
-        remainder_ms = 0;
+      DN_F64 remainder_s = remainder_ms / 1000.0;
+      DN_FmtAppend(result.data, &result.size, sizeof(result.data), "%s%.3f%.*s", result.size ? " " : "", remainder_s, DN_Str8PrintFmt(unit_suffix));
+      remainder_ms = 0;
     } else {
       DN_USize value_usize  = remainder_ms / 1000;
       remainder_ms         -= DN_Cast(DN_USize)(value_usize * 1000);
       if (value_usize)
-        DN_FmtAppend(result.data, &result.size, sizeof(result.data), "%s%zus", result.size ? " " : "", value_usize);
+        DN_FmtAppend(result.data, &result.size, sizeof(result.data), "%s%zu%.*s", result.size ? " " : "", value_usize, DN_Str8PrintFmt(unit_suffix));
     }
   }
 
   if (units & DN_AgeUnit_Ms) {
+    unit_suffix = DN_Str8Lit("ms");
     DN_Assert((units & DN_AgeUnit_FractionalSec) == 0);
     DN_USize value_usize  = remainder_ms;
     remainder_ms         -= value_usize;
     if (value_usize || result.size == 0)
-      DN_FmtAppend(result.data, &result.size, sizeof(result.data), "%s%zums", result.size ? " " : "", value_usize);
+      DN_FmtAppend(result.data, &result.size, sizeof(result.data), "%s%zu%.*s", result.size ? " " : "", value_usize, DN_Str8PrintFmt(unit_suffix));
   }
+
+  if (result.size == 0)
+    DN_FmtAppend(result.data, &result.size, sizeof(result.data), "0%.*s", DN_Str8PrintFmt(unit_suffix));
   return result;
 }
 
@@ -2892,6 +2903,104 @@ DN_API DN_Str8x128 DN_AgeStr8FromSecF64(DN_F64 duration_s, DN_AgeUnit units)
 {
   DN_U64      duration_ms = DN_Cast(DN_U64)(duration_s * 1000.0);
   DN_Str8x128 result      = DN_AgeStr8FromMsU64(duration_ms, units);
+  return result;
+}
+
+DN_API int DN_IsLeapYear(int year)
+{
+  if (year % 4 != 0)
+    return 0;
+  if (year % 100 != 0)
+    return 1;
+  return (year % 400 == 0);
+}
+
+DN_API bool DN_DateIsValid(DN_Date date)
+{
+  if (date.year < 1970)
+    return false;
+  if (date.month <= 0 || date.month >= 13)
+    return false;
+  if (date.day <= 0 || date.day >= 32)
+    return false;
+  if (date.hour >= 24)
+    return false;
+  if (date.minutes >= 60)
+    return false;
+  if (date.seconds >= 60)
+    return false;
+  return true;
+}
+
+DN_API DN_Date DN_DateFromUnixTimeMs(DN_USize unix_ts_ms)
+{
+  DN_Date  result        = {};
+  DN_USize ms            = unix_ts_ms % 1000;
+  DN_USize total_seconds = unix_ts_ms / 1000;
+  result.milliseconds    = (DN_U16)ms;
+
+  DN_USize secs_in_day = total_seconds % 86400;
+  DN_USize days        = total_seconds / 86400;
+
+  result.hour    = (DN_U8)(secs_in_day / 3600);
+  result.minutes = (DN_U8)((secs_in_day % 3600) / 60);
+  result.seconds = (DN_U8)(secs_in_day % 60);
+
+  DN_U16   days_in_month[13] = {0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+  DN_USize days_left         = days;
+  DN_U16   year              = 1970;
+
+  while (days_left >= (DN_IsLeapYear(year) ? 366 : 365)) {
+    DN_USize days_in_year  = DN_IsLeapYear(year) ? 366 : 365;
+    days_left             -= days_in_year;
+    year++;
+  }
+
+  DN_U8 month = 1;
+  for (;;) {
+    DN_U16 day_count = days_in_month[month];
+    if (month == 2 && DN_IsLeapYear(year))
+      day_count = 29;
+    if (days_left < day_count)
+      break;
+    days_left -= day_count;
+    month++;
+  }
+
+  result.year  = year;
+  result.month = month;
+  result.day   = (DN_U8)days_left + 1;
+  return result;
+}
+
+DN_API DN_U64 DN_UnixTimeMsFromDate(DN_Date date)
+{
+  DN_Assert(DN_DateIsValid(date));
+
+  // Precomputed cumulative days before each month (non-leap year)
+  const DN_U16 days_before_month[13] = {
+      0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334, 365};
+
+  DN_U16 y = date.year;
+  DN_U8  m = date.month;
+  DN_U8  d = date.day;
+
+  DN_U32 days  = d - 1;                    // day of month starts at 0 internally
+  days        += days_before_month[m - 1]; // Add days from previous months this year
+
+  if (m > 2 && DN_IsLeapYear(y)) // Add February 29 if leap year and month > 2
+    days += 1;
+
+  // Add full years from 1970 to y-1
+  for (DN_U16 year = 1970; year < y; ++year)
+    days += DN_IsLeapYear(year) ? 366 : 365;
+
+  // Convert to seconds
+  DN_U64 seconds  = DN_Cast(DN_U64)days * 86400ULL;
+  seconds        += DN_Cast(DN_U64)date.hour * 3600ULL;
+  seconds        += DN_Cast(DN_U64)date.minutes * 60ULL;
+  seconds        += DN_Cast(DN_U64)date.seconds;
+  DN_U64 result   = seconds * 1000ULL + date.milliseconds;
   return result;
 }
 

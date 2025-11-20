@@ -125,19 +125,20 @@ DN_API void DN_OS_MemDealloc(void *ptr)
   HeapFree(GetProcessHeap(), 0, ptr);
 }
 
-// NOTE: Date //////////////////////////////////////////////////////////////////////////////////////
-DN_API DN_OSDateTime DN_OS_DateLocalTimeNow()
+// NOTE: Date
+DN_API DN_Date DN_OS_DateLocalTimeNow()
 {
   SYSTEMTIME sys_time;
   GetLocalTime(&sys_time);
 
-  DN_OSDateTime result = {};
-  result.hour          = DN_Cast(uint8_t) sys_time.wHour;
-  result.minutes       = DN_Cast(uint8_t) sys_time.wMinute;
-  result.seconds       = DN_Cast(uint8_t) sys_time.wSecond;
-  result.day           = DN_Cast(uint8_t) sys_time.wDay;
-  result.month         = DN_Cast(uint8_t) sys_time.wMonth;
-  result.year          = DN_Cast(int16_t) sys_time.wYear;
+  DN_Date result      = {};
+  result.hour         = DN_Cast(DN_U8) sys_time.wHour;
+  result.milliseconds = DN_Cast(DN_U8) sys_time.wMilliseconds;
+  result.minutes      = DN_Cast(DN_U8) sys_time.wMinute;
+  result.seconds      = DN_Cast(DN_U8) sys_time.wSecond;
+  result.day          = DN_Cast(DN_U8) sys_time.wDay;
+  result.month        = DN_Cast(DN_U8) sys_time.wMonth;
+  result.year         = DN_Cast(DN_U16) sys_time.wYear;
   return result;
 }
 
@@ -158,15 +159,16 @@ DN_API DN_U64 DN_OS_DateUnixTimeNs()
   return result;
 }
 
-static SYSTEMTIME DN_OS_DateToSystemTime_(DN_OSDateTime date)
+static SYSTEMTIME DN_OS_DateToSystemTime_(DN_Date date)
 {
-  SYSTEMTIME result = {};
-  result.wYear      = date.year;
-  result.wMonth     = date.month;
-  result.wDay       = date.day;
-  result.wHour      = date.hour;
-  result.wMinute    = date.minutes;
-  result.wSecond    = date.seconds;
+  SYSTEMTIME result    = {};
+  result.wYear         = date.year;
+  result.wMonth        = date.month;
+  result.wDay          = date.day;
+  result.wHour         = date.hour;
+  result.wMinute       = date.minutes;
+  result.wSecond       = date.seconds;
+  result.wMilliseconds = date.milliseconds;
   return result;
 }
 
@@ -182,7 +184,7 @@ static DN_U64 DN_OS_SystemTimeToUnixTimeS_(SYSTEMTIME *sys_time)
   return result;
 }
 
-DN_API DN_U64 DN_OS_DateLocalToUnixTimeS(DN_OSDateTime date)
+DN_API DN_U64 DN_OS_DateUnixTimeSFromLocalDate(DN_Date date)
 {
   SYSTEMTIME local_time = DN_OS_DateToSystemTime_(date);
   SYSTEMTIME sys_time   = {};
@@ -191,36 +193,17 @@ DN_API DN_U64 DN_OS_DateLocalToUnixTimeS(DN_OSDateTime date)
   return result;
 }
 
-DN_API DN_U64 DN_OS_DateToUnixTimeS(DN_OSDateTime date)
+DN_API DN_U64 DN_OS_DateLocalUnixTimeSFromUnixTimeS(DN_U64 unix_ts_s)
 {
-  DN_Assert(DN_OS_DateIsValid(date));
+  DN_U64   unix_time    = DN_Cast(DN_U64) unix_ts_s * 10000000LL; // seconds -> 100ns units
+  DN_U64   filetime_utc = unix_time + 116444736000000000LL;       // Unix epoch -> Windows epoch
+  FILETIME ft_utc       = {DN_Cast(DWORD) filetime_utc, DN_Cast(DWORD)(filetime_utc >> 32)};
+  FILETIME ft_local;
+  bool     converted = FileTimeToLocalFileTime(&ft_utc, &ft_local);
+  DN_Assert(converted);
 
-  SYSTEMTIME sys_time = DN_OS_DateToSystemTime_(date);
-  DN_U64   result   = DN_OS_SystemTimeToUnixTimeS_(&sys_time);
-  return result;
-}
-
-DN_API DN_OSDateTime DN_OS_DateUnixTimeSToDate(DN_U64 time)
-{
-  // NOTE: Windows epoch time starts from Jan 1, 1601 and counts in
-  // 100-nanoseconds intervals.
-  //
-  // See: https://devblogs.microsoft.com/oldnewthing/20090306-00/?p=18913
-
-  DN_U64     w32_time      = 116'444'736'000'000'000 + (time * 10'000'000);
-  SYSTEMTIME sys_time      = {};
-  FILETIME   file_time     = {};
-  file_time.dwLowDateTime  = (DWORD)w32_time;
-  file_time.dwHighDateTime = w32_time >> 32;
-  FileTimeToSystemTime(&file_time, &sys_time);
-
-  DN_OSDateTime result = {};
-  result.year          = DN_Cast(uint16_t) sys_time.wYear;
-  result.month         = DN_Cast(uint8_t) sys_time.wMonth;
-  result.day           = DN_Cast(uint8_t) sys_time.wDay;
-  result.hour          = DN_Cast(uint8_t) sys_time.wHour;
-  result.minutes       = DN_Cast(uint8_t) sys_time.wMinute;
-  result.seconds       = DN_Cast(uint8_t) sys_time.wSecond;
+  DN_U64 filetime_local = (DN_Cast(DN_U64) ft_local.dwHighDateTime << 32) | ft_local.dwLowDateTime;
+  DN_U64 result         = (filetime_local - 116444736000000000LL) / 10000000LL;
   return result;
 }
 

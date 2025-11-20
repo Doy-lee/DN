@@ -760,6 +760,17 @@ struct DN_ByteCountResult
   DN_F64           bytes;
 };
 
+struct DN_Date
+{
+  DN_U8  day;
+  DN_U8  month;
+  DN_U16 year;
+  DN_U8  hour;
+  DN_U8  minutes;
+  DN_U8  seconds;
+  DN_U16 milliseconds;
+};
+
 struct DN_FmtAppendResult
 {
   DN_USize size_req;
@@ -1115,6 +1126,11 @@ DN_API DN_Hex128                DN_HexFromBytes64Ptr        (void const *bytes, 
 DN_API DN_Str8x128              DN_AgeStr8FromMsU64         (DN_U64 duration_ms, DN_AgeUnit units);
 DN_API DN_Str8x128              DN_AgeStr8FromSecU64        (DN_U64 duration_ms, DN_AgeUnit units);
 DN_API DN_Str8x128              DN_AgeStr8FromSecF64        (DN_F64 sec, DN_AgeUnit units);
+
+DN_API int                      DN_IsLeapYear               (int year);
+DN_API bool                     DN_DateIsValid              (DN_Date date);
+DN_API DN_Date                  DN_DateFromUnixTimeMs       (DN_USize unix_ts_ms);
+DN_API DN_U64                   DN_UnixTimeMsFromDate       (DN_Date date);
 
 DN_API DN_ByteCountResult       DN_ByteCountFromType        (DN_U64 bytes, DN_ByteCountType type);
 #define                         DN_ByteCount(bytes)         DN_ByteCountFromType(bytes, DN_ByteCountType_Auto)
