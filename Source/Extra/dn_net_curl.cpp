@@ -141,8 +141,7 @@ static int32_t DN_NET_CurlThreadEntryPoint_(DN_OSThread *thread)
           }
 
           DN_Assert(req->type           == DN_NETRequestType_WS);
-          DN_Assert(req->response.state == DN_NETResponseState_WSOpen);
-          DN_Assert(DN_NET_CurlRequestIsInList(curl->thread_request_list, req));
+          DN_Assert(req->response.state >= DN_NETResponseState_WSOpen && req->response.state <= DN_NETResponseState_WSPong);
 
           DN_USize sent           = 0;
           CURLcode send_result    = curl_ws_send(curl_req->handle, payload.data, payload.size, &sent, 0, curlws_flag);

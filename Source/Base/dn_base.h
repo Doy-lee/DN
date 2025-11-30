@@ -178,6 +178,7 @@ struct DN_Str8
   DN_USize size; // The number of bytes in the string
 };
 
+struct DN_Str8x16  { char data[16];  DN_USize size; };
 struct DN_Str8x32  { char data[32];  DN_USize size; };
 struct DN_Str8x64  { char data[64];  DN_USize size; };
 struct DN_Str8x128 { char data[128]; DN_USize size; };
@@ -1017,6 +1018,8 @@ DN_API DN_Str8                  DN_Str8FromFmtArena         (DN_Arena *arena, DN
 DN_API DN_Str8                  DN_Str8FromFmtVArena        (DN_Arena *arena, DN_FMT_ATTRIB char const *fmt, va_list args);
 DN_API DN_Str8                  DN_Str8FromFmtPool          (DN_Pool *pool, DN_FMT_ATTRIB char const *fmt, ...);
 DN_API DN_Str8                  DN_Str8FromByteCountType    (DN_ByteCountType type);
+DN_API DN_Str8x16               DN_Str8x16FromFmt           (DN_FMT_ATTRIB char const *fmt, ...);
+DN_API DN_Str8x16               DN_Str8x16FromFmtV          (DN_FMT_ATTRIB char const *fmt, va_list args);
 DN_API DN_Str8x32               DN_Str8x32FromFmt           (DN_FMT_ATTRIB char const *fmt, ...);
 DN_API DN_Str8x32               DN_Str8x32FromFmtV          (DN_FMT_ATTRIB char const *fmt, va_list args);
 DN_API DN_Str8x64               DN_Str8x64FromFmt           (DN_FMT_ATTRIB char const *fmt, ...);

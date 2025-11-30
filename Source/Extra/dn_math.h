@@ -265,11 +265,6 @@ DN_API DN_F32        DN_V3F32_LengthSq                           (DN_V3F32 a);
 DN_API DN_F32        DN_V3F32_Length                             (DN_V3F32 a);
 DN_API DN_V3F32      DN_V3F32_Normalise                          (DN_V3F32 a);
 
-DN_U32 const DN_V4_R_MASK_U32 = 0xFF000000;
-DN_U32 const DN_V4_G_MASK_U32 = 0x00FF0000;
-DN_U32 const DN_V4_B_MASK_U32 = 0x0000FF00;
-DN_U32 const DN_V4_A_MASK_U32 = 0x000000FF;
-
 #define              DN_V4F32_From1N(x)                          DN_Literal(DN_V4F32){{(DN_F32)(x), (DN_F32)(x), (DN_F32)(x), (DN_F32)(x)}}
 #define              DN_V4F32_From4N(x, y, z, w)                 DN_Literal(DN_V4F32){{(DN_F32)(x), (DN_F32)(y), (DN_F32)(z), (DN_F32)(w)}}
 #define              DN_V4F32_FromV3And1N(xyz, w)                DN_Literal(DN_V4F32){{xyz.x,        xyz.y,        xyz.z,        w}}

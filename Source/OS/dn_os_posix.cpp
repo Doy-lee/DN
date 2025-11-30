@@ -28,6 +28,10 @@ static DN_U32 DN_OS_MemConvertPageToOSFlags_(DN_U32 protect)
 
 DN_API void *DN_OS_MemReserve(DN_USize size, DN_MemCommit commit, DN_U32 page_flags)
 {
+  #if defined(DN_PLATFORM_EMSCRIPTEN)
+  DN_InvalidCodePathF("Emscripten does not support virtual memory, you should use DN_OS_MemAlloc");
+  #endif
+
   unsigned long os_page_flags = DN_OS_MemConvertPageToOSFlags_(page_flags);
 
   if (commit == DN_MemCommit_Yes)
@@ -43,6 +47,9 @@ DN_API void *DN_OS_MemReserve(DN_USize size, DN_MemCommit commit, DN_U32 page_fl
 
 DN_API bool DN_OS_MemCommit(void *ptr, DN_USize size, DN_U32 page_flags)
 {
+  #if defined(DN_PLATFORM_EMSCRIPTEN)
+  DN_InvalidCodePathF("Emscripten does not support virtual memory");
+  #endif
   bool result = false;
   if (!ptr || size == 0)
     return false;
@@ -56,17 +63,26 @@ DN_API bool DN_OS_MemCommit(void *ptr, DN_USize size, DN_U32 page_flags)
 
 DN_API void DN_OS_MemDecommit(void *ptr, DN_USize size)
 {
+  #if defined(DN_PLATFORM_EMSCRIPTEN)
+  DN_InvalidCodePathF("Emscripten does not support virtual memory");
+  #endif
   mprotect(ptr, size, PROT_NONE);
   madvise(ptr, size, MADV_FREE);
 }
 
 DN_API void DN_OS_MemRelease(void *ptr, DN_USize size)
 {
+  #if defined(DN_PLATFORM_EMSCRIPTEN)
+  DN_InvalidCodePathF("Emscripten does not support virtual memory");
+  #endif
   munmap(ptr, size);
 }
 
 DN_API int DN_OS_MemProtect(void *ptr, DN_USize size, DN_U32 page_flags)
 {
+  #if defined(DN_PLATFORM_EMSCRIPTEN)
+  DN_InvalidCodePathF("Emscripten does not support virtual memory");
+  #endif
   if (!ptr || size == 0)
     return 0;
 
@@ -151,7 +167,8 @@ DN_API DN_U64 DN_OS_DateUnixTimeSFromLocalDate(DN_Date date)
 DN_API DN_U64 DN_OS_DateLocalUnixTimeSFromUnixTimeS(DN_U64 unix_ts_s)
 {
   struct tm tm_local;
-  void     *ret = localtime_r(&unix_ts_s, &tm_local);
+  time_t    unix_ts = unix_ts_s;
+  void     *ret     = localtime_r(&unix_ts, &tm_local);
   DN_Assert(ret);
 
   long   local_offset_seconds = tm_local.tm_gmtoff;

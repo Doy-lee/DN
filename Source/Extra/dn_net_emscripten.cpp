@@ -21,7 +21,6 @@ struct DN_NETEmcWSEvent
 struct DN_NETEmcCore
 {
   DN_Pool        pool;
-  DN_NETRequest *request_list;  // Current requests being executed
   DN_NETRequest *response_list; // Responses received that are to be deqeued via wait for response
   DN_NETRequest *free_list;     // Request pool that new requests will use before allocating
 };
@@ -51,6 +50,7 @@ static DN_NETEmcWSEvent *DN_NET_EmcAllocWSEvent_(DN_NETRequest *request)
   // NOTE: Allocate the event and attach to the request
   DN_NETEmcRequest *emc_request = DN_Cast(DN_NETEmcRequest *) request->context[1];
   DN_NETEmcWSEvent *result      = DN_ArenaNew(&request->arena, DN_NETEmcWSEvent, DN_ZMem_Yes);
+  DN_Assert(result);
   if (result) {
     if (!emc_request->first_event)
       emc_request->first_event = result;
@@ -63,17 +63,23 @@ static DN_NETEmcWSEvent *DN_NET_EmcAllocWSEvent_(DN_NETRequest *request)
 
 static void DN_NET_EmcOnRequestDone_(DN_NETCore *net, DN_NETRequest *request)
 {
-  // NOTE: This may be call multiple times if we get multiple responses when we yield to the javascript event loop
-  if (!request->next) {
-    DN_NETEmcCore *emc = DN_Cast(DN_NETEmcCore *) net->context;
-    request->next      = emc->response_list;
+  // NOTE: This may be call multiple times on the same request if we get multiple responses when we
+  // yield to the javascript event loop, e.g. the application received multiple WS payloads before
+  // it waited and consequently consumed the response from the payload.
+  //
+  // So if the next pointer is already set, then it should be that the request is already enqueued.
+  DN_NETEmcCore *emc = DN_Cast(DN_NETEmcCore *) net->context;
+  if (!request->next && !request->prev && request != emc->response_list) {
+    request->prev = nullptr;
+    request->next = emc->response_list;
+    if (emc->response_list)
+      emc->response_list->prev = request;
     emc->response_list = request;
   }
   DN_OS_SemaphoreIncrement(&net->completion_sem, 1);
   DN_OS_SemaphoreIncrement(&request->completion_sem, 1);
 }
 
-// TODO: Need to enqueue the results since they can accumulate when you yield to the javascript event loop
 static bool DN_NET_EmcWSOnOpen(int eventType, EmscriptenWebSocketOpenEvent const *event, void *user_data)
 {
   DN_NETRequest    *req       = DN_Cast(DN_NETRequest *) user_data;
@@ -90,10 +96,8 @@ static bool DN_NET_EmcWSOnMessage(int eventType, const EmscriptenWebSocketMessag
   DN_NETCore       *net       = DN_Cast(DN_NETCore *) req->context[0];
   DN_NETEmcWSEvent *net_event = DN_NET_EmcAllocWSEvent_(req);
   net_event->state            = event->isText ? DN_NETResponseState_WSText : DN_NETResponseState_WSBinary;
-  if (event->numBytes > 0) {
-    DN_NETEmcCore *emc = DN_Cast(DN_NETEmcCore *) net->context;
-    net_event->payload = DN_Str8FromPtrPool(&emc->pool, event->data, event->numBytes);
-  }
+  if (event->numBytes > 0)
+    net_event->payload = DN_Str8FromPtrArena(&req->arena, event->data, event->numBytes);
   DN_NET_EmcOnRequestDone_(net, req);
   return true;
 }
@@ -112,10 +116,9 @@ static bool DN_NET_EmcWSOnClose(int eventType, EmscriptenWebSocketCloseEvent con
 {
   DN_NETRequest    *req       = DN_Cast(DN_NETRequest *) user_data;
   DN_NETCore       *net       = DN_Cast(DN_NETCore *) req->context[0];
-  DN_NETEmcCore    *emc       = DN_Cast(DN_NETEmcCore *) net->context;
   DN_NETEmcWSEvent *net_event = DN_NET_EmcAllocWSEvent_(req);
   net_event->state            = DN_NETResponseState_WSClose;
-  net_event->payload          = DN_Str8FromFmtPool(&emc->pool, "Websocket closed '%.*s': (%u) %s (was %s close)", DN_Str8PrintFmt(req->url), event->code, event->reason, event->wasClean ? "clean" : "unclean");
+  net_event->payload          = DN_Str8FromFmtArena(&req->arena, "Websocket closed '%.*s': (%u) %s (was %s close)", DN_Str8PrintFmt(req->url), event->code, event->reason, event->wasClean ? "clean" : "unclean");
   DN_NET_EmcOnRequestDone_(net, req);
   return true;
 }
@@ -157,22 +160,38 @@ void DN_NET_EmcDeinit(DN_NETCore *net)
   // TODO: Track all the request handles and clean it up
 }
 
-DN_NETRequestHandle DN_NET_EmcDoHTTP(DN_NETCore *net, DN_Str8 url, DN_Str8 method, DN_NETDoHTTPArgs const *args)
+static DN_NETRequest *DN_NET_EmcAllocRequest_(DN_NETCore *net)
 {
   // NOTE: Allocate request
   DN_NETEmcCore *emc = DN_Cast(DN_NETEmcCore *) net->context;
-  DN_NETRequest *req = emc->free_list;
-  if (req) {
+  DN_NETRequest *result = emc->free_list;
+  if (result) {
     emc->free_list = emc->free_list->next;
-    req->next      = nullptr;
+    result->next      = nullptr;
+    DN_Assert(result->prev == nullptr);
+    if (emc->free_list) {
+      DN_Assert(emc->free_list->prev == nullptr);
+    }
   } else {
-    req = DN_ArenaNew(&net->arena, DN_NETRequest, DN_ZMem_Yes);
+    // NOTE: Setup the request's arena here. WASM doesn't have the concept of virtual memory
+    // so we use malloc to initialise it.
+    result = DN_ArenaNew(&net->arena, DN_NETRequest, DN_ZMem_Yes);
+    if (result)
+      result->arena = DN_ArenaFromHeap(DN_Megabytes(1), DN_ArenaFlags_Nil);
   }
 
-  DN_NETRequestHandle result = DN_NET_SetupRequest_(req, url, method, args, DN_NETRequestType_HTTP);
-
   // NOTE: Setup some emscripten specific data into our request context
-  req->context[0] = DN_Cast(DN_UPtr) net;
+  if (result) {
+    result->context[0] = DN_Cast(DN_UPtr) net;
+  }
+
+  return result;
+}
+
+DN_NETRequestHandle DN_NET_EmcDoHTTP(DN_NETCore *net, DN_Str8 url, DN_Str8 method, DN_NETDoHTTPArgs const *args)
+{
+  DN_NETRequest      *req    = DN_NET_EmcAllocRequest_(net);
+  DN_NETRequestHandle result = DN_NET_SetupRequest_(req, url, method, args, DN_NETRequestType_HTTP);
 
   // NOTE: Setup the HTTP request via Emscripten
   emscripten_fetch_attr_t fetch_attribs = {};
@@ -236,23 +255,12 @@ DN_NETRequestHandle DN_NET_EmcDoHTTP(DN_NETCore *net, DN_Str8 url, DN_Str8 metho
 DN_NETRequestHandle DN_NET_EmcDoWS(DN_NETCore *net, DN_Str8 url)
 {
   DN_Assert(emscripten_websocket_is_supported());
-
-  // NOTE: Allocate request
-  DN_NETEmcCore *emc = DN_Cast(DN_NETEmcCore *) net->context;
-  DN_NETRequest *req = emc->free_list;
-  if (req) {
-    emc->free_list = emc->free_list->next;
-    req->next      = nullptr;
-  } else {
-    req = DN_ArenaNew(&net->arena, DN_NETRequest, DN_ZMem_Yes);
-  }
-
+  DN_NETRequest      *req    = DN_NET_EmcAllocRequest_(net);
   DN_NETRequestHandle result = DN_NET_SetupRequest_(req, url, /*method=*/DN_Str8Lit(""), /*args=*/nullptr, DN_NETRequestType_WS);
   if (!req)
     return result;
 
   // NOTE: Setup some emscripten specific data into our request context
-  req->context[0]               = DN_Cast(DN_UPtr) net;
   req->context[1]               = DN_Cast(DN_UPtr) DN_ArenaNew(&req->arena, DN_NETEmcRequest, DN_ZMem_Yes);
   req->start_response_arena_pos = DN_ArenaPos(&req->arena);
 
@@ -307,44 +315,79 @@ void DN_NET_EmcDoWSSend(DN_NETRequestHandle handle, DN_Str8 data, DN_NETWSSend s
 static DN_NETResponse DN_NET_EmcHandleFinishedRequest_(DN_NETCore *net, DN_NETEmcCore *emc, DN_NETRequestHandle handle, DN_NETRequest *request, DN_Arena *arena)
 {
   // NOTE: Generate the response, copy out the strings into the user given memory
-  DN_NETResponse result      = request->response;
-  bool           end_request = true;
+  DN_NETEmcRequest *emc_request     = DN_Cast(DN_NETEmcRequest *) request->context[1];
+  DN_NETResponse    result          = request->response;
+  bool              end_request     = true;
+  bool              dequeue_request = true;
   if (request->type == DN_NETRequestType_HTTP) {
     result.body = DN_Str8FromStr8Arena(arena, result.body);
   } else {
     // NOTE: Get emscripten contexts
-    DN_NETEmcRequest *emc_request = DN_Cast(DN_NETEmcRequest *) request->context[1];
-    DN_NETEmcWSEvent *emc_event   = emc_request->first_event;
-    emc_request->first_event       = emc_event->next; // Advance the list pointer
+    DN_NETEmcWSEvent *emc_event = emc_request->first_event;
     DN_Assert(emc_event);
-    DN_Assert((emc_event->state >= DN_NETResponseState_WSOpen && emc_event->state <= DN_NETResponseState_WSPong) ||
-              emc_event->state == DN_NETResponseState_Error);
+
+    DN_AssertF((emc_event->state >= DN_NETResponseState_WSOpen && emc_event->state <= DN_NETResponseState_WSPong) || emc_event->state == DN_NETResponseState_Error,
+               "emc_event=%p", emc_event);
 
     // NOTE: Build the result
     result.state   = emc_event->state;
     result.request = handle;
     result.body    = DN_Str8FromStr8Arena(arena, emc_event->payload);
 
+    // NOTE: Advance the event list
+    {
+      if (emc_request->first_event == emc_request->last_event) {
+        emc_request->last_event = emc_request->last_event->next;
+        DN_Assert(emc_request->first_event->next == emc_request->last_event);
+      }
+      emc_request->first_event = emc_event->next;
 
-    // NOTE: Free the payload which is stored in the Emscripten pool
-    if (emc_event->payload.size) {
-      DN_PoolDealloc(&emc->pool, emc_event->payload.data);
-      emc_event->payload = {};
+      // NOTE: If there's still an event on the request then we do not dequeue the request from the
+      // response list. The user can still "wait" for a response to read more data from it.
+      if (emc_request->first_event)
+        dequeue_request = false;
     }
 
     if (result.state != DN_NETResponseState_WSClose)
       end_request = false;
   }
 
-  // NOTE: Deallocate the memory used in the request and reset the string builder
-  DN_ArenaPopTo(&request->arena, 0);
+  // NOTE: Remove request from the response list which is doubly-linked
+  if (dequeue_request) {
+    if (request->prev) {
+      DN_AssertF(request->prev->next == request, "next=%p vs request=%p", request->prev->next, request);
+      request->prev->next = request->next;
+    }
+
+    if (request->next) {
+      DN_AssertF(request->next->prev == request, "prev=%p vs request=%p", request->next->prev, request);
+      request->next->prev = request->prev;
+    }
+
+    if (request == emc->response_list)
+      emc->response_list = emc->response_list->next;
+
+    request->prev = nullptr;
+    request->next = nullptr;
+    DN_Assert(emc_request->first_event == nullptr);
+    DN_Assert(emc_request->last_event == nullptr);
+
+    // NOTE: Deallocate the memory used in the request and reset the string builder (as all
+    // payload(s) have been read from the request).
+    if (end_request)
+        DN_ArenaPopTo(&request->arena, 0);
+    else
+        DN_ArenaPopTo(&request->arena, request->start_response_arena_pos);
+  }
+
   if (end_request) {
     DN_NET_EndFinishedRequest_(request);
-    DN_NETEmcRequest *emc_request = DN_Cast(DN_NETEmcRequest *) request->context[1];
     emscripten_websocket_delete(emc_request->socket);
+    emc_request->socket = 0;
 
     DN_NETEmcCore *emc = DN_Cast(DN_NETEmcCore *) net->context;
-    request->next  = emc->free_list;
+    request->next      = emc->free_list;
+    request->prev      = nullptr;
     emc->free_list     = request;
   }
 
@@ -381,7 +424,7 @@ static DN_OSSemaphoreWaitResult DN_NET_EmcSemaphoreWait_(DN_OSSemaphore *sem, DN
 
 DN_NETResponse DN_NET_EmcWaitForResponse(DN_NETRequestHandle handle, DN_Arena *arena, DN_U32 timeout_ms)
 {
-  DN_NETResponse         result      = {};
+  DN_NETResponse result      = {};
   DN_NETRequest *request_ptr = DN_Cast(DN_NETRequest *) handle.handle;
   if (request_ptr && request_ptr->gen == handle.gen) {
     DN_NETCore    *net = DN_Cast(DN_NETCore *) request_ptr->context[0];
@@ -391,10 +434,7 @@ DN_NETResponse DN_NET_EmcWaitForResponse(DN_NETRequestHandle handle, DN_Arena *a
     if (wait != DN_OSSemaphoreWaitResult_Success)
       return result;
 
-    // NOTE: Remove request from the done list
-    request_ptr->next  = nullptr;
-    emc->response_list = emc->response_list->next;
-    result             = DN_NET_EmcHandleFinishedRequest_(net, emc, handle, request_ptr, arena);
+    result = DN_NET_EmcHandleFinishedRequest_(net, emc, handle, request_ptr, arena);
 
     // NOTE: Decrement the global 'request done' completion semaphore since the user consumed the
     // request individually.
@@ -414,16 +454,12 @@ DN_NETResponse DN_NET_EmcWaitForAnyResponse(DN_NETCore *net, DN_Arena *arena, DN
   if (wait != DN_OSSemaphoreWaitResult_Success)
       return result;
 
-  // NOTE: Dequeue the request that is done from the done list
   DN_AssertF(emc->response_list,
              "This should be set otherwise we bumped the completion sem without queueing into the "
              "done list or we forgot to wait on the global semaphore after a request finished");
-  DN_NETRequest *request_ptr = emc->response_list;
-  DN_Assert(request_ptr == emc->response_list);
-  request_ptr->next = nullptr;
-  emc->response_list    = emc->response_list->next;
 
   // NOTE: Decrement the request's completion semaphore since the user consumed the global semaphore
+  DN_NETRequest           *request_ptr     = emc->response_list;
   DN_OSSemaphoreWaitResult net_wait_result = DN_OS_SemaphoreWait(&request_ptr->completion_sem, 0 /*timeout_ms*/);
   DN_AssertF(net_wait_result == DN_OSSemaphoreWaitResult_Success, "Wait result was: %zu", DN_Cast(DN_USize) net_wait_result);
 

@@ -4,7 +4,7 @@
   #include "dn_bin_pack.h"
 #endif
 
-DN_API void DN_BinPack_U64(DN_BinPack *pack, DN_BinPackMode mode, DN_U64 *item)
+DN_API void DN_BinPackU64(DN_BinPack *pack, DN_BinPackMode mode, DN_U64 *item)
 {
   DN_U64 const VALUE_MASK   = 0b0111'1111;
   DN_U8 const  CONTINUE_BIT = 0b1000'0000;
@@ -29,7 +29,7 @@ DN_API void DN_BinPack_U64(DN_BinPack *pack, DN_BinPackMode mode, DN_U64 *item)
   }
 }
 
-DN_API void DN_BinPack_VarInt_(DN_BinPack *pack, DN_BinPackMode mode, void *item, DN_USize size)
+DN_API void DN_BinPackVarInt_(DN_BinPack *pack, DN_BinPackMode mode, void *item, DN_USize size)
 {
   DN_U64 value = 0;
   DN_AssertF(size <= sizeof(value),
@@ -39,81 +39,92 @@ DN_API void DN_BinPack_VarInt_(DN_BinPack *pack, DN_BinPackMode mode, void *item
   if (mode == DN_BinPackMode_Serialise) // Read `item` into U64 `value`
     DN_Memcpy(&value, item, size);
 
-  DN_BinPack_U64(pack, mode, &value);
+  DN_BinPackU64(pack, mode, &value);
 
   if (mode == DN_BinPackMode_Deserialise) // Write U64 `value` into `item`
     DN_Memcpy(item, &value, size);
 }
 
-DN_API void DN_BinPack_U32(DN_BinPack *pack, DN_BinPackMode mode, DN_U32 *item)
+DN_API bool DN_BinPackIsEndOfReadStream(DN_BinPack const *pack)
 {
-  DN_BinPack_VarInt_(pack, mode, item, sizeof(*item));
+  bool result = pack->read_index == pack->read.size;
+  return result;
 }
 
-DN_API void DN_BinPack_U16(DN_BinPack *pack, DN_BinPackMode mode, DN_U16 *item)
+DN_API void DN_BinPackUSize(DN_BinPack *pack, DN_BinPackMode mode, DN_USize *item)
 {
-  DN_BinPack_VarInt_(pack, mode, item, sizeof(*item));
+  DN_BinPackVarInt_(pack, mode, item, sizeof(*item));
 }
 
-DN_API void DN_BinPack_U8(DN_BinPack *pack, DN_BinPackMode mode, DN_U8 *item)
+DN_API void DN_BinPackU32(DN_BinPack *pack, DN_BinPackMode mode, DN_U32 *item)
 {
-  DN_BinPack_VarInt_(pack, mode, item, sizeof(*item));
+  DN_BinPackVarInt_(pack, mode, item, sizeof(*item));
 }
 
-DN_API void DN_BinPack_I64(DN_BinPack *pack, DN_BinPackMode mode, DN_I64 *item)
+DN_API void DN_BinPackU16(DN_BinPack *pack, DN_BinPackMode mode, DN_U16 *item)
 {
-  DN_BinPack_VarInt_(pack, mode, item, sizeof(*item));
+  DN_BinPackVarInt_(pack, mode, item, sizeof(*item));
 }
 
-DN_API void DN_BinPack_I32(DN_BinPack *pack, DN_BinPackMode mode, DN_I32 *item)
+DN_API void DN_BinPackU8(DN_BinPack *pack, DN_BinPackMode mode, DN_U8 *item)
 {
-  DN_BinPack_VarInt_(pack, mode, item, sizeof(*item));
+  DN_BinPackVarInt_(pack, mode, item, sizeof(*item));
 }
 
-DN_API void DN_BinPack_I16(DN_BinPack *pack, DN_BinPackMode mode, DN_I16 *item)
+DN_API void DN_BinPackI64(DN_BinPack *pack, DN_BinPackMode mode, DN_I64 *item)
 {
-  DN_BinPack_VarInt_(pack, mode, item, sizeof(*item));
+  DN_BinPackVarInt_(pack, mode, item, sizeof(*item));
 }
 
-DN_API void DN_BinPack_I8(DN_BinPack *pack, DN_BinPackMode mode, DN_I8 *item)
+DN_API void DN_BinPackI32(DN_BinPack *pack, DN_BinPackMode mode, DN_I32 *item)
 {
-  DN_BinPack_VarInt_(pack, mode, item, sizeof(*item));
+  DN_BinPackVarInt_(pack, mode, item, sizeof(*item));
 }
 
-DN_API void DN_BinPack_F64(DN_BinPack *pack, DN_BinPackMode mode, DN_F64 *item)
+DN_API void DN_BinPackI16(DN_BinPack *pack, DN_BinPackMode mode, DN_I16 *item)
 {
-  DN_BinPack_VarInt_(pack, mode, item, sizeof(*item));
+  DN_BinPackVarInt_(pack, mode, item, sizeof(*item));
 }
 
-DN_API void DN_BinPack_F32(DN_BinPack *pack, DN_BinPackMode mode, DN_F32 *item)
+DN_API void DN_BinPackI8(DN_BinPack *pack, DN_BinPackMode mode, DN_I8 *item)
 {
-  DN_BinPack_VarInt_(pack, mode, item, sizeof(*item));
+  DN_BinPackVarInt_(pack, mode, item, sizeof(*item));
+}
+
+DN_API void DN_BinPackF64(DN_BinPack *pack, DN_BinPackMode mode, DN_F64 *item)
+{
+  DN_BinPackVarInt_(pack, mode, item, sizeof(*item));
+}
+
+DN_API void DN_BinPackF32(DN_BinPack *pack, DN_BinPackMode mode, DN_F32 *item)
+{
+  DN_BinPackVarInt_(pack, mode, item, sizeof(*item));
 }
 
 #if defined(DN_MATH_H)
-DN_API void DN_BinPack_V2(DN_BinPack *pack, DN_BinPackMode mode, DN_V2F32 *item)
+DN_API void DN_BinPackV2(DN_BinPack *pack, DN_BinPackMode mode, DN_V2F32 *item)
 {
-  DN_BinPack_F32(pack, mode, &item->x);
-  DN_BinPack_F32(pack, mode, &item->y);
+  DN_BinPackF32(pack, mode, &item->x);
+  DN_BinPackF32(pack, mode, &item->y);
 }
 
-DN_API void DN_BinPack_V4(DN_BinPack *pack, DN_BinPackMode mode, DN_V4F32 *item)
+DN_API void DN_BinPackV4(DN_BinPack *pack, DN_BinPackMode mode, DN_V4F32 *item)
 {
-  DN_BinPack_F32(pack, mode, &item->x);
-  DN_BinPack_F32(pack, mode, &item->y);
-  DN_BinPack_F32(pack, mode, &item->z);
-  DN_BinPack_F32(pack, mode, &item->w);
+  DN_BinPackF32(pack, mode, &item->x);
+  DN_BinPackF32(pack, mode, &item->y);
+  DN_BinPackF32(pack, mode, &item->z);
+  DN_BinPackF32(pack, mode, &item->w);
 }
 #endif
 
-DN_API void DN_BinPack_Bool(DN_BinPack *pack, DN_BinPackMode mode, bool *item)
+DN_API void DN_BinPackBool(DN_BinPack *pack, DN_BinPackMode mode, bool *item)
 {
-  DN_BinPack_VarInt_(pack, mode, item, sizeof(*item));
+  DN_BinPackVarInt_(pack, mode, item, sizeof(*item));
 }
 
-DN_API void DN_BinPack_Str8FromArena(DN_BinPack *pack, DN_Arena *arena, DN_BinPackMode mode, DN_Str8 *string)
+DN_API void DN_BinPackStr8FromArena(DN_BinPack *pack, DN_Arena *arena, DN_BinPackMode mode, DN_Str8 *string)
 {
-  DN_BinPack_VarInt_(pack, mode, &string->size, sizeof(string->size));
+  DN_BinPackVarInt_(pack, mode, &string->size, sizeof(string->size));
   if (mode == DN_BinPackMode_Serialise) {
     DN_Str8BuilderAppendBytesCopy(&pack->writer, string->data, string->size);
   } else {
@@ -123,9 +134,9 @@ DN_API void DN_BinPack_Str8FromArena(DN_BinPack *pack, DN_Arena *arena, DN_BinPa
   }
 }
 
-DN_API void DN_BinPack_Str8FromPool(DN_BinPack *pack, DN_Pool *pool, DN_BinPackMode mode, DN_Str8 *string)
+DN_API void DN_BinPackStr8FromPool(DN_BinPack *pack, DN_Pool *pool, DN_BinPackMode mode, DN_Str8 *string)
 {
-  DN_BinPack_VarInt_(pack, mode, &string->size, sizeof(string->size));
+  DN_BinPackVarInt_(pack, mode, &string->size, sizeof(string->size));
   if (mode == DN_BinPackMode_Serialise) {
     DN_Str8BuilderAppendBytesCopy(&pack->writer, string->data, string->size);
   } else {
@@ -135,25 +146,32 @@ DN_API void DN_BinPack_Str8FromPool(DN_BinPack *pack, DN_Pool *pool, DN_BinPackM
   }
 }
 
-DN_API void DN_BinPack_BytesFromArena(DN_BinPack *pack, DN_Arena *arena, DN_BinPackMode mode, void **ptr, DN_USize *size)
+DN_API DN_Str8 DN_BinPackStr8FromBuffer(DN_BinPack *pack, DN_BinPackMode mode, char *ptr, DN_USize *size, DN_USize max)
+{
+  DN_BinPackCBuffer(pack, mode, ptr, size, max);
+  DN_Str8 result = DN_Str8FromPtr(ptr, *size);
+  return result;
+}
+
+DN_API void DN_BinPackBytesFromArena(DN_BinPack *pack, DN_Arena *arena, DN_BinPackMode mode, void **ptr, DN_USize *size)
 {
   DN_Str8 string = DN_Str8FromPtr(*ptr, *size);
-  DN_BinPack_Str8FromArena(pack, arena, mode, &string);
+  DN_BinPackStr8FromArena(pack, arena, mode, &string);
   *ptr  = string.data;
   *size = string.size;
 }
 
-DN_API void DN_BinPack_BytesFromPool(DN_BinPack *pack, DN_Pool *pool, DN_BinPackMode mode, void **ptr, DN_USize *size)
+DN_API void DN_BinPackBytesFromPool(DN_BinPack *pack, DN_Pool *pool, DN_BinPackMode mode, void **ptr, DN_USize *size)
 {
   DN_Str8 string = DN_Str8FromPtr(*ptr, *size);
-  DN_BinPack_Str8FromPool(pack, pool, mode, &string);
+  DN_BinPackStr8FromPool(pack, pool, mode, &string);
   *ptr  = string.data;
   *size = string.size;
 }
 
-DN_API void DN_BinPack_CArray(DN_BinPack *pack, DN_BinPackMode mode, void *ptr, DN_USize size)
+DN_API void DN_BinPackCArray(DN_BinPack *pack, DN_BinPackMode mode, void *ptr, DN_USize size)
 {
-  DN_BinPack_VarInt_(pack, mode, &size, sizeof(size));
+  DN_BinPackVarInt_(pack, mode, &size, sizeof(size));
   if (mode == DN_BinPackMode_Serialise) {
     DN_Str8BuilderAppendBytesCopy(&pack->writer, ptr, size);
   } else {
@@ -164,7 +182,24 @@ DN_API void DN_BinPack_CArray(DN_BinPack *pack, DN_BinPackMode mode, void *ptr, 
   }
 }
 
-DN_API DN_Str8 DN_BinPack_Build(DN_BinPack const *pack, DN_Arena *arena)
+DN_API void DN_BinPackCBuffer(DN_BinPack *pack, DN_BinPackMode mode, char *ptr, DN_USize *size, DN_USize max)
+{
+  if (mode == DN_BinPackMode_Serialise) {
+    DN_BinPackUSize(pack, mode, size);
+    DN_Str8BuilderAppendBytesCopy(&pack->writer, ptr, *size);
+  } else {
+    DN_U64 size_u64 = 0;
+    DN_BinPackU64(pack, mode, &size_u64);
+    DN_Assert(size_u64 < DN_USIZE_MAX);
+    DN_Assert(size_u64 <= max);
+
+    *size = DN_Min(size_u64, max);
+    DN_Memcpy(ptr, pack->read.data + pack->read_index, *size);
+    pack->read_index += size_u64;
+  }
+}
+
+DN_API DN_Str8 DN_BinPackBuild(DN_BinPack const *pack, DN_Arena *arena)
 {
   DN_Str8 result = DN_Str8BuilderBuild(&pack->writer, arena);
   return result;

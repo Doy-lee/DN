@@ -42,7 +42,7 @@ DN_MSVC_WARNING_DISABLE(6262) // Function uses '29804' bytes of stack.  Consider
 int main(int, char**)
 {
   DN_Core core = {};
-  DN_Init(&core, DN_InitFlags_LogAllFeatures, nullptr);
+  DN_Init(&core, DN_InitFlags_LogAllFeatures | DN_InitFlags_OS, nullptr);
   DN_Tests_RunSuite(DN_TestsPrint_Yes);
   return 0;
 }

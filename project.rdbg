@@ -1,2 +1,19 @@
 // raddbg 0.9.25 project file
 
+recent_file: path: "Source/OS/dn_os_w32.cpp"
+target:
+{
+  executable: "Build/dn_unit_tests_msvc.exe"
+  working_directory: "Build/"
+  enabled: 1
+}
+debug_info:
+{
+  path: "C:/Home/Code/DN/Build/dn_unit_tests_msvc.pdb"
+  timestamp: 66199776062119
+}
+debug_info:
+{
+  path: "C:/Home/Cloud/Dev/Win/msvc/msvc_host_x64_target_x64/14.41.17.11/VC/Tools/MSVC/14.41.34120/bin/Hostx64/x64/clang_rt.asan_dynamic-x86_64.pdb"
+  timestamp: 66163731918117
+}

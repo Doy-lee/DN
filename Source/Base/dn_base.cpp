@@ -1686,6 +1686,23 @@ DN_API DN_Str8 DN_Str8FromFmtPool(DN_Pool *pool, DN_FMT_ATTRIB char const *fmt, 
   return result;
 }
 
+DN_API DN_Str8x16 DN_Str8x16FromFmt(DN_FMT_ATTRIB char const *fmt, ...)
+{
+  va_list args;
+  va_start(args, fmt);
+  DN_Str8x16 result = {};
+  DN_FmtVAppend(result.data, &result.size, sizeof(result.data), fmt, args);
+  va_end(args);
+  return result;
+}
+
+DN_API DN_Str8x16 DN_Str8x16FromFmtV(DN_FMT_ATTRIB char const *fmt, va_list args)
+{
+  DN_Str8x16 result = {};
+  DN_FmtVAppend(result.data, &result.size, sizeof(result.data), fmt, args);
+  return result;
+}
+
 DN_API DN_Str8x32 DN_Str8x32FromFmt(DN_FMT_ATTRIB char const *fmt, ...)
 {
   va_list args;

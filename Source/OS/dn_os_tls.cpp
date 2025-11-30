@@ -32,9 +32,12 @@ DN_API void DN_OS_TLSInit(DN_OSTLS *tls, DN_OSTLSInitArgs args)
     return;
 
   DN_U64 reserve          = args.reserve          ? args.reserve          : DN_Kilobytes(64);
-  DN_U64 commit           = args.commit           ? args.commit           : DN_Kilobytes(4);
   DN_U64 err_sink_reserve = args.err_sink_reserve ? args.err_sink_reserve : DN_Kilobytes(64);
+
+  #if !defined(DN_PLATFORM_EMSCRIPTEN)
+  DN_U64 commit           = args.commit           ? args.commit           : DN_Kilobytes(4);
   DN_U64 err_sink_commit  = args.err_sink_commit  ? args.err_sink_commit  : DN_Kilobytes(4);
+  #endif
 
   // TODO: We shouldn't have the no alloc track flag here but the initial TLS
   // init on OS init happens before CORE init. CORE init is the one responsible
@@ -42,8 +45,22 @@ DN_API void DN_OS_TLSInit(DN_OSTLS *tls, DN_OSTLSInitArgs args)
   for (DN_ForItCArray(it, DN_Arena, tls->arenas)) {
     DN_Arena *arena = it.data;
     switch (DN_Cast(DN_OSTLSArena) it.index) {
-      default:                      *arena = DN_ArenaFromVMem(reserve, commit, DN_ArenaFlags_AllocCanLeak | DN_ArenaFlags_NoAllocTrack); break;
-      case DN_OSTLSArena_ErrorSink: *arena = DN_ArenaFromVMem(err_sink_reserve, err_sink_commit, DN_ArenaFlags_AllocCanLeak | DN_ArenaFlags_NoAllocTrack); break;
+      default: {
+        #if defined(DN_PLATFORM_EMSCRIPTEN)
+        *arena = DN_ArenaFromHeap(reserve, DN_ArenaFlags_AllocCanLeak | DN_ArenaFlags_NoAllocTrack);
+        #else
+        *arena = DN_ArenaFromVMem(reserve, commit, DN_ArenaFlags_AllocCanLeak | DN_ArenaFlags_NoAllocTrack);
+        #endif
+      } break;
+
+      case DN_OSTLSArena_ErrorSink: {
+        #if defined(DN_PLATFORM_EMSCRIPTEN)
+        *arena = DN_ArenaFromHeap(err_sink_reserve, DN_ArenaFlags_AllocCanLeak | DN_ArenaFlags_NoAllocTrack);
+        #else
+        *arena = DN_ArenaFromVMem(err_sink_reserve, err_sink_commit, DN_ArenaFlags_AllocCanLeak | DN_ArenaFlags_NoAllocTrack);
+        #endif
+      } break;
+
       case DN_OSTLSArena_Count:     DN_InvalidCodePath; break;
     }
   }
