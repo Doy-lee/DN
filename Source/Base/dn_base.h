@@ -2,7 +2,7 @@
 #define DN_BASE_H
 
 #if defined(_CLANGD)
-  #include "../dn_base_inc.h"
+  #include "../dn.h"
 #endif
 
 // NOTE: Macros

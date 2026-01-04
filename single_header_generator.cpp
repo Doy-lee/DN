@@ -1,19 +1,17 @@
 #define USE_SINGLE_HEADER 1
 
+#define DN_H_WITH_OS 1
+#define DN_H_WITH_CORE 1
 #if USE_SINGLE_HEADER
 #include "Single-Header/dn_single_header.h"
 #else
-#include "Source/dn_base_inc.h"
-#include "Source/dn_os_inc.h"
-#include "Source/dn_inc.h"
+#include "Source/dn.h"
 #endif
 
 #if USE_SINGLE_HEADER
 #include "Single-Header/dn_single_header.cpp"
 #else
-#include "Source/dn_base_inc.cpp"
-#include "Source/dn_os_inc.cpp"
-#include "Source/dn_inc.cpp"
+#include "Source/dn.cpp"
 #endif
 
 enum FileType
@@ -94,12 +92,8 @@ int main(int argc, char **argv)
   }
 
   File const FILES[] = {
-      {FileType_Header, DN_Str8Lit("dn_base_inc.h")},
-      {FileType_Header, DN_Str8Lit("dn_os_inc.h")},
-      {FileType_Header, DN_Str8Lit("dn_inc.h")},
-      {FileType_Impl, DN_Str8Lit("dn_base_inc.cpp")},
-      {FileType_Impl, DN_Str8Lit("dn_os_inc.cpp")},
-      {FileType_Impl, DN_Str8Lit("dn_inc.cpp")},
+      {FileType_Header, DN_Str8Lit("dn.h")},
+      {FileType_Impl, DN_Str8Lit("dn.cpp")},
   };
 
   for (DN_ForIndexU(type, FileType_Count)) {

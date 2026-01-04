@@ -1,4 +1,9 @@
-#include "../dn_base_inc.h"
+#if !defined(DN_BASE_LEAK_H)
+#define DN_BASE_LEAK_H
+
+#if defined(_CLANGD)
+  #include "../dn_base_inc.h"
+#endif
 
 enum DN_LeakAllocFlag
 {
@@ -41,4 +46,4 @@ DN_API void DN_LeakDump_        (DN_LeakTracker *leak);
 #define     DN_LeakTrackDealloc(leak, ptr)                     do { (void)ptr;                                   } while (0)
 #define     DN_LeakDump(leak)                                  do {                                              } while (0)
 #endif
-
+#endif // DN_BASE_LEAK_H

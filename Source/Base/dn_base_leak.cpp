@@ -1,6 +1,8 @@
 #define DN_BASE_LEAK_CPP
 
-#include "../dn_base_inc.h"
+#if defined(_CLANGD)
+#include "../dn.h"
+#endif
 
 DN_API void DN_LeakTrackAlloc_(DN_LeakTracker *leak, void *ptr, DN_USize size, bool leak_permitted)
 {

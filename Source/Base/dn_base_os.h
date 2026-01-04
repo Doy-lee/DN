@@ -1,7 +1,9 @@
 #if !defined(DN_BASE_OS_H)
 #define DN_BASE_OS_H
 
-#include "../dn_base_inc.h"
+#if defined(_CLANGD)
+#include "../dn.h"
+#endif
 
 // NOTE: OS primitives that the OS layer can provide for the base layer but is optional.
 

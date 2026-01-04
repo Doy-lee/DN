@@ -1,10 +1,24 @@
-#if !defined(DN_BASE_INC_H)
-#define DN_BASE_INC_H
+#if !defined(DN_H)
+#define DN_H
 
 // NOTE: DN configuration
-//  All the following configuration options are optional. If omitted, DN has default behaviours to
-//  handle the various options.
-//
+//  Enabling DN modules
+//    By including this mega header 'dn.h' you must define the following symbols to 0 or 1 in order
+//    to include the module's implementation into the library as follows
+/*
+    #define DN_H_WITH_OS      1
+    #define DN_H_WITH_CORE    1
+    #define DN_H_WITH_MATH    1
+    #define DN_H_WITH_HASH    1
+    #define DN_H_WITH_HELPERS 1
+    #define DN_H_WITH_ASYNC   1
+    #define DN_H_WITH_NET     1
+    #include "dn.h"
+
+    #define DN_CPP_WITH_TESTS 1
+    #define DN_CPP_WITH_DEMO 1
+    #include "dn.cpp"
+*/
 //  Platform Target
 //    Define one of the following directives to configure this library to compile for that platform.
 //    By default, the library will auto-detect the current host platform and select that as the
@@ -60,4 +74,45 @@
 #include "Base/dn_base_containers.h"
 #include "Base/dn_base_leak.h"
 
-#endif // !defined(DN_BASE_INC_H)
+#if DN_H_WITH_OS
+#if defined(DN_PLATFORM_WIN32)
+  #include "OS/dn_os_windows.h"
+  #include "OS/dn_os_w32.h"
+#elif defined(DN_PLATFORM_POSIX) || defined(DN_PLATFORM_EMSCRIPTEN)
+  #include "OS/dn_os_posix.h"
+#else
+  #error Please define a platform e.g. 'DN_PLATFORM_WIN32' to enable the correct implementation for platform APIs
+#endif
+
+#include "OS/dn_os_tls.h"
+#include "OS/dn_os.h"
+#include "OS/dn_os_allocator.h"
+#include "OS/dn_os_containers.h"
+#include "OS/dn_os_print.h"
+#include "OS/dn_os_string.h"
+#endif
+
+#if DN_H_WITH_CORE
+#include "dn_core.h"
+#endif
+
+#if DN_H_WITH_MATH
+#include "Extra/dn_math.h"
+#endif
+
+#if DN_H_WITH_HASH
+#include "Extra/dn_hash.h"
+#endif
+
+#if DN_H_WITH_HELPERS
+#include "Extra/dn_helpers.h"
+#endif
+
+#if DN_H_WITH_ASYNC
+#include "Extra/dn_async.h"
+#endif
+
+#if DN_H_WITH_NET
+#include "Extra/dn_net.h"
+#endif
+#endif // !defined(DN_H)

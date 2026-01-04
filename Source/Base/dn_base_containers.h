@@ -1,7 +1,9 @@
 #if !defined(DN_CONTAINERS_H)
 #define DN_CONTAINERS_H
 
-#include "../dn_base_inc.h"
+#if defined(_CLANGD)
+#include "../dn.h"
+#endif
 
 struct DN_Ring
 {

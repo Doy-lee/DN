@@ -2,22 +2,15 @@
   #define DN_NO_WINDOWS_H_REPLACEMENT_HEADER
 #endif
 
-#include "../dn_base_inc.h"
-#include "../dn_os_inc.h"
-#include "../dn_inc.h"
-
-#include "../dn_base_inc.cpp"
-#include "../dn_os_inc.cpp"
-#include "../dn_inc.cpp"
-
-#include "../Extra/dn_math.h"
-#include "../Extra/dn_helpers.h"
-
-#include "../Extra/dn_math.cpp"
-#include "../Extra/dn_helpers.cpp"
-
-#include "../Extra/dn_net.h"
-#include "../Extra/dn_net.cpp"
+#define DN_H_WITH_OS      1
+#define DN_H_WITH_CORE    1
+#define DN_H_WITH_MATH    1
+#define DN_H_WITH_HASH    1
+#define DN_H_WITH_HELPERS 1
+#define DN_H_WITH_ASYNC   1
+#define DN_H_WITH_NET     1
+#include "../dn.h"
+#include "../dn.cpp"
 
 #if defined(DN_UNIT_TESTS_WITH_CURL)
   #define CURL_STATICLIB

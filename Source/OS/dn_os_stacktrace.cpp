@@ -1,7 +1,9 @@
 #define DN_CORE_DEBUG_CPP
 
-#include "../dn_base_inc.h"
-#include "../dn_os_inc.h"
+#if defined(_CLANGD)
+#define DN_H_WITH_OS 1
+#include "../dn.h"
+#endif
 
 DN_API DN_StackTraceWalkResult DN_StackTraceWalk(DN_Arena *arena, uint16_t limit)
 {

@@ -1,6 +1,8 @@
 #define DN_BASE_LOG_CPP
 
-#include "../dn_base_inc.h"
+#if defined(_CLANDG)
+#include "../dn.h"
+#endif
 
 static DN_LOGEmitFromTypeFVFunc *g_dn_base_log_emit_from_type_fv_func_;
 static void                     *g_dn_base_log_emit_from_type_fv_user_context_;

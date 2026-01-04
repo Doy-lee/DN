@@ -1,7 +1,9 @@
 #if !defined(DN_BASE_LOG_H)
 #define DN_BASE_LOG_H
 
-#include "../dn_base_inc.h"
+#if defined(_CLANGD)
+#include "../dn.h"
+#endif
 
 enum DN_LOGType
 {

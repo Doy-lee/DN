@@ -1,6 +1,7 @@
-#define DN_CONTAINERS_CPP
-
-#include "../dn_base_inc.h"
+#define DN_BASE_CONTAINERS_CPP
+#if defined(_CLANGD)
+#include "../dn.h"
+#endif
 
 DN_API void *DN_CArray2_InsertArray(void *data, DN_USize *size, DN_USize max, DN_USize elem_size, DN_USize index, void const *items, DN_USize count)
 {
@@ -1439,8 +1440,7 @@ DN_API DN_Str16 DN_Slice_Str16RenderSpaceSeparated(DN_Arena *arena, DN_Slice<DN_
   return result;
 }
 
-#if !defined(DN_NO_DSMAP)
-// NOTE: DN_DSMap //////////////////////////////////////////////////////////////////////////////////
+// NOTE: DN_DSMap
 DN_API DN_DSMapKey DN_DSMap_KeyU64NoHash(DN_U64 u64)
 {
   DN_DSMapKey result = {};
@@ -1474,4 +1474,3 @@ DN_API bool operator==(DN_DSMapKey lhs, DN_DSMapKey rhs)
   bool result = DN_DSMap_KeyEquals(lhs, rhs);
   return result;
 }
-#endif // !defined(DN_NO_DSMAP)
