@@ -1033,14 +1033,14 @@ DN_API DN_OSExecResult DN_OS_ExecPump(DN_OSExecAsyncHandle handle,
   return result;
 }
 
-static DN_OSPosixSyncPrimitive *DN_OS_U64ToPOSIXSyncPrimitive_(DN_U64 u64)
+static DN_OSPosixSyncPrimitive *DN_OS_PosixU64ToSyncPrimitive_(DN_U64 u64)
 {
   DN_OSPosixSyncPrimitive *result = nullptr;
   DN_Memcpy(&result, &u64, sizeof(result));
   return result;
 }
 
-static DN_U64 DN_POSIX_SyncPrimitiveToU64(DN_OSPosixSyncPrimitive *primitive)
+static DN_U64 DN_OS_PosixSyncPrimitiveToU64(DN_OSPosixSyncPrimitive *primitive)
 {
   DN_U64 result = 0;
   static_assert(sizeof(result) >= sizeof(primitive), "Pointer size mis-match");
@@ -1067,7 +1067,7 @@ static DN_OSPosixSyncPrimitive *DN_POSIX_AllocSyncPrimitive_()
   return result;
 }
 
-static void DN_POSIX_DeallocSyncPrimitive_(DN_OSPosixSyncPrimitive *primitive)
+static void DN_OS_PosixDeallocSyncPrimitive_(DN_OSPosixSyncPrimitive *primitive)
 {
   if (primitive) {
     DN_OSPosixCore *posix = DN_OS_GetPOSIXCore_();
@@ -1078,7 +1078,7 @@ static void DN_POSIX_DeallocSyncPrimitive_(DN_OSPosixSyncPrimitive *primitive)
   }
 }
 
-// NOTE: DN_OSSemaphore ////////////////////////////////////////////////////////////////////////////
+// NOTE: DN_OSSemaphore
 DN_API DN_OSSemaphore DN_OS_SemaphoreInit(DN_U32 initial_count)
 {
   DN_OSSemaphore         result    = {};
@@ -1086,9 +1086,9 @@ DN_API DN_OSSemaphore DN_OS_SemaphoreInit(DN_U32 initial_count)
   if (primitive) {
     int pshared = 0; // Share the semaphore across all threads in the process
     if (sem_init(&primitive->sem, pshared, initial_count) == 0)
-      result.handle = DN_POSIX_SyncPrimitiveToU64(primitive);
+      result.handle = DN_OS_PosixSyncPrimitiveToU64(primitive);
     else
-      DN_POSIX_DeallocSyncPrimitive_(primitive);
+      DN_OS_PosixDeallocSyncPrimitive_(primitive);
   }
   return result;
 }
@@ -1096,9 +1096,9 @@ DN_API DN_OSSemaphore DN_OS_SemaphoreInit(DN_U32 initial_count)
 DN_API void DN_OS_SemaphoreDeinit(DN_OSSemaphore *semaphore)
 {
   if (semaphore && semaphore->handle != 0) {
-    DN_OSPosixSyncPrimitive *primitive = DN_OS_U64ToPOSIXSyncPrimitive_(semaphore->handle);
+    DN_OSPosixSyncPrimitive *primitive = DN_OS_PosixU64ToSyncPrimitive_(semaphore->handle);
     sem_destroy(&primitive->sem);
-    DN_POSIX_DeallocSyncPrimitive_(primitive);
+    DN_OS_PosixDeallocSyncPrimitive_(primitive);
     *semaphore = {};
   }
 }
@@ -1106,7 +1106,7 @@ DN_API void DN_OS_SemaphoreDeinit(DN_OSSemaphore *semaphore)
 DN_API void DN_OS_SemaphoreIncrement(DN_OSSemaphore *semaphore, DN_U32 amount)
 {
   if (semaphore && semaphore->handle != 0) {
-    DN_OSPosixSyncPrimitive *primitive = DN_OS_U64ToPOSIXSyncPrimitive_(semaphore->handle);
+    DN_OSPosixSyncPrimitive *primitive = DN_OS_PosixU64ToSyncPrimitive_(semaphore->handle);
     #if defined(DN_OS_WIN32)
     sem_post_multiple(&primitive->sem, amount); // mingw extension
     #else
@@ -1123,7 +1123,7 @@ DN_API DN_OSSemaphoreWaitResult DN_OS_SemaphoreWait(DN_OSSemaphore *semaphore,
   if (!semaphore || semaphore->handle == 0)
     return result;
 
-  DN_OSPosixSyncPrimitive *primitive = DN_OS_U64ToPOSIXSyncPrimitive_(semaphore->handle);
+  DN_OSPosixSyncPrimitive *primitive = DN_OS_PosixU64ToSyncPrimitive_(semaphore->handle);
   if (timeout_ms == DN_OS_SEMAPHORE_INFINITE_TIMEOUT) {
     int wait_result = 0;
     do {
@@ -1147,16 +1147,49 @@ DN_API DN_OSSemaphoreWaitResult DN_OS_SemaphoreWait(DN_OSSemaphore *semaphore,
   return result;
 }
 
-// NOTE: DN_OSMutex ////////////////////////////////////////////////////////////////////////////////
+DN_API DN_OSBarrier DN_OS_BarrierInit(DN_U32 thread_count)
+{
+  DN_OSPosixSyncPrimitive *primitive = DN_POSIX_AllocSyncPrimitive_();
+  DN_OSBarrier             result    = {};
+  if (primitive) {
+    int init_result = pthread_barrier_init(&primitive->barrier, /*attr*/ NULL, thread_count);
+    if (init_result == 0) {
+      result.handle = DN_OS_PosixSyncPrimitiveToU64(primitive);
+    } else {
+      DN_OS_PosixDeallocSyncPrimitive_(primitive);
+    }
+  }
+  return result;
+}
+
+DN_API void DN_OS_BarrierDeinit(DN_OSBarrier *barrier)
+{
+  if (barrier && barrier->handle != 0) {
+    DN_OSPosixSyncPrimitive *primitive = DN_OS_PosixU64ToSyncPrimitive_(barrier->handle);
+    int del_result = pthread_barrier_destroy(&primitive->barrier);
+    DN_Assert(del_result == 0);
+    DN_OS_PosixDeallocSyncPrimitive_(primitive);
+  }
+}
+
+DN_API void DN_OS_BarrierWait(DN_OSBarrier *barrier)
+{
+  if (barrier && barrier->handle != 0) {
+    DN_OSPosixSyncPrimitive *primitive = DN_OS_PosixU64ToSyncPrimitive_(barrier->handle);
+    pthread_barrier_wait(&primitive->barrier);
+  }
+}
+
+// NOTE: DN_OSMutex
 DN_API DN_OSMutex DN_OS_MutexInit()
 {
   DN_OSPosixSyncPrimitive *primitive = DN_POSIX_AllocSyncPrimitive_();
-  DN_OSMutex             result    = {};
+  DN_OSMutex               result    = {};
   if (primitive) {
     if (pthread_mutex_init(&primitive->mutex, nullptr) == 0)
-      result.handle = DN_POSIX_SyncPrimitiveToU64(primitive);
+      result.handle = DN_OS_PosixSyncPrimitiveToU64(primitive);
     else
-      DN_POSIX_DeallocSyncPrimitive_(primitive);
+      DN_OS_PosixDeallocSyncPrimitive_(primitive);
   }
   return result;
 }
@@ -1164,9 +1197,9 @@ DN_API DN_OSMutex DN_OS_MutexInit()
 DN_API void DN_OS_MutexDeinit(DN_OSMutex *mutex)
 {
   if (mutex && mutex->handle != 0) {
-    DN_OSPosixSyncPrimitive *primitive = DN_OS_U64ToPOSIXSyncPrimitive_(mutex->handle);
+    DN_OSPosixSyncPrimitive *primitive = DN_OS_PosixU64ToSyncPrimitive_(mutex->handle);
     pthread_mutex_destroy(&primitive->mutex);
-    DN_POSIX_DeallocSyncPrimitive_(primitive);
+    DN_OS_PosixDeallocSyncPrimitive_(primitive);
     *mutex = {};
   }
 }
@@ -1174,7 +1207,7 @@ DN_API void DN_OS_MutexDeinit(DN_OSMutex *mutex)
 DN_API void DN_OS_MutexLock(DN_OSMutex *mutex)
 {
   if (mutex && mutex->handle != 0) {
-    DN_OSPosixSyncPrimitive *primitive = DN_OS_U64ToPOSIXSyncPrimitive_(mutex->handle);
+    DN_OSPosixSyncPrimitive *primitive = DN_OS_PosixU64ToSyncPrimitive_(mutex->handle);
     pthread_mutex_lock(&primitive->mutex);
   }
 }
@@ -1182,7 +1215,7 @@ DN_API void DN_OS_MutexLock(DN_OSMutex *mutex)
 DN_API void DN_OS_MutexUnlock(DN_OSMutex *mutex)
 {
   if (mutex && mutex->handle != 0) {
-    DN_OSPosixSyncPrimitive *primitive = DN_OS_U64ToPOSIXSyncPrimitive_(mutex->handle);
+    DN_OSPosixSyncPrimitive *primitive = DN_OS_PosixU64ToSyncPrimitive_(mutex->handle);
     pthread_mutex_unlock(&primitive->mutex);
   }
 }
@@ -1193,9 +1226,9 @@ DN_API DN_OSConditionVariable DN_OS_ConditionVariableInit()
   DN_OSConditionVariable result    = {};
   if (primitive) {
     if (pthread_cond_init(&primitive->cv, nullptr) == 0)
-      result.handle = DN_POSIX_SyncPrimitiveToU64(primitive);
+      result.handle = DN_OS_PosixSyncPrimitiveToU64(primitive);
     else
-      DN_POSIX_DeallocSyncPrimitive_(primitive);
+      DN_OS_PosixDeallocSyncPrimitive_(primitive);
   }
   return result;
 }
@@ -1203,9 +1236,9 @@ DN_API DN_OSConditionVariable DN_OS_ConditionVariableInit()
 DN_API void DN_OS_ConditionVariableDeinit(DN_OSConditionVariable *cv)
 {
   if (cv && cv->handle != 0) {
-    DN_OSPosixSyncPrimitive *primitive = DN_OS_U64ToPOSIXSyncPrimitive_(cv->handle);
+    DN_OSPosixSyncPrimitive *primitive = DN_OS_PosixU64ToSyncPrimitive_(cv->handle);
     pthread_cond_destroy(&primitive->cv);
-    DN_POSIX_DeallocSyncPrimitive_(primitive);
+    DN_OS_PosixDeallocSyncPrimitive_(primitive);
     *cv = {};
   }
 }
@@ -1214,8 +1247,8 @@ DN_API bool DN_OS_ConditionVariableWaitUntil(DN_OSConditionVariable *cv, DN_OSMu
 {
   bool result = false;
   if (cv && mutex && mutex->handle != 0 && cv->handle != 0) {
-    DN_OSPosixSyncPrimitive *cv_primitive    = DN_OS_U64ToPOSIXSyncPrimitive_(cv->handle);
-    DN_OSPosixSyncPrimitive *mutex_primitive = DN_OS_U64ToPOSIXSyncPrimitive_(mutex->handle);
+    DN_OSPosixSyncPrimitive *cv_primitive    = DN_OS_PosixU64ToSyncPrimitive_(cv->handle);
+    DN_OSPosixSyncPrimitive *mutex_primitive = DN_OS_PosixU64ToSyncPrimitive_(mutex->handle);
 
     struct timespec time = {};
     time.tv_sec          = end_ts_ms / 1'000;
@@ -1236,7 +1269,7 @@ DN_API bool DN_OS_ConditionVariableWait(DN_OSConditionVariable *cv, DN_OSMutex *
 DN_API void DN_OS_ConditionVariableSignal(DN_OSConditionVariable *cv)
 {
   if (cv && cv->handle != 0) {
-    DN_OSPosixSyncPrimitive *primitive = DN_OS_U64ToPOSIXSyncPrimitive_(cv->handle);
+    DN_OSPosixSyncPrimitive *primitive = DN_OS_PosixU64ToSyncPrimitive_(cv->handle);
     pthread_cond_signal(&primitive->cv);
   }
 }
@@ -1244,12 +1277,12 @@ DN_API void DN_OS_ConditionVariableSignal(DN_OSConditionVariable *cv)
 DN_API void DN_OS_ConditionVariableBroadcast(DN_OSConditionVariable *cv)
 {
   if (cv && cv->handle != 0) {
-    DN_OSPosixSyncPrimitive *primitive = DN_OS_U64ToPOSIXSyncPrimitive_(cv->handle);
+    DN_OSPosixSyncPrimitive *primitive = DN_OS_PosixU64ToSyncPrimitive_(cv->handle);
     pthread_cond_broadcast(&primitive->cv);
   }
 }
 
-// NOTE: DN_OSThread ///////////////////////////////////////////////////////////////////////////////
+// NOTE: DN_OSThread
 static void *DN_OS_ThreadFunc_(void *user_context)
 {
   DN_OS_ThreadExecute_(user_context);

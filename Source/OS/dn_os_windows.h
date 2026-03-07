@@ -329,6 +329,14 @@
       DWORD   flags;                  // options
   } MODLOAD_DATA, *PMODLOAD_DATA;
 
+  typedef struct _RTL_BARRIER {
+              DWORD Reserved1;
+              DWORD Reserved2;
+              ULONG_PTR Reserved3[2];
+              DWORD Reserved4;
+              DWORD Reserved5;
+  } RTL_BARRIER, *PRTL_BARRIER;
+
   #define SLMFLAG_VIRTUAL     0x1
   #define SLMFLAG_ALT_INDEX   0x2
   #define SLMFLAG_NO_SYMBOLS  0x4
@@ -1076,6 +1084,14 @@
   // NOTE: um/synchapi.h /////////////////////////////////////////////////////////////////////////
   typedef RTL_CONDITION_VARIABLE CONDITION_VARIABLE, *PCONDITION_VARIABLE;
 
+  typedef RTL_BARRIER SYNCHRONIZATION_BARRIER;
+  typedef PRTL_BARRIER PSYNCHRONIZATION_BARRIER;
+  typedef PRTL_BARRIER LPSYNCHRONIZATION_BARRIER;
+
+  #define SYNCHRONIZATION_BARRIER_FLAGS_SPIN_ONLY  0x01
+  #define SYNCHRONIZATION_BARRIER_FLAGS_BLOCK_ONLY 0x02
+  #define SYNCHRONIZATION_BARRIER_FLAGS_NO_DELETE  0x04
+
   extern "C"
   {
   __declspec(dllimport) VOID  __stdcall InitializeConditionVariable          (CONDITION_VARIABLE *ConditionVariable);
@@ -1095,6 +1111,10 @@
   __declspec(dllimport) DWORD __stdcall WaitForSingleObject                  (HANDLE hHandle, DWORD dwMilliseconds);
   __declspec(dllimport) BOOL  __stdcall ReleaseSemaphore                     (HANDLE hSemaphore, LONG lReleaseCount, LONG *lpPreviousCount);
   __declspec(dllimport) VOID  __stdcall Sleep                                (DWORD dwMilliseconds);
+
+  __declspec(dllimport) BOOL  __stdcall EnterSynchronizationBarrier          (SYNCHRONIZATION_BARRIER *lpBarrier, DWORD dwFlags);
+  __declspec(dllimport) BOOL  __stdcall InitializeSynchronizationBarrier     (SYNCHRONIZATION_BARRIER *lpBarrier, LONG lTotalThreads, LONG lSpinCount);
+  __declspec(dllimport) BOOL  __stdcall DeleteSynchronizationBarrier         (SYNCHRONIZATION_BARRIER *lpBarrier);
   }
 
   // NOTE: um/profileapi.h ///////////////////////////////////////////////////////////////////////

@@ -174,6 +174,11 @@ struct DN_OSSemaphore
   DN_U64 handle;
 };
 
+struct DN_OSBarrier
+{
+  DN_U64 handle;
+};
+
 enum DN_OSSemaphoreWaitResult
 {
   DN_OSSemaphoreWaitResult_Failed,
@@ -384,10 +389,13 @@ DN_API DN_OSExecResult           DN_OS_Exec                                   (D
 DN_API DN_OSExecResult           DN_OS_ExecOrAbort                            (DN_Slice<DN_Str8> cmd_line, DN_OSExecArgs *args, DN_Arena *arena);
 
 DN_API DN_OSSemaphore            DN_OS_SemaphoreInit                          (DN_U32 initial_count);
-DN_API bool                      DN_OS_SemaphoreIsValid                       (DN_OSSemaphore *semaphore);
 DN_API void                      DN_OS_SemaphoreDeinit                        (DN_OSSemaphore *semaphore);
 DN_API void                      DN_OS_SemaphoreIncrement                     (DN_OSSemaphore *semaphore, DN_U32 amount);
 DN_API DN_OSSemaphoreWaitResult  DN_OS_SemaphoreWait                          (DN_OSSemaphore *semaphore, DN_U32 timeout_ms);
+
+DN_API DN_OSBarrier              DN_OS_BarrierInit                            (DN_U32 thread_count);
+DN_API void                      DN_OS_BarrierDeinit                          (DN_OSBarrier *barrier);
+DN_API void                      DN_OS_BarrierWait                            (DN_OSBarrier *barrier);
 
 DN_API DN_OSMutex                DN_OS_MutexInit                              ();
 DN_API void                      DN_OS_MutexDeinit                            (DN_OSMutex *mutex);

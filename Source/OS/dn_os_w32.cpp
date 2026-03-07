@@ -1019,7 +1019,7 @@ static DN_OSW32SyncPrimitive *DN_OS_U64ToW32SyncPrimitive_(DN_U64 u64)
   return result;
 }
 
-static DN_U64 DN_OSW32SyncPrimitiveToU64(DN_OSW32SyncPrimitive *primitive)
+static DN_U64 DN_OS_W32SyncPrimitiveToU64(DN_OSW32SyncPrimitive *primitive)
 {
   DN_U64 result = 0;
   static_assert(sizeof(result) == sizeof(primitive), "Pointer size mis-match");
@@ -1057,16 +1057,16 @@ static void DN_OS_W32DeallocSyncPrimitive_(DN_OSW32SyncPrimitive *primitive)
   }
 }
 
-// NOTE: DN_OSSemaphore ////////////////////////////////////////////////////////////////////////////
+// NOTE: DN_OSSemaphore
 DN_API DN_OSSemaphore DN_OS_SemaphoreInit(DN_U32 initial_count)
 {
-  DN_OSSemaphore       result    = {};
+  DN_OSSemaphore         result    = {};
   DN_OSW32SyncPrimitive *primitive = DN_OS_W32AllocSyncPrimitive_();
   if (primitive) {
     SECURITY_ATTRIBUTES security_attribs = {};
     primitive->sem                       = CreateSemaphoreA(&security_attribs, initial_count, INT32_MAX, nullptr /*name*/);
     if (primitive->sem)
-      result.handle = DN_OSW32SyncPrimitiveToU64(primitive);
+      result.handle = DN_OS_W32SyncPrimitiveToU64(primitive);
     if (!primitive->sem)
       DN_OS_W32DeallocSyncPrimitive_(primitive);
   }
@@ -1106,14 +1106,48 @@ DN_API DN_OSSemaphoreWaitResult DN_OS_SemaphoreWait(DN_OSSemaphore *semaphore, D
   return result;
 }
 
-// NOTE: DN_OSMutex ////////////////////////////////////////////////////////////////////////////////
+// NOTE: DN_OSBarrier
+DN_API DN_OSBarrier DN_OS_BarrierInit(DN_U32 thread_count)
+{
+  DN_OSBarrier           result    = {};
+  DN_OSW32SyncPrimitive *primitive = DN_OS_W32AllocSyncPrimitive_();
+  if (primitive) {
+    BOOL init_result = InitializeSynchronizationBarrier(&primitive->barrier, thread_count, /*lSpinCount=*/-1);
+    if (init_result) {
+      result.handle = DN_OS_W32SyncPrimitiveToU64(primitive);
+    } else {
+      DN_OS_W32DeallocSyncPrimitive_(primitive);
+    }
+  }
+  return result;
+}
+
+DN_API void DN_OS_BarrierDeinit(DN_OSBarrier *barrier)
+{
+  if (barrier && barrier->handle != 0) {
+    DN_OSW32SyncPrimitive *primitive = DN_OS_U64ToW32SyncPrimitive_(barrier->handle);
+    bool                   result    = DeleteSynchronizationBarrier(&primitive->barrier);
+    DN_Assert(result);
+    DN_OS_W32DeallocSyncPrimitive_(primitive);
+  }
+}
+
+DN_API void DN_OS_BarrierWait(DN_OSBarrier *barrier)
+{
+  if (barrier && barrier->handle != 0) {
+    DN_OSW32SyncPrimitive *primitive = DN_OS_U64ToW32SyncPrimitive_(barrier->handle);
+    EnterSynchronizationBarrier(&primitive->barrier, /*dwFlags=*/ 0);
+  }
+}
+
+// NOTE: DN_OSMutex
 DN_API DN_OSMutex DN_OS_MutexInit()
 {
   DN_OSW32SyncPrimitive *primitive = DN_OS_W32AllocSyncPrimitive_();
   if (primitive)
     InitializeCriticalSection(&primitive->mutex);
   DN_OSMutex result = {};
-  result.handle     = DN_OSW32SyncPrimitiveToU64(primitive);
+  result.handle     = DN_OS_W32SyncPrimitiveToU64(primitive);
   return result;
 }
 
@@ -1150,7 +1184,7 @@ DN_API DN_OSConditionVariable DN_OS_ConditionVariableInit()
   if (primitive)
     InitializeConditionVariable(&primitive->cv);
   DN_OSConditionVariable result = {};
-  result.handle                 = DN_OSW32SyncPrimitiveToU64(primitive);
+  result.handle                 = DN_OS_W32SyncPrimitiveToU64(primitive);
   return result;
 }
 

@@ -46,9 +46,10 @@ struct DN_OSPosixSyncPrimitive
 {
   union
   {
-    sem_t           sem;
-    pthread_mutex_t mutex;
-    pthread_cond_t  cv;
+    sem_t             sem;
+    pthread_mutex_t   mutex;
+    pthread_cond_t    cv;
+    pthread_barrier_t barrier;
   };
   DN_OSPosixSyncPrimitive *next;
 };

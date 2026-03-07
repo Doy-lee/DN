@@ -25,15 +25,17 @@ enum DN_OSW32SyncPrimitiveType
   DN_OSW32SyncPrimitiveType_Semaphore,
   DN_OSW32SyncPrimitiveType_Mutex,
   DN_OSW32SyncPrimitiveType_ConditionVariable,
+  DN_OSW32SyncPrimitiveType_Barrier,
 };
 
 struct DN_OSW32SyncPrimitive
 {
   union
   {
-    void              *sem;
-    CRITICAL_SECTION   mutex;
-    CONDITION_VARIABLE cv;
+    void                   *sem;
+    CRITICAL_SECTION        mutex;
+    CONDITION_VARIABLE      cv;
+    SYNCHRONIZATION_BARRIER barrier;
   };
 
   DN_OSW32SyncPrimitive *next;
