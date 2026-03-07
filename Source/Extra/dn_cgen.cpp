@@ -63,7 +63,7 @@ DN_CGenTableHeaderType const DN_CGEN_TABLE_CODE_GEN_BUILTIN_TYPES_HEADER_LIST[] 
   DN_CGenTableHeaderType_Name,
 };
 
-static bool DN_CGen_GatherTables_(DN_CGen *cgen, DN_OSErrSink *err)
+static bool DN_CGen_GatherTables_(DN_CGen *cgen, DN_ErrSink *err)
 {
   bool result = false;
   if (!cgen || !cgen->file_list || !cgen->arena)
@@ -283,7 +283,7 @@ static bool DN_CGen_GatherTables_(DN_CGen *cgen, DN_OSErrSink *err)
   return result;
 }
 
-DN_API DN_CGen DN_CGen_FromFilesArgV(int argc, char const **argv, DN_OSErrSink *err)
+DN_API DN_CGen DN_CGen_FromFilesArgV(int argc, char const **argv, DN_ErrSink *err)
 {
   DN_CGen result   = {};
   result.arena     = MD_ArenaAlloc();
@@ -341,7 +341,7 @@ DN_API DN_CGenMapNodeToEnum DN_CGen_MapNodeToEnumOrExit(MD_Node const *node, DN_
 
   if (result.enum_val == 0) {
     MD_CodeLoc loc  = MD_CodeLocFromNode(DN_Cast(MD_Node *) node);
-    DN_OSTLSTMem tmem = DN_OS_TLSTMem(nullptr);
+    DN_TCScratch tmem = DN_TCScratchBegin(nullptr, 0);
     va_list    args;
     va_start(args, fmt);
     DN_Str8 user_msg = DN_Str8FromFmtVArena(tmem.arena, fmt, args);
@@ -357,6 +357,7 @@ DN_API DN_CGenMapNodeToEnum DN_CGen_MapNodeToEnumOrExit(MD_Node const *node, DN_
     }
 
     DN_Str8 error_msg = DN_Str8BuilderBuild(&builder, tmem.arena);
+    DN_TCScratchEnd(&tmem);
     MD_PrintMessageFmt(stderr, loc, MD_MessageKind_Error, DN_Cast(char *) "%.*s", DN_Str8PrintFmt(error_msg));
     DN_OS_Exit(DN_Cast(uint32_t) - 1);
   }
@@ -371,13 +372,14 @@ DN_API DN_USize DN_CGen_NodeChildrenCount(MD_Node const *node)
   return result;
 }
 
-DN_API void DN_CGen_LogF(MD_MessageKind kind, MD_Node *node, DN_OSErrSink *err, char const *fmt, ...)
+DN_API void DN_CGen_LogF(MD_MessageKind kind, MD_Node *node, DN_ErrSink *err, char const *fmt, ...)
 {
   if (!err)
     return;
 
-  DN_OSTLSTMem   tmem    = DN_OS_TLSPushTMem(nullptr);
-  DN_Str8Builder builder = DN_Str8BuilderFromTLS();
+  DN_TCScratch   tmem    = DN_TCScratchBegin(nullptr, 0);
+  DN_Str8Builder builder = {};
+  builder.arena = tmem.arena;
 
   MD_String8 kind_string = MD_StringFromMessageKind(kind);
   MD_CodeLoc loc         = MD_CodeLocFromNode(node);
@@ -388,14 +390,15 @@ DN_API void DN_CGen_LogF(MD_MessageKind kind, MD_Node *node, DN_OSErrSink *err, 
   DN_Str8BuilderAppendFV(&builder, fmt, args);
   va_end(args);
 
-  DN_Str8 msg = DN_Str8BuilderBuild(&builder, tmem.arena);
+  DN_Str8 msg = DN_Str8BuilderBuild(&builder, err->arena);
+  DN_TCScratchEnd(&tmem);
   DN_OS_ErrSinkAppendF(err, DN_Cast(uint32_t) - 1, "%.*s", DN_Str8PrintFmt(msg));
 }
 
-DN_API bool DN_CGen_TableHasHeaders(DN_CGenTable const *table, DN_Str8 const *headers, DN_USize header_count, DN_OSErrSink *err)
+DN_API bool DN_CGen_TableHasHeaders(DN_CGenTable const *table, DN_Str8 const *headers, DN_USize header_count, DN_ErrSink *err)
 {
   bool           result  = true;
-  DN_OSTLSTMem     tmem    = DN_OS_TLSTMem(nullptr);
+  DN_TCScratch     tmem    = DN_TCScratchBegin(nullptr, 0);
   DN_Str8Builder builder = {};
   builder.arena          = tmem.arena;
 
@@ -419,6 +422,7 @@ DN_API bool DN_CGen_TableHasHeaders(DN_CGenTable const *table, DN_Str8 const *he
                  DN_Str8PrintFmt(missing_headers));
   }
 
+  DN_TCScratchEnd(&tmem);
   return result;
 }
 
@@ -515,13 +519,14 @@ static void DN_CGen_EmitRowWhitespace_(DN_CGenTableRow const *row, DN_CppFile *c
         if (tag->comment.size <= 0)
           break;
 
-        DN_OSTLSTMem tmem         = DN_OS_TLSTMem(nullptr);
+        DN_TCScratch tmem         = DN_TCScratchBegin(nullptr, 0);
         DN_Str8    prefix       = DN_Str8FromFmtArena(tmem.arena, "// NOTE: %.*s ", MD_S8VArg(tag->comment));
         int        line_padding = DN_Max(100 - (DN_Cast(int) prefix.size + (DN_CppSpacePerIndent(cpp) * cpp->indent)), 0);
         DN_CppPrint(cpp, "%.*s", DN_Str8PrintFmt(prefix));
         for (int index = 0; index < line_padding; index++)
           DN_CppAppend(cpp, "/");
         DN_CppAppend(cpp, "\n");
+        DN_TCScratchEnd(&tmem);
       } break;
 
       case DN_CGenTableRowTagType_EmptyLine: {
@@ -533,17 +538,18 @@ static void DN_CGen_EmitRowWhitespace_(DN_CGenTableRow const *row, DN_CppFile *c
 
 DN_Str8 DN_CGen_ConvertTemplatesToEmittableLiterals_(DN_Arena *arena, DN_Str8 type)
 {
-  DN_OSTLSTMem tmem   = DN_OS_TLSTMem(arena);
+  DN_TCScratch tmem   = DN_TCScratchBegin(&arena, 1);
   DN_Str8    result = DN_Str8TrimWhitespaceAround(type);
   result            = DN_Str8Replace(result, /*find*/ DN_Str8Lit("<"), /*replace*/ DN_Str8Lit("_"), /*start_index*/ 0, arena, DN_Str8EqCase_Sensitive);
   result            = DN_Str8Replace(result, /*find*/ DN_Str8Lit(">"), /*replace*/ DN_Str8Lit(""), /*start_index*/ 0, arena, DN_Str8EqCase_Sensitive);
   result            = DN_Str8TrimWhitespaceAround(result);
+  DN_TCScratchEnd(&tmem);
   return result;
 }
 
 DN_Str8 DN_CGen_StripQualifiersOnCppType_(DN_Arena *arena, DN_Str8 type)
 {
-  DN_OSTLSTMem tmem   = DN_OS_TLSTMem(arena);
+  DN_TCScratch tmem   = DN_TCScratchBegin(&arena, 1);
   DN_Str8    result = DN_Str8TrimWhitespaceAround(type);
   result            = DN_Str8Replace(result, /*find*/ DN_Str8Lit("*"), /*replace*/ DN_Str8Lit(""), /*start_index*/ 0, tmem.arena, DN_Str8EqCase_Sensitive);
   result            = DN_Str8Replace(result, /*find*/ DN_Str8Lit("constexpr"), /*replace*/ DN_Str8Lit(""), /*start_index*/ 0, tmem.arena, DN_Str8EqCase_Sensitive);
@@ -551,6 +557,7 @@ DN_Str8 DN_CGen_StripQualifiersOnCppType_(DN_Arena *arena, DN_Str8 type)
   result            = DN_Str8Replace(result, /*find*/ DN_Str8Lit("static"), /*replace*/ DN_Str8Lit(""), /*start_index*/ 0, tmem.arena, DN_Str8EqCase_Sensitive);
   result            = DN_Str8Replace(result, /*find*/ DN_Str8Lit(" "), /*replace*/ DN_Str8Lit(""), /*start_index*/ 0, arena, DN_Str8EqCase_Sensitive);
   result            = DN_Str8TrimWhitespaceAround(result);
+  DN_TCScratchEnd(&tmem);
   return result;
 }
 
@@ -563,9 +570,10 @@ DN_API void DN_CGen_EmitCodeForTables(DN_CGen *cgen, DN_CGenEmit emit, DN_CppFil
       DN_CppLine(cpp, "%.*sType_Nil,", DN_Str8PrintFmt(emit_prefix));
       for (DN_CGenTable *table = cgen->first_table; table != 0; table = table->next)
         for (DN_CGenLookupTableIterator it = {}; DN_CGen_LookupNextTableInCodeGenTable(cgen, table, &it);) {
-          DN_OSTLSTMem tmem      = DN_OS_TLSTMem(nullptr);
+          DN_TCScratch tmem      = DN_TCScratchBegin(nullptr, 0);
           DN_Str8    enum_name = DN_CGen_ConvertTemplatesToEmittableLiterals_(tmem.arena, it.cgen_table_column[DN_CGenTableHeaderType_Name].string);
           DN_CppLine(cpp, "%.*sType_%.*s,", DN_Str8PrintFmt(emit_prefix), DN_Str8PrintFmt(enum_name));
+          DN_TCScratchEnd(&tmem);
         }
       DN_CppLine(cpp, "%.*sType_Count,", DN_Str8PrintFmt(emit_prefix));
     }
@@ -582,9 +590,9 @@ DN_API void DN_CGen_EmitCodeForTables(DN_CGen *cgen, DN_CGenEmit emit, DN_CppFil
         case DN_CGenTableType_CodeGenStruct: {
           for (DN_CGenLookupTableIterator it = {}; DN_CGen_LookupNextTableInCodeGenTable(cgen, table, &it);) {
             // TODO(doyle): Verify the codegen table has the headers from the table it references
-            int longest_type_name = 0;
+        int longest_type_name = 0;
             for (DN_USize row_index = 0; row_index < it.table->row_count; row_index++) {
-              DN_OSTLSTMem                  tmem     = DN_OS_TLSTMem(nullptr);
+              DN_TCScratch                  tmem     = DN_TCScratchBegin(nullptr, 0);
               DN_CGenTableRow const      *row      = it.table->rows + row_index;
               DN_CGenLookupColumnAtHeader cpp_type = DN_CGen_LookupColumnAtHeader(it.table, it.cgen_table_column[DN_CGenTableHeaderType_CppType].string, row);
 
@@ -594,6 +602,7 @@ DN_API void DN_CGen_EmitCodeForTables(DN_CGen *cgen, DN_CGenEmit emit, DN_CppFil
                 length += emit_prefix.size;
 
               longest_type_name = DN_Max(longest_type_name, DN_Cast(int) length);
+              DN_TCScratchEnd(&tmem);
             }
 
             DN_CppStructBlock(cpp, "%.*s%.*s", DN_Str8PrintFmt(emit_prefix), DN_Str8PrintFmt(it.cgen_table_column[DN_CGenTableHeaderType_Name].string))
@@ -606,8 +615,8 @@ DN_API void DN_CGen_EmitCodeForTables(DN_CGen *cgen, DN_CGenEmit emit, DN_CppFil
                 if (cpp_name.column.string.size <= 0 || cpp_type.column.string.size <= 0)
                   continue;
 
-                // NOTE: Generate cpp array size ///////////////////////////////////
-                DN_OSTLSTMem tmem       = DN_OS_TLSTMem(nullptr);
+            // NOTE: Generate cpp array size
+                DN_TCScratch tmem       = DN_TCScratchBegin(nullptr, 0);
                 DN_Str8    array_size = {};
                 if (cpp_array_size.column.string.size)
                   array_size = DN_Str8FromFmtArena(tmem.arena, "[%.*s]", DN_Str8PrintFmt(cpp_array_size.column.string));
@@ -620,6 +629,7 @@ DN_API void DN_CGen_EmitCodeForTables(DN_CGen *cgen, DN_CGenEmit emit, DN_CppFil
                   if (DN_CGen_WillCodeGenTypeName(cgen, find_name))
                     emit_cpp_type = DN_Str8FromFmtArena(tmem.arena, "%.*s%.*s", DN_Str8PrintFmt(emit_prefix), DN_Str8PrintFmt(cpp_type.column.string));
                 }
+                DN_TCScratchEnd(&tmem);
 
                 int name_to_type_padding = 1 + longest_type_name - DN_Cast(int) emit_cpp_type.size;
 
@@ -803,7 +813,7 @@ DN_API void DN_CGen_EmitCodeForTables(DN_CGen *cgen, DN_CGenEmit emit, DN_CppFil
             // for types that are declared in the same mdesk file. We will also
             // calculate the longest type name that we will generate for whitespace
             // padding purposes.
-            DN_OSTLSTMem tmem                  = DN_OS_TLSPushTMem(nullptr);
+            DN_TCScratch tmem                  = DN_TCScratchBegin(nullptr, 0);
             DN_USize   longest_cpp_type_name = 0;
             auto       cpp_type_list         = DN_SArray_Init<DN_Str8>(tmem.arena, it.table->row_count, DN_ZMem_Yes);
 
@@ -814,7 +824,7 @@ DN_API void DN_CGen_EmitCodeForTables(DN_CGen *cgen, DN_CGenEmit emit, DN_CppFil
               // NOTE: CHeck the length of the string after turning it into emittable code
               DN_Str8 cpp_type_name = DN_CGen_StripQualifiersOnCppType_(tmem.arena, cpp_type.column.string);
               if (DN_CGen_WillCodeGenTypeName(cgen, cpp_type_name))
-                cpp_type_name = DN_Str8FromTLSF("%.*s%.*s", DN_Str8PrintFmt(emit_prefix), DN_Str8PrintFmt(cpp_type_name));
+                cpp_type_name = DN_Str8FromFmtArena(tmem.arena, "%.*s%.*s", DN_Str8PrintFmt(emit_prefix), DN_Str8PrintFmt(cpp_type_name));
 
               DN_Str8 cpp_type_name_no_templates = DN_CGen_ConvertTemplatesToEmittableLiterals_(tmem.arena, cpp_type_name);
               longest_cpp_type_name              = DN_Max(longest_cpp_type_name, cpp_type_name_no_templates.size);
@@ -849,7 +859,7 @@ DN_API void DN_CGen_EmitCodeForTables(DN_CGen *cgen, DN_CGenEmit emit, DN_CppFil
                     index_the_field_references = sub_row_index;
                 }
                 cpp_array_size_field_str8 =
-                    DN_Str8FromTLSF("&g_%.*s%.*s_type_fields[%zu]",
+                    DN_Str8FromFmtArena(tmem.arena, "&g_%.*s%.*s_type_fields[%zu]",
                                       DN_Str8PrintFmt(emit_prefix),
                                       DN_Str8PrintFmt(struct_name.string),
                                       index_the_field_references);
@@ -862,7 +872,7 @@ DN_API void DN_CGen_EmitCodeForTables(DN_CGen *cgen, DN_CGenEmit emit, DN_CppFil
               DN_USize cpp_name_padding = 1 + it.table->headers[cpp_name.index].longest_string - cpp_name.column.string.size;
               DN_USize cpp_type_padding = 1 + longest_cpp_type_name - cpp_type_name.size;
 
-              DN_Str8  cpp_type_enum         = DN_Str8FromTLSF("%.*sType_%.*s", DN_Str8PrintFmt(emit_prefix), DN_Str8PrintFmt(orig_cpp_type_no_templates));
+              DN_Str8  cpp_type_enum         = DN_Str8FromFmtArena(tmem.arena, "%.*sType_%.*s", DN_Str8PrintFmt(emit_prefix), DN_Str8PrintFmt(orig_cpp_type_no_templates));
               DN_USize cpp_type_enum_padding = cpp_type_padding + (orig_cpp_type.size - cpp_type_name.size);
 
               DN_Str8  cpp_label_str8         = cpp_name.column.string;
@@ -960,10 +970,10 @@ DN_API void DN_CGen_EmitCodeForTables(DN_CGen *cgen, DN_CGenEmit emit, DN_CppFil
               if (cpp_name.column.string.size <= 0)
                 continue;
 
-              DN_OSTLSTMem tmem             = DN_OS_TLSPushTMem(nullptr);
+              DN_TCScratch tmem             = DN_TCScratchBegin(nullptr, 0);
               DN_USize   cpp_name_padding = 1 + it.table->headers[cpp_name.index].longest_string - cpp_name.column.string.size;
-              DN_Str8    cpp_value_str8   = cpp_value.column.string.size ? cpp_value.column.string : DN_Str8FromTLSF("%zu", row_index);
-              DN_Str8    cpp_type_enum    = DN_Str8FromTLSF("%.*sType_%.*s", DN_Str8PrintFmt(emit_prefix), DN_Str8PrintFmt(struct_or_enum_name));
+              DN_Str8    cpp_value_str8   = cpp_value.column.string.size ? cpp_value.column.string : DN_Str8FromFmtArena(tmem.arena, "%zu", row_index);
+              DN_Str8    cpp_type_enum    = DN_Str8FromFmtArena(tmem.arena, "%.*sType_%.*s", DN_Str8PrintFmt(emit_prefix), DN_Str8PrintFmt(struct_or_enum_name));
 
               DN_Str8  cpp_label_str8         = cpp_name.column.string;
               DN_USize cpp_label_str8_padding = cpp_name_padding;
@@ -972,7 +982,8 @@ DN_API void DN_CGen_EmitCodeForTables(DN_CGen *cgen, DN_CGenEmit emit, DN_CppFil
                 cpp_label_str8_padding = 1 + it.table->headers[cpp_label.index].longest_string - cpp_label.column.string.size;
               }
 
-              DN_Str8Builder builder = DN_Str8BuilderFromTLS();
+              DN_Str8Builder builder = {};
+              builder.arena = tmem.arena;
               // NOTE: row
               DN_Str8BuilderAppendF(&builder, "{%2d, ", row_index);
 
@@ -1015,23 +1026,26 @@ DN_API void DN_CGen_EmitCodeForTables(DN_CGen *cgen, DN_CGenEmit emit, DN_CppFil
               DN_Str8BuilderAppendF(&builder, "/*array_size*/ 0, ");
               DN_Str8BuilderAppendF(&builder, "/*array_size_field*/ NULL},");
 
-              DN_Str8 line = DN_Str8BuilderBuildFromTLS(&builder);
+              DN_Str8 line = DN_Str8BuilderBuild(&builder, tmem.arena);
+              DN_TCScratchEnd(&tmem);
               DN_CppLine(cpp, "%.*s", DN_Str8PrintFmt(line));
             }
           }
+          DN_TCScratchEnd(&tmem);
         }
       }
     }
 
-    int longest_name_across_all_tables = 0;
+        int longest_name_across_all_tables = 0;
     for (DN_CGenTable *table = cgen->first_table; table != 0; table = table->next) {
       for (DN_CGenLookupTableIterator it = {}; DN_CGen_LookupNextTableInCodeGenTable(cgen, table, &it);) {
-        DN_OSTLSTMem tmem      = DN_OS_TLSTMem(nullptr);
+        DN_TCScratch tmem      = DN_TCScratchBegin(nullptr, 0);
         DN_Str8    type_name = it.cgen_table_column[DN_CGenTableHeaderType_Name].string;
         if (DN_CGen_WillCodeGenTypeName(cgen, type_name))
           type_name = DN_Str8FromFmtArena(tmem.arena, "%.*s%.*s", DN_Str8PrintFmt(emit_prefix), DN_Str8PrintFmt(type_name));
 
         longest_name_across_all_tables = DN_Max(longest_name_across_all_tables, DN_Cast(int) type_name.size);
+        DN_TCScratchEnd(&tmem);
       }
     }
 
@@ -1042,20 +1056,21 @@ DN_API void DN_CGen_EmitCodeForTables(DN_CGen *cgen, DN_CGenEmit emit, DN_CppFil
       DN_USize longest_type_name = 0;
       for (DN_CGenTable *table = cgen->first_table; table != 0; table = table->next) {
         for (DN_CGenLookupTableIterator it = {}; DN_CGen_LookupNextTableInCodeGenTable(cgen, table, &it);) {
-          DN_OSTLSTMem tmem      = DN_OS_TLSTMem(nullptr);
+          DN_TCScratch tmem      = DN_TCScratchBegin(nullptr, 0);
           DN_Str8    type_name = it.cgen_table_column[DN_CGenTableHeaderType_Name].string;
           if (DN_CGen_WillCodeGenTypeName(cgen, type_name))
             type_name = DN_Str8FromFmtArena(tmem.arena, "%.*s%.*s", DN_Str8PrintFmt(emit_prefix), DN_Str8PrintFmt(type_name));
           longest_type_name = DN_Max(longest_type_name, type_name.size);
+          DN_TCScratchEnd(&tmem);
         }
       }
 
       for (DN_CGenTable *table = cgen->first_table; table != 0; table = table->next) {
         for (DN_CGenLookupTableIterator it = {}; DN_CGen_LookupNextTableInCodeGenTable(cgen, table, &it);) {
-          DN_OSTLSTMem tmem      = DN_OS_TLSPushTMem(nullptr);
+          DN_TCScratch tmem      = DN_TCScratchBegin(nullptr, 0);
           DN_Str8    type_name = it.cgen_table_column[DN_CGenTableHeaderType_Name].string;
           if (DN_CGen_WillCodeGenTypeName(cgen, type_name))
-            type_name = DN_Str8FromTLSF("%.*s%.*s", DN_Str8PrintFmt(emit_prefix), DN_Str8PrintFmt(type_name));
+            type_name = DN_Str8FromFmtArena(tmem.arena, "%.*s%.*s", DN_Str8PrintFmt(emit_prefix), DN_Str8PrintFmt(type_name));
 
           int         name_padding           = 1 + longest_name_across_all_tables - DN_Cast(int) type_name.size;
           DN_Str8     type_info_kind         = {};
@@ -1080,9 +1095,10 @@ DN_API void DN_CGen_EmitCodeForTables(DN_CGen *cgen, DN_CGenEmit emit, DN_CppFil
 
           DN_Str8 fields_count = DN_Str8Lit("0");
           if (!DN_Str8Eq(fields, DN_Str8Lit("NULL")))
-            fields_count = DN_Str8FromTLSF("sizeof(%.*s)/sizeof(%.*s[0])", DN_Str8PrintFmt(fields), DN_Str8PrintFmt(fields));
+            fields_count = DN_Str8FromFmtArena(tmem.arena, "sizeof(%.*s)/sizeof(%.*s[0])", DN_Str8PrintFmt(fields), DN_Str8PrintFmt(fields));
 
-          DN_Str8Builder builder = DN_Str8BuilderFromTLS();
+          DN_Str8Builder builder = {};
+          builder.arena = tmem.arena;
           // NOTE: name
           DN_Str8BuilderAppendF(&builder, "{DN_Str8Lit(\"%.*s\"),%*s", DN_Str8PrintFmt(type_name), name_padding, "");
 
@@ -1101,7 +1117,8 @@ DN_API void DN_CGen_EmitCodeForTables(DN_CGen *cgen, DN_CGenEmit emit, DN_CppFil
           // NOTE: DN_TypeField length
           DN_Str8BuilderAppendF(&builder, "/*count*/ %.*s},", DN_Str8PrintFmt(fields_count));
 
-          DN_Str8 line = DN_Str8BuilderBuildFromTLS(&builder);
+          DN_Str8 line = DN_Str8BuilderBuild(&builder, tmem.arena);
+          DN_TCScratchEnd(&tmem);
           DN_CppLine(cpp, "%.*s", DN_Str8PrintFmt(line));
         }
       }
@@ -1115,7 +1132,7 @@ DN_API void DN_CGen_EmitCodeForTables(DN_CGen *cgen, DN_CGenEmit emit, DN_CppFil
       {
         DN_CppLine(cpp, "case %.*sType_Nil: break;", DN_Str8PrintFmt(emit_prefix));
         DN_CppLine(cpp, "case %.*sType_Count: break;", DN_Str8PrintFmt(emit_prefix));
-        DN_OSTLSTMem tmem = DN_OS_TLSTMem(nullptr);
+        DN_TCScratch tmem = DN_TCScratchBegin(nullptr, 0);
         for (DN_CGenTable *table = cgen->first_table; table != 0; table = table->next) {
           for (DN_CGenLookupTableIterator it = {}; DN_CGen_LookupNextTableInCodeGenTable(cgen, table, &it);) {
             DN_Str8 enum_name          = DN_CGen_ConvertTemplatesToEmittableLiterals_(tmem.arena, it.cgen_table_column[DN_CGenTableHeaderType_Name].string);
@@ -1129,6 +1146,7 @@ DN_API void DN_CGen_EmitCodeForTables(DN_CGen *cgen, DN_CGenEmit emit, DN_CppFil
             DN_CppLine(cpp, "case %.*s: result = g_%.*stypes + %.*s; break;", DN_Str8PrintFmt(full_enum_name), DN_Str8PrintFmt(emit_prefix), DN_Str8PrintFmt(full_enum_name));
           }
         }
+        DN_TCScratchEnd(&tmem);
       }
       DN_CppLine(cpp, "return result;");
     }

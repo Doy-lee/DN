@@ -153,34 +153,37 @@ struct DN_INIFieldBool
 
 
 // NOTE: Utilities
-int              DN_INI_SNPrintF_                (char const *buffer, size_t size, char const *fmt, ...);
-void *           DN_INI_ArenaAlloc               (DN_INIArena *arena, size_t size);
-DN_INIStr8       DN_INI_Str8FromPtr              (char const *data, size_t count);
+// Str8FromINI's `size` parameter must include space for the null-terminator, i.e:
+// `DN_INIStr8FromResult.size_req + 1` bytes
+int                  DN_INI_SNPrintF_                (char const *buffer, size_t size, char const *fmt, ...);
+void *               DN_INI_ArenaAlloc               (DN_INIArena *arena, size_t size);
+DN_INIStr8           DN_INI_Str8FromPtr              (char const *data, size_t count);
+DN_INIStr8FromResult DN_INI_Str8FromINI              (DN_INICore const *ini, char *buffer, size_t size);
 
 // NOTE: Tokeniser/Parsing
-DN_INITokeniser  DN_INI_TokeniserFromPtr         (char const *buf, size_t count);
-DN_INIToken      DN_INI_NextToken                (DN_INITokeniser const *tokeniser);
-void             DN_INI_EatToken                 (DN_INITokeniser *tokeniser, DN_INIToken token);
+DN_INITokeniser      DN_INI_TokeniserFromPtr         (char const *buf, size_t count);
+DN_INIToken          DN_INI_NextToken                (DN_INITokeniser const *tokeniser);
+void                 DN_INI_EatToken                 (DN_INITokeniser *tokeniser, DN_INIToken token);
 
 // NOTE: Lookup
-DN_INISection *  DN_INI_ChildSectionFromStr8     (DN_INISection *section, DN_INIStr8 str8);
-DN_INISection *  DN_INI_ChildSectionFromCStr     (DN_INISection *section, char const *name, size_t name_size);
-DN_INIField *    DN_INI_FieldFromSectionStr8     (DN_INISection *section, DN_INIStr8 str8);
-DN_INIField *    DN_INI_FieldFromSection         (DN_INISection *section, char const *key, size_t key_size);
-DN_INIFieldUSize DN_INI_FieldUSizeFromSectionStr8(DN_INISection *section, DN_INIStr8 str8);
-DN_INIFieldStr8  DN_INI_FieldStr8FromSectionStr8 (DN_INISection *section, DN_INIStr8 str8);
-DN_INIFieldBool  DN_INI_FieldBoolFromSectionStr8 (DN_INISection *section, DN_INIStr8 str8);
-DN_INICore       DN_INI_ParseFromPtr             (char const *buf, size_t count, char *base, size_t base_count);
+DN_INISection *      DN_INI_ChildSectionFromStr8     (DN_INISection *section, DN_INIStr8 str8);
+DN_INISection *      DN_INI_ChildSectionFromCStr     (DN_INISection *section, char const *name, size_t name_size);
+DN_INIField *        DN_INI_FieldFromSectionStr8     (DN_INISection *section, DN_INIStr8 str8);
+DN_INIField *        DN_INI_FieldFromSection         (DN_INISection *section, char const *key, size_t key_size);
+DN_INIFieldUSize     DN_INI_FieldUSizeFromSectionStr8(DN_INISection *section, DN_INIStr8 str8);
+DN_INIFieldStr8      DN_INI_FieldStr8FromSectionStr8 (DN_INISection *section, DN_INIStr8 str8);
+DN_INIFieldBool      DN_INI_FieldBoolFromSectionStr8 (DN_INISection *section, DN_INIStr8 str8);
+DN_INICore           DN_INI_ParseFromPtr             (char const *buf, size_t count, char *base, size_t base_count);
 
-// NOTE: Building
-DN_INISection *  DN_INI_AppendSectionF           (DN_INICore *ini,        DN_INIArena *arena, DN_INISection *section, char const *fmt, ...);
-DN_INIField *    DN_INI_AppendKeyBool            (DN_INICore *ini,        DN_INIArena *arena, DN_INISection *section, DN_INIStr8 key,  bool value);
-DN_INIField *    DN_INI_AppendKeyPtrBool         (DN_INICore *ini,        DN_INIArena *arena, DN_INISection *section, char const *key, size_t key_size, bool value);
-DN_INIField *    DN_INI_AppendKeyUSize           (DN_INICore *ini,        DN_INIArena *arena, DN_INISection *section, DN_INIStr8 key,  size_t value);
-DN_INIField *    DN_INI_AppendKeyPtrUSize        (DN_INICore *ini,        DN_INIArena *arena, DN_INISection *section, char const *key, size_t key_size, size_t value);
-DN_INIField *    DN_INI_AppendKeyCStr8           (DN_INICore *ini,        DN_INIArena *arena, DN_INISection *section, DN_INIStr8 key,  char const *value, size_t value_size);
-DN_INIField *    DN_INI_AppendKeyF               (DN_INICore *ini,        DN_INIArena *arena, DN_INISection *section, DN_INIStr8 key,  char const *fmt, ...);
-void             DN_INI_AppendField              (DN_INISection *section, DN_INIField *field);
+// NOTE: Building    
+DN_INISection *      DN_INI_AppendSectionF           (DN_INICore *ini,        DN_INIArena *arena, DN_INISection *section, char const *fmt, ...);
+DN_INIField *        DN_INI_AppendKeyBool            (DN_INICore *ini,        DN_INIArena *arena, DN_INISection *section, DN_INIStr8 key,  bool value);
+DN_INIField *        DN_INI_AppendKeyPtrBool         (DN_INICore *ini,        DN_INIArena *arena, DN_INISection *section, char const *key, size_t key_size, bool value);
+DN_INIField *        DN_INI_AppendKeyUSize           (DN_INICore *ini,        DN_INIArena *arena, DN_INISection *section, DN_INIStr8 key,  size_t value);
+DN_INIField *        DN_INI_AppendKeyPtrUSize        (DN_INICore *ini,        DN_INIArena *arena, DN_INISection *section, char const *key, size_t key_size, size_t value);
+DN_INIField *        DN_INI_AppendKeyCStr8           (DN_INICore *ini,        DN_INIArena *arena, DN_INISection *section, DN_INIStr8 key,  char const *value, size_t value_size);
+DN_INIField *        DN_INI_AppendKeyF               (DN_INICore *ini,        DN_INIArena *arena, DN_INISection *section, DN_INIStr8 key,  char const *fmt, ...);
+void                 DN_INI_AppendField              (DN_INISection *section, DN_INIField *field);
 
 #if defined(DN_INI_WITH_UNIT_TESTS)
 void                DN_INI_UnitTests              ();

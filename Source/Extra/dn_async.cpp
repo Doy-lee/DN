@@ -1,8 +1,8 @@
 #define DN_ASYNC_CPP
 
 #if defined(_CLANGD)
-  #include "../dn_base_inc.h"
-  #include "../dn_os_inc.h"
+  #define DN_H_WITH_OS 1
+  #include "../dn.h"
   #include "dn_async.h"
 #endif
 
@@ -18,8 +18,8 @@ static DN_I32 DN_ASYNC_ThreadEntryPoint_(DN_OSThread *thread)
 
     DN_ASYNCTask task = {};
     for (DN_OS_MutexScope(&async->ring_mutex)) {
-      if (DN_Ring_HasData(ring, sizeof(task)))
-        DN_Ring_Read(ring, &task, sizeof(task));
+      if (DN_RingHasData(ring, sizeof(task)))
+        DN_RingRead(ring, &task, sizeof(task));
     }
 
     if (task.work.func) {
@@ -72,8 +72,8 @@ static bool DN_ASYNC_QueueTask_(DN_ASYNCCore *async, DN_ASYNCTask const *task, D
   bool result = false;
   for (DN_OS_MutexScope(&async->ring_mutex)) {
     for (;;) {
-      if (DN_Ring_HasSpace(&async->ring, sizeof(*task))) {
-        DN_Ring_WriteStruct(&async->ring, task);
+      if (DN_RingHasSpace(&async->ring, sizeof(*task))) {
+        DN_RingWriteStruct(&async->ring, task);
         result = true;
         break;
       }

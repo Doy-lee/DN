@@ -1,7 +1,7 @@
 #define DN_BASE_CPP
 
 #if defined(_CLANGD)
-  #include "../dn_base_inc.h"
+  #include "../dn_base.h"
 #endif
 
 DN_API bool DN_MemEq(void const *lhs, DN_USize lhs_size, void const *rhs, DN_USize rhs_size)
@@ -50,6 +50,28 @@ DN_API DN_U32 DN_AtomicSetValue32(DN_U32 volatile *target, DN_U32 value)
 #else
   #error Unsupported compiler
 #endif
+}
+
+DN_API DN_USize DN_AlignUpPowerOfTwoUSize(DN_USize val)
+{
+  DN_USize leading_zeros = DN_CountLeadingZerosUSize(val);
+  DN_USize bits          = sizeof(DN_USize) * 8 - 1;
+  DN_USize result        = leading_zeros == 0 ? SIZE_MAX : 1ULL << (bits - leading_zeros + 1);
+  return result;
+}
+
+DN_API DN_U64 DN_AlignUpPowerOfTwoU64(DN_U64 val)
+{
+  DN_U64 leading_zeros = DN_CountLeadingZerosU64(val);
+  DN_U64 result        = leading_zeros == 0 ? UINT64_MAX : 1ULL << (63 - leading_zeros + 1);
+  return result;
+}
+
+DN_API DN_U32 DN_AlignUpPowerOfTwoU32(DN_U32 val)
+{
+  DN_U32 leading_zeros = DN_CountLeadingZerosU32(val);
+  DN_U32 result        = leading_zeros == 0 ? UINT32_MAX : 1ULL << (31 - leading_zeros + 1);
+  return result;
 }
 
 DN_API DN_CPUIDResult DN_CPUID(DN_CPUIDArgs args)
@@ -1007,7 +1029,7 @@ DN_API void *DN_ArenaAlloc(DN_Arena *arena, DN_U64 size, uint8_t align, DN_ZMem 
     char    *commit_ptr  = DN_Cast(char *) curr + curr->commit;
     if (!arena->mem_funcs.vmem_commit(commit_ptr, commit_size, DN_MemPage_ReadWrite))
       return nullptr;
-    if (poison)
+    if (poison && DN_BitIsNotSet(arena->flags, DN_ArenaFlags_SimAlloc))
       DN_ASanPoisonMemoryRegion(commit_ptr, commit_size);
     curr->commit              = end_commit;
     arena->stats.info.commit += commit_size;
@@ -1018,9 +1040,11 @@ DN_API void *DN_ArenaAlloc(DN_Arena *arena, DN_U64 size, uint8_t align, DN_ZMem 
   curr->used             += alloc_size;
   arena->stats.info.used += alloc_size;
   arena->stats.hwm.used   = DN_Max(arena->stats.hwm.used, arena->stats.info.used);
-  DN_ASanUnpoisonMemoryRegion(result, size);
 
-  if (z_mem == DN_ZMem_Yes) {
+  if (DN_BitIsNotSet(arena->flags, DN_ArenaFlags_SimAlloc))
+    DN_ASanUnpoisonMemoryRegion(result, size);
+
+  if (z_mem == DN_ZMem_Yes && DN_BitIsNotSet(arena->flags, DN_ArenaFlags_SimAlloc)) {
     DN_USize reused_bytes = DN_Min(prev_arena_commit - offset_pos, size);
     DN_Memset(result, 0, reused_bytes);
   }
@@ -1279,6 +1303,372 @@ DN_API void DN_PoolDealloc(DN_Pool *pool, void *ptr)
 
   slot->next              = pool->slots[slot_index];
   pool->slots[slot_index] = slot;
+}
+
+static void DN_ErrSinkCheck_(DN_ErrSink const *err)
+{
+  DN_Assert(err->arena);
+  if (err->stack_size == 0)
+    return;
+
+  DN_ErrSinkNode const *node = err->stack + (err->stack_size - 1);
+  DN_Assert(node->mode >= DN_ErrSinkMode_Nil && node->mode <= DN_ErrSinkMode_ExitOnError);
+  DN_Assert(node->msg_sentinel);
+
+  // NOTE: Walk the list ensuring we eventually terminate at the sentinel (e.g. we have a
+  // well formed doubly-linked-list terminated by a sentinel, or otherwise we will hit the
+  // walk limit or dereference a null pointer and assert)
+  size_t WALK_LIMIT = 99'999;
+  size_t walk       = 0;
+  for (DN_ErrSinkMsg *it = node->msg_sentinel->next; it != node->msg_sentinel; it = it->next, walk++) {
+    DN_AssertF(it, "Encountered null pointer which should not happen in a sentinel DLL");
+    DN_Assert(walk < WALK_LIMIT);
+  }
+}
+
+DN_API DN_ErrSink* DN_ErrSinkBegin_(DN_ErrSink *err, DN_ErrSinkMode mode, DN_CallSite call_site)
+{
+  DN_USize arena_pos = DN_ArenaPos(err->arena);
+  if (err->stack_size == DN_ArrayCountU(err->stack)) {
+    DN_Str8Builder builder = DN_Str8BuilderFromArena(err->arena);
+    for (DN_ForItSize(it, DN_ErrSinkNode, err->stack, err->stack_size))
+      DN_Str8BuilderAppendF(&builder, "  [%04zu] %S:%u %.*s\n", it.index, it.data->call_site.file, it.data->call_site.line, DN_Str8PrintFmt(it.data->call_site.function));
+    DN_Str8 msg = DN_Str8BuilderBuild(&builder, err->arena);
+    DN_AssertF(err->stack_size < DN_ArrayCountU(err->stack), "Error sink has run out of error scopes, potential leak. Scopes were\n%.*s", DN_Str8PrintFmt(msg));
+    DN_ArenaPopTo(err->arena, arena_pos);
+  }
+
+  DN_ErrSinkNode *node = err->stack + err->stack_size++;
+  node->arena_pos      = arena_pos;
+  node->mode           = mode;
+  node->call_site      = call_site;
+  DN_SentinelDoublyLLInitArena(node->msg_sentinel, DN_ErrSinkMsg, err->arena);
+
+  // NOTE: Handle allocation error
+  if (!DN_Check(node && node->msg_sentinel)) {
+    DN_ArenaPopTo(err->arena, arena_pos);
+    node->msg_sentinel = nullptr;
+    err->stack_size--;
+  }
+  DN_ErrSink *result = err;
+  return result;
+}
+
+DN_API bool DN_ErrSinkHasError(DN_ErrSink *err)
+{
+  bool result = false;
+  if (err && err->stack_size) {
+    DN_ErrSinkNode *node = err->stack + (err->stack_size - 1);
+    result               = DN_SentinelDoublyLLHasItems(node->msg_sentinel);
+  }
+  return result;
+}
+
+DN_API DN_ErrSinkMsg *DN_ErrSinkEnd(DN_Arena *arena, DN_ErrSink *err)
+{
+  DN_ErrSinkMsg *result = nullptr;
+  DN_ErrSinkCheck_(err);
+  DN_AssertF(arena != err->arena, "You are not allowed to reuse the arena for ending the error sink because the memory would get popped and lost");
+
+  // NOTE: Walk the list and allocate it onto the user's arena
+  DN_ErrSinkNode *node = err->stack + (err->stack_size - 1);
+  DN_ErrSinkMsg  *prev = nullptr;
+  for (DN_ErrSinkMsg *it = node->msg_sentinel->next; it != node->msg_sentinel; it = it->next) {
+    DN_ErrSinkMsg *entry = DN_ArenaNew(arena, DN_ErrSinkMsg, DN_ZMem_Yes);
+    entry->msg           = DN_Str8FromStr8Arena(arena, it->msg);
+    entry->call_site     = it->call_site;
+    entry->error_code    = it->error_code;
+    if (!result)
+      result = entry; // Assign first entry if we haven't yet
+    if (prev)
+      prev->next = entry; // Link the prev message to the current one
+    prev = entry;         // Update prev to latest
+  }
+
+  // NOTE: Deallocate all the memory for this scope
+  err->stack_size--;
+  DN_ArenaPopTo(err->arena, node->arena_pos);
+  return result;
+}
+
+static void DN_ErrSinkAddMsgToStr8Builder_(DN_Str8Builder *builder, DN_ErrSinkMsg *msg, DN_ErrSinkMsg *end)
+{
+  if (msg == end) // NOTE: No error messages to add
+    return;
+
+  if (msg->next == end) {
+    DN_ErrSinkMsg *it        = msg;
+    DN_Str8        file_name = DN_Str8FileNameFromPath(it->call_site.file);
+    DN_Str8BuilderAppendF(builder,
+                           "%.*s:%05I32u:%.*s %.*s",
+                           DN_Str8PrintFmt(file_name),
+                           it->call_site.line,
+                           DN_Str8PrintFmt(it->call_site.function),
+                           DN_Str8PrintFmt(it->msg));
+  } else {
+    // NOTE: More than one message
+    for (DN_ErrSinkMsg *it = msg; it != end; it = it->next) {
+      DN_Str8 file_name = DN_Str8FileNameFromPath(it->call_site.file);
+      DN_Str8BuilderAppendF(builder,
+                             "%s  - %.*s:%05I32u:%.*s%s%.*s",
+                             it == msg ? "" : "\n",
+                             DN_Str8PrintFmt(file_name),
+                             it->call_site.line,
+                             DN_Str8PrintFmt(it->call_site.function),
+                             it->msg.size ? " " : "",
+                             DN_Str8PrintFmt(it->msg));
+    }
+  }
+}
+
+DN_API DN_Str8 DN_ErrSinkEndStr8(DN_Arena *arena, DN_ErrSink *err)
+{
+  DN_Str8 result = {};
+  DN_ErrSinkCheck_(err);
+  if (err->stack_size == 0)
+    return result;
+
+  DN_AssertF(arena != err->arena, "You are not allowed to reuse the arena for ending the error sink because the memory would get popped and lost");
+
+  // NOTE: Walk the list and allocate it onto the user's arena
+  DN_Str8Builder  builder = DN_Str8BuilderFromArena(err->arena);
+  DN_ErrSinkNode *node    = err->stack + (err->stack_size - 1);
+  DN_ErrSinkAddMsgToStr8Builder_(&builder, node->msg_sentinel->next, node->msg_sentinel);
+
+  // NOTE: Deallocate all the memory for this scope
+  err->stack_size--;
+  DN_U64 arena_pos = node->arena_pos;
+  DN_ArenaPopTo(err->arena, arena_pos);
+
+  result = DN_Str8BuilderBuild(&builder, arena);
+  return result;
+}
+
+DN_API void DN_ErrSinkEndIgnore(DN_ErrSink *err)
+{
+  DN_ErrSinkEnd(nullptr, err);
+}
+
+DN_API bool DN_ErrSinkEndLogError_(DN_ErrSink *err, DN_CallSite call_site, DN_Str8 err_msg)
+{
+  DN_ErrSinkNode *node = err->stack + (err->stack_size - 1);
+  DN_AssertF(err->stack_size, "Begin must be called before calling end");
+  DN_AssertF(node->msg_sentinel, "Begin must be called before calling end");
+  bool result = false;
+  if (node->msg_sentinel != node->msg_sentinel->next) {
+    result = true;
+    // NOTE: Build the error string
+    DN_Str8Builder builder = DN_Str8BuilderFromArena(err->arena);
+    {
+      if (err_msg.size) {
+        DN_Str8BuilderAppendRef(&builder, err_msg);
+        DN_Str8BuilderAppendRef(&builder, DN_Str8Lit(":"));
+      } else {
+        DN_Str8BuilderAppendRef(&builder, DN_Str8Lit("Error(s) encountered:"));
+      }
+      if (node->msg_sentinel->next->next != node->msg_sentinel) // NOTE: More than 1 message
+        DN_Str8BuilderAppendRef(&builder, DN_Str8Lit("\n"));
+      DN_ErrSinkAddMsgToStr8Builder_(&builder, node->msg_sentinel->next, node->msg_sentinel);
+    }
+
+    // NOTE: Log the error
+    DN_Str8 log = DN_Str8BuilderBuild(&builder, err->arena);
+    DN_LogEmitFromType(DN_LogMakeU32LogTypeParam(DN_LogType_Error), call_site, "%.*s", DN_Str8PrintFmt(log));
+
+    if (node->mode == DN_ErrSinkMode_DebugBreakOnErrorLog)
+      DN_DebugBreak;
+
+    // NOTE: Deallocate the error node's memory and pop it from the stack
+    DN_ArenaPopTo(err->arena, node->arena_pos);
+    err->stack_size--;
+  }
+  return result;
+}
+
+DN_API bool DN_ErrSinkEndLogErrorFV_(DN_ErrSink *err, DN_CallSite call_site, DN_FMT_ATTRIB char const *fmt, va_list args)
+{
+  DN_Str8 log    = DN_Str8FromFmtVArena(err->arena, fmt, args);
+  bool    result = DN_ErrSinkEndLogError_(err, call_site, log);
+  return result;
+}
+
+DN_API bool DN_ErrSinkEndLogErrorF_(DN_ErrSink *err, DN_CallSite call_site, DN_FMT_ATTRIB char const *fmt, ...)
+{
+  va_list args;
+  va_start(args, fmt);
+  DN_Str8    log    = DN_Str8FromFmtVArena(err->arena, fmt, args);
+  bool       result = DN_ErrSinkEndLogError_(err, call_site, log);
+  va_end(args);
+  return result;
+}
+
+DN_API void DN_ErrSinkEndExitIfErrorFV_(DN_ErrSink *err, DN_CallSite call_site, DN_U32 exit_val, DN_FMT_ATTRIB char const *fmt, va_list args)
+{
+  if (DN_ErrSinkEndLogErrorFV_(err, call_site, fmt, args)) {
+    DN_DebugBreak;
+    DN_OS_Exit(exit_val);
+  }
+}
+
+DN_API void DN_ErrSinkEndExitIfErrorF_(DN_ErrSink *err, DN_CallSite call_site, DN_U32 exit_val, DN_FMT_ATTRIB char const *fmt, ...)
+{
+  va_list args;
+  va_start(args, fmt);
+  DN_ErrSinkEndExitIfErrorFV_(err, call_site, exit_val, fmt, args);
+  va_end(args);
+}
+
+DN_API void DN_ErrSinkAppendFV_(DN_ErrSink *err, DN_U32 error_code, DN_CallSite call_site, DN_FMT_ATTRIB char const *fmt, va_list args)
+{
+  DN_Assert(err && err->stack_size);
+  DN_ErrSinkNode *node = err->stack + (err->stack_size - 1);
+  DN_AssertF(node, "Error sink must be begun by calling 'Begin' before using this function.");
+
+  DN_ErrSinkMsg *msg = DN_ArenaNew(err->arena, DN_ErrSinkMsg, DN_ZMem_Yes);
+  if (DN_Check(msg)) {
+    msg->msg        = DN_Str8FromFmtVArena(err->arena, fmt, args);
+    msg->error_code = error_code;
+    msg->call_site  = call_site;
+    DN_SentinelDoublyLLPrepend(node->msg_sentinel, msg);
+    if (node->mode == DN_ErrSinkMode_ExitOnError)
+      DN_ErrSinkEndExitIfErrorF_(err, msg->call_site, error_code, "Fatal error %u", error_code);
+  }
+}
+
+DN_API void DN_ErrSinkAppendF_(DN_ErrSink *err, DN_U32 error_code, DN_CallSite call_site, DN_FMT_ATTRIB char const *fmt, ...)
+{
+  va_list args;
+  va_start(args, fmt);
+  DN_ErrSinkAppendFV_(err, error_code, call_site, fmt, args);
+  va_end(args);
+}
+
+DN_THREAD_LOCAL DN_TCCore *g_dn_thread_context;
+
+DN_API void DN_TCInit(DN_TCCore *tc, DN_U64 thread_id, DN_Arena *main_arena, DN_Arena *temp_a_arena, DN_Arena *temp_b_arena, DN_Arena *err_sink_arena)
+{
+  tc->thread_id      = thread_id;
+  tc->main_arena     = main_arena;
+  tc->temp_a_arena   = temp_a_arena;
+  tc->temp_b_arena   = temp_b_arena;
+  tc->err_sink.arena = err_sink_arena;
+}
+
+DN_API void DN_TCInitFromMemFuncs(DN_TCCore *tc, DN_U64 thread_id, DN_TCInitArgs *args, DN_ArenaMemFuncs mem_funcs)
+{
+  DN_U64 main_reserve     = (args && args->main_reserve)     ? args->main_reserve     : DN_Kilobytes(64);
+  DN_U64 main_commit      = (args && args->main_commit)      ? args->main_commit      : DN_Kilobytes(4);
+  DN_U64 temp_reserve     = (args && args->temp_reserve)     ? args->temp_reserve     : DN_Kilobytes(64);
+  DN_U64 temp_commit      = (args && args->temp_commit)      ? args->temp_commit      : DN_Kilobytes(4);
+  DN_U64 err_sink_reserve = (args && args->err_sink_reserve) ? args->err_sink_reserve : DN_Kilobytes(64);
+  DN_U64 err_sink_commit  = (args && args->err_sink_commit)  ? args->err_sink_commit  : DN_Kilobytes(4);
+
+  tc->main_arena_         = DN_ArenaFromMemFuncs(main_reserve,     main_commit,     DN_ArenaFlags_AllocCanLeak | DN_ArenaFlags_NoAllocTrack, mem_funcs);
+  tc->temp_a_arena_       = DN_ArenaFromMemFuncs(temp_reserve,     temp_commit,     DN_ArenaFlags_AllocCanLeak | DN_ArenaFlags_NoAllocTrack, mem_funcs);
+  tc->temp_b_arena_       = DN_ArenaFromMemFuncs(temp_reserve,     temp_commit,     DN_ArenaFlags_AllocCanLeak | DN_ArenaFlags_NoAllocTrack, mem_funcs);
+  tc->err_sink_arena_     = DN_ArenaFromMemFuncs(err_sink_reserve, err_sink_commit, DN_ArenaFlags_AllocCanLeak | DN_ArenaFlags_NoAllocTrack, mem_funcs);
+
+  DN_TCInit(tc, thread_id, &tc->main_arena_, &tc->temp_a_arena_, &tc->temp_b_arena_, &tc->err_sink_arena_);
+}
+
+DN_API void DN_TCDeinit(DN_TCCore *tc)
+{
+  DN_ArenaDeinit(tc->main_arena);
+  DN_ArenaDeinit(tc->temp_a_arena);
+  DN_ArenaDeinit(tc->temp_b_arena);
+  DN_ArenaDeinit(tc->err_sink.arena);
+}
+
+DN_API void DN_TCEquip(DN_TCCore *tc)
+{
+  g_dn_thread_context = tc;
+}
+
+DN_API DN_TCCore *DN_TCGet()
+{
+  DN_RawAssert(g_dn_thread_context &&
+               "This thread's thread context has not been equipped yet. Ensure that DN_TCInit(...) "
+               "has been called to create a thread context and call DN_TCEquip(...) in the current "
+               "thread to make it retrievable via this function");
+  return g_dn_thread_context;
+}
+
+DN_API DN_Arena *DN_TCMainArena()
+{
+  DN_TCCore *tc     = DN_TCGet();
+  DN_Arena  *result = tc->main_arena;
+  return result;
+}
+
+DN_API DN_Arena *DN_TCTempArena(DN_Arena **conflicts, DN_U64 count)
+{
+  DN_TCCore *tc           = DN_TCGet();
+  DN_Arena  *candidates[] = {tc->temp_a_arena, tc->temp_b_arena};
+  DN_Arena  *result       = nullptr;
+  for (DN_ForItCArray(it, DN_Arena *, candidates)) {
+    bool is_usable = false;
+    for (DN_ForItSize(conflict_it, DN_Arena *, conflicts, count)) {
+      if (*conflict_it.data == *it.data)
+        continue;
+      is_usable = true;
+      break;
+    }
+
+    if (count == 0 || is_usable) {
+      result = *it.data;
+      break;
+    }
+  }
+  return result;
+}
+
+#if defined(__cplusplus)
+DN_TCScratchCpp::DN_TCScratchCpp(DN_Arena **conflicts, DN_USize count)
+{
+  this->data = DN_TCScratchBegin(conflicts, count);
+}
+
+DN_TCScratchCpp::~DN_TCScratchCpp()
+{
+  DN_TCScratchEnd(&this->data);
+}
+#endif
+
+DN_API DN_TCScratch DN_TCScratchBegin(DN_Arena **conflicts, DN_U64 count)
+{
+  DN_TCScratch result = {};
+  result.arena        = DN_TCTempArena(conflicts, count);
+  result.temp_mem     = DN_ArenaTempMemBegin(result.arena);
+  return result;
+}
+
+DN_API void DN_TCScratchEnd(DN_TCScratch *scratch)
+{
+  DN_Assert(scratch->destructed == false);
+  DN_ArenaTempMemEnd(scratch->temp_mem);
+  scratch->destructed = true;
+  scratch->arena      = nullptr;
+  scratch->temp_mem   = {};
+}
+
+DN_API void DN_TCSetFrameArena(DN_Arena *arena)
+{
+  DN_TCCore *tc   = DN_TCGet();
+  tc->frame_arena = arena;
+}
+
+DN_API DN_Arena *DN_TCFrameArena()
+{
+  DN_TCCore *tc     = DN_TCGet();
+  DN_Arena  *result = tc->frame_arena;
+  return result;
+}
+
+DN_API DN_ErrSink *DN_TCErrSink()
+{
+  DN_TCCore  *tc     = DN_TCGet();
+  DN_ErrSink *result = &tc->err_sink;
+  return result;
 }
 
 DN_API void *DN_PoolCopy(DN_Pool *pool, void const *data, DN_U64 size, uint8_t align)
@@ -1771,6 +2161,71 @@ DN_API DN_Str8x256 DN_Str8x256FromFmtV(DN_FMT_ATTRIB char const *fmt, va_list ar
   return result;
 }
 
+DN_API void DN_Str8x16AppendFmt(DN_Str8x16 *str, DN_FMT_ATTRIB char const *fmt, ...)
+{
+  va_list args;
+  va_start(args, fmt);
+  DN_Str8x16AppendFmtV(str, fmt, args);
+  va_end(args);
+}
+
+DN_API void DN_Str8x16AppendFmtV(DN_Str8x16 *str, DN_FMT_ATTRIB char const *fmt, va_list args)
+{
+  DN_FmtVAppend(str->data, &str->size, sizeof(str->data), fmt, args);
+}
+
+DN_API void DN_Str8x32AppendFmt(DN_Str8x32 *str, DN_FMT_ATTRIB char const *fmt, ...)
+{
+  va_list args;
+  va_start(args, fmt);
+  DN_Str8x32AppendFmtV(str, fmt, args);
+  va_end(args);
+}
+
+DN_API void DN_Str8x32AppendFmtV(DN_Str8x32 *str, DN_FMT_ATTRIB char const *fmt, va_list args)
+{
+  DN_FmtVAppend(str->data, &str->size, sizeof(str->data), fmt, args);
+}
+
+DN_API void DN_Str8x64AppendFmt(DN_Str8x64 *str, DN_FMT_ATTRIB char const *fmt, ...)
+{
+  va_list args;
+  va_start(args, fmt);
+  DN_Str8x64AppendFmtV(str, fmt, args);
+  va_end(args);
+}
+
+DN_API void DN_Str8x64AppendFmtV(DN_Str8x64 *str, DN_FMT_ATTRIB char const *fmt, va_list args)
+{
+  DN_FmtVAppend(str->data, &str->size, sizeof(str->data), fmt, args);
+}
+
+DN_API void DN_Str8x128AppendFmt(DN_Str8x128 *str, DN_FMT_ATTRIB char const *fmt, ...)
+{
+  va_list args;
+  va_start(args, fmt);
+  DN_Str8x128AppendFmtV(str, fmt, args);
+  va_end(args);
+}
+
+DN_API void DN_Str8x128AppendFmtV(DN_Str8x128 *str, DN_FMT_ATTRIB char const *fmt, va_list args)
+{
+  DN_FmtVAppend(str->data, &str->size, sizeof(str->data), fmt, args);
+}
+
+DN_API void DN_Str8x256AppendFmt(DN_Str8x256 *str, DN_FMT_ATTRIB char const *fmt, ...)
+{
+  va_list args;
+  va_start(args, fmt);
+  DN_Str8x256AppendFmtV(str, fmt, args);
+  va_end(args);
+}
+
+DN_API void DN_Str8x256AppendFmtV(DN_Str8x256 *str, DN_FMT_ATTRIB char const *fmt, va_list args)
+{
+  DN_FmtVAppend(str->data, &str->size, sizeof(str->data), fmt, args);
+}
+
 DN_API DN_Str8x32 DN_Str8x32FromU64(DN_U64 val, char separator)
 {
   DN_Str8x32 result     = {};
@@ -1823,7 +2278,7 @@ DN_API char *DN_Str8End(DN_Str8 string)
   return result;
 }
 
-DN_API DN_Str8 DN_Str8Slice(DN_Str8 string, DN_USize offset, DN_USize size)
+DN_API DN_Str8 DN_Str8Subset(DN_Str8 string, DN_USize offset, DN_USize size)
 {
   DN_Str8 result = DN_Str8FromPtr(string.data, 0);
   if (string.size == 0)
@@ -1838,7 +2293,7 @@ DN_API DN_Str8 DN_Str8Slice(DN_Str8 string, DN_USize offset, DN_USize size)
 
 DN_API DN_Str8 DN_Str8Advance(DN_Str8 string, DN_USize amount)
 {
-  DN_Str8 result = DN_Str8Slice(string, amount, DN_USIZE_MAX);
+  DN_Str8 result = DN_Str8Subset(string, amount, DN_USIZE_MAX);
   return result;
 }
 
@@ -1858,7 +2313,7 @@ DN_API DN_Str8BSplitResult DN_Str8BSplitArray(DN_Str8 string, DN_Str8 const *fin
   for (size_t index = 0; !result.rhs.data && index < string.size; index++) {
     for (DN_USize find_index = 0; find_index < find_size; find_index++) {
       DN_Str8 find_item    = find[find_index];
-      DN_Str8 string_slice = DN_Str8Slice(string, index, find_item.size);
+      DN_Str8 string_slice = DN_Str8Subset(string, index, find_item.size);
       if (DN_Str8Eq(string_slice, find_item)) {
         result.lhs.size = index;
         result.rhs.data = string_slice.data + find_item.size;
@@ -1887,7 +2342,7 @@ DN_API DN_Str8BSplitResult DN_Str8BSplitLastArray(DN_Str8 string, DN_Str8 const 
   for (size_t index = string.size - 1; !result.rhs.data && index < string.size; index--) {
     for (DN_USize find_index = 0; find_index < find_size; find_index++) {
       DN_Str8 find_item    = find[find_index];
-      DN_Str8 string_slice = DN_Str8Slice(string, index, find_item.size);
+      DN_Str8 string_slice = DN_Str8Subset(string, index, find_item.size);
       if (DN_Str8Eq(string_slice, find_item)) {
         result.lhs.size = index;
         result.rhs.data = string_slice.data + find_item.size;
@@ -1945,7 +2400,7 @@ DN_API DN_Str8FindResult DN_Str8FindStr8Array(DN_Str8 string, DN_Str8 const *fin
   for (DN_USize index = 0; !result.found && index < string.size; index++) {
     for (DN_USize find_index = 0; find_index < find_size; find_index++) {
       DN_Str8 find_item    = find[find_index];
-      DN_Str8 string_slice = DN_Str8Slice(string, index, find_item.size);
+      DN_Str8 string_slice = DN_Str8Subset(string, index, find_item.size);
       if (DN_Str8Eq(string_slice, find_item, eq_case)) {
         result.found                        = true;
         result.index                        = index;
@@ -2287,8 +2742,8 @@ DN_API DN_Str8TruncateResult DN_Str8TruncateMiddle(DN_Arena *arena, DN_Str8 str8
     return result;
   }
 
-  DN_Str8 head     = DN_Str8Slice(str8, 0, side_size);
-  DN_Str8 tail     = DN_Str8Slice(str8, str8.size - side_size, side_size);
+  DN_Str8 head     = DN_Str8Subset(str8, 0, side_size);
+  DN_Str8 tail     = DN_Str8Subset(str8, str8.size - side_size, side_size);
   DN_MSVC_WARNING_PUSH
   DN_MSVC_WARNING_DISABLE(6284) // Object passed as _Param_(3) when a string is required in call to 'DN_Str8FromFmtArena' Actual type: 'struct DN_Str8'
   result.str8      = DN_Str8FromFmtArena(arena, "%S%S%S", head, truncator, tail);
@@ -2310,6 +2765,70 @@ DN_API DN_Str8 DN_Str8Upper(DN_Arena *arena, DN_Str8 string)
   DN_Str8 result = DN_Str8FromStr8Arena(arena, string);
   for (DN_ForIndexU(index, result.size))
     result.data[index] = DN_CharToUpper(result.data[index]);
+  return result;
+}
+
+DN_API DN_Str8 DN_Str8Replace(DN_Str8       string,
+                              DN_Str8       find,
+                              DN_Str8       replace,
+                              DN_USize      start_index,
+                              DN_Arena     *arena,
+                              DN_Str8EqCase eq_case)
+{
+  // TODO: Implement this without requiring TLS so it can go into base strings
+  DN_Str8 result = {};
+  if (string.size == 0 || find.size == 0 || find.size > string.size || find.size == 0 || string.size == 0) {
+    result = DN_Str8FromStr8Arena(arena, string);
+    return result;
+  }
+
+  DN_TCScratch   scratch        = DN_TCScratchBegin(&arena, 1);
+  DN_Str8Builder string_builder = DN_Str8BuilderFromArena(scratch.arena);
+  DN_USize       max            = string.size - find.size;
+  DN_USize       head           = start_index;
+
+  for (DN_USize tail = head; tail <= max; tail++) {
+    DN_Str8 check = DN_Str8Subset(string, tail, find.size);
+    if (!DN_Str8Eq(check, find, eq_case))
+      continue;
+
+    if (start_index > 0 && string_builder.string_size == 0) {
+      // User provided a hint in the string to start searching from, we
+      // need to add the string up to the hint. We only do this if there's
+      // a replacement action, otherwise we have a special case for no
+      // replacements, where the entire string gets copied.
+      DN_Str8 slice = DN_Str8FromPtr(string.data, head);
+      DN_Str8BuilderAppendRef(&string_builder, slice);
+    }
+
+    DN_Str8 range = DN_Str8Subset(string, head, (tail - head));
+    DN_Str8BuilderAppendRef(&string_builder, range);
+    DN_Str8BuilderAppendRef(&string_builder, replace);
+    head = tail + find.size;
+    tail += find.size - 1; // NOTE: -1 since the for loop will post increment us past the end of the find string
+  }
+
+  if (string_builder.string_size == 0) {
+    // NOTE: No replacement possible, so we just do a full-copy
+    result = DN_Str8FromStr8Arena(arena, string);
+  } else {
+    DN_Str8 remainder = DN_Str8FromPtr(string.data + head, string.size - head);
+    DN_Str8BuilderAppendRef(&string_builder, remainder);
+    result = DN_Str8BuilderBuild(&string_builder, arena);
+  }
+  DN_TCScratchEnd(&scratch);
+  return result;
+}
+
+DN_API DN_Str8 DN_Str8ReplaceSensitive(DN_Str8 string, DN_Str8 find, DN_Str8 replace, DN_USize start_index, DN_Arena *arena)
+{
+  DN_Str8 result = DN_Str8Replace(string, find, replace, start_index, arena, DN_Str8EqCase_Sensitive);
+  return result;
+}
+
+DN_API DN_Str8 DN_Str8ReplaceInsensitive(DN_Str8 string, DN_Str8 find, DN_Str8 replace, DN_USize start_index, DN_Arena *arena)
+{
+  DN_Str8 result = DN_Str8Replace(string, find, replace, start_index, arena, DN_Str8EqCase_Insensitive);
   return result;
 }
 
@@ -2591,14 +3110,13 @@ DN_API DN_Str8 DN_Str8BuilderBuildDelimited(DN_Str8Builder const *builder, DN_St
   return result;
 }
 
-DN_API DN_Slice<DN_Str8> DN_Str8BuilderBuildSlice(DN_Str8Builder const *builder, DN_Arena *arena)
+DN_API DN_Str8Slice DN_Str8BuilderBuildSlice(DN_Str8Builder const *builder, DN_Arena *arena)
 {
-  DN_Slice<DN_Str8> result = DN_ZeroInit;
+  DN_Str8Slice result = {};
   if (!builder || builder->string_size <= 0 || builder->count <= 0)
     return result;
 
-  result = DN_Slice_Alloc<DN_Str8>(arena, builder->count, DN_ZMem_No);
-  if (!result.data)
+  if (!DN_ISliceAllocArena(DN_Str8, &result, builder->count, DN_ZMem_No, arena))
     return result;
 
   DN_USize slice_index = 0;
@@ -2609,9 +3127,8 @@ DN_API DN_Slice<DN_Str8> DN_Str8BuilderBuildSlice(DN_Str8Builder const *builder,
   return result;
 }
 
-// NOTE: DN_Char ///////////////////////////////////////////////////////////////////////////////////
-// NOTE: DN_UTF ////////////////////////////////////////////////////////////////////////////////////
-DN_API int DN_UTF8_EncodeCodepoint(uint8_t utf8[4], uint32_t codepoint)
+// NOTE: DN_UTF
+DN_API int DN_UTF8EncodeCodepoint(uint8_t utf8[4], uint32_t codepoint)
 {
   // NOTE: Table from https://www.reedbeta.com/blog/programmers-intro-to-unicode/
   // ----------------------------------------+----------------------------+--------------------+
@@ -2652,7 +3169,7 @@ DN_API int DN_UTF8_EncodeCodepoint(uint8_t utf8[4], uint32_t codepoint)
   return 0;
 }
 
-DN_API int DN_UTF16_EncodeCodepoint(uint16_t utf16[2], uint32_t codepoint)
+DN_API int DN_UTF16EncodeCodepoint(uint16_t utf16[2], uint32_t codepoint)
 {
   // NOTE: Table from https://www.reedbeta.com/blog/programmers-intro-to-unicode/
   // ----------------------------------------+------------------------------------+------------------+
@@ -3222,5 +3739,450 @@ DN_API DN_F64 DN_ProfilerSecFromTSC(DN_Profiler *profiler, DN_U64 duration_tsc)
 DN_API DN_F64 DN_ProfilerMsFromTSC(DN_Profiler *profiler, DN_U64 duration_tsc)
 {
   DN_F64 result = DN_Cast(DN_F64)duration_tsc / profiler->tsc_frequency * 1000.0;
+  return result;
+}
+
+#define DN_PCG_DEFAULT_MULTIPLIER_64 6364136223846793005ULL
+#define DN_PCG_DEFAULT_INCREMENT_64  1442695040888963407ULL
+DN_API DN_PCG32 DN_PCG32Init(DN_U64 seed)
+{
+  DN_PCG32 result = {};
+  DN_PCG32Next(&result);
+  result.state += seed;
+  DN_PCG32Next(&result);
+  return result;
+}
+
+DN_API DN_U32 DN_PCG32Next(DN_PCG32 *rng)
+{
+  DN_U64 state = rng->state;
+  rng->state     = state * DN_PCG_DEFAULT_MULTIPLIER_64 + DN_PCG_DEFAULT_INCREMENT_64;
+
+  // XSH-RR
+  DN_U32 value = (DN_U32)((state ^ (state >> 18)) >> 27);
+  int      rot   = state >> 59;
+  return rot ? (value >> rot) | (value << (32 - rot)) : value;
+}
+
+DN_API DN_U64 DN_PCG32Next64(DN_PCG32 *rng)
+{
+  DN_U64 value = DN_PCG32Next(rng);
+  value <<= 32;
+  value |= DN_PCG32Next(rng);
+  return value;
+}
+
+DN_API DN_U32 DN_PCG32Range(DN_PCG32 *rng, DN_U32 low, DN_U32 high)
+{
+  DN_U32 bound     = high - low;
+  DN_U32 threshold = -(int32_t)bound % bound;
+
+  for (;;) {
+    DN_U32 r = DN_PCG32Next(rng);
+    if (r >= threshold)
+      return low + (r % bound);
+  }
+}
+
+DN_API DN_F32 DN_PCG32NextF32(DN_PCG32 *rng)
+{
+  DN_U32 x = DN_PCG32Next(rng);
+  return (DN_F32)(int32_t)(x >> 8) * 0x1.0p-24f;
+}
+
+DN_API DN_F64 DN_PCG32NextF64(DN_PCG32 *rng)
+{
+  DN_U64 x = DN_PCG32Next64(rng);
+  return (DN_F64)(int64_t)(x >> 11) * 0x1.0p-53;
+}
+
+DN_API void DN_PCG32Advance(DN_PCG32 *rng, DN_U64 delta)
+{
+  DN_U64 cur_mult = DN_PCG_DEFAULT_MULTIPLIER_64;
+  DN_U64 cur_plus = DN_PCG_DEFAULT_INCREMENT_64;
+
+  DN_U64 acc_mult = 1;
+  DN_U64 acc_plus = 0;
+
+  while (delta != 0) {
+    if (delta & 1) {
+      acc_mult *= cur_mult;
+      acc_plus = acc_plus * cur_mult + cur_plus;
+    }
+    cur_plus = (cur_mult + 1) * cur_plus;
+    cur_mult *= cur_mult;
+    delta >>= 1;
+  }
+
+  rng->state = acc_mult * rng->state + acc_plus;
+}
+
+// Default values recommended by: http://isthe.com/chongo/tech/comp/fnv/
+DN_API DN_U32 DN_FNV1AHashU32FromBytes(void const *bytes, DN_USize size, DN_U32 hash)
+{
+    auto buffer = DN_Cast(DN_U8 const *)bytes;
+    for (DN_USize i = 0; i < size; i++)
+        hash = (buffer[i] ^ hash) * 16777619 /*FNV Prime*/;
+    return hash;
+}
+
+DN_API DN_U64 DN_FNV1AHashU64FromBytes(void const *bytes, DN_USize size, DN_U64 hash)
+{
+    auto buffer = DN_Cast(DN_U8 const *)bytes;
+    for (DN_USize i = 0; i < size; i++)
+        hash = (buffer[i] ^ hash) * 1099511628211 /*FNV Prime*/;
+    return hash;
+}
+
+#if defined(DN_COMPILER_MSVC) || defined(DN_COMPILER_CLANG_CL)
+    #define DN_MMH3_ROTL32(x, y) _rotl(x, y)
+    #define DN_MMH3_ROTL64(x, y) _rotl64(x, y)
+#else
+    #define DN_MMH3_ROTL32(x, y) ((x) << (y)) | ((x) >> (32 - (y)))
+    #define DN_MMH3_ROTL64(x, y) ((x) << (y)) | ((x) >> (64 - (y)))
+#endif
+
+//-----------------------------------------------------------------------------
+// Block read - if your platform needs to do endian-swapping or can only
+// handle aligned reads, do the conversion here
+DN_FORCE_INLINE DN_U32 DN_MurmurHash3GetBlock32_(DN_U32 const *p, int i)
+{
+    return p[i];
+}
+
+DN_FORCE_INLINE DN_U64 DN_MurmurHash3GetBlock64_(DN_U64 const *p, int i)
+{
+    return p[i];
+}
+
+//-----------------------------------------------------------------------------
+// Finalization mix - force all bits of a hash block to avalanche
+
+DN_FORCE_INLINE DN_U32 DN_MurmurHash3FMix32_(DN_U32 h)
+{
+    h ^= h >> 16;
+    h *= 0x85ebca6b;
+    h ^= h >> 13;
+    h *= 0xc2b2ae35;
+    h ^= h >> 16;
+    return h;
+}
+
+DN_FORCE_INLINE DN_U64 DN_MurmurHash3FMix64_(DN_U64 k)
+{
+    k ^= k >> 33;
+    k *= 0xff51afd7ed558ccd;
+    k ^= k >> 33;
+    k *= 0xc4ceb9fe1a85ec53;
+    k ^= k >> 33;
+    return k;
+}
+
+DN_API DN_U32 DN_MurmurHash3HashU128FromBytesX86(void const *bytes, int len, DN_U32 seed)
+{
+    const DN_U8 *data = (const DN_U8 *)bytes;
+    const int nblocks   = len / 4;
+
+    DN_U32 h1 = seed;
+
+    const DN_U32 c1 = 0xcc9e2d51;
+    const DN_U32 c2 = 0x1b873593;
+
+    //----------
+    // body
+
+    const DN_U32 *blocks = (const DN_U32 *)(data + nblocks * 4);
+
+    for (int i = -nblocks; i; i++)
+    {
+        DN_U32 k1 = DN_MurmurHash3GetBlock32_(blocks, i);
+
+        k1 *= c1;
+        k1 = DN_MMH3_ROTL32(k1, 15);
+        k1 *= c2;
+
+        h1 ^= k1;
+        h1 = DN_MMH3_ROTL32(h1, 13);
+        h1 = h1 * 5 + 0xe6546b64;
+    }
+
+    //----------
+    // tail
+
+    const DN_U8 *tail = (const DN_U8 *)(data + nblocks * 4);
+
+    DN_U32 k1 = 0;
+
+    switch (len & 3)
+    {
+        case 3:
+            k1 ^= tail[2] << 16;
+        case 2:
+            k1 ^= tail[1] << 8;
+        case 1:
+            k1 ^= tail[0];
+            k1 *= c1;
+            k1 = DN_MMH3_ROTL32(k1, 15);
+            k1 *= c2;
+            h1 ^= k1;
+    };
+
+    //----------
+    // finalization
+
+    h1 ^= len;
+
+    h1 = DN_MurmurHash3FMix32_(h1);
+
+    return h1;
+}
+
+DN_API DN_MurmurHash3 DN_MurmurHash3HashU128FromBytesX64(void const *bytes, int len, DN_U32 seed)
+{
+    const DN_U8 *data = (const DN_U8 *)bytes;
+    const int nblocks   = len / 16;
+
+    DN_U64 h1 = seed;
+    DN_U64 h2 = seed;
+
+    const DN_U64 c1 = 0x87c37b91114253d5;
+    const DN_U64 c2 = 0x4cf5ad432745937f;
+
+    //----------
+    // body
+
+    const DN_U64 *blocks = (const DN_U64 *)(data);
+
+    for (int i = 0; i < nblocks; i++)
+    {
+        DN_U64 k1 = DN_MurmurHash3GetBlock64_(blocks, i * 2 + 0);
+        DN_U64 k2 = DN_MurmurHash3GetBlock64_(blocks, i * 2 + 1);
+
+        k1 *= c1;
+        k1 = DN_MMH3_ROTL64(k1, 31);
+        k1 *= c2;
+        h1 ^= k1;
+
+        h1 = DN_MMH3_ROTL64(h1, 27);
+        h1 += h2;
+        h1 = h1 * 5 + 0x52dce729;
+
+        k2 *= c2;
+        k2 = DN_MMH3_ROTL64(k2, 33);
+        k2 *= c1;
+        h2 ^= k2;
+
+        h2 = DN_MMH3_ROTL64(h2, 31);
+        h2 += h1;
+        h2 = h2 * 5 + 0x38495ab5;
+    }
+
+    //----------
+    // tail
+
+    const DN_U8 *tail = (const DN_U8 *)(data + nblocks * 16);
+
+    DN_U64 k1 = 0;
+    DN_U64 k2 = 0;
+
+    switch (len & 15)
+    {
+        case 15:
+            k2 ^= ((DN_U64)tail[14]) << 48;
+        case 14:
+            k2 ^= ((DN_U64)tail[13]) << 40;
+        case 13:
+            k2 ^= ((DN_U64)tail[12]) << 32;
+        case 12:
+            k2 ^= ((DN_U64)tail[11]) << 24;
+        case 11:
+            k2 ^= ((DN_U64)tail[10]) << 16;
+        case 10:
+            k2 ^= ((DN_U64)tail[9]) << 8;
+        case 9:
+            k2 ^= ((DN_U64)tail[8]) << 0;
+            k2 *= c2;
+            k2 = DN_MMH3_ROTL64(k2, 33);
+            k2 *= c1;
+            h2 ^= k2;
+
+        case 8:
+            k1 ^= ((DN_U64)tail[7]) << 56;
+        case 7:
+            k1 ^= ((DN_U64)tail[6]) << 48;
+        case 6:
+            k1 ^= ((DN_U64)tail[5]) << 40;
+        case 5:
+            k1 ^= ((DN_U64)tail[4]) << 32;
+        case 4:
+            k1 ^= ((DN_U64)tail[3]) << 24;
+        case 3:
+            k1 ^= ((DN_U64)tail[2]) << 16;
+        case 2:
+            k1 ^= ((DN_U64)tail[1]) << 8;
+        case 1:
+            k1 ^= ((DN_U64)tail[0]) << 0;
+            k1 *= c1;
+            k1 = DN_MMH3_ROTL64(k1, 31);
+            k1 *= c2;
+            h1 ^= k1;
+    };
+
+    //----------
+    // finalization
+
+    h1 ^= len;
+    h2 ^= len;
+
+    h1 += h2;
+    h2 += h1;
+
+    h1 = DN_MurmurHash3FMix64_(h1);
+    h2 = DN_MurmurHash3FMix64_(h2);
+
+    h1 += h2;
+    h2 += h1;
+
+    DN_MurmurHash3 result = {};
+    result.e[0]            = h1;
+    result.e[1]            = h2;
+    return result;
+}
+
+DN_API DN_U64 DN_MurmurHash3HashU64FromBytesX64(void const *bytes, int len, DN_U32 seed)
+{
+  DN_MurmurHash3 hash   = DN_MurmurHash3HashU128FromBytesX64(bytes, len, seed);
+  DN_U64         result = hash.e[0];
+  return result;
+}
+
+DN_API DN_U32 DN_MurmurHash3HashU32FromBytesX64(void const *bytes, int len, DN_U32 seed)
+{
+  DN_MurmurHash3 hash   = DN_MurmurHash3HashU128FromBytesX64(bytes, len, seed);
+  DN_U32         result = DN_Cast(DN_U32)hash.e[0];
+  return result;
+}
+
+static DN_LogEmitFromTypeFVFunc *g_dn_base_log_emit_from_type_fv_func_;
+static void                     *g_dn_base_log_emit_from_type_fv_user_context_;
+DN_API DN_Str8 DN_LogColourEscapeCodeStr8FromRGB(DN_LogColourType colour, DN_U8 r, DN_U8 g, DN_U8 b)
+{
+  DN_THREAD_LOCAL char buffer[32];
+  buffer[0]      = 0;
+  DN_Str8 result = {};
+  result.size    = DN_SNPrintF(buffer,
+                            DN_ArrayCountU(buffer),
+                            "\x1b[%d;2;%u;%u;%um",
+                            colour == DN_LogColourType_Fg ? 38 : 48,
+                            r,
+                            g,
+                            b);
+  result.data    = buffer;
+  return result;
+}
+
+DN_API DN_Str8 DN_LogColourEscapeCodeStr8FromU32(DN_LogColourType colour, DN_U32 value)
+{
+  DN_U8   r      = DN_Cast(DN_U8)(value >> 24);
+  DN_U8   g      = DN_Cast(DN_U8)(value >> 16);
+  DN_U8   b      = DN_Cast(DN_U8)(value >> 8);
+  DN_Str8 result = DN_LogColourEscapeCodeStr8FromRGB(colour, r, g, b);
+  return result;
+}
+
+DN_API DN_LogPrefixSize DN_LogMakePrefix(DN_LogStyle style, DN_LogTypeParam type, DN_CallSite call_site, DN_LogDate date, char *dest, DN_USize dest_size)
+{
+  DN_Str8 type_str8 = type.str8;
+  if (type.is_u32_enum) {
+    switch (type.u32) {
+      case DN_LogType_Debug:   type_str8 = DN_Str8Lit("DEBUG"); break;
+      case DN_LogType_Info:    type_str8 = DN_Str8Lit("INFO "); break;
+      case DN_LogType_Warning: type_str8 = DN_Str8Lit("WARN");  break;
+      case DN_LogType_Error:   type_str8 = DN_Str8Lit("ERROR"); break;
+      case DN_LogType_Count:   type_str8 = DN_Str8Lit("BADXX"); break;
+    }
+  }
+
+  static DN_USize max_type_length = 0;
+  max_type_length                 = DN_Max(max_type_length, type_str8.size);
+  int type_padding                = DN_Cast(int)(max_type_length - type_str8.size);
+
+  DN_Str8 colour_esc = {};
+  DN_Str8 bold_esc   = {};
+  DN_Str8 reset_esc  = {};
+  if (style.colour) {
+    bold_esc   = DN_Str8Lit(DN_LogBoldEscapeCode);
+    reset_esc  = DN_Str8Lit(DN_LogResetEscapeCode);
+    colour_esc = DN_LogColourEscapeCodeStr8FromRGB(DN_LogColourType_Fg, style.r, style.g, style.b);
+  }
+
+  DN_Str8 file_name = DN_Str8FileNameFromPath(call_site.file);
+  DN_GCC_WARNING_PUSH
+  DN_GCC_WARNING_DISABLE(-Wformat)
+  DN_GCC_WARNING_DISABLE(-Wformat-extra-args)
+  DN_MSVC_WARNING_PUSH
+  DN_MSVC_WARNING_DISABLE(4477)
+  int     size      = DN_SNPrintF(dest,
+                         DN_Cast(int)dest_size,
+                         "%04u-%02u-%02uT%02u:%02u:%02u" // date
+                         "%S"                            // colour
+                         "%S"                            // bold
+                         " %S"                           // type
+                         "%.*s"                          // type padding
+                         "%S"                            // reset
+                         " %S"                           // file name
+                         ":%05I32u "                     // line number
+                         ,
+                         date.year,
+                         date.month,
+                         date.day,
+                         date.hour,
+                         date.minute,
+                         date.second,
+                         colour_esc,      // colour
+                         bold_esc,        // bold
+                         type_str8,       // type
+                         DN_Cast(int) type_padding,
+                         "",              // type padding
+                         reset_esc,       // reset
+                         file_name,       // file name
+                         call_site.line); // line number
+  DN_MSVC_WARNING_POP // '%S' requires an argument of type 'wchar_t *', but variadic argument 7 has type 'DN_Str8'
+  DN_GCC_WARNING_POP
+
+  static DN_USize max_header_length  = 0;
+  DN_USize        size_no_ansi_codes = size - colour_esc.size - reset_esc.size - bold_esc.size;
+  max_header_length                  = DN_Max(max_header_length, size_no_ansi_codes);
+  DN_USize header_padding            = max_header_length - size_no_ansi_codes;
+
+  DN_LogPrefixSize result = {};
+  result.size             = size;
+  result.padding          = header_padding;
+  return result;
+}
+
+DN_API void DN_LogSetEmitFromTypeFVFunc(DN_LogEmitFromTypeFVFunc *print_func, void *user_data)
+{
+  g_dn_base_log_emit_from_type_fv_func_         = print_func;
+  g_dn_base_log_emit_from_type_fv_user_context_ = user_data;
+}
+
+DN_API void DN_LogEmitFromType(DN_LogTypeParam type, DN_CallSite call_site, DN_FMT_ATTRIB char const *fmt, ...)
+{
+  DN_LogEmitFromTypeFVFunc *func         = g_dn_base_log_emit_from_type_fv_func_;
+  void                     *user_context = g_dn_base_log_emit_from_type_fv_user_context_;
+  if (func) {
+    va_list args;
+    va_start(args, fmt);
+    func(type, user_context, call_site, fmt, args);
+    va_end(args);
+  }
+}
+
+DN_API DN_LogTypeParam DN_LogMakeU32LogTypeParam(DN_LogType type)
+{
+  DN_LogTypeParam result = {};
+  result.is_u32_enum     = true;
+  result.u32             = type;
   return result;
 }

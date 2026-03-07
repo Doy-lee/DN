@@ -2,8 +2,8 @@
 #define DN_OS_H
 
 #if defined(_CLANGD)
-  #include "../dn_base_inc.h"
-  #include "../dn_os_inc.h"
+  #define DN_H_WITH_OS 1
+  #include "../dn.h"
 #endif
 
 #include <new> // operator new
@@ -123,7 +123,7 @@ struct DN_OSPath
   DN_OSPathLink *head;
   DN_OSPathLink *tail;
   DN_USize       string_size;
-  DN_U16       links_size;
+  DN_U16         links_size;
 };
 
 // NOTE: DN_OSExec
@@ -197,8 +197,7 @@ typedef DN_I32(DN_OSThreadFunc)(struct DN_OSThread *);
 struct DN_OSThread
 {
   DN_Str8x64       name;
-  DN_OSTLS         tls;
-  DN_OSTLSInitArgs tls_init_args;
+  DN_TCCore        context;
   void            *handle;
   DN_U64           thread_id;
   void            *user_context;
@@ -229,7 +228,7 @@ struct DN_OSHttpResponse
   // Synchronous HTTP response uses the TLS scratch arena whereas async
   // calls use their own dedicated arena.
   DN_Arena       tmp_arena;
-  DN_Arena      *tmem_arena;
+  DN_Arena      *scratch_arena;
   DN_Str8Builder builder;
   DN_OSSemaphore on_complete_semaphore;
 
@@ -245,10 +244,9 @@ struct DN_OSHttpResponse
 struct DN_OSCore
 {
   DN_CPUReport                    cpu_report;
-  DN_OSTLS                        tls;                      // Thread local storage state for the main thread.
 
   // NOTE: Logging
-  DN_LOGEmitFromTypeFVFunc *      log_callback;             // Set this pointer to override the logging routine
+  DN_LogEmitFromTypeFVFunc *      log_callback;             // Set this pointer to override the logging routine
   void *                          log_user_data;            // User pointer passed into 'log_callback'
   bool                            log_to_file;              // Output logs to file as well as standard out
   DN_OSFile                       log_file;                 // TODO(dn): Hmmm, how should we do this... ?
@@ -280,13 +278,18 @@ struct DN_OSDiskSpace
   DN_U64 size;
 };
 
+DN_API DN_ArenaMemFuncs          DN_ArenaMemFuncsGet                          (DN_ArenaMemFuncType type);
+DN_API DN_ArenaMemFuncs          DN_ArenaMemFuncsGetDefaults                  ();
+DN_API DN_Arena                  DN_ArenaFromHeap                             (DN_U64 size, DN_ArenaFlags flags);
+DN_API DN_Arena                  DN_ArenaFromVMem                             (DN_U64 reserve, DN_U64 commit, DN_ArenaFlags flags);
+
+
+DN_API DN_Str8                   DN_Str8FromHeapF                             (DN_FMT_ATTRIB char const *fmt, ...);
+DN_API DN_Str8                   DN_Str8FromHeap                              (DN_USize size, DN_ZMem z_mem);
+DN_API DN_Str8                   DN_Str8BuilderBuildFromHeap                  (DN_Str8Builder const *builder);
+
 DN_API void                      DN_OS_EmitLogsWithOSPrintFunctions           (DN_OSCore *os);
 DN_API void                      DN_OS_DumpThreadContextArenaStat             (DN_Str8 file_path);
-
-DN_API DN_Str8                   DN_OS_BytesFromHexPtrArenaFrame              (void const *hex, DN_USize hex_count);
-DN_API DN_Str8                   DN_OS_BytesFromHexStr8ArenaFrame             (DN_Str8 hex);
-DN_API DN_Str8                   DN_OS_HexFromBytesPtrArenaFrame              (void const *bytes, DN_USize bytes_count);
-DN_API DN_Str8                   DN_OS_HexFromBytesPtrArenaTLS                (void const *bytes, DN_USize bytes_count);
 
 DN_API void *                    DN_OS_MemReserve                             (DN_USize size, DN_MemCommit commit, DN_MemPage page_flags);
 DN_API bool                      DN_OS_MemCommit                              (void *ptr, DN_USize size, DN_U32 page_flags);
@@ -312,7 +315,6 @@ DN_API bool                      DN_OS_SetEnvVar                              (D
 DN_API DN_OSDiskSpace            DN_OS_DiskSpace                              (DN_Str8 path);
 DN_API DN_Str8                   DN_OS_EXEPath                                (DN_Arena *arena);
 DN_API DN_Str8                   DN_OS_EXEDir                                 (DN_Arena *arena);
-#define                          DN_OS_EXEDirFromTLS()                        DN_OS_EXEDir(DN_OS_TLSTopArena())
 DN_API void                      DN_OS_SleepMs                                (DN_UInt milliseconds);
 
 DN_API DN_U64                    DN_OS_PerfCounterNow                         ();
@@ -329,28 +331,28 @@ DN_API DN_F64                    DN_OS_TimerUs                                (D
 DN_API DN_F64                    DN_OS_TimerNs                                (DN_OSTimer timer);
 DN_API DN_U64                    DN_OS_EstimateTSCPerSecond                   (uint64_t duration_ms_to_gauge_tsc_frequency);
 
-DN_API bool                      DN_OS_FileCopy                               (DN_Str8 src, DN_Str8 dest, bool overwrite, DN_OSErrSink *err);
-DN_API bool                      DN_OS_FileMove                               (DN_Str8 src, DN_Str8 dest, bool overwrite, DN_OSErrSink *err);
+DN_API bool                      DN_OS_FileCopy                               (DN_Str8 src, DN_Str8 dest, bool overwrite, DN_ErrSink *err);
+DN_API bool                      DN_OS_FileMove                               (DN_Str8 src, DN_Str8 dest, bool overwrite, DN_ErrSink *err);
 
-DN_API DN_OSFile                 DN_OS_FileOpen                               (DN_Str8 path, DN_OSFileOpen open_mode, DN_OSFileAccess access, DN_OSErrSink *err);
-DN_API DN_OSFileRead             DN_OS_FileRead                               (DN_OSFile *file, void *buffer, DN_USize size, DN_OSErrSink *err);
-DN_API bool                      DN_OS_FileWritePtr                           (DN_OSFile *file, void const *data, DN_USize size, DN_OSErrSink *err);
-DN_API bool                      DN_OS_FileWrite                              (DN_OSFile *file, DN_Str8 buffer, DN_OSErrSink *err);
-DN_API bool                      DN_OS_FileWriteFV                            (DN_OSFile *file, DN_OSErrSink *err, DN_FMT_ATTRIB char const *fmt, va_list args);
-DN_API bool                      DN_OS_FileWriteF                             (DN_OSFile *file, DN_OSErrSink *err, DN_FMT_ATTRIB char const *fmt, ...);
-DN_API bool                      DN_OS_FileFlush                              (DN_OSFile *file, DN_OSErrSink *err);
+DN_API DN_OSFile                 DN_OS_FileOpen                               (DN_Str8 path, DN_OSFileOpen open_mode, DN_OSFileAccess access, DN_ErrSink *err);
+DN_API DN_OSFileRead             DN_OS_FileRead                               (DN_OSFile *file, void *buffer, DN_USize size, DN_ErrSink *err);
+DN_API bool                      DN_OS_FileWritePtr                           (DN_OSFile *file, void const *data, DN_USize size, DN_ErrSink *err);
+DN_API bool                      DN_OS_FileWrite                              (DN_OSFile *file, DN_Str8 buffer, DN_ErrSink *err);
+DN_API bool                      DN_OS_FileWriteFV                            (DN_OSFile *file, DN_ErrSink *err, DN_FMT_ATTRIB char const *fmt, va_list args);
+DN_API bool                      DN_OS_FileWriteF                             (DN_OSFile *file, DN_ErrSink *err, DN_FMT_ATTRIB char const *fmt, ...);
+DN_API bool                      DN_OS_FileFlush                              (DN_OSFile *file, DN_ErrSink *err);
 DN_API void                      DN_OS_FileClose                              (DN_OSFile *file);
 
-DN_API DN_Str8                   DN_OS_FileReadAll                            (DN_Allocator alloc_type, void *allocator, DN_Str8 path, DN_OSErrSink *err);
-DN_API DN_Str8                   DN_OS_FileReadAllArena                       (DN_Arena *arena, DN_Str8 path, DN_OSErrSink *err);
-DN_API DN_Str8                   DN_OS_FileReadAllPool                        (DN_Pool *pool, DN_Str8 path, DN_OSErrSink *err);
-DN_API DN_Str8                   DN_OS_FileReadAllTLS                         (DN_Str8 path, DN_OSErrSink *err);
-DN_API bool                      DN_OS_FileWriteAll                           (DN_Str8 path, DN_Str8 buffer, DN_OSErrSink *err);
-DN_API bool                      DN_OS_FileWriteAllFV                         (DN_Str8 path, DN_OSErrSink *err, DN_FMT_ATTRIB char const *fmt, va_list args);
-DN_API bool                      DN_OS_FileWriteAllF                          (DN_Str8 path, DN_OSErrSink *err, DN_FMT_ATTRIB char const *fmt, ...);
-DN_API bool                      DN_OS_FileWriteAllSafe                       (DN_Str8 path, DN_Str8 buffer, DN_OSErrSink *err);
-DN_API bool                      DN_OS_FileWriteAllSafeFV                     (DN_Str8 path, DN_OSErrSink *err, DN_FMT_ATTRIB char const *fmt, va_list args);
-DN_API bool                      DN_OS_FileWriteAllSafeF                      (DN_Str8 path, DN_OSErrSink *err, DN_FMT_ATTRIB char const *fmt, ...);
+DN_API DN_Str8                   DN_OS_FileReadAll                            (DN_Allocator alloc_type, void *allocator, DN_Str8 path, DN_ErrSink *err);
+DN_API DN_Str8                   DN_OS_FileReadAllArena                       (DN_Arena *arena, DN_Str8 path, DN_ErrSink *err);
+DN_API DN_Str8                   DN_OS_FileReadAllPool                        (DN_Pool *pool, DN_Str8 path, DN_ErrSink *err);
+
+DN_API bool                      DN_OS_FileWriteAll                           (DN_Str8 path, DN_Str8 buffer, DN_ErrSink *err);
+DN_API bool                      DN_OS_FileWriteAllFV                         (DN_Str8 path, DN_ErrSink *err, DN_FMT_ATTRIB char const *fmt, va_list args);
+DN_API bool                      DN_OS_FileWriteAllF                          (DN_Str8 path, DN_ErrSink *err, DN_FMT_ATTRIB char const *fmt, ...);
+DN_API bool                      DN_OS_FileWriteAllSafe                       (DN_Str8 path, DN_Str8 buffer, DN_ErrSink *err);
+DN_API bool                      DN_OS_FileWriteAllSafeFV                     (DN_Str8 path, DN_ErrSink *err, DN_FMT_ATTRIB char const *fmt, va_list args);
+DN_API bool                      DN_OS_FileWriteAllSafeF                      (DN_Str8 path, DN_ErrSink *err, DN_FMT_ATTRIB char const *fmt, ...);
 
 DN_API DN_OSPathInfo             DN_OS_PathInfo                               (DN_Str8 path);
 DN_API bool                      DN_OS_PathIsOlderThan                        (DN_Str8 file, DN_Str8 check_against);
@@ -361,42 +363,25 @@ DN_API bool                      DN_OS_PathMakeDir                            (D
 DN_API bool                      DN_OS_PathIterateDir                         (DN_Str8 path, DN_OSDirIterator *it);
 
 DN_API bool                      DN_OS_PathAddRef                             (DN_Arena *arena, DN_OSPath *fs_path, DN_Str8 path);
-DN_API bool                      DN_OS_PathAddRefTLS                          (DN_OSPath *fs_path, DN_Str8 path);
-DN_API bool                      DN_OS_PathAddRefFrame                        (DN_OSPath *fs_path, DN_Str8 path);
 DN_API bool                      DN_OS_PathAdd                                (DN_Arena *arena, DN_OSPath *fs_path, DN_Str8 path);
-#define                          DN_OS_PathAddFromTLS(...)                    DN_OS_PathAdd(DN_OS_TLSTopArena(), ##__VA_ARGS__)
-#define                          DN_OS_PathAddFromFrame(...)                  DN_OS_PathAdd(DN_OS_TLSFrameArena(), ##__VA_ARGS__)
 DN_API bool                      DN_OS_PathAddF                               (DN_Arena *arena, DN_OSPath *fs_path, DN_FMT_ATTRIB char const *fmt, ...);
-#define                          DN_OS_PathAddFFromTLS(...)                   DN_OS_PathAddF(DN_OS_TLSTopArena(), ##__VA_ARGS__)
-#define                          DN_OS_PathAddFFromFrame(...)                 DN_OS_PathAddF(DN_OS_TLSFrameArena(), ##__VA_ARGS__)
 DN_API bool                      DN_OS_PathPop                                (DN_OSPath *fs_path);
 DN_API DN_Str8                   DN_OS_PathBuildWithSeparator                 (DN_Arena *arena, DN_OSPath const *fs_path, DN_Str8 path_separator);
-#define                          DN_OS_PathBuildWithSeperatorFromTLS(...)     DN_OS_PathBuildWithSeperator(DN_OS_TLSTopArena(), ##__VA_ARGS__)
-#define                          DN_OS_PathBuildWithSeperatorFromFrame(...)   DN_OS_PathBuildWithSeperator(DN_OS_TLSFrameArena(), ##__VA_ARGS__)
 DN_API DN_Str8                   DN_OS_PathTo                                 (DN_Arena *arena, DN_Str8 path, DN_Str8 path_separtor);
-#define                          DN_OS_PathToFromTLS(...)                     DN_OS_PathTo(DN_OS_TLSTopArena(), ##__VA_ARGS__)
-#define                          DN_OS_PathToFromFrame(...)                   DN_OS_PathTo(DN_OS_TLSFrameArena(), ##__VA_ARGS__)
 DN_API DN_Str8                   DN_OS_PathToF                                (DN_Arena *arena, DN_Str8 path_separator, DN_FMT_ATTRIB char const *fmt, ...);
-#define                          DN_OS_PathToFFromTLS(...)                    DN_OS_PathToF(DN_OS_TLSTopArena(), ##__VA_ARGS__)
-#define                          DN_OS_PathToFFromFrame(...)                  DN_OS_PathToF(DN_OS_TLSFrameArena(), ##__VA_ARGS__)
 DN_API DN_Str8                   DN_OS_Path                                   (DN_Arena *arena, DN_Str8 path);
-#define                          DN_OS_PathFromTLS(...)                       DN_OS_Path(DN_OS_TLSTopArena(), ##__VA_ARGS__)
-#define                          DN_OS_PathFromFrame(...)                     DN_OS_Path(DN_OS_TLSFrameArena(), ##__VA_ARGS__)
 DN_API DN_Str8                   DN_OS_PathF                                  (DN_Arena *arena, DN_FMT_ATTRIB char const *fmt, ...);
-#define                          DN_OS_PathFFromTLS(...)                      DN_OS_PathF(DN_OS_TLSTopArena(), ##__VA_ARGS__)
-#define                          DN_OS_PathFFromFrame(...)                    DN_OS_PathF(DN_OS_TLSFrameArena(), ##__VA_ARGS__)
 
 #define                          DN_OS_PathBuildFwdSlash(allocator, fs_path)  DN_OS_PathBuildWithSeparator(allocator, fs_path, DN_Str8Lit("/"))
 #define                          DN_OS_PathBuildBackSlash(allocator, fs_path) DN_OS_PathBuildWithSeparator(allocator, fs_path, DN_Str8Lit("\\"))
 #define                          DN_OS_PathBuild(allocator, fs_path)          DN_OS_PathBuildWithSeparator(allocator, fs_path, DN_OSPathSeparatorString)
 
 DN_API void                      DN_OS_Exit                                   (int32_t exit_code);
-DN_API DN_OSExecResult           DN_OS_ExecPump                               (DN_OSExecAsyncHandle handle, char *stdout_buffer, size_t *stdout_size, char *stderr_buffer, size_t *stderr_size, DN_U32 timeout_ms, DN_OSErrSink  *err);
-DN_API DN_OSExecResult           DN_OS_ExecWait                               (DN_OSExecAsyncHandle handle, DN_Arena *arena, DN_OSErrSink *err);
-DN_API DN_OSExecAsyncHandle      DN_OS_ExecAsync                              (DN_Slice<DN_Str8> cmd_line, DN_OSExecArgs *args, DN_OSErrSink *err);
-DN_API DN_OSExecResult           DN_OS_Exec                                   (DN_Slice<DN_Str8> cmd_line, DN_OSExecArgs *args, DN_Arena *arena, DN_OSErrSink *err);
+DN_API DN_OSExecResult           DN_OS_ExecPump                               (DN_OSExecAsyncHandle handle, char *stdout_buffer, size_t *stdout_size, char *stderr_buffer, size_t *stderr_size, DN_U32 timeout_ms, DN_ErrSink  *err);
+DN_API DN_OSExecResult           DN_OS_ExecWait                               (DN_OSExecAsyncHandle handle, DN_Arena *arena, DN_ErrSink *err);
+DN_API DN_OSExecAsyncHandle      DN_OS_ExecAsync                              (DN_Slice<DN_Str8> cmd_line, DN_OSExecArgs *args, DN_ErrSink *err);
+DN_API DN_OSExecResult           DN_OS_Exec                                   (DN_Slice<DN_Str8> cmd_line, DN_OSExecArgs *args, DN_Arena *arena, DN_ErrSink *err);
 DN_API DN_OSExecResult           DN_OS_ExecOrAbort                            (DN_Slice<DN_Str8> cmd_line, DN_OSExecArgs *args, DN_Arena *arena);
-#define                          DN_OS_ExecOrAbortFromTLS                     (...) DN_OS_ExecOrAbort(__VA_ARGS__, DN_OS_TLSTopArena())
 
 DN_API DN_OSSemaphore            DN_OS_SemaphoreInit                          (DN_U32 initial_count);
 DN_API bool                      DN_OS_SemaphoreIsValid                       (DN_OSSemaphore *semaphore);
@@ -426,4 +411,104 @@ DN_API void                      DN_OS_HttpRequestAsync                       (D
 DN_API void                      DN_OS_HttpRequestWait                        (DN_OSHttpResponse *response);
 DN_API void                      DN_OS_HttpRequestFree                        (DN_OSHttpResponse *response);
 DN_API DN_OSHttpResponse         DN_OS_HttpRequest                            (DN_Arena *arena, DN_Str8 host, DN_Str8 path, DN_OSHttpRequestSecure secure, DN_Str8 method, DN_Str8 body, DN_Str8 headers);
+
+// NOTE: DN_OSPrint
+enum DN_OSPrintDest
+{
+  DN_OSPrintDest_Out,
+  DN_OSPrintDest_Err,
+};
+
+// NOTE: Print Macros
+#define DN_OS_PrintOut(string)                       DN_OS_Print(DN_OSPrintDest_Out, string)
+#define DN_OS_PrintOutF(fmt, ...)                    DN_OS_PrintF(DN_OSPrintDest_Out, fmt, ##__VA_ARGS__)
+#define DN_OS_PrintOutFV(fmt, args)                  DN_OS_PrintFV(DN_OSPrintDest_Out, fmt, args)
+
+#define DN_OS_PrintOutStyle(style, string)           DN_OS_PrintStyle(DN_OSPrintDest_Out, style, string)
+#define DN_OS_PrintOutFStyle(style, fmt, ...)        DN_OS_PrintFStyle(DN_OSPrintDest_Out, style, fmt, ##__VA_ARGS__)
+#define DN_OS_PrintOutFVStyle(style, fmt, args, ...) DN_OS_PrintFVStyle(DN_OSPrintDest_Out, style, fmt, args)
+
+#define DN_OS_PrintOutLn(string)                     DN_OS_PrintLn(DN_OSPrintDest_Out, string)
+#define DN_OS_PrintOutLnF(fmt, ...)                  DN_OS_PrintLnF(DN_OSPrintDest_Out, fmt, ##__VA_ARGS__)
+#define DN_OS_PrintOutLnFV(fmt, args)                DN_OS_PrintLnFV(DN_OSPrintDest_Out, fmt, args)
+
+#define DN_OS_PrintOutLnStyle(style, string)         DN_OS_PrintLnStyle(DN_OSPrintDest_Out, style, string);
+#define DN_OS_PrintOutLnFStyle(style, fmt, ...)      DN_OS_PrintLnFStyle(DN_OSPrintDest_Out, style, fmt, ##__VA_ARGS__)
+#define DN_OS_PrintOutLnFVStyle(style, fmt, args)    DN_OS_PrintLnFVStyle(DN_OSPrintDest_Out, style, fmt, args);
+
+#define DN_OS_PrintErr(string)                       DN_OS_Print(DN_OSPrintDest_Err, string)
+#define DN_OS_PrintErrF(fmt, ...)                    DN_OS_PrintF(DN_OSPrintDest_Err, fmt, ##__VA_ARGS__)
+#define DN_OS_PrintErrFV(fmt, args)                  DN_OS_PrintFV(DN_OSPrintDest_Err, fmt, args)
+
+#define DN_OS_PrintErrStyle(style, string)           DN_OS_PrintStyle(DN_OSPrintDest_Err, style, string)
+#define DN_OS_PrintErrFStyle(style, fmt, ...)        DN_OS_PrintFStyle(DN_OSPrintDest_Err, style, fmt, ##__VA_ARGS__)
+#define DN_OS_PrintErrFVStyle(style, fmt, args, ...) DN_OS_PrintFVStyle(DN_OSPrintDest_Err, style, fmt, args)
+
+#define DN_OS_PrintErrLn(string)                     DN_OS_PrintLn(DN_OSPrintDest_Err, string)
+#define DN_OS_PrintErrLnF(fmt, ...)                  DN_OS_PrintLnF(DN_OSPrintDest_Err, fmt, ##__VA_ARGS__)
+#define DN_OS_PrintErrLnFV(fmt, args)                DN_OS_PrintLnFV(DN_OSPrintDest_Err, fmt, args)
+
+#define DN_OS_PrintErrLnStyle(style, string)         DN_OS_PrintLnStyle(DN_OSPrintDest_Err, style, string);
+#define DN_OS_PrintErrLnFStyle(style, fmt, ...)      DN_OS_PrintLnFStyle(DN_OSPrintDest_Err, style, fmt, ##__VA_ARGS__)
+#define DN_OS_PrintErrLnFVStyle(style, fmt, args)    DN_OS_PrintLnFVStyle(DN_OSPrintDest_Err, style, fmt, args);
+
+// NOTE: Print
+DN_API void DN_OS_Print                (DN_OSPrintDest dest, DN_Str8 string);
+DN_API void DN_OS_PrintF               (DN_OSPrintDest dest, DN_FMT_ATTRIB char const *fmt, ...);
+DN_API void DN_OS_PrintFV              (DN_OSPrintDest dest, DN_FMT_ATTRIB char const *fmt, va_list args);
+
+DN_API void DN_OS_PrintStyle           (DN_OSPrintDest dest, DN_LogStyle style, DN_Str8 string);
+DN_API void DN_OS_PrintFStyle          (DN_OSPrintDest dest, DN_LogStyle style, DN_FMT_ATTRIB char const *fmt, ...);
+DN_API void DN_OS_PrintFVStyle         (DN_OSPrintDest dest, DN_LogStyle style, DN_FMT_ATTRIB char const *fmt, va_list args);
+
+DN_API void DN_OS_PrintLn              (DN_OSPrintDest dest, DN_Str8 string);
+DN_API void DN_OS_PrintLnF             (DN_OSPrintDest dest, DN_FMT_ATTRIB char const *fmt, ...);
+DN_API void DN_OS_PrintLnFV            (DN_OSPrintDest dest, DN_FMT_ATTRIB char const *fmt, va_list args);
+
+DN_API void DN_OS_PrintLnStyle         (DN_OSPrintDest dest, DN_LogStyle style, DN_Str8 string);
+DN_API void DN_OS_PrintLnFStyle        (DN_OSPrintDest dest, DN_LogStyle style, DN_FMT_ATTRIB char const *fmt, ...);
+DN_API void DN_OS_PrintLnFVStyle       (DN_OSPrintDest dest, DN_LogStyle style, DN_FMT_ATTRIB char const *fmt, va_list args);
+
+// NOTE: DN_VArray
+// TODO(doyle): Add an API for shrinking the array by decomitting pages back to the OS.
+template <typename T> struct DN_VArray
+{
+  T       *data;   // Pointer to the start of the array items in the block of memory
+  DN_USize size;   // Number of items currently in the array
+  DN_USize max;    // Maximum number of items this array can store
+  DN_USize commit; // Bytes committed
+
+  T       *begin()       { return data; }
+  T       *end  ()       { return data + size; }
+  T const *begin() const { return data; }
+  T const *end  () const { return data + size; }
+};
+
+template <typename T>                           DN_VArray<T>          DN_OS_VArrayInitByteSize          (DN_USize byte_size);
+template <typename T>                           DN_VArray<T>          DN_OS_VArrayInit                  (DN_USize max);
+template <typename T>                           DN_VArray<T>          DN_OS_VArrayInitSlice             (DN_Slice<T> slice, DN_USize max);
+template <typename T, DN_USize N>               DN_VArray<T>          DN_OS_VArrayInitCArray            (T const (&items)[N], DN_USize max);
+template <typename T>                           void                  DN_OS_VArrayDeinit                (DN_VArray<T> *array);
+template <typename T>                           bool                  DN_OS_VArrayIsValid               (DN_VArray<T> const *array);
+template <typename T>                           bool                  DN_OS_VArrayReserve               (DN_VArray<T> *array, DN_USize count);
+template <typename T>                           T *                   DN_OS_VArrayAddArray              (DN_VArray<T> *array, T const *items, DN_USize count);
+template <typename T, DN_USize N>               T *                   DN_OS_VArrayAddCArray             (DN_VArray<T> *array, T const (&items)[N]);
+template <typename T>                           T *                   DN_OS_VArrayAdd                   (DN_VArray<T> *array, T const &item);
+#define                                                               DN_OS_VArrayAddArrayAssert(...)   DN_HardAssert(DN_OS_VArrayAddArray(__VA_ARGS__))
+#define                                                               DN_OS_VArrayAddCArrayAssert(...)  DN_HardAssert(DN_OS_VArrayAddCArray(__VA_ARGS__))
+#define                                                               DN_OS_VArrayAddAssert(...)        DN_HardAssert(DN_OS_VArrayAdd(__VA_ARGS__))
+template <typename T>                           T *                   DN_OS_VArrayMakeArray             (DN_VArray<T> *array, DN_USize count, DN_ZMem z_mem);
+template <typename T>                           T *                   DN_OS_VArrayMake                  (DN_VArray<T> *array, DN_ZMem z_mem);
+#define                                                               DN_OS_VArrayMakeArrayAssert(...)  DN_HardAssert(DN_OS_VArrayMakeArray(__VA_ARGS__))
+#define                                                               DN_OS_VArrayMakeAssert(...)       DN_HardAssert(DN_OS_VArrayMake(__VA_ARGS__))
+template <typename T>                           T *                   DN_OS_VArrayInsertArray           (DN_VArray<T> *array, DN_USize index, T const *items, DN_USize count);
+template <typename T, DN_USize N>               T *                   DN_OS_VArrayInsertCArray          (DN_VArray<T> *array, DN_USize index, T const (&items)[N]);
+template <typename T>                           T *                   DN_OS_VArrayInsert                (DN_VArray<T> *array, DN_USize index, T const &item);
+#define                                                               DN_OS_VArrayInsertArrayAssert(...) DN_HardAssert(DN_OS_VArrayInsertArray(__VA_ARGS__))
+#define                                                               DN_OS_VArrayInsertCArrayAssert(...) DN_HardAssert(DN_OS_VArrayInsertCArray(__VA_ARGS__))
+#define                                                               DN_OS_VArrayInsertAssert(...)     DN_HardAssert(DN_OS_VArrayInsert(__VA_ARGS__))
+template <typename T>                           T                     DN_OS_VArrayPopFront              (DN_VArray<T> *array, DN_USize count);
+template <typename T>                           T                     DN_OS_VArrayPopBack               (DN_VArray<T> *array, DN_USize count);
+template <typename T>                           DN_ArrayEraseResult   DN_OS_VArrayEraseRange            (DN_VArray<T> *array, DN_USize begin_index, DN_ISize count, DN_ArrayErase erase);
+template <typename T>                           void                  DN_OS_VArrayClear                 (DN_VArray<T> *array, DN_ZMem z_mem);
 #endif // !defined(DN_OS_H)

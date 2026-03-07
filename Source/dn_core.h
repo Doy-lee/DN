@@ -2,8 +2,8 @@
 #define DN_INC_H
 
 #if defined(_CLANGD)
-  #include "dn_base_inc.h"
-  #include "dn_os_inc.h"
+  #define DN_H_WITH_OS 1
+  #include "dn.h"
 #endif
 
 struct DN_InitArgs
@@ -38,6 +38,7 @@ struct DN_Core
 extern DN_Core *g_dn_;
 
 DN_API void DN_Init(DN_Core *dn, DN_InitFlags flags, DN_InitArgs *args);
+DN_API void DN_ThreadContextInit();
 DN_API void DN_BeginFrame();
 
 #endif // !defined(DN_INC_H)

@@ -2,7 +2,7 @@
 #define DN_MATH_H
 
 #if defined(_CLANGD)
-  #include "../dn_base_inc.h"
+  #include "../dn.h"
 #endif
 
 DN_MSVC_WARNING_PUSH
@@ -34,25 +34,25 @@ union DN_V2F32
   struct { DN_F32 w, h; };
   DN_F32 data[2];
 };
+DN_DArrayStructDecl(DN_V2F32);
 
 union DN_V3F32
 {
   struct { DN_F32 x, y, z; };
   struct { DN_F32 r, g, b; };
-  DN_F32 data[3];
+  DN_V2F32  xy;
+  DN_F32    data[3];
 };
-
 
 union DN_V4F32
 {
   struct { DN_F32 x, y, z, w; };
   struct { DN_F32 r, g, b, a; };
-  #if !defined(DN_NO_V3)
   DN_V3F32  rgb;
   DN_V3F32  xyz;
-  #endif
-  DN_F32 data[4];
+  DN_F32    data[4];
 };
+DN_DArrayStructDecl(DN_V4F32);
 DN_MSVC_WARNING_POP
 
 struct DN_M4
@@ -137,10 +137,10 @@ DN_API DN_V2I32      DN_V2I32_Min                                (DN_V2I32 a, DN
 DN_API DN_V2I32      DN_V2I32_Max                                (DN_V2I32 a, DN_V2I32 b);
 DN_API DN_V2I32      DN_V2I32_Abs                                (DN_V2I32 a);
 
-#define              DN_V2U16_Zero                               DN_Literal(DN_V2U16){{(uint16_t)(0), (uint16_t)(0)}}
-#define              DN_V2U16_One                                DN_Literal(DN_V2U16){{(uint16_t)(1), (uint16_t)(1)}}
-#define              DN_V2U16_From1N(x)                          DN_Literal(DN_V2U16){{(uint16_t)(x), (uint16_t)(x)}}
-#define              DN_V2U16_From2N(x, y)                       DN_Literal(DN_V2U16){{(uint16_t)(x), (uint16_t)(y)}}
+#define              DN_V2U16_Zero                               DN_Literal(DN_V2U16){{(DN_U16)(0), (DN_U16)(0)}}
+#define              DN_V2U16_One                                DN_Literal(DN_V2U16){{(DN_U16)(1), (DN_U16)(1)}}
+#define              DN_V2U16_From1N(x)                          DN_Literal(DN_V2U16){{(DN_U16)(x), (DN_U16)(x)}}
+#define              DN_V2U16_From2N(x, y)                       DN_Literal(DN_V2U16){{(DN_U16)(x), (DN_U16)(y)}}
 
 DN_API bool          operator!=                                  (DN_V2U16  lhs, DN_V2U16 rhs);
 DN_API bool          operator==                                  (DN_V2U16  lhs, DN_V2U16 rhs);
@@ -164,6 +164,11 @@ DN_API DN_V2U16 &    operator/=                                  (DN_V2U16& lhs,
 DN_API DN_V2U16 &    operator/=                                  (DN_V2U16& lhs, int32_t rhs);
 DN_API DN_V2U16 &    operator-=                                  (DN_V2U16& lhs, DN_V2U16 rhs);
 DN_API DN_V2U16 &    operator+=                                  (DN_V2U16& lhs, DN_V2U16 rhs);
+
+#define              DN_V2U32_Zero                               DN_Literal(DN_V2U32){{(DN_U32)(0), (DN_U32)(0)}}
+#define              DN_V2U32_One                                DN_Literal(DN_V2U32){{(DN_U32)(1), (DN_U32)(1)}}
+#define              DN_V2U32_From1N(x)                          DN_Literal(DN_V2U32){{(DN_U32)(x), (DN_U32)(x)}}
+#define              DN_V2U32_From2N(x, y)                       DN_Literal(DN_V2U32){{(DN_U32)(x), (DN_U32)(y)}}
 
 #define              DN_V2F32_Zero                               DN_Literal(DN_V2F32){{(DN_F32)(0),    (DN_F32)(0)}}
 #define              DN_V2F32_One                                DN_Literal(DN_V2F32){{(DN_F32)(1),    (DN_F32)(1)}}
@@ -315,6 +320,7 @@ DN_API bool          operator==                                  (DN_M2x3 const 
 DN_API bool          operator!=                                  (DN_M2x3 const &lhs, DN_M2x3 const &rhs);
 DN_API DN_M2x3       DN_M2x3_Identity                            ();
 DN_API DN_M2x3       DN_M2x3_Translate                           (DN_V2F32 offset);
+DN_API DN_V2F32      DN_M2x3_ScaleGet                            (DN_M2x3 m2x3);
 DN_API DN_M2x3       DN_M2x3_Scale                               (DN_V2F32 scale);
 DN_API DN_M2x3       DN_M2x3_Rotate                              (DN_F32 radians);
 DN_API DN_M2x3       DN_M2x3_Mul                                 (DN_M2x3 m1, DN_M2x3 m2);
@@ -323,6 +329,7 @@ DN_API DN_V2F32      DN_M2x3_MulV2                               (DN_M2x3 m1, DN
 
 #define              DN_Rect_From2V2(pos, size)                  DN_Literal(DN_Rect){(pos), (size)}
 #define              DN_Rect_From4N(x, y, w, h)                  DN_Literal(DN_Rect){DN_Literal(DN_V2F32){{x, y}}, DN_Literal(DN_V2F32){{w, h}}}
+#define              DN_Rect_Zero                                DN_Rect_From4N(0, 0, 0, 0)
 
 DN_API bool          operator==                                  (const DN_Rect& lhs, const DN_Rect& rhs);
 DN_API DN_V2F32      DN_Rect_Center                              (DN_Rect rect);

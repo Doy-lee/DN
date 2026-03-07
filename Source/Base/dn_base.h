@@ -5,10 +5,173 @@
   #include "../dn.h"
 #endif
 
+// NOTE: Compiler identification
+// Warning! Order is important here, clang-cl on Windows defines _MSC_VER
+#if defined(_MSC_VER)
+  #if defined(__clang__)
+    #define DN_COMPILER_CLANG_CL
+    #define DN_COMPILER_CLANG
+  #else
+    #define DN_COMPILER_MSVC
+  #endif
+#elif defined(__clang__)
+  #define DN_COMPILER_CLANG
+#elif defined(__GNUC__)
+  #define DN_COMPILER_GCC
+#endif
+
+// NOTE: __has_feature
+// MSVC for example does not support the feature detection macro for instance so we compile it out
+#if defined(__has_feature)
+  #define DN_HAS_FEATURE(expr) __has_feature(expr)
+#else
+  #define DN_HAS_FEATURE(expr) 0
+#endif
+
+// NOTE: __has_builtin
+// MSVC for example does not support the feature detection macro for instance so we compile it out
+#if defined(__has_builtin)
+  #define DN_HAS_BUILTIN(expr) __has_builtin(expr)
+#else
+  #define DN_HAS_BUILTIN(expr) 0
+#endif
+
+// NOTE: Warning suppression macros
+#if defined(DN_COMPILER_MSVC)
+  #define DN_MSVC_WARNING_PUSH         __pragma(warning(push))
+  #define DN_MSVC_WARNING_DISABLE(...) __pragma(warning(disable :##__VA_ARGS__))
+  #define DN_MSVC_WARNING_POP          __pragma(warning(pop))
+#else
+  #define DN_MSVC_WARNING_PUSH
+  #define DN_MSVC_WARNING_DISABLE(...)
+  #define DN_MSVC_WARNING_POP
+#endif
+
+#if defined(DN_COMPILER_CLANG) || defined(DN_COMPILER_GCC) || defined(DN_COMPILER_CLANG_CL)
+  #define DN_GCC_WARNING_PUSH                _Pragma("GCC diagnostic push")
+  #define DN_GCC_WARNING_DISABLE_HELPER_0(x) #x
+  #define DN_GCC_WARNING_DISABLE_HELPER_1(y) DN_GCC_WARNING_DISABLE_HELPER_0(GCC diagnostic ignored #y)
+  #define DN_GCC_WARNING_DISABLE(warning)    _Pragma(DN_GCC_WARNING_DISABLE_HELPER_1(warning))
+  #define DN_GCC_WARNING_POP                 _Pragma("GCC diagnostic pop")
+#else
+  #define DN_GCC_WARNING_PUSH
+  #define DN_GCC_WARNING_DISABLE(...)
+  #define DN_GCC_WARNING_POP
+#endif
+
+// NOTE: Host OS identification
+#if defined(_WIN32)
+  #define DN_OS_WIN32
+#elif defined(__gnu_linux__) || defined(__linux__)
+  #define DN_OS_UNIX
+#endif
+
+// NOTE: Platform identification
+#if !defined(DN_PLATFORM_EMSCRIPTEN) && \
+    !defined(DN_PLATFORM_POSIX) &&      \
+    !defined(DN_PLATFORM_WIN32)
+  #if defined(__aarch64__) || defined(_M_ARM64)
+    #define DN_PLATFORM_ARM64
+  #elif defined(__EMSCRIPTEN__)
+    #define DN_PLATFORM_EMSCRIPTEN
+  #elif defined(DN_OS_WIN32)
+    #define DN_PLATFORM_WIN32
+  #else
+    #define DN_PLATFORM_POSIX
+  #endif
+#endif
+
+// NOTE: Windows crap
+#if defined(DN_COMPILER_MSVC) || defined(DN_COMPILER_CLANG_CL)
+  #if defined(_CRT_SECURE_NO_WARNINGS)
+    #define DN_CRT_SECURE_NO_WARNINGS_PREVIOUSLY_DEFINED
+  #else
+    #define _CRT_SECURE_NO_WARNINGS
+  #endif
+#endif
+
+// NOTE: Force Inline
+#if defined(DN_COMPILER_MSVC) || defined(DN_COMPILER_CLANG_CL)
+  #define DN_FORCE_INLINE __forceinline
+#else
+  #define DN_FORCE_INLINE inline __attribute__((always_inline))
+#endif
+
+// NOTE: Function/Variable Annotations
+#if defined(DN_STATIC_API)
+  #define DN_API static
+#else
+  #define DN_API
+#endif
+
+// NOTE: C/CPP Literals
+// Declare struct literals that work in both C and C++ because the syntax is different between
+// languages.
+#if 0
+  struct Foo { int a; }
+  struct Foo foo = DN_LITERAL(Foo){32}; // Works on both C and C++
+#endif
+
+#if defined(__cplusplus)
+  #define DN_Literal(T) T
+#else
+  #define DN_Literal(T) (T)
+#endif
+
+// NOTE: Thread Locals
+#if defined(__cplusplus)
+  #define DN_THREAD_LOCAL thread_local
+#else
+  #define DN_THREAD_LOCAL _Thread_local
+#endif
+
+// NOTE: C variadic argument annotations
+// TODO: Other compilers
+#if defined(DN_COMPILER_MSVC)
+  #define DN_FMT_ATTRIB _Printf_format_string_
+#else
+  #define DN_FMT_ATTRIB
+#endif
+
+// NOTE: Type Cast
+#define DN_Cast(val) (val)
+
+// NOTE: Zero initialisation macro
+#if defined(__cplusplus)
+  #define DN_ZeroInit {}
+#else
+  #define DN_ZeroInit {0}
+#endif
+
+// NOTE: Address sanitizer
+#if !defined(DN_ASAN_POISON)
+  #define DN_ASAN_POISON 0
+#endif
+
+#if !defined(DN_ASAN_VET_POISON)
+  #define DN_ASAN_VET_POISON 0
+#endif
+
+#define DN_ASAN_POISON_ALIGNMENT 8
+
+#if !defined(DN_ASAN_POISON_GUARD_SIZE)
+  #define DN_ASAN_POISON_GUARD_SIZE 128
+#endif
+
+#if DN_HAS_FEATURE(address_sanitizer) || defined(__SANITIZE_ADDRESS__)
+  #include <sanitizer/asan_interface.h>
+#endif
+
 // NOTE: Macros
 #define DN_Stringify(x) #x
 #define DN_TokenCombine2(x, y) x ## y
 #define DN_TokenCombine(x, y) DN_TokenCombine2(x, y)
+
+#if defined(__aarch64__) || defined(_M_X64) || defined(__x86_64__) || defined(__x86_64)
+  #define DN_64_BIT
+#else
+  #define DN_32_BIT
+#endif
 
 #include <stdarg.h> // va_list
 #include <stdio.h>
@@ -70,8 +233,8 @@
 // NOTE: Math
 #define DN_PiF32 3.14159265359f
 
-#define DN_DegreesToRadians(degrees) ((degrees) * (DN_PI / 180.0f))
-#define DN_RadiansToDegrees(radians) ((radians) * (180.f * DN_PI))
+#define DN_DegreesToRadsF32(degrees) ((degrees) * (DN_PiF32 / 180.0f))
+#define DN_RadsToDegreesF32(radians) ((radians) * (180.f * DN_PiF32))
 
 #define DN_Abs(val) (((val) < 0) ? (-(val)) : (val))
 #define DN_Max(a, b) (((a) > (b)) ? (a) : (b))
@@ -138,6 +301,23 @@
                               ((((u64) >> 8)  & 0xFF) << 48) | \
                               ((((u64) >> 0)  & 0xFF) << 56))
 
+// NOTE: Helper macros to declare an array data structure for a given `Type`
+#define DN_DArrayStructDecl(Type) \
+  struct Type##Array             \
+  {                              \
+    Type*    data;               \
+    DN_USize count;              \
+    DN_USize max;                \
+  }
+
+#define DN_FixedArrayStructDecl(Type, capacity) \
+  struct Type##x##capacity##Array \
+  {                               \
+    Type     data[capacity];      \
+    DN_USize count;               \
+    DN_USize max;                 \
+  }
+
 // NOTE: Types
 typedef intptr_t     DN_ISize;
 typedef uintptr_t    DN_USize;
@@ -176,6 +356,12 @@ struct DN_Str8
 {
   char    *data; // The bytes of the string
   DN_USize size; // The number of bytes in the string
+};
+
+struct DN_Str8Slice
+{
+  DN_Str8 *data;
+  DN_USize count;
 };
 
 struct DN_Str8x16  { char data[16];  DN_USize size; };
@@ -314,7 +500,7 @@ struct DN_DeferHelper
   #error "Compiler not supported"
 #endif
 
-#if defined(__aarch64__) || defined(_M_X64) || defined(__x86_64__) || defined(__x86_64)
+#if defined(DN_64_BIT)
   #define DN_CountLeadingZerosUSize(value) DN_CountLeadingZerosU64(value)
 #else
   #define DN_CountLeadingZerosUSize(value) DN_CountLeadingZerosU32(value)
@@ -516,6 +702,7 @@ enum DN_ArenaFlags_
   DN_ArenaFlags_NoPoison     = 1 << 1,
   DN_ArenaFlags_NoAllocTrack = 1 << 2,
   DN_ArenaFlags_AllocCanLeak = 1 << 3,
+  DN_ArenaFlags_SimAlloc     = 1 << 4,
 
   // NOTE: Internal flags. Do not use
   DN_ArenaFlags_UserBuffer   = 1 << 4,
@@ -823,6 +1010,172 @@ struct DN_Profiler
   DN_F64                 frame_avg_tsc;
 };
 
+enum DN_ErrSinkMode
+{
+  DN_ErrSinkMode_Nil,                  // Default behaviour to accumulate errors into the sink
+  DN_ErrSinkMode_DebugBreakOnErrorLog, // Debug break (int3) when error is encountered and the sink is ended by the 'end and log' functions.
+  DN_ErrSinkMode_ExitOnError,          // When an error is encountered, exit the program with the error code of the error that was caught.
+};
+
+struct DN_ErrSinkMsg
+{
+  DN_I32         error_code;
+  DN_Str8        msg;
+  DN_CallSite    call_site;
+  DN_ErrSinkMsg *next;
+  DN_ErrSinkMsg *prev;
+};
+
+struct DN_ErrSinkNode
+{
+  DN_CallSite    call_site;    // Call site that the node was created
+  DN_ErrSinkMode mode;         // Controls how the sink behaves when an error is registered onto the sink.
+  DN_ErrSinkMsg *msg_sentinel; // List of error messages accumulated for the current scope
+  DN_U64         arena_pos;    // Position to reset the arena when the scope is ended
+};
+
+struct DN_ErrSink
+{
+  DN_Arena*      arena;      // Dedicated allocator from the thread's local storage
+  DN_ErrSinkNode stack[128]; // Each entry contains errors accumulated between a [begin, end] region of the active sink.
+  DN_USize       stack_size;
+};
+
+struct DN_TCScratch
+{
+  DN_Arena*       arena;
+  DN_ArenaTempMem temp_mem;
+  DN_B32          destructed;
+};
+
+#if defined(__cplusplus)
+struct DN_TCScratchCpp
+{
+  DN_TCScratchCpp(DN_Arena **conflicts, DN_USize count);
+  ~DN_TCScratchCpp();
+  DN_TCScratch data;
+};
+#endif
+
+struct DN_TCInitArgs
+{
+  DN_U64 main_reserve;
+  DN_U64 main_commit;
+  DN_U64 temp_reserve;
+  DN_U64 temp_commit;
+  DN_U64 err_sink_reserve;
+  DN_U64 err_sink_commit;
+};
+
+struct DN_TCCore // (T)hread (C)ontext sitting in thread-local storage
+{
+  DN_Str8x64  name;
+  DN_U64      thread_id;
+  DN_CallSite call_site;
+
+  DN_Arena    main_arena_;
+  DN_Arena    temp_a_arena_;
+  DN_Arena    temp_b_arena_;
+  DN_Arena    err_sink_arena_;
+
+  DN_Arena*   main_arena;
+  DN_Arena*   temp_a_arena;
+  DN_Arena*   temp_b_arena;
+  DN_ErrSink  err_sink;
+
+  DN_Arena*   frame_arena;
+};
+
+struct DN_PCG32       { DN_U64 state; };
+struct DN_MurmurHash3 { DN_U64 e[2]; };
+
+enum DN_LogType
+{
+  DN_LogType_Debug,
+  DN_LogType_Info,
+  DN_LogType_Warning,
+  DN_LogType_Error,
+  DN_LogType_Count,
+};
+
+enum DN_LogBold
+{
+  DN_LogBold_No,
+  DN_LogBold_Yes,
+};
+
+struct DN_LogStyle
+{
+  DN_LogBold bold;
+  bool       colour;
+  DN_U8      r, g, b;
+};
+
+struct DN_LogTypeParam
+{
+  bool    is_u32_enum;
+  DN_U32  u32;
+  DN_Str8 str8;
+};
+
+enum DN_LogColourType
+{
+  DN_LogColourType_Fg,
+  DN_LogColourType_Bg,
+};
+
+struct DN_LogDate
+{
+  DN_U16 year;
+  DN_U8  month;
+  DN_U8  day;
+
+  DN_U8 hour;
+  DN_U8 minute;
+  DN_U8 second;
+};
+
+struct DN_LogPrefixSize
+{
+  DN_USize size;
+  DN_USize padding;
+};
+
+struct DN_StackTraceFrame
+{
+  DN_U64  address;
+  DN_U64  line_number;
+  DN_Str8 file_name;
+  DN_Str8 function_name;
+};
+
+struct DN_StackTraceFrameSlice
+{
+  DN_StackTraceFrame *data;
+  DN_USize            count;
+};
+
+struct DN_StackTraceRawFrame
+{
+  void  *process;
+  DN_U64 base_addr;
+};
+
+struct DN_StackTraceWalkResult
+{
+  void   *process;   // [Internal] Windows handle to the process
+  DN_U64 *base_addr; // The addresses of the functions in the stack trace
+  DN_U16  size;      // The number of `base_addr`'s stored from the walk
+};
+
+struct DN_StackTraceWalkResultIterator
+{
+  DN_StackTraceRawFrame raw_frame;
+  DN_U16                index;
+};
+
+typedef void DN_LogEmitFromTypeFVFunc(DN_LogTypeParam type, void *user_data, DN_CallSite call_site, DN_FMT_ATTRIB char const *fmt, va_list args);
+
 #if !defined(DN_STB_SPRINTF_HEADER_ONLY)
   #define STB_SPRINTF_IMPLEMENTATION
   #define STB_SPRINTF_STATIC
@@ -836,326 +1189,448 @@ DN_GCC_WARNING_DISABLE(-Wunused-function)
 DN_GCC_WARNING_POP
 DN_MSVC_WARNING_POP
 
-DN_API void                     DN_BeginFrame               ();
+DN_API void                     DN_BeginFrame                                          ();
 
-#define                         DN_SPrintF(...)             STB_SPRINTF_DECORATE(sprintf)(__VA_ARGS__)
-#define                         DN_SNPrintF(...)            STB_SPRINTF_DECORATE(snprintf)(__VA_ARGS__)
-#define                         DN_VSPrintF(...)            STB_SPRINTF_DECORATE(vsprintf)(__VA_ARGS__)
-#define                         DN_VSNPrintF(...)           STB_SPRINTF_DECORATE(vsnprintf)(__VA_ARGS__)
+#define                         DN_SPrintF(...)                                        STB_SPRINTF_DECORATE(sprintf)(__VA_ARGS__)
+#define                         DN_SNPrintF(...)                                       STB_SPRINTF_DECORATE(snprintf)(__VA_ARGS__)
+#define                         DN_VSPrintF(...)                                       STB_SPRINTF_DECORATE(vsprintf)(__VA_ARGS__)
+#define                         DN_VSNPrintF(...)                                      STB_SPRINTF_DECORATE(vsnprintf)(__VA_ARGS__)
 
-DN_API bool                     DN_MemEq                    (void const *lhs, DN_USize lhs_size, void const *rhs, DN_USize rhs_size);
+DN_API bool                     DN_MemEq                                               (void const *lhs, DN_USize lhs_size, void const *rhs, DN_USize rhs_size);
 
-DN_API DN_U64                   DN_AtomicSetValue64         (DN_U64 volatile *target, DN_U64 value);
-DN_API DN_U32                   DN_AtomicSetValue32         (DN_U32 volatile *target, DN_U32 value);
+DN_API DN_U64                   DN_AtomicSetValue64                                    (DN_U64 volatile *target, DN_U64 value);
+DN_API DN_U32                   DN_AtomicSetValue32                                    (DN_U32 volatile *target, DN_U32 value);
+DN_API DN_USize                 DN_AlignUpPowerOfTwoUSize                              (DN_USize val);
+DN_API DN_U64                   DN_AlignUpPowerOfTwoU64                                (DN_U64 val);
+DN_API DN_U32                   DN_AlignUpPowerOfTwoU32                                (DN_U32 val);
 
-DN_API DN_CPUIDResult           DN_CPUID                    (DN_CPUIDArgs args);
-DN_API DN_USize                 DN_CPUHasFeatureArray       (DN_CPUReport const *report, DN_CPUFeatureQuery *features, DN_USize features_size);
-DN_API bool                     DN_CPUHasFeature            (DN_CPUReport const *report, DN_CPUFeature feature);
-DN_API bool                     DN_CPUHasAllFeatures        (DN_CPUReport const *report, DN_CPUFeature const *features, DN_USize features_size);
-DN_API void                     DN_CPUSetFeature            (DN_CPUReport *report, DN_CPUFeature feature);
-DN_API DN_CPUReport             DN_CPUGetReport             ();
+DN_API DN_CPUIDResult           DN_CPUID                                               (DN_CPUIDArgs args);
+DN_API DN_USize                 DN_CPUHasFeatureArray                                  (DN_CPUReport const *report, DN_CPUFeatureQuery *features, DN_USize features_size);
+DN_API bool                     DN_CPUHasFeature                                       (DN_CPUReport const *report, DN_CPUFeature feature);
+DN_API bool                     DN_CPUHasAllFeatures                                   (DN_CPUReport const *report, DN_CPUFeature const *features, DN_USize features_size);
+DN_API void                     DN_CPUSetFeature                                       (DN_CPUReport *report, DN_CPUFeature feature);
+DN_API DN_CPUReport             DN_CPUGetReport                                        ();
 
-DN_API void                     DN_TicketMutex_Begin        (DN_TicketMutex *mutex);
-DN_API void                     DN_TicketMutex_End          (DN_TicketMutex *mutex);
-DN_API DN_UInt                  DN_TicketMutex_MakeTicket   (DN_TicketMutex *mutex);
-DN_API void                     DN_TicketMutex_BeginTicket  (DN_TicketMutex const *mutex, DN_UInt ticket);
-DN_API bool                     DN_TicketMutex_CanLock      (DN_TicketMutex const *mutex, DN_UInt ticket);
+DN_API void                     DN_TicketMutex_Begin                                   (DN_TicketMutex *mutex);
+DN_API void                     DN_TicketMutex_End                                     (DN_TicketMutex *mutex);
+DN_API DN_UInt                  DN_TicketMutex_MakeTicket                              (DN_TicketMutex *mutex);
+DN_API void                     DN_TicketMutex_BeginTicket                             (DN_TicketMutex const *mutex, DN_UInt ticket);
+DN_API bool                     DN_TicketMutex_CanLock                                 (DN_TicketMutex const *mutex, DN_UInt ticket);
 
-DN_API void                     DN_BitUnsetInplace          (DN_USize *flags, DN_USize bitfield);
-DN_API void                     DN_BitSetInplace            (DN_USize *flags, DN_USize bitfield);
-DN_API bool                     DN_BitIsSet                 (DN_USize bits, DN_USize bits_to_set);
-DN_API bool                     DN_BitIsNotSet              (DN_USize bits, DN_USize bits_to_check);
-#define                         DN_BitClearNextLSB(value)   (value) & ((value) - 1)
+DN_API void                     DN_BitUnsetInplace                                     (DN_USize *flags, DN_USize bitfield);
+DN_API void                     DN_BitSetInplace                                       (DN_USize *flags, DN_USize bitfield);
+DN_API bool                     DN_BitIsSet                                            (DN_USize bits, DN_USize bits_to_set);
+DN_API bool                     DN_BitIsNotSet                                         (DN_USize bits, DN_USize bits_to_check);
+#define                         DN_BitClearNextLSB(value)                              (value) & ((value) - 1)
 
-DN_API DN_I64                   DN_SafeAddI64               (DN_I64 a,  DN_I64 b);
-DN_API DN_I64                   DN_SafeMulI64               (DN_I64 a,  DN_I64 b);
+DN_API DN_I64                   DN_SafeAddI64                                          (DN_I64 a,  DN_I64 b);
+DN_API DN_I64                   DN_SafeMulI64                                          (DN_I64 a,  DN_I64 b);
 
-DN_API DN_U64                   DN_SafeAddU64               (DN_U64 a, DN_U64 b);
-DN_API DN_U64                   DN_SafeMulU64               (DN_U64 a, DN_U64 b);
+DN_API DN_U64                   DN_SafeAddU64                                          (DN_U64 a, DN_U64 b);
+DN_API DN_U64                   DN_SafeMulU64                                          (DN_U64 a, DN_U64 b);
 
-DN_API DN_U64                   DN_SafeSubU64               (DN_U64 a, DN_U64 b);
-DN_API DN_U32                   DN_SafeSubU32               (DN_U32 a, DN_U32 b);
+DN_API DN_U64                   DN_SafeSubU64                                          (DN_U64 a, DN_U64 b);
+DN_API DN_U32                   DN_SafeSubU32                                          (DN_U32 a, DN_U32 b);
 
-DN_API int                      DN_SaturateCastUSizeToInt   (DN_USize val);
-DN_API DN_I8                    DN_SaturateCastUSizeToI8    (DN_USize val);
-DN_API DN_I16                   DN_SaturateCastUSizeToI16   (DN_USize val);
-DN_API DN_I32                   DN_SaturateCastUSizeToI32   (DN_USize val);
-DN_API DN_I64                   DN_SaturateCastUSizeToI64   (DN_USize val);
+DN_API int                      DN_SaturateCastUSizeToInt                              (DN_USize val);
+DN_API DN_I8                    DN_SaturateCastUSizeToI8                               (DN_USize val);
+DN_API DN_I16                   DN_SaturateCastUSizeToI16                              (DN_USize val);
+DN_API DN_I32                   DN_SaturateCastUSizeToI32                              (DN_USize val);
+DN_API DN_I64                   DN_SaturateCastUSizeToI64                              (DN_USize val);
 
-DN_API int                      DN_SaturateCastU64ToInt     (DN_U64 val);
-DN_API DN_I8                    DN_SaturateCastU8ToI8       (DN_U64 val);
-DN_API DN_I16                   DN_SaturateCastU16ToI16     (DN_U64 val);
-DN_API DN_I32                   DN_SaturateCastU32ToI32     (DN_U64 val);
-DN_API DN_I64                   DN_SaturateCastU64ToI64     (DN_U64 val);
-DN_API DN_UInt                  DN_SaturateCastU64ToUInt    (DN_U64 val);
-DN_API DN_U8                    DN_SaturateCastU64ToU8      (DN_U64 val);
-DN_API DN_U16                   DN_SaturateCastU64ToU16     (DN_U64 val);
-DN_API DN_U32                   DN_SaturateCastU64ToU32     (DN_U64 val);
+DN_API int                      DN_SaturateCastU64ToInt                                (DN_U64 val);
+DN_API DN_I8                    DN_SaturateCastU8ToI8                                  (DN_U64 val);
+DN_API DN_I16                   DN_SaturateCastU16ToI16                                (DN_U64 val);
+DN_API DN_I32                   DN_SaturateCastU32ToI32                                (DN_U64 val);
+DN_API DN_I64                   DN_SaturateCastU64ToI64                                (DN_U64 val);
+DN_API DN_UInt                  DN_SaturateCastU64ToUInt                               (DN_U64 val);
+DN_API DN_U8                    DN_SaturateCastU64ToU8                                 (DN_U64 val);
+DN_API DN_U16                   DN_SaturateCastU64ToU16                                (DN_U64 val);
+DN_API DN_U32                   DN_SaturateCastU64ToU32                                (DN_U64 val);
 
-DN_API DN_U8                    DN_SaturateCastUSizeToU8    (DN_USize val);
-DN_API DN_U16                   DN_SaturateCastUSizeToU16   (DN_USize val);
-DN_API DN_U32                   DN_SaturateCastUSizeToU32   (DN_USize val);
-DN_API DN_U64                   DN_SaturateCastUSizeToU64   (DN_USize val);
+DN_API DN_U8                    DN_SaturateCastUSizeToU8                               (DN_USize val);
+DN_API DN_U16                   DN_SaturateCastUSizeToU16                              (DN_USize val);
+DN_API DN_U32                   DN_SaturateCastUSizeToU32                              (DN_USize val);
+DN_API DN_U64                   DN_SaturateCastUSizeToU64                              (DN_USize val);
 
-DN_API int                      DN_SaturateCastISizeToInt   (DN_ISize val);
-DN_API DN_I8                    DN_SaturateCastISizeToI8    (DN_ISize val);
-DN_API DN_I16                   DN_SaturateCastISizeToI16   (DN_ISize val);
-DN_API DN_I32                   DN_SaturateCastISizeToI32   (DN_ISize val);
-DN_API DN_I64                   DN_SaturateCastISizeToI64   (DN_ISize val);
+DN_API int                      DN_SaturateCastISizeToInt                              (DN_ISize val);
+DN_API DN_I8                    DN_SaturateCastISizeToI8                               (DN_ISize val);
+DN_API DN_I16                   DN_SaturateCastISizeToI16                              (DN_ISize val);
+DN_API DN_I32                   DN_SaturateCastISizeToI32                              (DN_ISize val);
+DN_API DN_I64                   DN_SaturateCastISizeToI64                              (DN_ISize val);
 
-DN_API DN_UInt                  DN_SaturateCastISizeToUInt  (DN_ISize val);
-DN_API DN_U8                    DN_SaturateCastISizeToU8    (DN_ISize val);
-DN_API DN_U16                   DN_SaturateCastISizeToU16   (DN_ISize val);
-DN_API DN_U32                   DN_SaturateCastISizeToU32   (DN_ISize val);
-DN_API DN_U64                   DN_SaturateCastISizeToU64   (DN_ISize val);
+DN_API DN_UInt                  DN_SaturateCastISizeToUInt                             (DN_ISize val);
+DN_API DN_U8                    DN_SaturateCastISizeToU8                               (DN_ISize val);
+DN_API DN_U16                   DN_SaturateCastISizeToU16                              (DN_ISize val);
+DN_API DN_U32                   DN_SaturateCastISizeToU32                              (DN_ISize val);
+DN_API DN_U64                   DN_SaturateCastISizeToU64                              (DN_ISize val);
 
-DN_API DN_ISize                 DN_SaturateCastI64ToISize   (DN_I64 val);
-DN_API DN_I8                    DN_SaturateCastI64ToI8      (DN_I64 val);
-DN_API DN_I16                   DN_SaturateCastI64ToI16     (DN_I64 val);
-DN_API DN_I32                   DN_SaturateCastI64ToI32     (DN_I64 val);
+DN_API DN_ISize                 DN_SaturateCastI64ToISize                              (DN_I64 val);
+DN_API DN_I8                    DN_SaturateCastI64ToI8                                 (DN_I64 val);
+DN_API DN_I16                   DN_SaturateCastI64ToI16                                (DN_I64 val);
+DN_API DN_I32                   DN_SaturateCastI64ToI32                                (DN_I64 val);
 
-DN_API DN_UInt                  DN_SaturateCastI64ToUInt    (DN_I64 val);
-DN_API DN_ISize                 DN_SaturateCastI64ToUSize   (DN_I64 val);
-DN_API DN_U8                    DN_SaturateCastI64ToU8      (DN_I64 val);
-DN_API DN_U16                   DN_SaturateCastI64ToU16     (DN_I64 val);
-DN_API DN_U32                   DN_SaturateCastI64ToU32     (DN_I64 val);
-DN_API DN_U64                   DN_SaturateCastI64ToU64     (DN_I64 val);
+DN_API DN_UInt                  DN_SaturateCastI64ToUInt                               (DN_I64 val);
+DN_API DN_ISize                 DN_SaturateCastI64ToUSize                              (DN_I64 val);
+DN_API DN_U8                    DN_SaturateCastI64ToU8                                 (DN_I64 val);
+DN_API DN_U16                   DN_SaturateCastI64ToU16                                (DN_I64 val);
+DN_API DN_U32                   DN_SaturateCastI64ToU32                                (DN_I64 val);
+DN_API DN_U64                   DN_SaturateCastI64ToU64                                (DN_I64 val);
 
-DN_API DN_I8                    DN_SaturateCastIntToI8      (int val);
-DN_API DN_I16                   DN_SaturateCastIntToI16     (int val);
-DN_API DN_U8                    DN_SaturateCastIntToU8      (int val);
-DN_API DN_U16                   DN_SaturateCastIntToU16     (int val);
-DN_API DN_U32                   DN_SaturateCastIntToU32     (int val);
-DN_API DN_U64                   DN_SaturateCastIntToU64     (int val);
+DN_API DN_I8                    DN_SaturateCastIntToI8                                 (int val);
+DN_API DN_I16                   DN_SaturateCastIntToI16                                (int val);
+DN_API DN_U8                    DN_SaturateCastIntToU8                                 (int val);
+DN_API DN_U16                   DN_SaturateCastIntToU16                                (int val);
+DN_API DN_U32                   DN_SaturateCastIntToU32                                (int val);
+DN_API DN_U64                   DN_SaturateCastIntToU64                                (int val);
 
-DN_API void                     DN_ASanPoisonMemoryRegion   (void const volatile *ptr, DN_USize size);
-DN_API void                     DN_ASanUnpoisonMemoryRegion (void const volatile *ptr, DN_USize size);
+DN_API void                     DN_ASanPoisonMemoryRegion                              (void const volatile *ptr, DN_USize size);
+DN_API void                     DN_ASanUnpoisonMemoryRegion                            (void const volatile *ptr, DN_USize size);
 
-DN_API DN_F32                   DN_EpsilonClampF32          (DN_F32 value, DN_F32 target, DN_F32 epsilon);
+DN_API DN_F32                   DN_EpsilonClampF32                                     (DN_F32 value, DN_F32 target, DN_F32 epsilon);
 
-DN_API DN_Arena                 DN_ArenaFromBuffer          (void *buffer, DN_USize size, DN_ArenaFlags flags);
-DN_API DN_Arena                 DN_ArenaFromMemFuncs        (DN_U64 reserve, DN_U64 commit, DN_ArenaFlags flags, DN_ArenaMemFuncs mem_funcs);
-DN_API void                     DN_ArenaDeinit              (DN_Arena *arena);
-DN_API bool                     DN_ArenaCommit              (DN_Arena *arena, DN_U64 size);
-DN_API bool                     DN_ArenaCommitTo            (DN_Arena *arena, DN_U64 pos);
-DN_API bool                     DN_ArenaGrow                (DN_Arena *arena, DN_U64 reserve, DN_U64 commit);
-DN_API void *                   DN_ArenaAlloc               (DN_Arena *arena, DN_U64 size, uint8_t align, DN_ZMem zmem);
-DN_API void *                   DN_ArenaAllocContiguous     (DN_Arena *arena, DN_U64 size, uint8_t align, DN_ZMem zmem);
-DN_API void *                   DN_ArenaCopy                (DN_Arena *arena, void const *data, DN_U64 size, uint8_t align);
-DN_API void                     DN_ArenaPopTo               (DN_Arena *arena, DN_U64 init_used);
-DN_API void                     DN_ArenaPop                 (DN_Arena *arena, DN_U64 amount);
-DN_API DN_U64                   DN_ArenaPos                 (DN_Arena const *arena);
-DN_API void                     DN_ArenaClear               (DN_Arena *arena);
-DN_API bool                     DN_ArenaOwnsPtr             (DN_Arena const *arena, void *ptr);
-DN_API DN_Str8x64               DN_ArenaInfoStr8x64         (DN_ArenaInfo info);
-DN_API DN_ArenaStats            DN_ArenaSumStatsArray       (DN_ArenaStats const *array, DN_USize size);
-DN_API DN_ArenaStats            DN_ArenaSumStats            (DN_ArenaStats lhs, DN_ArenaStats rhs);
-DN_API DN_ArenaStats            DN_ArenaSumArenaArrayToStats(DN_Arena const *array, DN_USize size);
-DN_API DN_ArenaTempMem          DN_ArenaTempMemBegin        (DN_Arena *arena);
-DN_API void                     DN_ArenaTempMemEnd          (DN_ArenaTempMem mem);
-#define                         DN_ArenaNew(arena, T, zmem)                (T *)DN_ArenaAlloc(arena, sizeof(T), alignof(T), zmem)
-#define                         DN_ArenaNewZ(arena, T)                     (T *)DN_ArenaAlloc(arena, sizeof(T), alignof(T), DN_ZMem_Yes)
+DN_API DN_Arena                 DN_ArenaFromBuffer                                     (void *buffer, DN_USize size, DN_ArenaFlags flags);
+DN_API DN_Arena                 DN_ArenaFromMemFuncs                                   (DN_U64 reserve, DN_U64 commit, DN_ArenaFlags flags, DN_ArenaMemFuncs mem_funcs);
+DN_API void                     DN_ArenaDeinit                                         (DN_Arena *arena);
+DN_API bool                     DN_ArenaCommit                                         (DN_Arena *arena, DN_U64 size);
+DN_API bool                     DN_ArenaCommitTo                                       (DN_Arena *arena, DN_U64 pos);
+DN_API bool                     DN_ArenaGrow                                           (DN_Arena *arena, DN_U64 reserve, DN_U64 commit);
+DN_API void *                   DN_ArenaAlloc                                          (DN_Arena *arena, DN_U64 size, uint8_t align, DN_ZMem zmem);
+DN_API void *                   DN_ArenaAllocContiguous                                (DN_Arena *arena, DN_U64 size, uint8_t align, DN_ZMem zmem);
+DN_API void *                   DN_ArenaCopy                                           (DN_Arena *arena, void const *data, DN_U64 size, uint8_t align);
+DN_API void                     DN_ArenaPopTo                                          (DN_Arena *arena, DN_U64 init_used);
+DN_API void                     DN_ArenaPop                                            (DN_Arena *arena, DN_U64 amount);
+DN_API DN_U64                   DN_ArenaPos                                            (DN_Arena const *arena);
+DN_API void                     DN_ArenaClear                                          (DN_Arena *arena);
+DN_API bool                     DN_ArenaOwnsPtr                                        (DN_Arena const *arena, void *ptr);
+DN_API DN_Str8x64               DN_ArenaInfoStr8x64                                    (DN_ArenaInfo info);
+DN_API DN_ArenaStats            DN_ArenaSumStatsArray                                  (DN_ArenaStats const *array, DN_USize size);
+DN_API DN_ArenaStats            DN_ArenaSumStats                                       (DN_ArenaStats lhs, DN_ArenaStats rhs);
+DN_API DN_ArenaStats            DN_ArenaSumArenaArrayToStats                           (DN_Arena const *array, DN_USize size);
+DN_API DN_ArenaTempMem          DN_ArenaTempMemBegin                                   (DN_Arena *arena);
+DN_API void                     DN_ArenaTempMemEnd                                     (DN_ArenaTempMem mem);
+#define                         DN_ArenaNew(arena, T, zmem)                            (T *)DN_ArenaAlloc(arena, sizeof(T), alignof(T), zmem)
+#define                         DN_ArenaNewZ(arena, T)                                 (T *)DN_ArenaAlloc(arena, sizeof(T), alignof(T), DN_ZMem_Yes)
 
-#define                         DN_ArenaNewContiguous(arena, T, zmem)      (T *)DN_ArenaAllocContiguous(arena, sizeof(T), alignof(T), zmem)
-#define                         DN_ArenaNewContiguousZ(arena, T)           (T *)DN_ArenaAllocContiguous(arena, sizeof(T), alignof(T), DN_ZMem_Yes)
+#define                         DN_ArenaNewContiguous(arena, T, zmem)                  (T *)DN_ArenaAllocContiguous(arena, sizeof(T), alignof(T), zmem)
+#define                         DN_ArenaNewContiguousZ(arena, T)                       (T *)DN_ArenaAllocContiguous(arena, sizeof(T), alignof(T), DN_ZMem_Yes)
 
-#define                         DN_ArenaNewArray(arena, T, count, zmem)    (T *)DN_ArenaAlloc(arena, sizeof(T) * (count), alignof(T), zmem)
-#define                         DN_ArenaNewArrayZ(arena, T, count)         (T *)DN_ArenaAlloc(arena, sizeof(T) * (count), alignof(T), DN_ZMem_Yes)
+#define                         DN_ArenaNewArray(arena, T, count, zmem)                (T *)DN_ArenaAlloc(arena, sizeof(T) * (count), alignof(T), zmem)
+#define                         DN_ArenaNewArrayZ(arena, T, count)                     (T *)DN_ArenaAlloc(arena, sizeof(T) * (count), alignof(T), DN_ZMem_Yes)
 
-#define                         DN_ArenaNewCopy(arena, T, src)             (T *)DN_ArenaCopy (arena, (src),                sizeof(T),            alignof(T))
-#define                         DN_ArenaNewArrayCopy(arena, T, src, count) (T *)DN_ArenaCopy (arena, (src),                sizeof(T)  * (count), alignof(T))
+#define                         DN_ArenaNewCopy(arena, T, src)                         (T *)DN_ArenaCopy (arena, (src),                sizeof(T),            alignof(T))
+#define                         DN_ArenaNewArrayCopy(arena, T, src, count)             (T *)DN_ArenaCopy (arena, (src),                sizeof(T)  * (count), alignof(T))
 
-DN_API DN_Pool                  DN_PoolFromArena            (DN_Arena *arena, DN_U8 align);
-DN_API bool                     DN_PoolIsValid              (DN_Pool const *pool);
-DN_API void *                   DN_PoolAlloc                (DN_Pool *pool, DN_USize size);
-DN_API void                     DN_PoolDealloc              (DN_Pool *pool, void *ptr);
-DN_API void *                   DN_PoolCopy                 (DN_Pool *pool, void const *data, DN_U64 size, uint8_t align);
-#define                         DN_PoolNew(pool, T)                         (T *)DN_PoolAlloc(pool, sizeof(T))
-#define                         DN_PoolNewArray(pool, T, count)             (T *)DN_PoolAlloc(pool, count * sizeof(T))
-#define                         DN_PoolNewCopy(pool, T, src)                (T *)DN_PoolCopy (pool, (src), sizeof(T),            alignof(T))
-#define                         DN_PoolNewArrayCopy(pool, T, src, count)    (T *)DN_PoolCopy (pool, (src), sizeof(T)  * (count), alignof(T))
+DN_API DN_Pool                  DN_PoolFromArena                                       (DN_Arena *arena, DN_U8 align);
+DN_API bool                     DN_PoolIsValid                                         (DN_Pool const *pool);
+DN_API void *                   DN_PoolAlloc                                           (DN_Pool *pool, DN_USize size);
+DN_API void                     DN_PoolDealloc                                         (DN_Pool *pool, void *ptr);
+DN_API void *                   DN_PoolCopy                                            (DN_Pool *pool, void const *data, DN_U64 size, uint8_t align);
+#define                         DN_PoolNew(pool, T)                                    (T *)DN_PoolAlloc(pool, sizeof(T))
+#define                         DN_PoolNewArray(pool, T, count)                        (T *)DN_PoolAlloc(pool, count * sizeof(T))
+#define                         DN_PoolNewCopy(pool, T, src)                           (T *)DN_PoolCopy (pool, (src), sizeof(T),            alignof(T))
+#define                         DN_PoolNewArrayCopy(pool, T, src, count)               (T *)DN_PoolCopy (pool, (src), sizeof(T)  * (count), alignof(T))
 
-DN_API bool                     DN_CharIsAlphabet           (char ch);
-DN_API bool                     DN_CharIsDigit              (char ch);
-DN_API bool                     DN_CharIsAlphaNum           (char ch);
-DN_API bool                     DN_CharIsWhitespace         (char ch);
-DN_API bool                     DN_CharIsHex                (char ch);
-DN_API char                     DN_CharToLower              (char ch);
-DN_API char                     DN_CharToUpper              (char ch);
+DN_API DN_ErrSink*              DN_ErrSinkBegin_                                       (DN_ErrSink *err, DN_ErrSinkMode mode, DN_CallSite call_site);
+#define                         DN_ErrSinkBegin(err, mode)                             DN_ErrSinkBegin_(err, mode, DN_CALL_SITE)
+#define                         DN_ErrSinkBeginDefault(err)                            DN_ErrSinkBegin(err, DN_ErrSinkMode_Nil)
+DN_API bool                     DN_ErrSinkHasError                                     (DN_ErrSink *err);
+DN_API DN_ErrSinkMsg*           DN_ErrSinkEnd                                          (DN_Arena *arena, DN_ErrSink *err);
+DN_API DN_Str8                  DN_ErrSinkEndStr8                                      (DN_Arena *arena, DN_ErrSink *err);
+DN_API void                     DN_ErrSinkEndIgnore                                    (DN_ErrSink *err);
+DN_API bool                     DN_ErrSinkEndLogError_                                 (DN_ErrSink *err, DN_CallSite call_site, DN_Str8 msg);
+#define                         DN_ErrSinkEndLogError(err, err_msg)                    DN_ErrSinkEndLogError_(err, DN_CALL_SITE, err_msg)
+DN_API bool                     DN_ErrSinkEndLogErrorFV_                               (DN_ErrSink *err, DN_CallSite call_site, DN_FMT_ATTRIB char const *fmt, va_list args);
+#define                         DN_ErrSinkEndLogErrorFV(err, fmt, args)                DN_ErrSinkEndLogErrorFV_(err, DN_CALL_SITE, fmt, args)
+DN_API bool                     DN_ErrSinkEndLogErrorF_                                (DN_ErrSink *err, DN_CallSite call_site, DN_FMT_ATTRIB char const *fmt, ...);
+#define                         DN_ErrSinkEndLogErrorF(err, fmt, ...)                  DN_ErrSinkEndLogErrorF_(err, DN_CALL_SITE, fmt, ##__VA_ARGS__)
+DN_API void                     DN_ErrSinkEndExitIfErrorF_                             (DN_ErrSink *err, DN_CallSite call_site, DN_U32 exit_val, DN_FMT_ATTRIB char const *fmt, ...);
+#define                         DN_ErrSinkEndExitIfErrorF(err, exit_val, fmt, ...)     DN_ErrSinkEndExitIfErrorF_(err, DN_CALL_SITE, exit_val, fmt, ##__VA_ARGS__)
+DN_API void                     DN_ErrSinkEndExitIfErrorFV_                            (DN_ErrSink *err, DN_CallSite call_site, DN_U32 exit_val, DN_FMT_ATTRIB char const *fmt, va_list args);
+#define                         DN_ErrSinkEndExitIfErrorFV(err, exit_val, fmt, args)   DN_ErrSinkEndExitIfErrorFV_(err, DN_CALL_SITE, exit_val, fmt, args)
+DN_API void                     DN_ErrSinkAppendFV_                                    (DN_ErrSink *err, DN_U32 error_code, DN_CallSite call_site, DN_FMT_ATTRIB char const *fmt, va_list args);
+#define                         DN_ErrSinkAppendFV(error, error_code, fmt, args)       DN_ErrSinkAppendFV_(error, error_code, DN_CALL_SITE, fmt, args)
+DN_API void                     DN_ErrSinkAppendF_                                     (DN_ErrSink *err, DN_U32 error_code, DN_CallSite call_site, DN_FMT_ATTRIB char const *fmt, ...);
+#define                         DN_ErrSinkAppendF(error, error_code, fmt, ...)         DN_ErrSinkAppendF_(error, error_code, DN_CALL_SITE, fmt, ##__VA_ARGS__)
 
-DN_API DN_U64FromResult         DN_U64FromStr8              (DN_Str8 string, char separator);
-DN_API DN_U64FromResult         DN_U64FromPtr               (void const *data, DN_USize size, char separator);
-DN_API DN_U64                   DN_U64FromPtrUnsafe         (void const *data, DN_USize size, char separator);
-DN_API DN_U64FromResult         DN_U64FromHexPtr            (void const *hex, DN_USize hex_count);
-DN_API DN_U64                   DN_U64FromHexPtrUnsafe      (void const *hex, DN_USize hex_count);
-DN_API DN_U64FromResult         DN_U64FromHexStr8           (DN_Str8 hex);
-DN_API DN_U64                   DN_U64FromHexStr8Unsafe     (DN_Str8 hex);
-DN_API DN_I64FromResult         DN_I64FromStr8              (DN_Str8 string, char separator);
-DN_API DN_I64FromResult         DN_I64FromPtr               (void const *data, DN_USize size, char separator);
-DN_API DN_I64                   DN_I64FromPtrUnsafe         (void const *data, DN_USize size, char separator);
+DN_API void                     DN_TCInit                                              (DN_TCCore *tc, DN_U64 thread_id, DN_Arena *main_arena, DN_Arena *temp_a_arena, DN_Arena *temp_b_arena, DN_Arena *err_sink_arena);
+DN_API void                     DN_TCInitFromMemFuncs                                  (DN_TCCore *tc, DN_U64 thread_id, DN_TCInitArgs *args, DN_ArenaMemFuncs mem_funcs);
+DN_API void                     DN_TCDeinit                                            (DN_TCCore *tc);
+DN_API void                     DN_TCEquip                                             (DN_TCCore *tc);
+DN_API DN_TCCore*               DN_TCGet                                               ();
+DN_API DN_Arena*                DN_TCMainArena                                         ();
+DN_API DN_Arena*                DN_TCTempArena                                         (DN_Arena **conflicts, DN_USize count);
+DN_API DN_TCScratch             DN_TCScratchBegin                                      (DN_Arena **conflicts, DN_USize count);
+DN_API void                     DN_TCScratchEnd                                        (DN_TCScratch *scratch);
+DN_API void                     DN_TCSetFrameArena                                     (DN_Arena *arena);
+DN_API DN_Arena*                DN_TCFrameArena                                        ();
+DN_API DN_ErrSink*              DN_TCErrSink                                           ();
+#define                         DN_TCErrSinkBegin(mode)                                DN_ErrSinkBegin(DN_TCErrSink(), mode)
+#define                         DN_TCErrSinkBeginDefault()                             DN_ErrSinkBeginDefault(DN_TCErrSink())
 
-DN_API DN_USize                 DN_FmtVSize                 (DN_FMT_ATTRIB char const *fmt, va_list args);
-DN_API DN_USize                 DN_FmtSize                  (DN_FMT_ATTRIB char const *fmt, ...);
-DN_API DN_FmtAppendResult       DN_FmtVAppend               (char *buf, DN_USize *buf_size, DN_USize buf_max, char const *fmt, va_list args);
-DN_API DN_FmtAppendResult       DN_FmtAppend                (char *buf, DN_USize *buf_size, DN_USize buf_max, char const *fmt, ...);
-DN_API DN_FmtAppendResult       DN_FmtAppendTruncate        (char *buf, DN_USize *buf_size, DN_USize buf_max, DN_Str8 truncator, char const *fmt, ...);
-DN_API DN_USize                 DN_CStr8Size                (char const *src);
-DN_API DN_USize                 DN_CStr16Size               (wchar_t const *src);
+DN_API bool                     DN_CharIsAlphabet                                      (char ch);
+DN_API bool                     DN_CharIsDigit                                         (char ch);
+DN_API bool                     DN_CharIsAlphaNum                                      (char ch);
+DN_API bool                     DN_CharIsWhitespace                                    (char ch);
+DN_API bool                     DN_CharIsHex                                           (char ch);
+DN_API char                     DN_CharToLower                                         (char ch);
+DN_API char                     DN_CharToUpper                                         (char ch);
 
-#define                         DN_Str16Lit(string)         DN_Str16{(wchar_t *)(string), sizeof(string)/sizeof(string[0]) - 1}
-#define                         DN_Str8Lit(c_str)           DN_Literal(DN_Str8){(char *)(c_str), sizeof(c_str) - 1}
-#define                         DN_Str8PrintFmt(string)     (int)((string).size), (string).data
-#define                         DN_Str8FromPtr(data, size)  DN_Literal(DN_Str8){(char *)(data), (DN_USize)(size)}
-#define                         DN_Str8FromStruct(ptr)      DN_Str8FromPtr((ptr)->data, (ptr)->size)
-DN_API DN_Str8                  DN_Str8FromCStr8            (char const *src);
-DN_API DN_Str8                  DN_Str8FromArena            (DN_Arena *arena, DN_USize size, DN_ZMem z_mem);
-DN_API DN_Str8                  DN_Str8FromPool             (DN_Pool *pool, DN_USize size);
-DN_API DN_Str8                  DN_Str8FromPtrArena         (DN_Arena *arena, void const *data, DN_USize size);
-DN_API DN_Str8                  DN_Str8FromPtrPool          (DN_Pool *pool, void const *data, DN_USize size);
-DN_API DN_Str8                  DN_Str8FromStr8Arena        (DN_Arena *arena, DN_Str8 string);
-DN_API DN_Str8                  DN_Str8FromStr8Pool         (DN_Pool *pool, DN_Str8 string);
-DN_API DN_Str8                  DN_Str8FromFmtArena         (DN_Arena *arena, DN_FMT_ATTRIB char const *fmt, ...);
-DN_API DN_Str8                  DN_Str8FromFmtVArena        (DN_Arena *arena, DN_FMT_ATTRIB char const *fmt, va_list args);
-DN_API DN_Str8                  DN_Str8FromFmtPool          (DN_Pool *pool, DN_FMT_ATTRIB char const *fmt, ...);
-DN_API DN_Str8                  DN_Str8FromByteCountType    (DN_ByteCountType type);
-DN_API DN_Str8x16               DN_Str8x16FromFmt           (DN_FMT_ATTRIB char const *fmt, ...);
-DN_API DN_Str8x16               DN_Str8x16FromFmtV          (DN_FMT_ATTRIB char const *fmt, va_list args);
-DN_API DN_Str8x32               DN_Str8x32FromFmt           (DN_FMT_ATTRIB char const *fmt, ...);
-DN_API DN_Str8x32               DN_Str8x32FromFmtV          (DN_FMT_ATTRIB char const *fmt, va_list args);
-DN_API DN_Str8x64               DN_Str8x64FromFmt           (DN_FMT_ATTRIB char const *fmt, ...);
-DN_API DN_Str8x64               DN_Str8x64FromFmtV          (DN_FMT_ATTRIB char const *fmt, va_list args);
-DN_API DN_Str8x128              DN_Str8x128FromFmt          (DN_FMT_ATTRIB char const *fmt, ...);
-DN_API DN_Str8x256              DN_Str8x256FromFmtV         (DN_FMT_ATTRIB char const *fmt, va_list args);
-DN_API DN_Str8x256              DN_Str8x256FromFmt          (DN_FMT_ATTRIB char const *fmt, ...);
-DN_API DN_Str8x256              DN_Str8x256FromFmtV         (DN_FMT_ATTRIB char const *fmt, va_list args);
-DN_API DN_Str8x32               DN_Str8x32FromU64           (DN_U64 val, char separator);
-DN_API bool                     DN_Str8IsAll                (DN_Str8 string, DN_Str8IsAllType is_all);
-DN_API char *                   DN_Str8End                  (DN_Str8 string);
-DN_API DN_Str8                  DN_Str8Slice                (DN_Str8 string, DN_USize offset, DN_USize size);
-DN_API DN_Str8                  DN_Str8Advance              (DN_Str8 string, DN_USize amount);
-DN_API DN_Str8                  DN_Str8NextLine             (DN_Str8 string);
-DN_API DN_Str8BSplitResult      DN_Str8BSplitArray          (DN_Str8 string, DN_Str8 const *find, DN_USize find_size);
-DN_API DN_Str8BSplitResult      DN_Str8BSplit               (DN_Str8 string, DN_Str8 find);
-DN_API DN_Str8BSplitResult      DN_Str8BSplitLastArray      (DN_Str8 string, DN_Str8 const *find, DN_USize find_size);
-DN_API DN_Str8BSplitResult      DN_Str8BSplitLast           (DN_Str8 string, DN_Str8 find);
-DN_API DN_USize                 DN_Str8Split                (DN_Str8 string, DN_Str8 delimiter, DN_Str8 *splits, DN_USize splits_count, DN_Str8SplitIncludeEmptyStrings mode);
-DN_API DN_Str8SplitResult       DN_Str8SplitArena           (DN_Arena *arena, DN_Str8 string, DN_Str8 delimiter, DN_Str8SplitIncludeEmptyStrings mode);
-DN_API DN_Str8FindResult        DN_Str8FindStr8Array        (DN_Str8 string, DN_Str8 const *find, DN_USize find_size, DN_Str8EqCase eq_case);
-DN_API DN_Str8FindResult        DN_Str8FindStr8             (DN_Str8 string, DN_Str8 find, DN_Str8EqCase eq_case);
-DN_API DN_Str8FindResult        DN_Str8Find                 (DN_Str8 string, uint32_t flags);
-DN_API DN_Str8                  DN_Str8Segment              (DN_Arena *arena, DN_Str8 src, DN_USize segment_size, char segment_char);
-DN_API DN_Str8                  DN_Str8ReverseSegment       (DN_Arena *arena, DN_Str8 src, DN_USize segment_size, char segment_char);
-DN_API bool                     DN_Str8Eq                   (DN_Str8 lhs, DN_Str8 rhs, DN_Str8EqCase eq_case = DN_Str8EqCase_Sensitive);
-DN_API bool                     DN_Str8EqInsensitive        (DN_Str8 lhs, DN_Str8 rhs);
-DN_API bool                     DN_Str8StartsWith           (DN_Str8 string, DN_Str8 prefix, DN_Str8EqCase eq_case = DN_Str8EqCase_Sensitive);
-DN_API bool                     DN_Str8StartsWithInsensitive(DN_Str8 string, DN_Str8 prefix);
-DN_API bool                     DN_Str8EndsWith             (DN_Str8 string, DN_Str8 prefix, DN_Str8EqCase eq_case = DN_Str8EqCase_Sensitive);
-DN_API bool                     DN_Str8EndsWithInsensitive  (DN_Str8 string, DN_Str8 prefix);
-DN_API bool                     DN_Str8HasChar              (DN_Str8 string, char ch);
-DN_API DN_Str8                  DN_Str8TrimPrefix           (DN_Str8 string, DN_Str8 prefix, DN_Str8EqCase eq_case = DN_Str8EqCase_Sensitive);
-DN_API DN_Str8                  DN_Str8TrimHexPrefix        (DN_Str8 string);
-DN_API DN_Str8                  DN_Str8TrimSuffix           (DN_Str8 string, DN_Str8 suffix, DN_Str8EqCase eq_case = DN_Str8EqCase_Sensitive);
-DN_API DN_Str8                  DN_Str8TrimAround           (DN_Str8 string, DN_Str8 trim_string);
-DN_API DN_Str8                  DN_Str8TrimHeadWhitespace   (DN_Str8 string);
-DN_API DN_Str8                  DN_Str8TrimTailWhitespace   (DN_Str8 string);
-DN_API DN_Str8                  DN_Str8TrimWhitespaceAround (DN_Str8 string);
-DN_API DN_Str8                  DN_Str8TrimByteOrderMark    (DN_Str8 string);
-DN_API DN_Str8                  DN_Str8FileNameFromPath     (DN_Str8 path);
-DN_API DN_Str8                  DN_Str8FileNameNoExtension  (DN_Str8 path);
-DN_API DN_Str8                  DN_Str8FilePathNoExtension  (DN_Str8 path);
-DN_API DN_Str8                  DN_Str8FileExtension        (DN_Str8 path);
-DN_API DN_Str8                  DN_Str8FileDirectoryFromPath(DN_Str8 path);
-DN_API DN_Str8                  DN_Str8AppendF              (DN_Arena *arena, DN_Str8 string, char const *fmt, ...);
-DN_API DN_Str8                  DN_Str8AppendFV             (DN_Arena *arena, DN_Str8 string, char const *fmt, va_list args);
-DN_API DN_Str8                  DN_Str8FillF                (DN_Arena *arena, DN_USize count, char const *fmt, ...);
-DN_API DN_Str8                  DN_Str8FillFV               (DN_Arena *arena, DN_USize count, char const *fmt, va_list args);
-DN_API void                     DN_Str8Remove               (DN_Str8 *string, DN_USize offset, DN_USize size);
-DN_API DN_Str8TruncateResult    DN_Str8TruncateMiddle       (DN_Arena *arena, DN_Str8 str8, DN_U32 side_size, DN_Str8 truncator);
-DN_API DN_Str8                  DN_Str8Lower                (DN_Arena *arena, DN_Str8 string);
-DN_API DN_Str8                  DN_Str8Upper                (DN_Arena *arena, DN_Str8 string);
+DN_API DN_U64FromResult         DN_U64FromStr8                                         (DN_Str8 string, char separator);
+DN_API DN_U64FromResult         DN_U64FromPtr                                          (void const *data, DN_USize size, char separator);
+DN_API DN_U64                   DN_U64FromPtrUnsafe                                    (void const *data, DN_USize size, char separator);
+DN_API DN_U64FromResult         DN_U64FromHexPtr                                       (void const *hex, DN_USize hex_count);
+DN_API DN_U64                   DN_U64FromHexPtrUnsafe                                 (void const *hex, DN_USize hex_count);
+DN_API DN_U64FromResult         DN_U64FromHexStr8                                      (DN_Str8 hex);
+DN_API DN_U64                   DN_U64FromHexStr8Unsafe                                (DN_Str8 hex);
+DN_API DN_I64FromResult         DN_I64FromStr8                                         (DN_Str8 string, char separator);
+DN_API DN_I64FromResult         DN_I64FromPtr                                          (void const *data, DN_USize size, char separator);
+DN_API DN_I64                   DN_I64FromPtrUnsafe                                    (void const *data, DN_USize size, char separator);
 
-DN_API  DN_Str8Builder          DN_Str8BuilderFromArena               (DN_Arena *arena);
-DN_API  DN_Str8Builder          DN_Str8BuilderFromStr8PtrRef          (DN_Arena *arena, DN_Str8 const *strings, DN_USize size);
-DN_API  DN_Str8Builder          DN_Str8BuilderFromStr8PtrCopy         (DN_Arena *arena, DN_Str8 const *strings, DN_USize size);
-DN_API  DN_Str8Builder          DN_Str8BuilderFromBuilder             (DN_Arena *arena, DN_Str8Builder const *builder);
-DN_API  bool                    DN_Str8BuilderAddArrayRef             (DN_Str8Builder *builder, DN_Str8 const *strings, DN_USize size, DN_Str8BuilderAdd add);
-DN_API  bool                    DN_Str8BuilderAddArrayCopy            (DN_Str8Builder *builder, DN_Str8 const *strings, DN_USize size, DN_Str8BuilderAdd add);
-DN_API  bool                    DN_Str8BuilderAddFV                   (DN_Str8Builder *builder, DN_Str8BuilderAdd add, DN_FMT_ATTRIB char const *fmt, va_list args);
-#define                         DN_Str8BuilderAppendArrayRef(builder, strings, size)  DN_Str8BuilderAddArrayRef(builder, strings, size, DN_Str8BuilderAdd_Append)
-#define                         DN_Str8BuilderAppendArrayCopy(builder, strings, size) DN_Str8BuilderAddArrayCopy(builder, strings, size, DN_Str8BuilderAdd_Append)
-#define                         DN_Str8BuilderAppendSliceRef(builder, slice)          DN_Str8BuilderAddArrayRef(builder, slice.data, slice.size, DN_Str8BuilderAdd_Append)
-#define                         DN_Str8BuilderAppendSliceCopy(builder, slice)         DN_Str8BuilderAddArrayCopy(builder, slice.data, slice.size, DN_Str8BuilderAdd_Append)
-DN_API  bool                    DN_Str8BuilderAppendRef               (DN_Str8Builder *builder, DN_Str8 string);
-DN_API  bool                    DN_Str8BuilderAppendCopy              (DN_Str8Builder *builder, DN_Str8 string);
-#define                         DN_Str8BuilderAppendFV(builder, fmt, args)            DN_Str8BuilderAddFV(builder, DN_Str8BuilderAdd_Append, fmt, args)
-DN_API  bool                    DN_Str8BuilderAppendF                 (DN_Str8Builder *builder, DN_FMT_ATTRIB char const *fmt, ...);
-DN_API  bool                    DN_Str8BuilderAppendBytesRef          (DN_Str8Builder *builder, void const *ptr, DN_USize size);
-DN_API  bool                    DN_Str8BuilderAppendBytesCopy         (DN_Str8Builder *builder, void const *ptr, DN_USize size);
-DN_API  bool                    DN_Str8BuilderAppendBuilderRef        (DN_Str8Builder *dest, DN_Str8Builder const *src);
-DN_API  bool                    DN_Str8BuilderAppendBuilderCopy       (DN_Str8Builder *dest, DN_Str8Builder const *src);
+DN_API DN_USize                 DN_FmtVSize                                            (DN_FMT_ATTRIB char const *fmt, va_list args);
+DN_API DN_USize                 DN_FmtSize                                             (DN_FMT_ATTRIB char const *fmt, ...);
+DN_API DN_FmtAppendResult       DN_FmtVAppend                                          (char *buf, DN_USize *buf_size, DN_USize buf_max, char const *fmt, va_list args);
+DN_API DN_FmtAppendResult       DN_FmtAppend                                           (char *buf, DN_USize *buf_size, DN_USize buf_max, char const *fmt, ...);
+DN_API DN_FmtAppendResult       DN_FmtAppendTruncate                                   (char *buf, DN_USize *buf_size, DN_USize buf_max, DN_Str8 truncator, char const *fmt, ...);
+DN_API DN_USize                 DN_CStr8Size                                           (char const *src);
+DN_API DN_USize                 DN_CStr16Size                                          (wchar_t const *src);
+
+#define                         DN_Str16Lit(string)                                    DN_Str16{(wchar_t *)(string), sizeof(string)/sizeof(string[0]) - 1}
+#define                         DN_Str16FromPtr(data, size)                            DN_Literal(DN_Str16){(wchar_t *)(data), (DN_USize)(size)}
+
+#define                         DN_Str8Lit(c_str)                                      DN_Literal(DN_Str8){(char *)(c_str), sizeof(c_str) - 1}
+#define                         DN_Str8PrintFmt(string)                                (int)((string).size), (string).data
+#define                         DN_Str8FromPtr(data, size)                             DN_Literal(DN_Str8){(char *)(data), (DN_USize)(size)}
+#define                         DN_Str8FromStruct(ptr)                                 DN_Str8FromPtr((ptr)->data, (ptr)->size)
+DN_API DN_Str8                  DN_Str8FromCStr8                                       (char const *src);
+DN_API DN_Str8                  DN_Str8FromArena                                       (DN_Arena *arena, DN_USize size, DN_ZMem z_mem);
+DN_API DN_Str8                  DN_Str8FromPool                                        (DN_Pool *pool, DN_USize size);
+DN_API DN_Str8                  DN_Str8FromPtrArena                                    (DN_Arena *arena, void const *data, DN_USize size);
+DN_API DN_Str8                  DN_Str8FromPtrPool                                     (DN_Pool *pool, void const *data, DN_USize size);
+DN_API DN_Str8                  DN_Str8FromStr8Arena                                   (DN_Arena *arena, DN_Str8 string);
+DN_API DN_Str8                  DN_Str8FromStr8Pool                                    (DN_Pool *pool, DN_Str8 string);
+DN_API DN_Str8                  DN_Str8FromFmtArena                                    (DN_Arena *arena, DN_FMT_ATTRIB char const *fmt, ...);
+DN_API DN_Str8                  DN_Str8FromFmtVArena                                   (DN_Arena *arena, DN_FMT_ATTRIB char const *fmt, va_list args);
+DN_API DN_Str8                  DN_Str8FromFmtPool                                     (DN_Pool *pool, DN_FMT_ATTRIB char const *fmt, ...);
+DN_API DN_Str8                  DN_Str8FromByteCountType                               (DN_ByteCountType type);
+DN_API DN_Str8x16               DN_Str8x16FromFmt                                      (DN_FMT_ATTRIB char const *fmt, ...);
+DN_API DN_Str8x16               DN_Str8x16FromFmtV                                     (DN_FMT_ATTRIB char const *fmt, va_list args);
+DN_API DN_Str8x32               DN_Str8x32FromFmt                                      (DN_FMT_ATTRIB char const *fmt, ...);
+DN_API DN_Str8x32               DN_Str8x32FromFmtV                                     (DN_FMT_ATTRIB char const *fmt, va_list args);
+DN_API DN_Str8x64               DN_Str8x64FromFmt                                      (DN_FMT_ATTRIB char const *fmt, ...);
+DN_API DN_Str8x64               DN_Str8x64FromFmtV                                     (DN_FMT_ATTRIB char const *fmt, va_list args);
+DN_API DN_Str8x128              DN_Str8x128FromFmt                                     (DN_FMT_ATTRIB char const *fmt, ...);
+DN_API DN_Str8x256              DN_Str8x256FromFmtV                                    (DN_FMT_ATTRIB char const *fmt, va_list args);
+DN_API DN_Str8x256              DN_Str8x256FromFmt                                     (DN_FMT_ATTRIB char const *fmt, ...);
+DN_API DN_Str8x256              DN_Str8x256FromFmtV                                    (DN_FMT_ATTRIB char const *fmt, va_list args);
+DN_API void                     DN_Str8x16AppendFmt                                    (DN_Str8x16 *str, DN_FMT_ATTRIB char const *fmt, ...);
+DN_API void                     DN_Str8x16AppendFmtV                                   (DN_Str8x16 *str, DN_FMT_ATTRIB char const *fmt, va_list args);
+DN_API void                     DN_Str8x32AppendFmt                                    (DN_Str8x32 *str, DN_FMT_ATTRIB char const *fmt, ...);
+DN_API void                     DN_Str8x32AppendFmtV                                   (DN_Str8x32 *str, DN_FMT_ATTRIB char const *fmt, va_list args);
+DN_API void                     DN_Str8x64AppendFmt                                    (DN_Str8x64 *str, DN_FMT_ATTRIB char const *fmt, ...);
+DN_API void                     DN_Str8x64AppendFmtV                                   (DN_Str8x64 *str, DN_FMT_ATTRIB char const *fmt, va_list args);
+DN_API void                     DN_Str8x128AppendFmt                                   (DN_Str8x128 *str, DN_FMT_ATTRIB char const *fmt, ...);
+DN_API void                     DN_Str8x128AppendFmtV                                  (DN_Str8x128 *str, DN_FMT_ATTRIB char const *fmt, va_list args);
+DN_API void                     DN_Str8x256AppendFmt                                   (DN_Str8x256 *str, DN_FMT_ATTRIB char const *fmt, ...);
+DN_API void                     DN_Str8x256AppendFmtV                                  (DN_Str8x256 *str, DN_FMT_ATTRIB char const *fmt, va_list args);
+DN_API DN_Str8x32               DN_Str8x32FromU64                                      (DN_U64 val, char separator);
+DN_API bool                     DN_Str8IsAll                                           (DN_Str8 string, DN_Str8IsAllType is_all);
+DN_API char *                   DN_Str8End                                             (DN_Str8 string);
+DN_API DN_Str8                  DN_Str8Subset                                          (DN_Str8 string, DN_USize offset, DN_USize size);
+DN_API DN_Str8                  DN_Str8Advance                                         (DN_Str8 string, DN_USize amount);
+DN_API DN_Str8                  DN_Str8NextLine                                        (DN_Str8 string);
+DN_API DN_Str8BSplitResult      DN_Str8BSplitArray                                     (DN_Str8 string, DN_Str8 const *find, DN_USize find_size);
+DN_API DN_Str8BSplitResult      DN_Str8BSplit                                          (DN_Str8 string, DN_Str8 find);
+DN_API DN_Str8BSplitResult      DN_Str8BSplitLastArray                                 (DN_Str8 string, DN_Str8 const *find, DN_USize find_size);
+DN_API DN_Str8BSplitResult      DN_Str8BSplitLast                                      (DN_Str8 string, DN_Str8 find);
+DN_API DN_USize                 DN_Str8Split                                           (DN_Str8 string, DN_Str8 delimiter, DN_Str8 *splits, DN_USize splits_count, DN_Str8SplitIncludeEmptyStrings mode);
+DN_API DN_Str8SplitResult       DN_Str8SplitArena                                      (DN_Arena *arena, DN_Str8 string, DN_Str8 delimiter, DN_Str8SplitIncludeEmptyStrings mode);
+DN_API DN_Str8FindResult        DN_Str8FindStr8Array                                   (DN_Str8 string, DN_Str8 const *find, DN_USize find_size, DN_Str8EqCase eq_case);
+DN_API DN_Str8FindResult        DN_Str8FindStr8                                        (DN_Str8 string, DN_Str8 find, DN_Str8EqCase eq_case);
+DN_API DN_Str8FindResult        DN_Str8Find                                            (DN_Str8 string, uint32_t flags);
+DN_API DN_Str8                  DN_Str8Segment                                         (DN_Arena *arena, DN_Str8 src, DN_USize segment_size, char segment_char);
+DN_API DN_Str8                  DN_Str8ReverseSegment                                  (DN_Arena *arena, DN_Str8 src, DN_USize segment_size, char segment_char);
+DN_API bool                     DN_Str8Eq                                              (DN_Str8 lhs, DN_Str8 rhs, DN_Str8EqCase eq_case = DN_Str8EqCase_Sensitive);
+DN_API bool                     DN_Str8EqInsensitive                                   (DN_Str8 lhs, DN_Str8 rhs);
+DN_API bool                     DN_Str8StartsWith                                      (DN_Str8 string, DN_Str8 prefix, DN_Str8EqCase eq_case = DN_Str8EqCase_Sensitive);
+DN_API bool                     DN_Str8StartsWithInsensitive                           (DN_Str8 string, DN_Str8 prefix);
+DN_API bool                     DN_Str8EndsWith                                        (DN_Str8 string, DN_Str8 prefix, DN_Str8EqCase eq_case = DN_Str8EqCase_Sensitive);
+DN_API bool                     DN_Str8EndsWithInsensitive                             (DN_Str8 string, DN_Str8 prefix);
+DN_API bool                     DN_Str8HasChar                                         (DN_Str8 string, char ch);
+DN_API DN_Str8                  DN_Str8TrimPrefix                                      (DN_Str8 string, DN_Str8 prefix, DN_Str8EqCase eq_case = DN_Str8EqCase_Sensitive);
+DN_API DN_Str8                  DN_Str8TrimHexPrefix                                   (DN_Str8 string);
+DN_API DN_Str8                  DN_Str8TrimSuffix                                      (DN_Str8 string, DN_Str8 suffix, DN_Str8EqCase eq_case = DN_Str8EqCase_Sensitive);
+DN_API DN_Str8                  DN_Str8TrimAround                                      (DN_Str8 string, DN_Str8 trim_string);
+DN_API DN_Str8                  DN_Str8TrimHeadWhitespace                              (DN_Str8 string);
+DN_API DN_Str8                  DN_Str8TrimTailWhitespace                              (DN_Str8 string);
+DN_API DN_Str8                  DN_Str8TrimWhitespaceAround                            (DN_Str8 string);
+DN_API DN_Str8                  DN_Str8TrimByteOrderMark                               (DN_Str8 string);
+DN_API DN_Str8                  DN_Str8FileNameFromPath                                (DN_Str8 path);
+DN_API DN_Str8                  DN_Str8FileNameNoExtension                             (DN_Str8 path);
+DN_API DN_Str8                  DN_Str8FilePathNoExtension                             (DN_Str8 path);
+DN_API DN_Str8                  DN_Str8FileExtension                                   (DN_Str8 path);
+DN_API DN_Str8                  DN_Str8FileDirectoryFromPath                           (DN_Str8 path);
+DN_API DN_Str8                  DN_Str8AppendF                                         (DN_Arena *arena, DN_Str8 string, char const *fmt, ...);
+DN_API DN_Str8                  DN_Str8AppendFV                                        (DN_Arena *arena, DN_Str8 string, char const *fmt, va_list args);
+DN_API DN_Str8                  DN_Str8FillF                                           (DN_Arena *arena, DN_USize count, char const *fmt, ...);
+DN_API DN_Str8                  DN_Str8FillFV                                          (DN_Arena *arena, DN_USize count, char const *fmt, va_list args);
+DN_API void                     DN_Str8Remove                                          (DN_Str8 *string, DN_USize offset, DN_USize size);
+DN_API DN_Str8TruncateResult    DN_Str8TruncateMiddle                                  (DN_Arena *arena, DN_Str8 str8, DN_U32 side_size, DN_Str8 truncator);
+DN_API DN_Str8                  DN_Str8Lower                                           (DN_Arena *arena, DN_Str8 string);
+DN_API DN_Str8                  DN_Str8Upper                                           (DN_Arena *arena, DN_Str8 string);
+DN_API DN_Str8                  DN_Str8PadNewLines                                     (DN_Arena *arena, DN_Str8 src, DN_Str8 pad);
+DN_API DN_Str8                  DN_Str8Replace                                         (DN_Str8 string, DN_Str8 find, DN_Str8 replace, DN_USize start_index, DN_Arena *arena, DN_Str8EqCase eq_case);
+DN_API DN_Str8                  DN_Str8ReplaceSensitive                                (DN_Str8 string, DN_Str8 find, DN_Str8 replace, DN_USize start_index, DN_Arena *arena);
+DN_API DN_Str8                  DN_Str8ReplaceInsensitive                              (DN_Str8 string, DN_Str8 find, DN_Str8 replace, DN_USize start_index, DN_Arena *arena);
+
+DN_API DN_Str8Builder           DN_Str8BuilderFromArena                                (DN_Arena *arena);
+DN_API DN_Str8Builder           DN_Str8BuilderFromStr8PtrRef                           (DN_Arena *arena, DN_Str8 const *strings, DN_USize size);
+DN_API DN_Str8Builder           DN_Str8BuilderFromStr8PtrCopy                          (DN_Arena *arena, DN_Str8 const *strings, DN_USize size);
+DN_API DN_Str8Builder           DN_Str8BuilderFromBuilder                              (DN_Arena *arena, DN_Str8Builder const *builder);
+DN_API bool                     DN_Str8BuilderAddArrayRef                              (DN_Str8Builder *builder, DN_Str8 const *strings, DN_USize size, DN_Str8BuilderAdd add);
+DN_API bool                     DN_Str8BuilderAddArrayCopy                             (DN_Str8Builder *builder, DN_Str8 const *strings, DN_USize size, DN_Str8BuilderAdd add);
+DN_API bool                     DN_Str8BuilderAddFV                                    (DN_Str8Builder *builder, DN_Str8BuilderAdd add, DN_FMT_ATTRIB char const *fmt, va_list args);
+#define                         DN_Str8BuilderAppendArrayRef(builder, strings, size)   DN_Str8BuilderAddArrayRef(builder, strings, size, DN_Str8BuilderAdd_Append)
+#define                         DN_Str8BuilderAppendArrayCopy(builder, strings, size)  DN_Str8BuilderAddArrayCopy(builder, strings, size, DN_Str8BuilderAdd_Append)
+#define                         DN_Str8BuilderAppendSliceRef(builder, slice)           DN_Str8BuilderAddArrayRef(builder, slice.data, slice.size, DN_Str8BuilderAdd_Append)
+#define                         DN_Str8BuilderAppendSliceCopy(builder, slice)          DN_Str8BuilderAddArrayCopy(builder, slice.data, slice.size, DN_Str8BuilderAdd_Append)
+DN_API bool                     DN_Str8BuilderAppendRef                                (DN_Str8Builder *builder, DN_Str8 string);
+DN_API bool                     DN_Str8BuilderAppendCopy                               (DN_Str8Builder *builder, DN_Str8 string);
+#define                         DN_Str8BuilderAppendFV(builder, fmt, args)             DN_Str8BuilderAddFV(builder, DN_Str8BuilderAdd_Append, fmt, args)
+DN_API bool                     DN_Str8BuilderAppendF                                  (DN_Str8Builder *builder, DN_FMT_ATTRIB char const *fmt, ...);
+DN_API bool                     DN_Str8BuilderAppendBytesRef                           (DN_Str8Builder *builder, void const *ptr, DN_USize size);
+DN_API bool                     DN_Str8BuilderAppendBytesCopy                          (DN_Str8Builder *builder, void const *ptr, DN_USize size);
+DN_API bool                     DN_Str8BuilderAppendBuilderRef                         (DN_Str8Builder *dest, DN_Str8Builder const *src);
+DN_API bool                     DN_Str8BuilderAppendBuilderCopy                        (DN_Str8Builder *dest, DN_Str8Builder const *src);
 #define                         DN_Str8BuilderPrependArrayRef(builder, strings, size)  DN_Str8BuilderAddArrayRef(builder, strings, size, DN_Str8BuilderAdd_Prepend)
 #define                         DN_Str8BuilderPrependArrayCopy(builder, strings, size) DN_Str8BuilderAddArrayCopy(builder, strings, size, DN_Str8BuilderAdd_Prepend)
 #define                         DN_Str8BuilderPrependSliceRef(builder, slice)          DN_Str8BuilderAddArrayRef(builder, slice.data, slice.size, DN_Str8BuilderAdd_Prepend)
 #define                         DN_Str8BuilderPrependSliceCopy(builder, slice)         DN_Str8BuilderAddArrayCopy(builder, slice.data, slice.size, DN_Str8BuilderAdd_Prepend)
-DN_API  bool                    DN_Str8BuilderPrependRef              (DN_Str8Builder *builder, DN_Str8 string);
-DN_API  bool                    DN_Str8BuilderPrependCopy             (DN_Str8Builder *builder, DN_Str8 string);
+DN_API bool                     DN_Str8BuilderPrependRef                               (DN_Str8Builder *builder, DN_Str8 string);
+DN_API bool                     DN_Str8BuilderPrependCopy                              (DN_Str8Builder *builder, DN_Str8 string);
 #define                         DN_Str8BuilderPrependFV(builder, fmt, args)            DN_Str8BuilderAddFV(builder, DN_Str8BuilderAdd_Prepend, fmt, args)
-DN_API  bool                    DN_Str8BuilderPrependF                (DN_Str8Builder *builder, DN_FMT_ATTRIB char const *fmt, ...);
-DN_API  bool                    DN_Str8BuilderErase                   (DN_Str8Builder *builder, DN_Str8 string);
-DN_API  DN_Str8                 DN_Str8BuilderBuild                   (DN_Str8Builder const *builder, DN_Arena *arena);
-DN_API  DN_Str8                 DN_Str8BuilderBuildDelimited          (DN_Str8Builder const *builder, DN_Str8 delimiter, DN_Arena *arena);
-DN_API  DN_Slice<DN_Str8>       DN_Str8BuilderBuildSlice              (DN_Str8Builder const *builder, DN_Arena *arena);
+DN_API bool                     DN_Str8BuilderPrependF                                 (DN_Str8Builder *builder, DN_FMT_ATTRIB char const *fmt, ...);
+DN_API bool                     DN_Str8BuilderErase                                    (DN_Str8Builder *builder, DN_Str8 string);
+DN_API DN_Str8                  DN_Str8BuilderBuild                                    (DN_Str8Builder const *builder, DN_Arena *arena);
+DN_API DN_Str8                  DN_Str8BuilderBuildDelimited                           (DN_Str8Builder const *builder, DN_Str8 delimiter, DN_Arena *arena);
+DN_API DN_Str8Slice             DN_Str8BuilderBuildSlice                               (DN_Str8Builder const *builder, DN_Arena *arena);
 
-DN_API int                      DN_EncodeUTF8Codepoint                (uint8_t utf8[4], uint32_t codepoint);
-DN_API int                      DN_EncodeUTF16Codepoint               (uint16_t utf16[2], uint32_t codepoint);
+DN_API int                      DN_EncodeUTF8Codepoint                                 (uint8_t utf8[4], uint32_t codepoint);
+DN_API int                      DN_EncodeUTF16Codepoint                                (uint16_t utf16[2], uint32_t codepoint);
 
-DN_API DN_U8                    DN_U8FromHexNibble          (char hex);
-DN_API DN_NibbleFromU8Result    DN_NibbleFromU8             (DN_U8 u8);
+DN_API DN_U8                    DN_U8FromHexNibble                                     (char hex);
+DN_API DN_NibbleFromU8Result    DN_NibbleFromU8                                        (DN_U8 u8);
 
-DN_API DN_USize                 DN_BytesFromHexPtr          (void const *hex, DN_USize hex_count, void *dest, DN_USize dest_count);
-DN_API DN_Str8                  DN_BytesFromHexPtrArena     (void const *hex, DN_USize hex_count, DN_Arena *arena);
-DN_API DN_USize                 DN_BytesFromHexStr8         (DN_Str8 hex, void *dest, DN_USize dest_count);
-DN_API DN_Str8                  DN_BytesFromHexStr8Arena    (DN_Str8 hex, DN_Arena *arena);
-DN_API DN_U8x16                 DN_BytesFromHex32Ptr        (void const *hex, DN_USize hex_count);
-DN_API DN_U8x32                 DN_BytesFromHex64Ptr        (void const *hex, DN_USize hex_count);
+DN_API DN_USize                 DN_BytesFromHexPtr                                     (void const *hex, DN_USize hex_count, void *dest, DN_USize dest_count);
+DN_API DN_Str8                  DN_BytesFromHexPtrArena                                (void const *hex, DN_USize hex_count, DN_Arena *arena);
+DN_API DN_USize                 DN_BytesFromHexStr8                                    (DN_Str8 hex, void *dest, DN_USize dest_count);
+DN_API DN_Str8                  DN_BytesFromHexStr8Arena                               (DN_Str8 hex, DN_Arena *arena);
+DN_API DN_U8x16                 DN_BytesFromHex32Ptr                                   (void const *hex, DN_USize hex_count);
+DN_API DN_U8x32                 DN_BytesFromHex64Ptr                                   (void const *hex, DN_USize hex_count);
 
-DN_API DN_HexU64Str8            DN_HexFromU64               (DN_U64 value, DN_HexFromU64Type type);
-DN_API DN_USize                 DN_HexFromBytesPtr          (void const *bytes, DN_USize bytes_count, void *hex, DN_USize hex_count);
-DN_API DN_Str8                  DN_HexFromBytesPtrArena     (void const *bytes, DN_USize bytes_count, DN_Arena *arena);
-DN_API DN_Hex32                 DN_HexFromBytes16Ptr        (void const *bytes, DN_USize bytes_count);
-DN_API DN_Hex64                 DN_HexFromBytes32Ptr        (void const *bytes, DN_USize bytes_count);
-DN_API DN_Hex128                DN_HexFromBytes64Ptr        (void const *bytes, DN_USize bytes_count);
+DN_API DN_HexU64Str8            DN_HexFromU64                                          (DN_U64 value, DN_HexFromU64Type type);
+DN_API DN_USize                 DN_HexFromBytesPtr                                     (void const *bytes, DN_USize bytes_count, void *hex, DN_USize hex_count);
+DN_API DN_Str8                  DN_HexFromBytesPtrArena                                (void const *bytes, DN_USize bytes_count, DN_Arena *arena);
+DN_API DN_Hex32                 DN_HexFromBytes16Ptr                                   (void const *bytes, DN_USize bytes_count);
+DN_API DN_Hex64                 DN_HexFromBytes32Ptr                                   (void const *bytes, DN_USize bytes_count);
+DN_API DN_Hex128                DN_HexFromBytes64Ptr                                   (void const *bytes, DN_USize bytes_count);
 
-DN_API DN_Str8x128              DN_AgeStr8FromMsU64         (DN_U64 duration_ms, DN_AgeUnit units);
-DN_API DN_Str8x128              DN_AgeStr8FromSecU64        (DN_U64 duration_ms, DN_AgeUnit units);
-DN_API DN_Str8x128              DN_AgeStr8FromSecF64        (DN_F64 sec, DN_AgeUnit units);
+DN_API DN_Str8x128              DN_AgeStr8FromMsU64                                    (DN_U64 duration_ms, DN_AgeUnit units);
+DN_API DN_Str8x128              DN_AgeStr8FromSecU64                                   (DN_U64 duration_ms, DN_AgeUnit units);
+DN_API DN_Str8x128              DN_AgeStr8FromSecF64                                   (DN_F64 sec, DN_AgeUnit units);
 
-DN_API int                      DN_IsLeapYear               (int year);
-DN_API bool                     DN_DateIsValid              (DN_Date date);
-DN_API DN_Date                  DN_DateFromUnixTimeMs       (DN_USize unix_ts_ms);
-DN_API DN_U64                   DN_UnixTimeMsFromDate       (DN_Date date);
+DN_API int                      DN_IsLeapYear                                          (int year);
+DN_API bool                     DN_DateIsValid                                         (DN_Date date);
+DN_API DN_Date                  DN_DateFromUnixTimeMs                                  (DN_USize unix_ts_ms);
+DN_API DN_U64                   DN_UnixTimeMsFromDate                                  (DN_Date date);
 
-DN_API DN_ByteCountResult       DN_ByteCountFromType        (DN_U64 bytes, DN_ByteCountType type);
-#define                         DN_ByteCount(bytes)         DN_ByteCountFromType(bytes, DN_ByteCountType_Auto)
-DN_API DN_Str8x32               DN_ByteCountStr8x32FromType (DN_U64 bytes, DN_ByteCountType type);
-#define                         DN_ByteCountStr8x32(bytes)  DN_ByteCountStr8x32FromType(bytes, DN_ByteCountType_Auto)
+DN_API DN_ByteCountResult       DN_ByteCountFromType                                   (DN_U64 bytes, DN_ByteCountType type);
+#define                         DN_ByteCount(bytes)                                    DN_ByteCountFromType(bytes, DN_ByteCountType_Auto)
+DN_API DN_Str8x32               DN_ByteCountStr8x32FromType                            (DN_U64 bytes, DN_ByteCountType type);
+#define                         DN_ByteCountStr8x32(bytes)                             DN_ByteCountStr8x32FromType(bytes, DN_ByteCountType_Auto)
 
 #define DN_ProfilerZoneLoop(prof, name, index)                                                                            \
   DN_ProfilerZone DN_UniqueName(zone_) = DN_ProfilerBeginZone(prof, DN_Str8Lit(name), index), DN_UniqueName(dummy_) = {}; \
-  DN_UniqueName(dummy_).begin_tsc == 0;                                                                                    \
+  DN_UniqueName(dummy_).begin_tsc == 0;                                                                                   \
   DN_ProfilerEndZone(prof, DN_UniqueName(zone_)), DN_UniqueName(dummy_).begin_tsc = 1
 
-#define                       DN_ProfilerZoneLoopAuto(prof, name)   DN_ProfilerZoneLoop(prof, name, __COUNTER__ + 1)
-DN_API DN_Profiler            DN_ProfilerInit                      (DN_ProfilerAnchor *anchors, DN_USize count, DN_USize anchors_per_frame, DN_ProfilerTSCNowFunc *tsc_now, DN_U64 tsc_frequency);
-DN_API DN_ProfilerZone        DN_ProfilerBeginZone                 (DN_Profiler *profiler, DN_Str8 name, DN_U16 anchor_index);
-#define                       DN_ProfilerBeginZoneAuto(prof, name) DN_ProfilerBeginZone(prof, DN_Str8Lit(name), __COUNTER__ + 1)
-DN_API void                   DN_ProfilerEndZone                   (DN_Profiler *profiler, DN_ProfilerZone zone);
-DN_API DN_USize               DN_ProfilerFrameCount                (DN_Profiler const *profiler);
-DN_API DN_ProfilerAnchorArray DN_ProfilerFrameAnchorsFromIndex     (DN_Profiler *profiler, DN_USize frame_index);
-DN_API DN_ProfilerAnchorArray DN_ProfilerFrameAnchors              (DN_Profiler *profiler);
-DN_API void                   DN_ProfilerNewFrame                  (DN_Profiler *profiler);
-DN_API void                   DN_ProfilerDump                      (DN_Profiler *profiler);
-DN_API DN_F64                 DN_ProfilerSecFromTSC                (DN_Profiler *profiler, DN_U64 duration_tsc);
-DN_API DN_F64                 DN_ProfilerMsFromTSC                 (DN_Profiler *profiler, DN_U64 duration_tsc);
+#define                         DN_ProfilerZoneLoopAuto(prof, name)                    DN_ProfilerZoneLoop(prof, name, __COUNTER__ + 1)
+DN_API DN_Profiler              DN_ProfilerInit                                        (DN_ProfilerAnchor *anchors, DN_USize count, DN_USize anchors_per_frame, DN_ProfilerTSCNowFunc *tsc_now, DN_U64 tsc_frequency);
+DN_API DN_ProfilerZone          DN_ProfilerBeginZone                                   (DN_Profiler *profiler, DN_Str8 name, DN_U16 anchor_index);
+#define                         DN_ProfilerBeginZoneAuto(prof, name)                   DN_ProfilerBeginZone(prof, DN_Str8Lit(name), __COUNTER__ + 1)
+DN_API void                     DN_ProfilerEndZone                                     (DN_Profiler *profiler, DN_ProfilerZone zone);
+DN_API DN_USize                 DN_ProfilerFrameCount                                  (DN_Profiler const *profiler);
+DN_API DN_ProfilerAnchorArray   DN_ProfilerFrameAnchorsFromIndex                       (DN_Profiler *profiler, DN_USize frame_index);
+DN_API DN_ProfilerAnchorArray   DN_ProfilerFrameAnchors                                (DN_Profiler *profiler);
+DN_API void                     DN_ProfilerNewFrame                                    (DN_Profiler *profiler);
+DN_API void                     DN_ProfilerDump                                        (DN_Profiler *profiler);
+DN_API DN_F64                   DN_ProfilerSecFromTSC                                  (DN_Profiler *profiler, DN_U64 duration_tsc);
+DN_API DN_F64                   DN_ProfilerMsFromTSC                                   (DN_Profiler *profiler, DN_U64 duration_tsc);
 
+DN_API DN_PCG32                 DN_PCG32Init                                           (DN_U64 seed);
+DN_API DN_U32                   DN_PCG32Next                                           (DN_PCG32 *rng);
+DN_API DN_U64                   DN_PCG32Next64                                         (DN_PCG32 *rng);
+DN_API DN_U32                   DN_PCG32Range                                          (DN_PCG32 *rng, DN_U32 low, DN_U32 high);
+DN_API DN_F32                   DN_PCG32NextF32                                        (DN_PCG32 *rng);
+DN_API DN_F64                   DN_PCG32NextF64                                        (DN_PCG32 *rng);
+DN_API void                     DN_PCG32Advance                                        (DN_PCG32 *rng, DN_U64 delta);
+
+#if !defined(DN_FNV1A32_SEED)
+  #define DN_FNV1A32_SEED 2166136261U
+#endif
+
+#if !defined(DN_FNV1A64_SEED)
+  #define DN_FNV1A64_SEED 14695981039346656037ULL
+#endif
+
+DN_API DN_U32                   DN_FNV1AHashU32FromBytes                               (void const *bytes, DN_USize size, DN_U32 seed);
+DN_API DN_U64                   DN_FNV1AHashU64FromBytes                               (void const *bytes, DN_USize size, DN_U64 seed);
+
+DN_API DN_U32                   DN_MurmurHash3HashU32FromBytesX86                      (void const *bytes, int len, DN_U32 seed);
+DN_API DN_MurmurHash3           DN_MurmurHash3HashU128FromBytesX64                     (void const *bytes, int len, DN_U32 seed);
+DN_API DN_U64                   DN_MurmurHash3HashU64FromBytesX64                      (void const *bytes, int len, DN_U32 seed);
+DN_API DN_U32                   DN_MurmurHash3HashU32FromBytesX64                      (void const *bytes, int len, DN_U32 seed);
+
+#if defined(DN_64_BIT)
+  #define                       DN_MurmurHash3HashU32FromBytes(bytes, len, seed)       DN_MurmurHash3HashU32FromBytesX64(bytes, len, seed)
+#else
+  #define                       DN_MurmurHash3HashU32FromBytes(bytes, len, seed)       DN_MurmurHash3HashU32FromBytesX86(bytes, len, seed)
+#endif
+
+#define                         DN_LogResetEscapeCode                                  "\x1b[0m"
+#define                         DN_LogBoldEscapeCode                                   "\x1b[1m"
+DN_API DN_Str8                  DN_LogColourEscapeCodeStr8FromRGB                      (DN_LogColourType colour, DN_U8 r, DN_U8 g, DN_U8 b);
+DN_API DN_Str8                  DN_LogColourEscapeCodeStr8FromU32                      (DN_LogColourType colour, DN_U32 value);
+DN_API DN_LogPrefixSize         DN_LogMakePrefix                                       (DN_LogStyle style, DN_LogTypeParam type, DN_CallSite call_site, DN_LogDate date, char *dest, DN_USize dest_size);
+DN_API void                     DN_LogSetEmitFromTypeFVFunc                            (DN_LogEmitFromTypeFVFunc *print_func, void *user_data);
+DN_API void                     DN_LogEmitFromType                                     (DN_LogTypeParam type, DN_CallSite call_site, DN_FMT_ATTRIB char const *fmt, ...);
+DN_API DN_LogTypeParam          DN_LogMakeU32LogTypeParam                              (DN_LogType type);
+#define                         DN_LogDebugF(fmt, ...)                                 DN_LogEmitFromType(DN_LogMakeU32LogTypeParam(DN_LogType_Debug), DN_CALL_SITE, fmt, ##__VA_ARGS__)
+#define                         DN_LogInfoF(fmt, ...)                                  DN_LogEmitFromType(DN_LogMakeU32LogTypeParam(DN_LogType_Info), DN_CALL_SITE, fmt, ##__VA_ARGS__)
+#define                         DN_LogWarningF(fmt, ...)                               DN_LogEmitFromType(DN_LogMakeU32LogTypeParam(DN_LogType_Warning), DN_CALL_SITE, fmt, ##__VA_ARGS__)
+#define                         DN_LogErrorF(fmt, ...)                                 DN_LogEmitFromType(DN_LogMakeU32LogTypeParam(DN_LogType_Error), DN_CALL_SITE, fmt, ##__VA_ARGS__)
+
+// NOTE: OS primitives that the OS layer can provide for the base layer but is optional.
+#if defined(DN_FREESTANDING)
+#define                        DN_StackTraceWalkStr8FromHeap(...) DN_Str8Lit("N/A")
+#define                        DN_StackTraceWalk(...)
+#define                        DN_StackTraceWalkResultIterate(...)
+#define                        DN_StackTraceWalkResultToStr8(...) DN_Str8Lit("N/A")
+#define                        DN_StackTraceWalkStr8(...) DN_Str8Lit("N/A")
+#define                        DN_StackTraceWalkStr8FromHeap(...) DN_Str8Lit("N/A")
+#define                        DN_StackTraceGetFrames(...)
+#define                        DN_StackTraceRawFrameToFrame(...)
+#define                        DN_StackTracePrint(...)
+#define                        DN_StackTraceReloadSymbols(...)
+#else
+DN_API DN_StackTraceWalkResult DN_StackTraceWalk             (DN_Arena *arena, DN_U16 limit);
+DN_API bool                    DN_StackTraceWalkResultIterate(DN_StackTraceWalkResultIterator *it, DN_StackTraceWalkResult const *walk);
+DN_API DN_Str8                 DN_StackTraceWalkResultToStr8 (DN_Arena *arena, DN_StackTraceWalkResult const *walk, DN_U16 skip);
+DN_API DN_Str8                 DN_StackTraceWalkStr8         (DN_Arena *arena, DN_U16 limit, DN_U16 skip);
+DN_API DN_Str8                 DN_StackTraceWalkStr8FromHeap (DN_U16 limit, DN_U16 skip);
+DN_API DN_StackTraceFrameSlice DN_StackTraceGetFrames        (DN_Arena *arena, DN_U16 limit);
+DN_API DN_StackTraceFrame      DN_StackTraceRawFrameToFrame  (DN_Arena *arena, DN_StackTraceRawFrame raw_frame);
+DN_API void                    DN_StackTracePrint            (DN_U16 limit);
+DN_API void                    DN_StackTraceReloadSymbols    ();
+#endif
 #endif // !defined(DN_BASE_H)

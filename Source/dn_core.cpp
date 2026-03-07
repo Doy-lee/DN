@@ -1,12 +1,13 @@
 #define DN_INC_CPP
 
 #if defined(_CLANGD)
-  #include "dn_inc.h"
+  #include "../Base/dn_base.h"
+  #include "../OS/dn_os.h"
 #endif
 
 DN_Core *g_dn_;
 
-static void DN_InitOS_(DN_OSCore *os, DN_InitArgs *args)
+static void DN_InitOS_(DN_OSCore *os)
 {
   #if defined(DN_OS_H) && defined(DN_OS_CPP)
   // NOTE: OS
@@ -40,19 +41,19 @@ static void DN_InitOS_(DN_OSCore *os, DN_InitArgs *args)
     #endif
 
     #if defined(DN_PLATFORM_WIN32)
-    os->platform_context = DN_ArenaNew(&os->arena, DN_W32Core, DN_ZMem_Yes);
+    os->platform_context = DN_ArenaNew(&os->arena, DN_OSW32Core, DN_ZMem_Yes);
     #elif defined(DN_PLATFORM_POSIX) || defined(DN_PLATFORM_EMSCRIPTEN)
-    os->platform_context = DN_ArenaNew(&os->arena, DN_POSIXCore, DN_ZMem_Yes);
+    os->platform_context = DN_ArenaNew(&os->arena, DN_OSPOSIXCore, DN_ZMem_Yes);
     #endif
 
     #if defined(DN_PLATFORM_WIN32)
-    DN_W32Core *w32 = DN_Cast(DN_W32Core *) os->platform_context;
+    DN_OSW32Core *w32 = DN_Cast(DN_OSW32Core *) os->platform_context;
     InitializeCriticalSection(&w32->sync_primitive_free_list_mutex);
 
     QueryPerformanceFrequency(&w32->qpc_frequency);
     HMODULE module = LoadLibraryA("kernel32.dll");
     if (module) {
-      w32->set_thread_description = DN_Cast(DN_W32SetThreadDescriptionFunc *) GetProcAddress(module, "SetThreadDescription");
+      w32->set_thread_description = DN_Cast(DN_OSW32SetThreadDescriptionFunc *) GetProcAddress(module, "SetThreadDescription");
       FreeLibrary(module);
     }
 
@@ -62,27 +63,12 @@ static void DN_InitOS_(DN_OSCore *os, DN_InitArgs *args)
     if (w32->bcrypt_rng_handle && init_status == 0)
       w32->bcrypt_init_success = true;
     else
-      DN_LOG_ErrorF("Failed to initialise Windows secure random number generator, error: %d", init_status);
+      DN_LogErrorF("Failed to initialise Windows secure random number generator, error: %d", init_status);
     #else
-    DN_Posix_Init(DN_Cast(DN_POSIXCore *)os->platform_context);
+    DN_OS_PosixInit(DN_Cast(DN_OSPosixCore *)os->platform_context);
     #endif
   }
 
-  // NOTE: Initialise tmem arenas which allocate memory and will be
-  // recorded to the now initialised allocation table. The initialisation
-  // of tmem memory may request tmem memory itself in leak tracing mode.
-  // This is supported as the tmem arenas defer allocation tracking until
-  // initialisation is done.
-  DN_OSTLSInitArgs tls_init_args = {};
-  if (args) {
-    tls_init_args.commit           = args->os_tls_commit;
-    tls_init_args.reserve          = args->os_tls_reserve;
-    tls_init_args.err_sink_reserve = args->os_tls_err_sink_reserve;
-    tls_init_args.err_sink_commit  = args->os_tls_err_sink_commit;
-  }
-
-  DN_OS_TLSInit(&os->tls, tls_init_args);
-  DN_OS_TLSSetCurrentThreadTLS(&os->tls);
   os->cpu_report = DN_CPUGetReport();
 
   #define DN_CPU_FEAT_XENTRY(label) g_dn_cpu_feature_decl[DN_CPUFeature_##label] = {DN_CPUFeature_##label, DN_Str8Lit(#label)};
@@ -92,20 +78,19 @@ static void DN_InitOS_(DN_OSCore *os, DN_InitArgs *args)
   #endif // defined(DN_OS_H) && defined(DN_OS_CPP)
 }
 
-
-DN_API void DN_Init(DN_Core *dn, DN_InitFlags flags, DN_InitArgs *args)
+DN_API void DN_Init(DN_Core *dn, DN_InitFlags flags)
 {
   g_dn_          = dn;
   dn->init_flags = flags;
 
   if (flags & DN_InitFlags_OS) {
     #if defined(DN_OS_H) && defined(DN_OS_CPP)
-    DN_InitOS_(&dn->os, args);
+    DN_InitOS_(&dn->os);
     if (flags & DN_InitFlags_OSLeakTracker) {
       // NOTE: Setup the allocation table with allocation tracking turned off on
       // the arena we're using to initialise the table.
       dn->leak.alloc_table_arena = DN_ArenaFromVMem(DN_Megabytes(1), DN_Kilobytes(512), DN_ArenaFlags_NoAllocTrack | DN_ArenaFlags_AllocCanLeak);
-      dn->leak.alloc_table       = DN_DSMap_Init<DN_LeakAlloc>(&dn->leak.alloc_table_arena, 4096, DN_DSMapFlags_Nil);
+      dn->leak.alloc_table       = DN_DSMapInit<DN_LeakAlloc>(&dn->leak.alloc_table_arena, 4096, DN_DSMapFlags_Nil);
     }
     #endif
   }
@@ -141,7 +126,7 @@ DN_API void DN_Init(DN_Core *dn, DN_InitFlags flags, DN_InitArgs *args)
     #endif
 
     #if defined(DN_PLATFORM_EMSCRIPTEN) || defined(DN_PLATFORM_POSIX)
-    DN_POSIXCore *posix = DN_Cast(DN_POSIXCore *)g_dn_->os.platform_context;
+    DN_OSPosixCore *posix = DN_Cast(DN_OSPosixCore *)g_dn_->os.platform_context;
     DN_FmtAppendTruncate(buf, &buf_size, sizeof(buf), DN_Str8Lit("..."), "  Clock GetTime: %S\n", posix->clock_monotonic_raw ? DN_Str8Lit("CLOCK_MONOTONIC_RAW") : DN_Str8Lit("CLOCK_MONOTONIC"));
     #endif
     // TODO(doyle): Add stacktrace feature log
@@ -177,7 +162,7 @@ DN_API void DN_Init(DN_Core *dn, DN_InitFlags flags, DN_InitArgs *args)
   }
 
   if (buf_size)
-    DN_LOG_DebugF("%.*s", DN_Cast(int)buf_size, buf);
+    DN_LogDebugF("%.*s", DN_Cast(int)buf_size, buf);
 }
 
 DN_API void DN_BeginFrame()

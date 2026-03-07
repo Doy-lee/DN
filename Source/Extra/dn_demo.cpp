@@ -1,6 +1,5 @@
 #if defined(_CLANGD)
-  #include "../dn_base_inc.h"
-  #include "../dn_os_inc.h"
+  #include "../dn.h"
 #endif
 
 DN_MSVC_WARNING_PUSH
@@ -31,10 +30,11 @@ void DN_Demo()
 
   // NOTE: DN_HexFromBytes
   {
-    DN_OSTLSTMem  tmem     = DN_OS_TLSTMem(nullptr);
+    DN_TCScratch  scratch  = DN_TCScratchBegin(nullptr, 0);
     unsigned char bytes[2] = {0xFA, 0xCE};
-    DN_Str8       hex      = DN_HexFromBytesPtrArena(bytes, sizeof(bytes), tmem.arena);
+    DN_Str8       hex      = DN_HexFromBytesPtrArena(bytes, sizeof(bytes), scratch.arena);
     DN_Assert(DN_Str8Eq(hex, DN_Str8Lit("face"))); // NOTE: Guaranteed to be null-terminated
+    DN_TCScratchEnd(&scratch);
   }
 
   // NOTE: DN_BytesFromHex
@@ -119,8 +119,8 @@ void DN_Demo()
   // buffer, this buffer must be valid throughout the lifetime of the hash
   // table!
   {
-    // NOTE: DN_DSMap_Init  
-    // NOTE: DN_DSMap_Deinit
+    // NOTE: DN_DSMapInit  
+    // NOTE: DN_DSMapDeinit
     //
     // Initialise a hash table where the table size *must* be a
     // power-of-two, otherwise an assert will be triggered. If
@@ -139,15 +139,15 @@ void DN_Demo()
     // A 'Deinit' of the map will similarly deallocate the passed in arena (as
     // the map takes ownership of the arena).
     DN_Arena      arena = DN_ArenaFromVMem(0, 0, DN_ArenaFlags_Nil);
-    DN_DSMap<int> map   = DN_DSMap_Init<int>(&arena, /*size*/ 1024, DN_DSMapFlags_Nil); // Size must be PoT!
-    DN_Assert(DN_DSMap_IsValid(&map));                                                  // Valid if no initialisation failure (e.g. mem alloc failure)
+    DN_DSMap<int> map   = DN_DSMapInit<int>(&arena, /*size*/ 1024, DN_DSMapFlags_Nil); // Size must be PoT!
+    DN_Assert(DN_DSMapIsValid(&map));                                                  // Valid if no initialisation failure (e.g. mem alloc failure)
 
-    // NOTE: DN_DSMap_KeyCStringLit
-    // NOTE: DN_DSMap_KeyU64       
-    // NOTE: DN_DSMap_KeyU64NoHash 
-    // NOTE: DN_DSMap_KeyBuffer    
-    // NOTE: DN_DSMap_KeyStr8      
-    // NOTE: DN_DSMap_KeyStr8Copy  
+    // NOTE: DN_DSMapKeyCStringLit
+    // NOTE: DN_DSMapKeyU64       
+    // NOTE: DN_DSMapKeyU64NoHash 
+    // NOTE: DN_DSMapKeyBuffer    
+    // NOTE: DN_DSMapKeyStr8      
+    // NOTE: DN_DSMapKeyStr8Copy  
     // Create a hash-table key where:
     //
     //   KeyCStringLit: Uses a Hash(cstring literal)
@@ -168,11 +168,11 @@ void DN_Demo()
     // already sufficiently uniformly distributed already (e.g. using 8
     // bytes taken from a SHA256 hash as the key) and the first 4 bytes
     // will be used verbatim.
-    DN_DSMapKey key = DN_DSMap_KeyStr8(&map, DN_Str8Lit("Sample Key"));
+    DN_DSMapKey key = DN_DSMapKeyStr8(&map, DN_Str8Lit("Sample Key"));
 
-    // NOTE: DN_DSMap_Find
-    // NOTE: DN_DSMap_Make
-    // NOTE: DN_DSMap_Set 
+    // NOTE: DN_DSMapFind
+    // NOTE: DN_DSMapMake
+    // NOTE: DN_DSMapSet 
     //
     // Query or commit key-value pair to the table, where:
     //
@@ -190,7 +190,7 @@ void DN_Demo()
     // the table will be grown to 2x the current the size before insertion
     // completes.
     {
-      DN_DSMapResult<int> set_result = DN_DSMap_Set(&map, key, 0xCAFE);
+      DN_DSMapResult<int> set_result = DN_DSMapSet(&map, key, 0xCAFE);
       DN_Assert(!set_result.found); // First time we are setting the key-value pair, it wasn't previously in the table
       DN_Assert(map.occupied == 2); // Sentinel + new element == 2
     }
@@ -206,38 +206,38 @@ void DN_Demo()
       DN_Assert(DN_Str8Eq(DN_Str8FromPtr(it_key.buffer_data, it_key.buffer_size), DN_Str8Lit("Sample Key")));
     }
 
-    // NOTE: DN_DSMap_Erase
+    // NOTE: DN_DSMapErase
     //
     // Remove the key-value pair from the table. If by erasing the key-value
     // pair from the table puts the table under 25% load, the table will be
     // shrunk by 1/2 the current size after erasing. The table will not shrink
     // below the initial size that the table was initialised as.
     {
-      bool erased = DN_DSMap_Erase(&map, key);
+      bool erased = DN_DSMapErase(&map, key);
       DN_Assert(erased);
       DN_Assert(map.occupied == 1); // Sentinel element
     }
 
-    DN_DSMap_Deinit(&map, DN_ZMem_Yes); // Deallocates the 'arena' for us!
+    DN_DSMapDeinit(&map, DN_ZMem_Yes); // Deallocates the 'arena' for us!
   }
 
-// NOTE: DN_DSMap_Hash
+// NOTE: DN_DSMapHash
 //
 // Hash the input key using the custom hash function if it's set on the map,
 // otherwise uses the default hashing function (32bit Murmur3).
 
-// NOTE: DN_DSMap_HashToSlotIndex
+// NOTE: DN_DSMapHashToSlotIndex
 //
 // Calculate the index into the map's 'slots' array from the given hash.
 
-// NOTE: DN_DSMap_Resize
+// NOTE: DN_DSMapResize
 //
 // Resize the table and move all elements to the new map, note that the new
 // size must be a power of two. This function wil fail on memory allocation
 // failure, or the requested size is smaller than the current number of
 // elements in the map to resize.
 
-// NOTE: DN_OSErrSink
+// NOTE: DN_ErrSink
 //
 // Error sinks are a way of accumulating errors from API calls related or
 // unrelated into 1 unified error handling pattern. The implemenation of a
@@ -273,11 +273,11 @@ void DN_Demo()
   // (B) Error handling using pipelining and and error proof APIs. APIs that
   // produce errors take in the error sink as a parameter.
   if (0) {
-    DN_OSErrSink *error = DN_OS_ErrSinkBegin(DN_OSErrSinkMode_Nil);
+    DN_ErrSink *error = DN_TCErrSinkBegin(DN_ErrSinkMode_Nil);
     DN_OSFile   file  = DN_OS_FileOpen(DN_Str8Lit("/path/to/file"), DN_OSFileOpen_OpenIfExist, DN_OSFileAccess_ReadWrite, error);
     DN_OS_FileWrite(&file, DN_Str8Lit("abc"), error);
     DN_OS_FileClose(&file);
-    if (DN_OS_ErrSinkEndAndLogErrorF(error, "Failed to write to file")) {
+    if (DN_ErrSinkEndLogErrorF(error, "Failed to write to file")) {
       // Do error handling!
     }
   }
@@ -297,7 +297,7 @@ void DN_Demo()
   // be populated by the first error encountered in that scope.
 
   if (0) {
-    DN_OSErrSink *error = DN_OS_ErrSinkBegin(DN_OSErrSinkMode_Nil);
+    DN_ErrSink *error = DN_TCErrSinkBegin(DN_ErrSinkMode_Nil);
     DN_OSFile   file  = DN_OS_FileOpen(DN_Str8Lit("/path/to/file"), DN_OSFileOpen_OpenIfExist, DN_OSFileAccess_ReadWrite, error);
     DN_OS_FileWrite(&file, DN_Str8Lit("abc"), error);
     DN_OS_FileClose(&file);
@@ -305,12 +305,12 @@ void DN_Demo()
     {
       // NOTE: My error sinks are thread-local, so the returned 'error' is
       // the same as the 'error' value above.
-      DN_OS_ErrSinkBegin(DN_OSErrSinkMode_Nil);
+      DN_TCErrSinkBegin(DN_ErrSinkMode_Nil);
       DN_OS_FileWriteAll(DN_Str8Lit("/path/to/another/file"), DN_Str8Lit("123"), error);
-      DN_OS_ErrSinkEndAndLogErrorF(error, "Failed to write to another file");
+      DN_ErrSinkEndLogErrorF(error, "Failed to write to another file");
     }
 
-    if (DN_OS_ErrSinkEndAndLogErrorF(error, "Failed to write to file")) {
+    if (DN_ErrSinkEndLogErrorF(error, "Failed to write to file")) {
       // Do error handling!
     }
   }
@@ -356,16 +356,6 @@ void DN_Demo()
   // "<name>": <value>
   //
   // And the non-named version emit just the 'value' portion
-
-  // NOTE: DN_List_Iterate
-  {
-    DN_OSTLSTMem   tmem = DN_OS_TLSTMem(nullptr);
-    DN_List<int> list = DN_List_Init<int>(/*chunk_size*/ 128);
-    for (DN_ListIterator<int> it = {}; DN_List_Iterate(&list, &it, 0);) {
-      int *item = it.data;
-      (void)item;
-    }
-  }
 
   // NOTE: DN_LOGProc
   //
@@ -438,10 +428,11 @@ void DN_Demo()
   // If 'tmp_path' is written to successfuly, the file will be copied over into
   // 'path'.
   if (0) {
-    DN_OSTLSTMem  tmem  = DN_OS_TLSTMem(nullptr);
-    DN_OSErrSink *error = DN_OS_ErrSinkBegin(DN_OSErrSinkMode_Nil);
+    DN_TCScratch scratch = DN_TCScratchBegin(nullptr, 0);
+    DN_ErrSink  *error   = DN_TCErrSinkBegin(DN_ErrSinkMode_Nil);
     DN_OS_FileWriteAllSafe(/*path*/ DN_Str8Lit("C:/Home/my.txt"), /*buffer*/ DN_Str8Lit("Hello world"), error);
-    DN_OS_ErrSinkEndAndLogErrorF(error, "");
+    DN_ErrSinkEndLogErrorF(error, "");
+    DN_TCScratchEnd(&scratch);
   }
 
   // NOTE: DN_OS_EstimateTSCPerSecond
@@ -630,7 +621,7 @@ void DN_Demo()
   // Int -> U32:    0         or UINT32_MAX
   // Int -> U64:    0         or UINT64_MAX
 
-  // NOTE: DN_StackTrace
+  // NOTE: DN_OS_StackTrace
   // Emit stack traces at the calling site that these functions are invoked
   // from.
   //
@@ -647,15 +638,15 @@ void DN_Demo()
   // the debug APIs are aware of how to resolve the new addresses imported
   // into the address space.
   {
-    DN_OSTLSTMem tmem = DN_OS_TLSTMem(nullptr);
+    DN_TCScratch scratch = DN_TCScratchBegin(nullptr, 0);
 
-    // NOTE: DN_StackTraceWalk
+    // NOTE: DN_OS_StackTraceWalk
     //
     // Generate a stack trace as a series of addresses to the base of the
     // functions on the call-stack at the current instruction pointer. The
     // addresses are stored in order from the current executing function
     // first to the most ancestor function last in the walk.
-    DN_StackTraceWalkResult walk = DN_StackTraceWalk(tmem.arena, /*depth limit*/ 128);
+    DN_StackTraceWalkResult walk = DN_StackTraceWalk(scratch.arena, /*depth limit*/ 128);
 
     // Loop over the addresses produced in the stack trace
     for (DN_StackTraceWalkResultIterator it = {}; DN_StackTraceWalkResultIterate(&it, &walk);) {
@@ -663,7 +654,7 @@ void DN_Demo()
       //
       // Converts the base address into a human readable stack trace
       // entry (e.g. address, line number, file and function name).
-      DN_StackTraceFrame frame = DN_StackTraceRawFrameToFrame(tmem.arena, it.raw_frame);
+      DN_StackTraceFrame frame = DN_StackTraceRawFrameToFrame(scratch.arena, it.raw_frame);
 
       // You may then print out the frame like so
       if (0)
@@ -675,13 +666,15 @@ void DN_Demo()
     // to resolve the new addresses.
     DN_StackTraceReloadSymbols();
 
-    // NOTE: DN_StackTraceGetFrames
+    // NOTE: DN_OS_StackTraceGetFrames
     //
     // Helper function to create a stack trace and automatically convert the
     // raw frames into human readable frames. This function effectively
     // calls 'Walk' followed by 'RawFrameToFrame'.
-    DN_Slice<DN_StackTraceFrame> frames = DN_StackTraceGetFrames(tmem.arena, /*depth limit*/ 128);
+    DN_StackTraceFrameSlice frames = DN_StackTraceGetFrames(scratch.arena, /*depth limit*/ 128);
     (void)frames;
+
+    DN_TCScratchEnd(&scratch);
   }
 
   // NOTE: DN_Str8FromArena
@@ -693,10 +686,11 @@ void DN_Demo()
   // The returned string's 'size' member variable does *not* include this
   // additional null-terminating byte.
   {
-    DN_OSTLSTMem tmem   = DN_OS_TLSTMem(nullptr);
-    DN_Str8      string = DN_Str8FromArena(tmem.arena, /*size*/ 1, DN_ZMem_Yes);
+    DN_TCScratch scratch   = DN_TCScratchBegin(nullptr, 0);
+    DN_Str8      string = DN_Str8FromArena(scratch.arena, /*size*/ 1, DN_ZMem_Yes);
     DN_Assert(string.size == 1);
     DN_Assert(string.data[string.size] == 0); // It is null-terminated!
+    DN_TCScratchEnd(&scratch);
   }
 
   // NOTE: DN_Str8BSplit
@@ -773,14 +767,15 @@ void DN_Demo()
   // always be a newly allocated copy, irrespective of if any replacements
   // were done or not.
   {
-    DN_OSTLSTMem tmem   = DN_OS_TLSTMem(nullptr);
+    DN_TCScratch scratch   = DN_TCScratchBegin(nullptr, 0);
     DN_Str8      string = DN_Str8Replace(/*string*/ DN_Str8Lit("Foo Foo Bar"),
                                      /*find*/ DN_Str8Lit("Foo"),
                                      /*replace*/ DN_Str8Lit("Moo"),
                                      /*start_index*/ 1,
-                                     /*arena*/ tmem.arena,
+                                     /*arena*/ scratch.arena,
                                      /*eq_case*/ DN_Str8EqCase_Sensitive);
     DN_Assert(DN_Str8Eq(string, DN_Str8Lit("Foo Moo Bar")));
+    DN_TCScratchEnd(&scratch);
   }
 
   // NOTE: DN_Str8Segment
@@ -791,18 +786,19 @@ void DN_Demo()
   // Reverse segment delimits the string counting 'segment_size' from the back
   // of the string.
   {
-    DN_OSTLSTMem tmem   = DN_OS_TLSTMem(nullptr);
-    DN_Str8      string = DN_Str8Segment(tmem.arena, /*string*/ DN_Str8Lit("123456789"), /*segment_size*/ 3, /*segment_char*/ ',');
+    DN_TCScratch scratch   = DN_TCScratchBegin(nullptr, 0);
+    DN_Str8      string = DN_Str8Segment(scratch.arena, /*string*/ DN_Str8Lit("123456789"), /*segment_size*/ 3, /*segment_char*/ ',');
     DN_Assert(DN_Str8Eq(string, DN_Str8Lit("123,456,789")));
+    DN_TCScratchEnd(&scratch);
   }
 
   // NOTE: DN_Str8Split
   {
     // Splits the string at each delimiter into substrings occuring prior and
     // after until the next delimiter.
-    DN_OSTLSTMem tmem = DN_OS_TLSTMem(nullptr);
+    DN_TCScratch scratch = DN_TCScratchBegin(nullptr, 0);
     {
-      DN_Str8SplitResult splits = DN_Str8SplitArena(/*arena*/ tmem.arena,
+      DN_Str8SplitResult splits = DN_Str8SplitArena(/*arena*/ scratch.arena,
                                                     /*string*/ DN_Str8Lit("192.168.8.1"),
                                                     /*delimiter*/ DN_Str8Lit("."),
                                                     /*mode*/ DN_Str8SplitIncludeEmptyStrings_No);
@@ -816,7 +812,7 @@ void DN_Demo()
     // You can include empty strings that occur when splitting by setting
     // the split mode to include empty strings.
     {
-      DN_Str8SplitResult splits = DN_Str8SplitArena(/*arena*/ tmem.arena,
+      DN_Str8SplitResult splits = DN_Str8SplitArena(/*arena*/ scratch.arena,
                                                     /*string*/ DN_Str8Lit("a--b"),
                                                     /*delimiter*/ DN_Str8Lit("-"),
                                                     /*mode*/ DN_Str8SplitIncludeEmptyStrings_Yes);
@@ -825,6 +821,8 @@ void DN_Demo()
                 DN_Str8Eq(splits.data[1], DN_Str8Lit("")) &&
                 DN_Str8Eq(splits.data[2], DN_Str8Lit("b")));
     }
+
+    DN_TCScratchEnd(&scratch);
   }
 
   // NOTE: DN_I64FromStr8, DN_U64FromStr8
@@ -931,7 +929,7 @@ void DN_Demo()
 
   // NOTE: DN_ThreadContext
   //
-  // Each thread is assigned in their thread-local storage (TLS) tmem and
+  // Each thread is assigned in their thread-local storage (TLS) scratch and
   // permanent arena allocators. These can be used for allocations with a
   // lifetime scoped to the lexical scope or for storing data permanently
   // using the arena paradigm.
@@ -939,40 +937,43 @@ void DN_Demo()
   // TLS in this implementation is implemented using the `thread_local` C/C++
   // keyword.
   //
-  // 99% of the time you will want DN_OS_TLSTMem(...) which returns you a
+  // 99% of the time you will want DN_OS_TLSTMem...) which returns you a
   // temporary arena for function lifetime allocations. On scope exit, the
   // arena is cleared out.
   //
-  // This library's paradigm revolves heavily around arenas including tmem
+  // This library's paradigm revolves heavily around arenas including scratch
   // arenas into child functions for temporary calculations. If an arena is
   // passed into a function, this poses a problem sometimes known as
   // 'arena aliasing'.
   //
   // If an arena aliases another arena (e.g. the arena passed in) is the same
-  // as the tmem arena requested in the function, we risk the tmem arena
+  // as the scratch arena requested in the function, we risk the scratch arena
   // on scope exit deallocating memory belonging to the caller.
   //
-  // To avoid this we the 'DN_OS_TLSTMem(...)' API takes in a list of arenas
-  // to ensure that we provide a tmem arena that *won't* alias with the
+  // To avoid this we the 'DN_OS_TLSTMem...)' API takes in a list of arenas
+  // to ensure that we provide a scratch arena that *won't* alias with the
   // caller's arena. If arena aliasing occurs, with ASAN on, generally
   // the library will trap and report use-after-poison once violated.
   {
-    DN_OSTLSTMem tmem_a = DN_OS_TLSTMem(nullptr);
+    DN_TCScratch scratch_a = DN_TCScratchBegin(nullptr, 0);
 
-    // Now imagine we call a function where we pass tmem_a.arena down
-    // into it .. If we call tmem again, we need to pass in the arena
+    // Now imagine we call a function where we pass scratch_a.arena down
+    // into it .. If we call scratch again, we need to pass in the arena
     // to prevent aliasing.
-    DN_OSTLSTMem tmem_b = DN_OS_TLSTMem(tmem_a.arena);
-    DN_Assert(tmem_a.arena != tmem_b.arena);
+    DN_TCScratch scratch_b = DN_TCScratchBegin(&scratch_a.arena, 1);
+    DN_Assert(scratch_a.arena != scratch_b.arena);
+
+    DN_TCScratchEnd(&scratch_b);
+    DN_TCScratchEnd(&scratch_a);
   }
 
-  // @proc DN_Thread_GetTMem
+  // @proc DN_Thread_Getscratch
   //   @desc Retrieve the per-thread temporary arena allocator that is reset on scope
   //   exit.
 
-  //   The tmem arena must be deconflicted with any existing arenas in the
+  //   The scratch arena must be deconflicted with any existing arenas in the
   //   function to avoid trampling over each other's memory. Consider the situation
-  //   where the tmem arena is passed into the function. Inside the function, if
+  //   where the scratch arena is passed into the function. Inside the function, if
   //   the same arena is reused then, if both arenas allocate, when the inner arena
   //   is reset, this will undo the passed in arena's allocations in the function.
 
@@ -988,9 +989,10 @@ void DN_Demo()
 
   // NOTE: DN_CVT_AgeFromU64
   {
-    DN_OSTLSTMem tmem   = DN_OS_TLSTMem(nullptr);
+    DN_TCScratch scratch   = DN_TCScratchBegin(nullptr, 0);
     DN_Str8x128  string = DN_AgeStr8FromSecF64(DN_SecFromHours(2) + DN_SecFromMins(30), DN_AgeUnit_All);
     DN_Assert(DN_Str8Eq(DN_Str8FromStruct(&string), DN_Str8Lit("2h 30m")));
+    DN_TCScratchEnd(&scratch);
   }
 
   // NOTE: DN_VArray
@@ -1017,21 +1019,21 @@ void DN_Demo()
   // In addition to no realloc on expansion or shrinking.
   //
   {
-    // NOTE: DN_VArray_Init        
-    // NOTE: DN_VArray_InitByteSize
+    // NOTE: DN_OS_VArrayInit        
+    // NOTE: DN_OS_VArrayInitByteSize
     //
     // Initialise an array with the requested byte size or item capacity
     // respectively. The returned array may have a higher capacity than the
     // requested amount since requested memory from the OS may have a certain
     // alignment requirement (e.g. on Windows reserve/commit are 64k/4k
     // aligned).
-    DN_VArray<int> array = DN_VArray_Init<int>(1024);
+    DN_VArray<int> array = DN_OS_VArrayInit<int>(1024);
     DN_Assert(array.size == 0 && array.max >= 1024);
 
-    // NOTE: DN_VArray_Make     
-    // NOTE: DN_VArray_Add      
-    // NOTE: DN_VArray_MakeArray
-    // NOTE: DN_VArray_AddArray 
+    // NOTE: DN_OS_VArrayMake     
+    // NOTE: DN_OS_VArrayAdd      
+    // NOTE: DN_OS_VArrayMakeArray
+    // NOTE: DN_OS_VArrayAddArray 
     //
     // Allocate items from the array where:
     //
@@ -1040,11 +1042,11 @@ void DN_Demo()
     //
     // If the array has run out of capacity or was never initialised, a null
     // pointer is returned.
-    int *item = DN_VArray_Add(&array, 0xCAFE);
+    int *item = DN_OS_VArrayAdd(&array, 0xCAFE);
     DN_Assert(*item == 0xCAFE && array.size == 1);
 
-    // NOTE: DN_VArray_AddCArray 
-    DN_VArray_AddCArray(&array, {1, 2, 3});
+    // NOTE: DN_OS_VArrayAddCArray 
+    DN_OS_VArrayAddCArray(&array, {1, 2, 3});
     DN_Assert(array.size == 4);
 
 // TODO(doyle): There's a bug here with the negative erase!
@@ -1054,7 +1056,7 @@ void DN_Demo()
           if (index != 1)
               continue;
 
-          // NOTE: DN_VArray_EraseRange
+          // NOTE: DN_OS_VArrayEraseRange
           //
           // Erase the next 'count' items at 'begin_index' in the array.
           // 'count' can be positive or negative which dictates the if we
@@ -1072,7 +1074,7 @@ void DN_Demo()
 
           // TODO(doyle): There's a bug here! This doesn't work.
           // Erase index 0 with the negative count!
-          DN_ArrayEraseResult erase_result = DN_VArray_EraseRange(&array,
+          DN_ArrayEraseResult erase_result = DN_OS_VArrayEraseRange(&array,
                                                                     /*begin_index*/ index,
                                                                     /*count*/ -1,
                                                                     /*erase*/ DN_ArrayErase_Stable);
@@ -1089,7 +1091,7 @@ void DN_Demo()
                 array.data[2] == 3);
 #endif
 
-    // NOTE: DN_VArray_Reserve
+    // NOTE: DN_OS_VArrayReserve
     //
     // Ensure that the requested number of items are backed by physical pages
     // from the OS. Calling this pre-emptively will minimise syscalls into the
@@ -1097,9 +1099,9 @@ void DN_Demo()
     // in bytes to the allocation granularity of OS allocation APIs hence the
     // reserved space may be greater than the requested amount (e.g. this is 4k
     // on Windows).
-    DN_VArray_Reserve(&array, /*count*/ 8);
+    DN_OS_VArrayReserve(&array, /*count*/ 8);
 
-    DN_VArray_Deinit(&array);
+    DN_OS_VArrayDeinit(&array);
   }
 
   // NOTE: DN_W32_LastError        
@@ -1108,13 +1110,14 @@ void DN_Demo()
     if (0) {
       // Generate the error string for the last Win32 API called that return
       // an error value.
-      DN_OSTLSTMem  tmem           = DN_OS_TLSTMem(nullptr);
-      DN_W32Error get_last_error = DN_W32_LastError(tmem.arena);
+      DN_TCScratch scratch            = DN_TCScratchBegin(nullptr, 0);
+      DN_OSW32Error get_last_error = DN_OS_W32LastError(scratch.arena);
       printf("Error (%lu): %.*s", get_last_error.code, DN_Str8PrintFmt(get_last_error.msg));
 
       // Alternatively, pass in the error code directly
-      DN_W32Error error_msg_for_code = DN_W32_ErrorCodeToMsg(tmem.arena, /*error_code*/ 0);
+      DN_OSW32Error error_msg_for_code = DN_OS_W32ErrorCodeToMsg(scratch.arena, /*error_code*/ 0);
       printf("Error (%lu): %.*s", error_msg_for_code.code, DN_Str8PrintFmt(error_msg_for_code.msg));
+      DN_TCScratchEnd(&scratch);
     }
 
   // NOTE: DN_W32_MakeProcessDPIAware

@@ -45,6 +45,83 @@ DN_INIStr8 DN_INI_Str8FromPtr(char const *data, size_t count)
   return result;
 }
 
+static void DN_INI_Str8BuilderAppend_(DN_INIStr8Builder *builder, char const *fmt, ...)
+{
+  va_list args;
+  va_list args_copy;
+  va_start(args, fmt);
+  va_copy(args_copy, args);
+  int size_req = vsnprintf(0, 0, fmt, args);
+  va_end(args);
+
+  builder->size_req += size_req;
+  if (builder->used + size_req <= builder->max) {
+    vsnprintf(builder->data + builder->used, builder->max - builder->used, fmt, args_copy);
+    builder->used += size_req;
+  }
+  va_end(args_copy);
+}
+
+DN_INIStr8FromResult DN_INI_Str8FromINI(DN_INICore const *ini, char *buffer, size_t size)
+{
+  DN_INIStr8FromResult result              = {};
+  DN_INISection const *section_stack[64]   = {};
+  size_t               section_stack_count = 0;
+  if (ini->first_section.child_first)
+    section_stack[section_stack_count++] = &ini->first_section;
+
+  DN_INIStr8Builder builder = {};
+  builder.data              = buffer;
+  builder.max               = size;
+
+  DN_INISection *parent_stack[32]   = {};
+  size_t         parent_stack_count = 0;
+  for (; section_stack_count;) {
+    DN_INISection const *it = section_stack[--section_stack_count];
+
+    if (it != &ini->first_section) {
+      DN_INI_Str8BuilderAppend_(&builder, "[");
+      for (DN_INISection *parent = it->parent; parent; parent = parent->parent)
+        if (parent->name.size)
+          parent_stack[parent_stack_count++] = parent;
+      for (size_t index = parent_stack_count - 1; index < parent_stack_count; index--) {
+        DN_INISection *parent = parent_stack[index];
+        DN_INI_Str8BuilderAppend_(&builder, "%.*s.", (int)parent->name.size, parent->name.data);
+      }
+      parent_stack_count = 0;
+      DN_INI_Str8BuilderAppend_(&builder, "%.*s]\n", (int)it->name.size, it->name.data);
+    }
+
+    for (DN_INIField *field = it->first_field; field; field = field->next) {
+      DN_INI_Str8BuilderAppend_(&builder, "%.*s = ", (int)field->key.size, field->key.data);
+      switch (field->value_type) {
+        case DN_INIFieldType_String: DN_INI_Str8BuilderAppend_(&builder, "%.*s\n", (int)field->value.size, field->value.data); break;
+        case DN_INIFieldType_Bool:   DN_INI_Str8BuilderAppend_(&builder, "%d\n", field->value_bool); break;
+        case DN_INIFieldType_USize:  DN_INI_Str8BuilderAppend_(&builder, "%zu\n", field->value_usize); break;
+      }
+    }
+
+    if (it->next)
+      section_stack[section_stack_count++] = it->next;
+    if (it->child_first)
+      section_stack[section_stack_count++] = it->child_first;
+
+    if (section_stack_count && it != &ini->first_section)
+      DN_INI_Str8BuilderAppend_(&builder, "\n");
+  }
+
+  result.size_req = builder.size_req;
+  if (buffer) {
+    result.str8.data = builder.data;
+    result.str8.size = builder.used;
+    result.success   = true;
+  } else {
+    result.success = true;
+  }
+
+  return result;
+}
+
 static bool DN_INI_Str8Eq(DN_INIStr8 lhs, DN_INIStr8 rhs)
 {
   bool result = lhs.size == rhs.size && DN_INI_Memcmp(lhs.data, rhs.data, lhs.size) == 0;
@@ -442,8 +519,8 @@ DN_INICore DN_INI_ParseFromPtr(char const *buf, size_t count, char *base, size_t
   arena.max                 = base_count;
 
   DN_INICore     result       = {};
-  DN_INISection  *curr_section = &result.first_section;
-  DN_INIField *field    = 0;
+  DN_INISection *curr_section = &result.first_section;
+  DN_INIField   *field        = 0;
   for (;;) {
     DN_INIToken token = DN_INI_NextToken(&tokeniser);
     if (token.type == DN_INITokenType_EndOfStream)
@@ -651,6 +728,8 @@ DN_INISection *DN_INI_AppendSectionF(DN_INICore *ini, DN_INIArena *arena, DN_INI
     result->name.data = (char *)DN_INI_ArenaAlloc(arena, size_req + 1);
     result->name.size = size_req;
     vsnprintf(result->name.data, result->name.size + 1, fmt, args_copy);
+    if (!section)
+      section = &ini->first_section;
 
     if (result) {
       if (section) {
@@ -766,83 +845,6 @@ DN_INIField *DN_INI_AppendKeyF(DN_INICore *ini, DN_INIArena *arena, DN_INISectio
     DN_INI_AppendValue(section, result);
   }
   va_end(args_copy);
-
-  return result;
-}
-
-static void DN_INI_Str8BuilderAppend(DN_INIStr8Builder *builder, char const *fmt, ...)
-{
-  va_list args;
-  va_list args_copy;
-  va_start(args, fmt);
-  va_copy(args_copy, args);
-  int size_req = vsnprintf(0, 0, fmt, args);
-  va_end(args);
-
-  builder->size_req += size_req;
-  if (builder->used + size_req <= builder->max) {
-    vsnprintf(builder->data + builder->used, builder->max - builder->used, fmt, args_copy);
-    builder->used += size_req;
-  }
-  va_end(args_copy);
-}
-
-DN_INIStr8FromResult DN_INI_Str8FromINI(DN_INICore const *ini, char *buffer, size_t size)
-{
-  DN_INIStr8FromResult result              = {};
-  DN_INISection const *section_stack[64]   = {};
-  size_t               section_stack_count = 0;
-  if (ini->first_section.child_first)
-    section_stack[section_stack_count++] = &ini->first_section;
-
-  DN_INIStr8Builder builder = {};
-  builder.data              = buffer;
-  builder.max               = size;
-
-  DN_INISection *parent_stack[32]   = {};
-  size_t         parent_stack_count = 0;
-  for (; section_stack_count;) {
-    DN_INISection const *it = section_stack[--section_stack_count];
-
-    if (it != &ini->first_section) {
-      DN_INI_Str8BuilderAppend(&builder, "[");
-      for (DN_INISection *parent = it->parent; parent; parent = parent->parent)
-        if (parent->name.size)
-          parent_stack[parent_stack_count++] = parent;
-      for (size_t index = parent_stack_count - 1; index < parent_stack_count; index--) {
-        DN_INISection *parent = parent_stack[index];
-        DN_INI_Str8BuilderAppend(&builder, "%.*s.", (int)parent->name.size, parent->name.data);
-      }
-      parent_stack_count = 0;
-      DN_INI_Str8BuilderAppend(&builder, "%.*s]\n", (int)it->name.size, it->name.data);
-    }
-
-    for (DN_INIField *field = it->first_field; field; field = field->next) {
-      DN_INI_Str8BuilderAppend(&builder, "%.*s = ", (int)field->key.size, field->key.data);
-      switch (field->value_type) {
-        case DN_INIFieldType_String: DN_INI_Str8BuilderAppend(&builder, "%.*s\n", (int)field->value.size, field->value.data); break;
-        case DN_INIFieldType_Bool:   DN_INI_Str8BuilderAppend(&builder, "%d\n", field->value_bool); break;
-        case DN_INIFieldType_USize:  DN_INI_Str8BuilderAppend(&builder, "%zu\n", field->value_usize); break;
-      }
-    }
-
-    if (it->next)
-      section_stack[section_stack_count++] = it->next;
-    if (it->child_first)
-      section_stack[section_stack_count++] = it->child_first;
-
-    if (section_stack_count)
-      DN_INI_Str8BuilderAppend(&builder, "\n");
-  }
-
-  result.size_req = builder.size_req;
-  if (buffer) {
-    result.str8.data = builder.data;
-    result.str8.size = builder.used;
-    result.success   = true;
-  } else {
-    result.success = true;
-  }
 
   return result;
 }

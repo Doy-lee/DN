@@ -1255,18 +1255,18 @@ DN_API DN_M2x3 DN_M2x3_Translate(DN_V2F32 offset)
   return result;
 }
 
+DN_API DN_V2F32 DN_M2x3_ScaleGet(DN_M2x3 m2x3)
+{
+  DN_V2F32 result = DN_V2F32_From2N(m2x3.row[0][0], m2x3.row[1][1]);
+  return result;
+}
+
 DN_API DN_M2x3 DN_M2x3_Scale(DN_V2F32 scale)
 {
-  DN_M2x3 result = {
-      {
-       scale.x,
-       0,
-       0,
-       0,
-       scale.y,
-       0,
-       }
-  };
+  DN_M2x3 result = {{
+    scale.x, 0,       0,
+    0,       scale.y, 0,
+  }};
   return result;
 }
 

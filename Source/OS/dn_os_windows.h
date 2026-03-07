@@ -2,7 +2,7 @@
 #define DN_OS_WINDOWS_H
 
 #if defined(_CLANGD)
-  #include "../dn_base_inc.h"
+  #include "../dn.h"
 #endif
 
 #if defined(DN_COMPILER_MSVC) || defined(DN_COMPILER_CLANG_CL)

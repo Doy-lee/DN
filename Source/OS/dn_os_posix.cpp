@@ -1,12 +1,14 @@
 #define DN_OS_POSIX_CPP
 
 #if defined(_CLANGD)
-  #include "../dn_base_inc.h"
-  #include "../dn_os_inc.h"
+  #define DN_H_WITH_OS 1
+  #include "../dn.h"
+  #include "dn_os_posix.h"
 #endif
 
 #include <dirent.h> // readdir, opendir, closedir
 #include <sys/statvfs.h>
+#include <sys/mman.h>
 
 // NOTE: DN_OSMem
 static DN_U32 DN_OS_MemConvertPageToOSFlags_(DN_U32 protect)
@@ -226,17 +228,20 @@ DN_API bool DN_OS_SetEnvVar(DN_Str8 name, DN_Str8 value)
 
 DN_API DN_OSDiskSpace DN_OS_DiskSpace(DN_Str8 path)
 {
-  DN_OSTLSTMem   tmem              = DN_OS_TLSPushTMem(nullptr);
+  DN_TCScratch   tmem              = DN_TCScratchBegin(nullptr, 0);
   DN_OSDiskSpace result            = {};
   DN_Str8        path_z_terminated = DN_Str8FromStr8Arena(tmem.arena, path);
 
   struct statvfs info = {};
-  if (statvfs(path_z_terminated.data, &info) != 0)
+  if (statvfs(path_z_terminated.data, &info) != 0) {
+    DN_TCScratchEnd(&tmem);
     return result;
+  }
 
   result.success = true;
   result.avail   = info.f_bavail * info.f_frsize;
   result.size    = info.f_blocks * info.f_frsize;
+  DN_TCScratchEnd(&tmem);
   return result;
 }
 
@@ -313,23 +318,23 @@ DN_API DN_U64 DN_OS_PerfCounterFrequency()
   return result;
 }
 
-static DN_POSIXCore *DN_OS_GetPOSIXCore_()
+static DN_OSPosixCore *DN_OS_GetPOSIXCore_()
 {
   DN_Assert(g_dn_ && g_dn_->os.platform_context);
-  DN_POSIXCore *result = DN_Cast(DN_POSIXCore *)g_dn_->os.platform_context;
+  DN_OSPosixCore *result = DN_Cast(DN_OSPosixCore *)g_dn_->os.platform_context;
   return result;
 }
 
 DN_API DN_U64 DN_OS_PerfCounterNow()
 {
-  DN_POSIXCore *posix = DN_OS_GetPOSIXCore_();
+  DN_OSPosixCore *posix = DN_OS_GetPOSIXCore_();
   struct timespec ts;
   clock_gettime(posix->clock_monotonic_raw ? CLOCK_MONOTONIC_RAW : CLOCK_MONOTONIC, &ts);
   DN_U64 result = DN_Cast(DN_U64) ts.tv_sec * 1'000'000'000 + DN_Cast(DN_U64) ts.tv_nsec;
   return result;
 }
 
-DN_API bool DN_OS_FileCopy(DN_Str8 src, DN_Str8 dest, bool overwrite, DN_OSErrSink *error)
+DN_API bool DN_OS_FileCopy(DN_Str8 src, DN_Str8 dest, bool overwrite, DN_ErrSink *error)
 {
   bool result = false;
   #if defined(DN_PLATFORM_EMSCRIPTEN)
@@ -385,9 +390,9 @@ DN_API bool DN_OS_FileCopy(DN_Str8 src, DN_Str8 dest, bool overwrite, DN_OSErrSi
   result                = (bytes_written == stat_existing.st_size);
   if (!result) {
     int        error_code = errno;
-    DN_OSTLSTMem tmem               = DN_OS_TLSTMem(nullptr);
-    DN_Str8      file_size_str8     = DN_Str8FromByteCount(tmem.arena, stat_existing.st_size, DN_ByteCountType_Auto);
-    DN_Str8      bytes_written_str8 = DN_Str8FromByteCount(tmem.arena, bytes_written, DN_ByteCountType_Auto);
+    DN_TCScratch scratch               = DN_TCScratchBegin(nullptr, 0);
+    DN_Str8      file_size_str8     = DN_Str8FromByteCount(scratch.arena, stat_existing.st_size, DN_ByteCountType_Auto);
+    DN_Str8      bytes_written_str8 = DN_Str8FromByteCount(scratch.arena, bytes_written, DN_ByteCountType_Auto);
     DN_OS_ErrSinkAppendF(error,
                        error_code,
                        "Failed to copy file '%.*s' to '%.*s', we copied %.*s but the file "
@@ -398,13 +403,14 @@ DN_API bool DN_OS_FileCopy(DN_Str8 src, DN_Str8 dest, bool overwrite, DN_OSErrSi
                        DN_Str8PrintFmt(file_size_str8),
                        error_code,
                        strerror(error_code));
+    DN_TCScratchEnd(&scratch);
   }
 
   #endif
   return result;
 }
 
-DN_API bool DN_OS_FileMove(DN_Str8 src, DN_Str8 dest, bool overwrite, DN_OSErrSink *error)
+DN_API bool DN_OS_FileMove(DN_Str8 src, DN_Str8 dest, bool overwrite, DN_ErrSink *error)
 {
   // See: https://github.com/gingerBill/gb/blob/master/gb.h
   bool result     = false;
@@ -435,7 +441,7 @@ DN_API bool DN_OS_FileMove(DN_Str8 src, DN_Str8 dest, bool overwrite, DN_OSErrSi
 DN_API DN_OSFile DN_OS_FileOpen(DN_Str8         path,
                                 DN_OSFileOpen   open_mode,
                                 DN_OSFileAccess access,
-                                DN_OSErrSink     *error)
+                                DN_ErrSink     *error)
 {
   DN_OSFile result = {};
   if (path.size == 0 || path.size <= 0)
@@ -506,7 +512,7 @@ DN_API DN_OSFile DN_OS_FileOpen(DN_Str8         path,
   return result;
 }
 
-DN_API DN_OSFileRead DN_OS_FileRead(DN_OSFile *file, void *buffer, DN_USize size, DN_OSErrSink *err)
+DN_API DN_OSFileRead DN_OS_FileRead(DN_OSFile *file, void *buffer, DN_USize size, DN_ErrSink *err)
 {
   DN_OSFileRead result = {};
   if (!file || !file->handle || file->error || !buffer || size <= 0)
@@ -514,9 +520,10 @@ DN_API DN_OSFileRead DN_OS_FileRead(DN_OSFile *file, void *buffer, DN_USize size
 
   result.bytes_read = fread(buffer, 1, size, DN_Cast(FILE *) file->handle);
   if (feof(DN_Cast(FILE*)file->handle)) {
-    DN_OSTLSTMem tmem             = DN_OS_TLSTMem(nullptr);
+    DN_TCScratch scratch             = DN_TCScratchBegin(nullptr, 0);
     DN_Str8x32   buffer_size_str8 = DN_ByteCountStr8x32(size);
     DN_OS_ErrSinkAppendF(err, 1, "Failed to read %S from file", buffer_size_str8);
+    DN_TCScratchEnd(&scratch);
     return result;
   }
 
@@ -524,7 +531,7 @@ DN_API DN_OSFileRead DN_OS_FileRead(DN_OSFile *file, void *buffer, DN_USize size
   return result;
 }
 
-DN_API bool DN_OS_FileWritePtr(DN_OSFile *file, void const *buffer, DN_USize size, DN_OSErrSink *err)
+DN_API bool DN_OS_FileWritePtr(DN_OSFile *file, void const *buffer, DN_USize size, DN_ErrSink *err)
 {
   if (!file || !file->handle || file->error || !buffer || size <= 0)
     return false;
@@ -532,14 +539,15 @@ DN_API bool DN_OS_FileWritePtr(DN_OSFile *file, void const *buffer, DN_USize siz
       fwrite(buffer, DN_Cast(DN_USize) size, 1 /*count*/, DN_Cast(FILE *) file->handle) ==
       1 /*count*/;
   if (!result) {
-    DN_OSTLSTMem tmem             = DN_OS_TLSTMem(nullptr);
+    DN_TCScratch scratch             = DN_TCScratchBegin(nullptr, 0);
     DN_Str8x32   buffer_size_str8 = DN_ByteCountStr8x32(size);
     DN_OS_ErrSinkAppendF(err, 1, "Failed to write buffer (%s) to file handle", DN_Str8PrintFmt(buffer_size_str8));
+    DN_TCScratchEnd(&scratch);
   }
   return result;
 }
 
-DN_API bool DN_OS_FileFlush(DN_OSFile *file, DN_OSErrSink *err)
+DN_API bool DN_OS_FileFlush(DN_OSFile *file, DN_ErrSink *err)
 {
   // TODO: errno is not thread safe
   int fd = fileno(DN_Cast(FILE *) file->handle);
@@ -622,7 +630,7 @@ DN_API bool DN_OS_PathIsDir(DN_Str8 path)
 
 DN_API bool DN_OS_PathMakeDir(DN_Str8 path)
 {
-  DN_OSTLSTMem tmem   = DN_OS_TLSTMem(nullptr);
+  DN_TCScratch scratch   = DN_TCScratchBegin(nullptr, 0);
   bool       result = true;
 
   // TODO(doyle): Implement this without using the path indexes, it's not
@@ -630,7 +638,7 @@ DN_API bool DN_OS_PathMakeDir(DN_Str8 path)
   DN_USize path_indexes_size = 0;
   uint16_t path_indexes[64]  = {};
 
-  DN_Str8 copy = DN_Str8FromStr8Arena(tmem.arena, path);
+  DN_Str8 copy = DN_Str8FromStr8Arena(scratch.arena, path);
   for (DN_USize index = copy.size - 1; index < copy.size; index--) {
     bool first_char = index == (copy.size - 1);
     char ch         = copy.data[index];
@@ -649,6 +657,7 @@ DN_API bool DN_OS_PathMakeDir(DN_Str8 path)
         // NOTE: There's something that exists in at this path, but
         // it's not a directory. This request to make a directory is
         // invalid.
+        DN_TCScratchEnd(&scratch);
         return false;
       } else if (DN_OS_PathIsDir(copy)) {
         // NOTE: We found a directory, we can stop here and start
@@ -673,6 +682,7 @@ DN_API bool DN_OS_PathMakeDir(DN_Str8 path)
     if (index != 0)
       copy.data[path_index] = temp;
   }
+  DN_TCScratchEnd(&scratch);
   return result;
 }
 
@@ -723,7 +733,7 @@ enum DN_OSPipeType_
 
 DN_API DN_OSExecResult DN_OS_ExecWait(DN_OSExecAsyncHandle handle,
                                       DN_Arena            *arena,
-                                      DN_OSErrSink          *error)
+                                      DN_ErrSink          *error)
 {
   DN_OSExecResult result = {};
   if (!handle.process || handle.os_error_code || handle.exit_code) {
@@ -786,10 +796,10 @@ DN_API DN_OSExecResult DN_OS_ExecWait(DN_OSExecAsyncHandle handle,
 
   // NOTE: Read the data from the read end of the pipe
   if (result.os_error_code == 0) {
-    DN_OSTLSTMem tmem = DN_OS_TLSTMem(arena);
+    DN_TCScratch scratch = DN_TCScratchBegin(&arena, 1);
     if (arena && handle.stdout_read) {
       char           buffer[4096];
-      DN_Str8Builder builder = DN_Str8BuilderFromArena(tmem.arena);
+      DN_Str8Builder builder = DN_Str8BuilderFromArena(scratch.arena);
       for (;;) {
         ssize_t bytes_read =
             read(stdout_pipe[DN_OSPipeType__Read], buffer, sizeof(buffer));
@@ -803,7 +813,7 @@ DN_API DN_OSExecResult DN_OS_ExecWait(DN_OSExecAsyncHandle handle,
 
     if (arena && handle.stderr_read) {
       char           buffer[4096];
-      DN_Str8Builder builder = DN_Str8BuilderFromArena(tmem.arena);
+      DN_Str8Builder builder = DN_Str8BuilderFromArena(scratch.arena);
       for (;;) {
         ssize_t bytes_read =
             read(stderr_pipe[DN_OSPipeType__Read], buffer, sizeof(buffer));
@@ -814,6 +824,7 @@ DN_API DN_OSExecResult DN_OS_ExecWait(DN_OSExecAsyncHandle handle,
 
       result.stderr_text = DN_Str8BuilderBuild(&builder, arena);
     }
+    DN_TCScratchEnd(&scratch);
   }
 
   close(stdout_pipe[DN_OSPipeType__Read]);
@@ -823,7 +834,7 @@ DN_API DN_OSExecResult DN_OS_ExecWait(DN_OSExecAsyncHandle handle,
 
 DN_API DN_OSExecAsyncHandle DN_OS_ExecAsync(DN_Slice<DN_Str8> cmd_line,
                                             DN_OSExecArgs    *args,
-                                            DN_OSErrSink       *error)
+                                            DN_ErrSink       *error)
 {
 #if defined(DN_PLATFORM_EMSCRIPTEN)
   DN_InvalidCodePathF("Unsupported operation");
@@ -834,12 +845,13 @@ DN_API DN_OSExecAsyncHandle DN_OS_ExecAsync(DN_Slice<DN_Str8> cmd_line,
   if (cmd_line.size == 0)
     return result;
 
-  DN_OSTLSTMem tmem                              = DN_OS_TLSTMem(nullptr);
-  DN_Str8    cmd_rendered                      = DN_Slice_Str8Render(tmem.arena, cmd_line, DN_Str8Lit(" "));
+  DN_TCScratch scratch                              = DN_TCScratchBegin(nullptr, 0);
+  DN_DEFER { DN_TCScratchEnd(&scratch); };
+  DN_Str8    cmd_rendered                      = DN_Slice_Str8Render(scratch.arena, cmd_line, DN_Str8Lit(" "));
   int        stdout_pipe[DN_OSPipeType__Count] = {};
   int        stderr_pipe[DN_OSPipeType__Count] = {};
 
-  // NOTE: Open stdout pipe //////////////////////////////////////////////////////////////////////
+  // NOTE: Open stdout pipe
   if (DN_BitIsSet(args->flags, DN_OSExecFlags_SaveStdout)) {
     if (pipe(stdout_pipe) == -1) {
       result.os_error_code = errno;
@@ -929,7 +941,7 @@ DN_API DN_OSExecAsyncHandle DN_OS_ExecAsync(DN_Slice<DN_Str8> cmd_line,
 
     // NOTE: Convert the command into something suitable for execvp
     char **argv =
-        DN_ArenaNewArray(tmem.arena, char *, cmd_line.size + 1 /*null*/, DN_ZMem_Yes);
+        DN_ArenaNewArray(scratch.arena, char *, cmd_line.size + 1 /*null*/, DN_ZMem_Yes);
     if (!argv) {
       result.exit_code = -1;
       DN_OS_ErrSinkAppendF(
@@ -942,7 +954,7 @@ DN_API DN_OSExecAsyncHandle DN_OS_ExecAsync(DN_Slice<DN_Str8> cmd_line,
 
     for (DN_ForIndexU(arg_index, cmd_line.size)) {
       DN_Str8 arg     = cmd_line.data[arg_index];
-      argv[arg_index] = DN_Str8FromStr8Arena(tmem.arena, arg).data; // NOTE: Copy string to guarantee it is null-terminated
+      argv[arg_index] = DN_Str8FromStr8Arena(scratch.arena, arg).data; // NOTE: Copy string to guarantee it is null-terminated
     }
 
     // NOTE: Change the working directory if there is one
@@ -960,7 +972,7 @@ DN_API DN_OSExecAsyncHandle DN_OS_ExecAsync(DN_Slice<DN_Str8> cmd_line,
 
     if (args->working_dir.size) {
       prev_working_dir    = get_current_dir_name();
-      DN_Str8 working_dir = DN_Str8FromStr8Arena(tmem.arena, args->working_dir);
+      DN_Str8 working_dir = DN_Str8FromStr8Arena(scratch.arena, args->working_dir);
       if (chdir(working_dir.data) == -1) {
         result.os_error_code = errno;
         DN_OS_ErrSinkAppendF(
@@ -1014,21 +1026,21 @@ DN_API DN_OSExecResult DN_OS_ExecPump(DN_OSExecAsyncHandle handle,
                                       char                *stderr_buffer,
                                       size_t              *stderr_size,
                                       DN_U32             timeout_ms,
-                                      DN_OSErrSink          *err)
+                                      DN_ErrSink          *err)
 {
   DN_InvalidCodePath;
   DN_OSExecResult result = {};
   return result;
 }
 
-static DN_POSIXSyncPrimitive *DN_OS_U64ToPOSIXSyncPrimitive_(DN_U64 u64)
+static DN_OSPosixSyncPrimitive *DN_OS_U64ToPOSIXSyncPrimitive_(DN_U64 u64)
 {
-  DN_POSIXSyncPrimitive *result = nullptr;
+  DN_OSPosixSyncPrimitive *result = nullptr;
   DN_Memcpy(&result, &u64, sizeof(result));
   return result;
 }
 
-static DN_U64 DN_POSIX_SyncPrimitiveToU64(DN_POSIXSyncPrimitive *primitive)
+static DN_U64 DN_POSIX_SyncPrimitiveToU64(DN_OSPosixSyncPrimitive *primitive)
 {
   DN_U64 result = 0;
   static_assert(sizeof(result) >= sizeof(primitive), "Pointer size mis-match");
@@ -1036,10 +1048,10 @@ static DN_U64 DN_POSIX_SyncPrimitiveToU64(DN_POSIXSyncPrimitive *primitive)
   return result;
 }
 
-static DN_POSIXSyncPrimitive *DN_POSIX_AllocSyncPrimitive_()
+static DN_OSPosixSyncPrimitive *DN_POSIX_AllocSyncPrimitive_()
 {
-  DN_POSIXCore          *posix  = DN_OS_GetPOSIXCore_();
-  DN_POSIXSyncPrimitive *result = nullptr;
+  DN_OSPosixCore          *posix  = DN_OS_GetPOSIXCore_();
+  DN_OSPosixSyncPrimitive *result = nullptr;
   pthread_mutex_lock(&posix->sync_primitive_free_list_mutex);
   {
     if (posix->sync_primitive_free_list) {
@@ -1048,17 +1060,17 @@ static DN_POSIXSyncPrimitive *DN_POSIX_AllocSyncPrimitive_()
       result->next                    = nullptr;
     } else {
       DN_OSCore *os = &g_dn_->os;
-      result        = DN_ArenaNew(&os->arena, DN_POSIXSyncPrimitive, DN_ZMem_Yes);
+      result        = DN_ArenaNew(&os->arena, DN_OSPosixSyncPrimitive, DN_ZMem_Yes);
     }
   }
   pthread_mutex_unlock(&posix->sync_primitive_free_list_mutex);
   return result;
 }
 
-static void DN_POSIX_DeallocSyncPrimitive_(DN_POSIXSyncPrimitive *primitive)
+static void DN_POSIX_DeallocSyncPrimitive_(DN_OSPosixSyncPrimitive *primitive)
 {
   if (primitive) {
-    DN_POSIXCore *posix = DN_OS_GetPOSIXCore_();
+    DN_OSPosixCore *posix = DN_OS_GetPOSIXCore_();
     pthread_mutex_lock(&posix->sync_primitive_free_list_mutex);
     primitive->next                 = posix->sync_primitive_free_list;
     posix->sync_primitive_free_list = primitive;
@@ -1070,7 +1082,7 @@ static void DN_POSIX_DeallocSyncPrimitive_(DN_POSIXSyncPrimitive *primitive)
 DN_API DN_OSSemaphore DN_OS_SemaphoreInit(DN_U32 initial_count)
 {
   DN_OSSemaphore         result    = {};
-  DN_POSIXSyncPrimitive *primitive = DN_POSIX_AllocSyncPrimitive_();
+  DN_OSPosixSyncPrimitive *primitive = DN_POSIX_AllocSyncPrimitive_();
   if (primitive) {
     int pshared = 0; // Share the semaphore across all threads in the process
     if (sem_init(&primitive->sem, pshared, initial_count) == 0)
@@ -1084,7 +1096,7 @@ DN_API DN_OSSemaphore DN_OS_SemaphoreInit(DN_U32 initial_count)
 DN_API void DN_OS_SemaphoreDeinit(DN_OSSemaphore *semaphore)
 {
   if (semaphore && semaphore->handle != 0) {
-    DN_POSIXSyncPrimitive *primitive = DN_OS_U64ToPOSIXSyncPrimitive_(semaphore->handle);
+    DN_OSPosixSyncPrimitive *primitive = DN_OS_U64ToPOSIXSyncPrimitive_(semaphore->handle);
     sem_destroy(&primitive->sem);
     DN_POSIX_DeallocSyncPrimitive_(primitive);
     *semaphore = {};
@@ -1094,7 +1106,7 @@ DN_API void DN_OS_SemaphoreDeinit(DN_OSSemaphore *semaphore)
 DN_API void DN_OS_SemaphoreIncrement(DN_OSSemaphore *semaphore, DN_U32 amount)
 {
   if (semaphore && semaphore->handle != 0) {
-    DN_POSIXSyncPrimitive *primitive = DN_OS_U64ToPOSIXSyncPrimitive_(semaphore->handle);
+    DN_OSPosixSyncPrimitive *primitive = DN_OS_U64ToPOSIXSyncPrimitive_(semaphore->handle);
     #if defined(DN_OS_WIN32)
     sem_post_multiple(&primitive->sem, amount); // mingw extension
     #else
@@ -1111,7 +1123,7 @@ DN_API DN_OSSemaphoreWaitResult DN_OS_SemaphoreWait(DN_OSSemaphore *semaphore,
   if (!semaphore || semaphore->handle == 0)
     return result;
 
-  DN_POSIXSyncPrimitive *primitive = DN_OS_U64ToPOSIXSyncPrimitive_(semaphore->handle);
+  DN_OSPosixSyncPrimitive *primitive = DN_OS_U64ToPOSIXSyncPrimitive_(semaphore->handle);
   if (timeout_ms == DN_OS_SEMAPHORE_INFINITE_TIMEOUT) {
     int wait_result = 0;
     do {
@@ -1138,7 +1150,7 @@ DN_API DN_OSSemaphoreWaitResult DN_OS_SemaphoreWait(DN_OSSemaphore *semaphore,
 // NOTE: DN_OSMutex ////////////////////////////////////////////////////////////////////////////////
 DN_API DN_OSMutex DN_OS_MutexInit()
 {
-  DN_POSIXSyncPrimitive *primitive = DN_POSIX_AllocSyncPrimitive_();
+  DN_OSPosixSyncPrimitive *primitive = DN_POSIX_AllocSyncPrimitive_();
   DN_OSMutex             result    = {};
   if (primitive) {
     if (pthread_mutex_init(&primitive->mutex, nullptr) == 0)
@@ -1152,7 +1164,7 @@ DN_API DN_OSMutex DN_OS_MutexInit()
 DN_API void DN_OS_MutexDeinit(DN_OSMutex *mutex)
 {
   if (mutex && mutex->handle != 0) {
-    DN_POSIXSyncPrimitive *primitive = DN_OS_U64ToPOSIXSyncPrimitive_(mutex->handle);
+    DN_OSPosixSyncPrimitive *primitive = DN_OS_U64ToPOSIXSyncPrimitive_(mutex->handle);
     pthread_mutex_destroy(&primitive->mutex);
     DN_POSIX_DeallocSyncPrimitive_(primitive);
     *mutex = {};
@@ -1162,7 +1174,7 @@ DN_API void DN_OS_MutexDeinit(DN_OSMutex *mutex)
 DN_API void DN_OS_MutexLock(DN_OSMutex *mutex)
 {
   if (mutex && mutex->handle != 0) {
-    DN_POSIXSyncPrimitive *primitive = DN_OS_U64ToPOSIXSyncPrimitive_(mutex->handle);
+    DN_OSPosixSyncPrimitive *primitive = DN_OS_U64ToPOSIXSyncPrimitive_(mutex->handle);
     pthread_mutex_lock(&primitive->mutex);
   }
 }
@@ -1170,14 +1182,14 @@ DN_API void DN_OS_MutexLock(DN_OSMutex *mutex)
 DN_API void DN_OS_MutexUnlock(DN_OSMutex *mutex)
 {
   if (mutex && mutex->handle != 0) {
-    DN_POSIXSyncPrimitive *primitive = DN_OS_U64ToPOSIXSyncPrimitive_(mutex->handle);
+    DN_OSPosixSyncPrimitive *primitive = DN_OS_U64ToPOSIXSyncPrimitive_(mutex->handle);
     pthread_mutex_unlock(&primitive->mutex);
   }
 }
 
 DN_API DN_OSConditionVariable DN_OS_ConditionVariableInit()
 {
-  DN_POSIXSyncPrimitive *primitive = DN_POSIX_AllocSyncPrimitive_();
+  DN_OSPosixSyncPrimitive *primitive = DN_POSIX_AllocSyncPrimitive_();
   DN_OSConditionVariable result    = {};
   if (primitive) {
     if (pthread_cond_init(&primitive->cv, nullptr) == 0)
@@ -1191,7 +1203,7 @@ DN_API DN_OSConditionVariable DN_OS_ConditionVariableInit()
 DN_API void DN_OS_ConditionVariableDeinit(DN_OSConditionVariable *cv)
 {
   if (cv && cv->handle != 0) {
-    DN_POSIXSyncPrimitive *primitive = DN_OS_U64ToPOSIXSyncPrimitive_(cv->handle);
+    DN_OSPosixSyncPrimitive *primitive = DN_OS_U64ToPOSIXSyncPrimitive_(cv->handle);
     pthread_cond_destroy(&primitive->cv);
     DN_POSIX_DeallocSyncPrimitive_(primitive);
     *cv = {};
@@ -1202,8 +1214,8 @@ DN_API bool DN_OS_ConditionVariableWaitUntil(DN_OSConditionVariable *cv, DN_OSMu
 {
   bool result = false;
   if (cv && mutex && mutex->handle != 0 && cv->handle != 0) {
-    DN_POSIXSyncPrimitive *cv_primitive    = DN_OS_U64ToPOSIXSyncPrimitive_(cv->handle);
-    DN_POSIXSyncPrimitive *mutex_primitive = DN_OS_U64ToPOSIXSyncPrimitive_(mutex->handle);
+    DN_OSPosixSyncPrimitive *cv_primitive    = DN_OS_U64ToPOSIXSyncPrimitive_(cv->handle);
+    DN_OSPosixSyncPrimitive *mutex_primitive = DN_OS_U64ToPOSIXSyncPrimitive_(mutex->handle);
 
     struct timespec time = {};
     time.tv_sec          = end_ts_ms / 1'000;
@@ -1224,7 +1236,7 @@ DN_API bool DN_OS_ConditionVariableWait(DN_OSConditionVariable *cv, DN_OSMutex *
 DN_API void DN_OS_ConditionVariableSignal(DN_OSConditionVariable *cv)
 {
   if (cv && cv->handle != 0) {
-    DN_POSIXSyncPrimitive *primitive = DN_OS_U64ToPOSIXSyncPrimitive_(cv->handle);
+    DN_OSPosixSyncPrimitive *primitive = DN_OS_U64ToPOSIXSyncPrimitive_(cv->handle);
     pthread_cond_signal(&primitive->cv);
   }
 }
@@ -1232,7 +1244,7 @@ DN_API void DN_OS_ConditionVariableSignal(DN_OSConditionVariable *cv)
 DN_API void DN_OS_ConditionVariableBroadcast(DN_OSConditionVariable *cv)
 {
   if (cv && cv->handle != 0) {
-    DN_POSIXSyncPrimitive *primitive = DN_OS_U64ToPOSIXSyncPrimitive_(cv->handle);
+    DN_OSPosixSyncPrimitive *primitive = DN_OS_U64ToPOSIXSyncPrimitive_(cv->handle);
     pthread_cond_broadcast(&primitive->cv);
   }
 }
@@ -1307,7 +1319,7 @@ DN_API DN_U32 DN_OS_ThreadID()
   return DN_Cast(DN_U32) result;
 }
 
-DN_API void DN_Posix_Init(DN_POSIXCore *posix)
+DN_API void DN_OS_PosixInit(DN_OSPosixCore *posix)
 {
   int mutex_init = pthread_mutex_init(&posix->sync_primitive_free_list_mutex, nullptr);
   DN_Assert(mutex_init == 0);
@@ -1320,21 +1332,22 @@ DN_API void DN_Posix_Init(DN_POSIXCore *posix)
   }
 }
 
-DN_API void DN_Posix_ThreadSetName(DN_Str8 name)
+DN_API void DN_OS_PosixThreadSetName(DN_Str8 name)
 {
 #if defined(DN_PLATFORM_EMSCRIPTEN)
   (void)name;
 #else
-  DN_OSTLSTMem tmem   = DN_OS_TLSPushTMem(nullptr);
+  DN_TCScratch tmem   = DN_TCScratchBegin(nullptr, 0);
   DN_Str8      copy   = DN_Str8FromStr8Arena(tmem.arena, name);
   pthread_t    thread = pthread_self();
   pthread_setname_np(thread, (char *)copy.data);
+  DN_TCScratchEnd(&tmem);
 #endif
 }
 
-DN_API DN_POSIXProcSelfStatus DN_Posix_ProcSelfStatus()
+DN_API DN_OSPosixProcSelfStatus DN_OS_PosixProcSelfStatus()
 {
-  DN_POSIXProcSelfStatus result = {};
+  DN_OSPosixProcSelfStatus result = {};
 
   // NOTE: Example
   //
@@ -1346,11 +1359,11 @@ DN_API DN_POSIXProcSelfStatus DN_Posix_ProcSelfStatus()
   //
   // VmSize is the total virtual memory used
   DN_OSFile    file = DN_OS_FileOpen(DN_Str8Lit("/proc/self/status"), DN_OSFileOpen_OpenIfExist, DN_OSFileAccess_Read, nullptr);
-  DN_OSTLSTMem tmem = DN_OS_TLSPushTMem(nullptr);
 
   if (!file.error) {
+    DN_TCScratch tmem = DN_TCScratchBegin(nullptr, 0);
     char           buf[256];
-    DN_Str8Builder builder = DN_Str8BuilderFromTLS();
+    DN_Str8Builder builder = DN_Str8BuilderFromArena(tmem.arena);
     for (;;) {
       DN_OSFileRead read = DN_OS_FileRead(&file, buf, sizeof(buf), nullptr);
       if (!read.success || read.bytes_read == 0)
@@ -1362,8 +1375,8 @@ DN_API DN_POSIXProcSelfStatus DN_Posix_ProcSelfStatus()
     DN_Str8 const      PID        = DN_Str8Lit("Pid:");
     DN_Str8 const      VM_PEAK    = DN_Str8Lit("VmPeak:");
     DN_Str8 const      VM_SIZE    = DN_Str8Lit("VmSize:");
-    DN_Str8            status_buf = DN_Str8BuilderBuildFromTLS(&builder);
-    DN_Str8SplitResult lines      = DN_Str8SplitFromTLS(status_buf, DN_Str8Lit("\n"), DN_Str8SplitIncludeEmptyStrings_No);
+    DN_Str8            status_buf = DN_Str8BuilderBuild(&builder, tmem.arena);
+    DN_Str8SplitResult lines      = DN_Str8Split(tmem.arena, status_buf, DN_Str8Lit("\n"), DN_Str8SplitIncludeEmptyStrings_No);
 
     for (DN_ForItSize(line_it, DN_Str8, lines.data, lines.count)) {
       DN_Str8       line    = DN_Str8TrimWhitespaceAround(*line_it.data);
@@ -1392,6 +1405,7 @@ DN_API DN_POSIXProcSelfStatus DN_Posix_ProcSelfStatus()
         DN_Assert(to_u64.success);
       }
     }
+    DN_TCScratchEnd(&tmem);
   }
   DN_OS_FileClose(&file);
   return result;
@@ -1406,7 +1420,7 @@ static EM_BOOL EMWebSocketOnOpenCallback(int type, const EmscriptenWebSocketOpen
     (void)event;
     // EMSCRIPTEN_RESULT result = emscripten_websocket_send_utf8_text(event->socket, R"({"jsonrpc":"2.0","id":1,"method": "eth_subscribe","params":["newHeads"]})");
     // if (result)
-    //     DN_LOG_InfoF("Failed to emscripten_websocket_send_utf8_text(): %d\n", result);
+    //     DN_LogInfoF("Failed to emscripten_websocket_send_utf8_text(): %d\n", result);
     return EM_TRUE;
 }
 
@@ -1416,9 +1430,9 @@ static EM_BOOL EMWebSocketOnMsgCallback(int type, const EmscriptenWebSocketMessa
     (void)user_context;
     (void)event;
     if (event->isText) {
-        DN_LOG_InfoF("Received: %.*s", event->numBytes, event->data);
+        DN_LogInfoF("Received: %.*s", event->numBytes, event->data);
     } else {
-        DN_LOG_InfoF("Received: %d bytes", event->numBytes);
+        DN_LogInfoF("Received: %d bytes", event->numBytes);
     }
     return EM_TRUE;
 }
@@ -1486,12 +1500,13 @@ DN_API void DN_OS_HttpRequestAsync(DN_OSHttpResponse     *response,
 
   response->arena = arena;
   response->builder.arena =
-      response->tmem_arena ? response->tmem_arena : &response->tmp_arena;
+      response->scratch_arena ? response->scratch_arena : &response->tmp_arena;
 
-  DN_Arena  *tmem  = response->tmem_arena;
-  DN_OSTLSTMem tmem_ = DN_OS_TLSTMem(arena);
-  if (!tmem)
-    tmem = tmem_.arena;
+  DN_Arena  *scratch  = response->scratch_arena;
+  DN_TCScratch scratch_ = DN_TCScratchBegin(&arena, 1);
+  DN_DEFER { DN_TCScratchEnd(&scratch_); };
+  if (!scratch)
+    scratch = scratch_.arena;
 
 #if defined(DN_PLATFORM_EMSCRIPTEN)
   emscripten_fetch_attr_t fetch_attribs = {};
@@ -1521,8 +1536,8 @@ DN_API void DN_OS_HttpRequestAsync(DN_OSHttpResponse     *response,
   fetch_attribs.onerror         = DN_OS_HttpRequestEMFetchOnErrorCallback;
   fetch_attribs.userData        = response;
 
-  DN_Str8 url = DN_Str8FromFmtArena(tmem, "%.*s%.*s", DN_Str8PrintFmt(host), DN_Str8PrintFmt(path));
-  DN_LOG_InfoF("Initiating HTTP '%s' request to '%.*s' with payload '%.*s'",
+  DN_Str8 url = DN_Str8FromFmtArena(scratch, "%.*s%.*s", DN_Str8PrintFmt(host), DN_Str8PrintFmt(path));
+  DN_LogInfoF("Initiating HTTP '%s' request to '%.*s' with payload '%.*s'",
                fetch_attribs.requestMethod,
                DN_Str8PrintFmt(url),
                DN_Str8PrintFmt(body));

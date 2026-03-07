@@ -2,8 +2,8 @@
 #define DN_CGEN_H
 
 #if defined(_CLANGD)
-  #include "../dn_base_inc.h"
-  #include "../dn_os_inc.h"
+  #define DN_H_WITH_OS 1
+  #include "../dn.h"
   #include "../Standalone/dn_cpp_file.h"
 #endif
 
@@ -37,27 +37,6 @@
 #if !defined(MD_H)
 #error Metadesk 'md.h' must be included before 'dn_cgen.h'
 #endif
-
-#if !defined(DN_BASE_INC_H)
-  #error dn_base_inc.h must be included before this
-#endif
-
-/*
-////////////////////////////////////////////////////////////////////////////////////////////////////
-//
-//    $$$$$$\   $$$$$$\  $$$$$$$$\ $$\   $$\
-//   $$  __$$\ $$  __$$\ $$  _____|$$$\  $$ |
-//   $$ /  \__|$$ /  \__|$$ |      $$$$\ $$ |
-//   $$ |      $$ |$$$$\ $$$$$\    $$ $$\$$ |
-//   $$ |      $$ |\_$$ |$$  __|   $$ \$$$$ |
-//   $$ |  $$\ $$ |  $$ |$$ |      $$ |\$$$ |
-//   \$$$$$$  |\$$$$$$  |$$$$$$$$\ $$ | \$$ |
-//    \______/  \______/ \________|\__|  \__|
-//
-//   dn_cgen.h -- C/C++ code generation from table data in Metadesk files
-//
-////////////////////////////////////////////////////////////////////////////////////////////////////
-*/
 
 enum DN_CGenTableKeyType
 {
@@ -194,12 +173,12 @@ enum DN_CGenEmit
         (str8).size              \
   }
 
-DN_API DN_CGen                     DN_CGen_InitFilesArgV(int argc, char const **argv, DN_OSErrSink *err);
+DN_API DN_CGen                     DN_CGen_InitFilesArgV(int argc, char const **argv, DN_ErrSink *err);
 DN_API DN_Str8                     DN_CGen_TableHeaderTypeToDeclStr8(DN_CGenTableHeaderType type);
 DN_API DN_CGenMapNodeToEnum        DN_CGen_MapNodeToEnumOrExit(MD_Node const *node, DN_CGenMapNodeToEnum const *valid_keys, DN_USize valid_keys_size, char const *fmt, ...);
 DN_API DN_USize                    DN_CGen_NodeChildrenCount(MD_Node const *node);
-DN_API void                        DN_CGen_LogF(MD_MessageKind kind, MD_Node *node, DN_OSErrSink *err, char const *fmt, ...);
-DN_API bool                        DN_CGen_TableHasHeaders(DN_CGenTable const *table, DN_Str8 const *headers, DN_USize header_count, DN_OSErrSink *err);
+DN_API void                        DN_CGen_LogF(MD_MessageKind kind, MD_Node *node, DN_ErrSink *err, char const *fmt, ...);
+DN_API bool                        DN_CGen_TableHasHeaders(DN_CGenTable const *table, DN_Str8 const *headers, DN_USize header_count, DN_ErrSink *err);
 DN_API DN_CGenLookupColumnAtHeader DN_CGen_LookupColumnAtHeader(DN_CGenTable *table, DN_Str8 header, DN_CGenTableRow const *row);
 DN_API bool                        DN_CGen_LookupNextTableInCodeGenTable(DN_CGen *cgen, DN_CGenTable *cgen_table, DN_CGenLookupTableIterator *it);
 DN_API void                        DN_CGen_EmitCodeForTables(DN_CGen *cgen, DN_CGenEmit emit, DN_CppFile *cpp, DN_Str8 emit_prefix);

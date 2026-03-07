@@ -9,7 +9,6 @@
     #define DN_H_WITH_OS      1
     #define DN_H_WITH_CORE    1
     #define DN_H_WITH_MATH    1
-    #define DN_H_WITH_HASH    1
     #define DN_H_WITH_HELPERS 1
     #define DN_H_WITH_ASYNC   1
     #define DN_H_WITH_NET     1
@@ -66,11 +65,8 @@
 //    This means functionality that relies on the OS like printing, memory allocation, stack traces
 //    and so forth are disabled.
 
-#include "Base/dn_base_compiler.h"
 #include "Base/dn_base.h"
-#include "Base/dn_base_os.h"
 #include "Base/dn_base_assert.h"
-#include "Base/dn_base_log.h"
 #include "Base/dn_base_containers.h"
 #include "Base/dn_base_leak.h"
 
@@ -84,12 +80,7 @@
   #error Please define a platform e.g. 'DN_PLATFORM_WIN32' to enable the correct implementation for platform APIs
 #endif
 
-#include "OS/dn_os_tls.h"
 #include "OS/dn_os.h"
-#include "OS/dn_os_allocator.h"
-#include "OS/dn_os_containers.h"
-#include "OS/dn_os_print.h"
-#include "OS/dn_os_string.h"
 #endif
 
 #if DN_H_WITH_CORE
@@ -98,10 +89,6 @@
 
 #if DN_H_WITH_MATH
 #include "Extra/dn_math.h"
-#endif
-
-#if DN_H_WITH_HASH
-#include "Extra/dn_hash.h"
 #endif
 
 #if DN_H_WITH_HELPERS

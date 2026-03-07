@@ -91,14 +91,14 @@ static int32_t DN_NET_CurlThreadEntryPoint_(DN_OSThread *thread)
   DN_OS_ThreadSetName(DN_Str8FromPtr(curl->thread.name.data, curl->thread.name.size));
 
   while (!curl->kill_thread) {
-    DN_OSTLSTMem tmem = DN_OS_TLSPushTMem(nullptr);
+    DN_TCScratch tmem = DN_TCScratchBegin(nullptr, 0);
 
     // NOTE: Handle events sitting in the ring queue
     for (bool dequeue_ring = true; dequeue_ring;) {
       DN_NETCurlRingEvent event = {};
       for (DN_OS_MutexScope(&curl->ring_mutex)) {
-        if (DN_Ring_HasData(&curl->ring, sizeof(event)))
-            DN_Ring_Read(&curl->ring, &event, sizeof(event));
+        if (DN_RingHasData(&curl->ring, sizeof(event)))
+            DN_RingRead(&curl->ring, &event, sizeof(event));
       }
 
       DN_NETRequest     *req      = DN_NET_RequestFromHandle(event.request);
@@ -126,9 +126,9 @@ static int32_t DN_NET_CurlThreadEntryPoint_(DN_OSThread *thread)
         case DN_NETCurlRingEventType_SendWS: {
           DN_Str8 payload = {};
           for (DN_OS_MutexScope(&curl->ring_mutex)) {
-            DN_Assert(DN_Ring_HasData(&curl->ring, event.ws_send_size));
+            DN_Assert(DN_RingHasData(&curl->ring, event.ws_send_size));
             payload = DN_Str8FromArena(tmem.arena, event.ws_send_size, DN_ZMem_No);
-            DN_Ring_Read(&curl->ring, payload.data, payload.size);
+            DN_RingRead(&curl->ring, payload.data, payload.size);
           }
 
           DN_U32 curlws_flag = 0;
@@ -370,6 +370,7 @@ static int32_t DN_NET_CurlThreadEntryPoint_(DN_OSThread *thread)
 
     DN_I32 sleep_time_ms = ws_count > 0 ? 16 : INT32_MAX;
     curl_multi_poll(curl->thread_curlm, nullptr, 0, sleep_time_ms, nullptr);
+    DN_TCScratchEnd(&tmem);
   }
 
   return 0;
@@ -526,7 +527,7 @@ static DN_NETRequestHandle DN_NET_CurlDoRequest_(DN_NETCore *net, DN_Str8 url, D
     event.type                = DN_NETCurlRingEventType_DoRequest;
     event.request             = result;
     for (DN_OS_MutexScope(&curl_core->ring_mutex))
-      DN_Ring_WriteStruct(&curl_core->ring, &event);
+      DN_RingWriteStruct(&curl_core->ring, &event);
 
     curl_multi_wakeup(curl_core->thread_curlm);
   }
@@ -569,9 +570,9 @@ void DN_NET_CurlDoWSSend(DN_NETRequestHandle handle, DN_Str8 payload, DN_NETWSSe
   event.ws_send              = send;
 
   for (DN_OS_MutexScope(&curl->ring_mutex)) {
-    DN_Assert(DN_Ring_HasSpace(&curl->ring, payload.size));
-    DN_Ring_WriteStruct(&curl->ring, &event);
-    DN_Ring_Write(&curl->ring, payload.data, payload.size);
+    DN_Assert(DN_RingHasSpace(&curl->ring, payload.size));
+    DN_RingWriteStruct(&curl->ring, &event);
+    DN_RingWrite(&curl->ring, payload.data, payload.size);
   }
   curl_multi_wakeup(curl->thread_curlm);
 }
@@ -627,7 +628,7 @@ static DN_NETResponse DN_NET_CurlHandleFinishedRequest_(DN_NETCurlCore *curl, DN
   }
 
   for (DN_OS_MutexScope(&curl->ring_mutex))
-    DN_Ring_WriteStruct(&curl->ring, &event);
+    DN_RingWriteStruct(&curl->ring, &event);
   curl_multi_wakeup(curl->thread_curlm);
 
   return result;

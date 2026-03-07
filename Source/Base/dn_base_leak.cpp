@@ -15,12 +15,9 @@ DN_API void DN_LeakTrackAlloc_(DN_LeakTracker *leak, void *ptr, DN_USize size, b
     DN_TicketMutex_End(&leak->alloc_table_mutex);
   };
 
-  // NOTE: If the entry was not added, we are reusing a pointer that has been freed.
-  // TODO: Add API for always making the item but exposing a var to indicate if the item was newly created or it
-  // already existed.
   DN_Str8                      stack_trace = DN_StackTraceWalkStr8FromHeap(128, 3 /*skip*/);
   DN_DSMap<DN_LeakAlloc>      *alloc_table = &leak->alloc_table;
-  DN_DSMapResult<DN_LeakAlloc> alloc_entry = DN_DSMap_MakeKeyU64(alloc_table, DN_Cast(DN_U64) ptr);
+  DN_DSMapResult<DN_LeakAlloc> alloc_entry = DN_DSMapMakeKeyU64(alloc_table, DN_Cast(DN_U64) ptr);
   DN_LeakAlloc                *alloc       = alloc_entry.value;
   if (alloc_entry.found) {
     if ((alloc->flags & DN_LeakAllocFlag_Freed) == 0) {
@@ -76,7 +73,7 @@ DN_API void DN_LeakTrackDealloc_(DN_LeakTracker *leak, void *ptr)
 
   DN_Str8                      stack_trace = DN_StackTraceWalkStr8FromHeap(128, 3 /*skip*/);
   DN_DSMap<DN_LeakAlloc>      *alloc_table = &leak->alloc_table;
-  DN_DSMapResult<DN_LeakAlloc> alloc_entry = DN_DSMap_FindKeyU64(alloc_table, DN_Cast(uintptr_t) ptr);
+  DN_DSMapResult<DN_LeakAlloc> alloc_entry = DN_DSMapFindKeyU64(alloc_table, DN_Cast(uintptr_t) ptr);
   DN_HardAssertF(alloc_entry.found,
                  "Allocated pointer can not be removed as it does not exist in the "
                  "allocation table. When this memory was allocated, the pointer was "
@@ -128,7 +125,7 @@ DN_API void DN_LeakDump_(DN_LeakTracker *leak)
       leaked_bytes += alloc->size;
       leak_count++;
       DN_Str8x32 alloc_size = DN_ByteCountStr8x32(alloc->size);
-      DN_LOG_WarningF(
+      DN_LogWarningF(
           "Pointer (0x%p) leaked %.*s at:\n"
           "%.*s",
           alloc->ptr,
@@ -139,6 +136,6 @@ DN_API void DN_LeakDump_(DN_LeakTracker *leak)
 
   if (leak_count) {
     DN_Str8x32 leak_size = DN_ByteCountStr8x32(leaked_bytes);
-    DN_LOG_WarningF("There were %I64u leaked allocations totalling %.*s", leak_count, DN_Str8PrintFmt(leak_size));
+    DN_LogWarningF("There were %I64u leaked allocations totalling %.*s", leak_count, DN_Str8PrintFmt(leak_size));
   }
 }

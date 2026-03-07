@@ -2,30 +2,13 @@
 #define DN_OS_POSIX_H
 
 #if defined(_CLANGD)
-  #include "../dn_base_inc.h"
+  #include "../dn.h"
 #endif
 
 #include <pthread.h>
 #include <semaphore.h>
 
-/*
-////////////////////////////////////////////////////////////////////////////////////////////////////
-//
-//    $$$$$$\   $$$$$$\        $$$$$$$\   $$$$$$\   $$$$$$\  $$$$$$\ $$\   $$\
-//   $$  __$$\ $$  __$$\       $$  __$$\ $$  __$$\ $$  __$$\ \_$$  _|$$ |  $$ |
-//   $$ /  $$ |$$ /  \__|      $$ |  $$ |$$ /  $$ |$$ /  \__|  $$ |  \$$\ $$  |
-//   $$ |  $$ |\$$$$$$\        $$$$$$$  |$$ |  $$ |\$$$$$$\    $$ |   \$$$$  /
-//   $$ |  $$ | \____$$\       $$  ____/ $$ |  $$ | \____$$\   $$ |   $$  $$<
-//   $$ |  $$ |$$\   $$ |      $$ |      $$ |  $$ |$$\   $$ |  $$ |  $$  /\$$\
-//    $$$$$$  |\$$$$$$  |      $$ |       $$$$$$  |\$$$$$$  |$$$$$$\ $$ /  $$ |
-//    \______/  \______/       \__|       \______/  \______/ \______|\__|  \__|
-//
-//   dn_os_posix.h
-//
-////////////////////////////////////////////////////////////////////////////////////////////////////
-*/
-
-struct DN_POSIXProcSelfStatus
+struct DN_OSPosixProcSelfStatus
 {
   char   name[64];
   DN_U8  name_size;
@@ -52,15 +35,14 @@ struct DN_POSIXProcSelfStatus
 // unlocking, or destroying the object is undefined. [...] The effect of
 // referring to a copy of the object when locking, unlocking, or destroying it
 // is undefined.
-
-enum DN_POSIXSyncPrimitiveType
+enum DN_OSPosixSyncPrimitiveType
 {
-  DN_OSPOSIXSyncPrimitiveType_Semaphore,
-  DN_OSPOSIXSyncPrimitiveType_Mutex,
-  DN_OSPOSIXSyncPrimitiveType_ConditionVariable,
+  DN_OSPosixSyncPrimitiveType_Semaphore,
+  DN_OSPosixSyncPrimitiveType_Mutex,
+  DN_OSPosixSyncPrimitiveType_ConditionVariable,
 };
 
-struct DN_POSIXSyncPrimitive
+struct DN_OSPosixSyncPrimitive
 {
   union
   {
@@ -68,17 +50,17 @@ struct DN_POSIXSyncPrimitive
     pthread_mutex_t mutex;
     pthread_cond_t  cv;
   };
-  DN_POSIXSyncPrimitive *next;
+  DN_OSPosixSyncPrimitive *next;
 };
 
-struct DN_POSIXCore
+struct DN_OSPosixCore
 {
-  DN_POSIXSyncPrimitive *sync_primitive_free_list;
-  pthread_mutex_t        sync_primitive_free_list_mutex;
-  bool                   clock_monotonic_raw;
+  DN_OSPosixSyncPrimitive *sync_primitive_free_list;
+  pthread_mutex_t          sync_primitive_free_list_mutex;
+  bool                     clock_monotonic_raw;
 };
 
-DN_API void                   DN_Posix_Init(DN_POSIXCore *posix);
-DN_API void                   DN_Posix_ThreadSetName(DN_Str8 name);
-DN_API DN_POSIXProcSelfStatus DN_Posix_ProcSelfStatus();
+DN_API void                     DN_OS_PosixInit          (DN_OSPosixCore *posix);
+DN_API void                     DN_OS_PosixThreadSetName (DN_Str8 name);
+DN_API DN_OSPosixProcSelfStatus DN_OS_PosixProcSelfStatus();
 #endif // !defined(DN_OS_POSIX_H)

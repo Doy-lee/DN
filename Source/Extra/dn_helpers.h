@@ -2,16 +2,7 @@
 #define DN_HELPERS_H
 
 #if defined(_CLANGD)
-  #include "../dn_base_inc.h"
-  #include "dn_math.h"
-#endif
-
-#if !defined(DN_BASE_H)
-  #error dn_base_inc.h must be included before this
-#endif
-
-#if !defined(DN_MATH_H)
-  #error dn_math.h must be included before this
+  #include "../dn.h"
 #endif
 
 /*
@@ -31,11 +22,7 @@
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 */
 
-// NOTE: DN_PCG32 //////////////////////////////////////////////////////////////////////////////////
-struct DN_PCG32 { uint64_t state; };
-
 #if !defined(DN_NO_JSON_BUILDER)
-// NOTE: DN_JSONBuilder ////////////////////////////////////////////////////////////////////////////
 enum DN_JSONBuilderItem
 {
   DN_JSONBuilderItem_Empty,
@@ -99,15 +86,6 @@ struct DN_BinarySearchResult
 
 template <typename T>
 using DN_QSortLessThanProc = bool(T const &a, T const &b, void *user_context);
-
-// NOTE: DN_PCG32 //////////////////////////////////////////////////////////////////////////////////
-DN_API DN_PCG32            DN_PCG32_Init                          (uint64_t seed);
-DN_API uint32_t            DN_PCG32_Next                          (DN_PCG32 *rng);
-DN_API uint64_t            DN_PCG32_Next64                        (DN_PCG32 *rng);
-DN_API uint32_t            DN_PCG32_Range                         (DN_PCG32 *rng, uint32_t low, uint32_t high);
-DN_API DN_F32              DN_PCG32_NextF32                       (DN_PCG32 *rng);
-DN_API DN_F64              DN_PCG32_NextF64                       (DN_PCG32 *rng);
-DN_API void                DN_PCG32_Advance                       (DN_PCG32 *rng, uint64_t delta);
 
 #if !defined(DN_NO_JSON_BUILDER)
 // NOTE: DN_JSONBuilder ////////////////////////////////////////////////////////////////////////////
