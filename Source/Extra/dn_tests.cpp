@@ -39,12 +39,12 @@ struct DN_RefImplCPUReport {
   int             brandSize_       = 0;
   bool            isIntel_         = false;
   bool            isAMD_           = false;
-  uint32_t        f_1_ECX_         = 0;
-  uint32_t        f_1_EDX_         = 0;
-  uint32_t        f_7_EBX_         = 0;
-  uint32_t        f_7_ECX_         = 0;
-  uint32_t        f_81_ECX_        = 0;
-  uint32_t        f_81_EDX_        = 0;
+  DN_U32        f_1_ECX_         = 0;
+  DN_U32        f_1_EDX_         = 0;
+  DN_U32        f_7_EBX_         = 0;
+  DN_U32        f_7_ECX_         = 0;
+  DN_U32        f_81_ECX_        = 0;
+  DN_U32        f_81_EDX_        = 0;
   int             data_[400][4]    = {};
   size_t          dataSize_        = 0;
   int             extdata_[400][4] = {};
@@ -500,7 +500,7 @@ static DN_UTCore DN_Tests_Bin()
       DN_UT_Assert(&test, !result.success);
     }
 
-    uint32_t number = 0xd095f6;
+    DN_U32 number = 0xd095f6;
     for (DN_UT_Test(&test, "Convert %x to string", number)) {
       DN_Str8 number_hex = DN_HexFromBytesPtrArena(&number, sizeof(number), scratch.arena);
       DN_UT_AssertF(&test, DN_Str8Eq(number_hex, DN_Str8Lit("f695d000")), "number_hex=%.*s", DN_Str8PrintFmt(number_hex));
@@ -531,301 +531,301 @@ static DN_UTCore DN_Tests_BinarySearch()
   DN_UT_LogF(&result, "DN_BinarySearch\n");
   {
     for (DN_UT_Test(&result, "Search array of 1 item")) {
-      uint32_t              array[] = {1};
+      DN_U32              array[] = {1};
       DN_BinarySearchResult search  = {};
 
       // NOTE: Match =============================================================================
-      search = DN_BinarySearch<uint32_t>(array, DN_ArrayCountU(array), 0U /*find*/, DN_BinarySearchType_Match);
+      search = DN_BinarySearch<DN_U32>(array, DN_ArrayCountU(array), 0U /*find*/, DN_BinarySearchType_Match);
       DN_UT_Assert(&result, !search.found);
       DN_UT_Assert(&result, search.index == 0);
 
-      search = DN_BinarySearch<uint32_t>(array, DN_ArrayCountU(array), 1U /*find*/, DN_BinarySearchType_Match);
+      search = DN_BinarySearch<DN_U32>(array, DN_ArrayCountU(array), 1U /*find*/, DN_BinarySearchType_Match);
       DN_UT_Assert(&result, search.found);
       DN_UT_Assert(&result, search.index == 0);
 
-      search = DN_BinarySearch<uint32_t>(array, DN_ArrayCountU(array), 2U /*find*/, DN_BinarySearchType_Match);
+      search = DN_BinarySearch<DN_U32>(array, DN_ArrayCountU(array), 2U /*find*/, DN_BinarySearchType_Match);
       DN_UT_Assert(&result, !search.found);
       DN_UT_Assert(&result, search.index == 1);
 
       // NOTE: Lower bound =======================================================================
-      search = DN_BinarySearch<uint32_t>(array, DN_ArrayCountU(array), 0U /*find*/, DN_BinarySearchType_LowerBound);
+      search = DN_BinarySearch<DN_U32>(array, DN_ArrayCountU(array), 0U /*find*/, DN_BinarySearchType_LowerBound);
       DN_UT_Assert(&result, search.found);
       DN_UT_Assert(&result, search.index == 0);
 
-      search = DN_BinarySearch<uint32_t>(array, DN_ArrayCountU(array), 1U /*find*/, DN_BinarySearchType_LowerBound);
+      search = DN_BinarySearch<DN_U32>(array, DN_ArrayCountU(array), 1U /*find*/, DN_BinarySearchType_LowerBound);
       DN_UT_Assert(&result, search.found);
       DN_UT_Assert(&result, search.index == 0);
 
-      search = DN_BinarySearch<uint32_t>(array, DN_ArrayCountU(array), 2U /*find*/, DN_BinarySearchType_LowerBound);
+      search = DN_BinarySearch<DN_U32>(array, DN_ArrayCountU(array), 2U /*find*/, DN_BinarySearchType_LowerBound);
       DN_UT_Assert(&result, !search.found);
       DN_UT_Assert(&result, search.index == 1);
 
       // NOTE: Upper bound =======================================================================
-      search = DN_BinarySearch<uint32_t>(array, DN_ArrayCountU(array), 0U /*find*/, DN_BinarySearchType_UpperBound);
+      search = DN_BinarySearch<DN_U32>(array, DN_ArrayCountU(array), 0U /*find*/, DN_BinarySearchType_UpperBound);
       DN_UT_Assert(&result, search.found);
       DN_UT_Assert(&result, search.index == 0);
 
-      search = DN_BinarySearch<uint32_t>(array, DN_ArrayCountU(array), 1U /*find*/, DN_BinarySearchType_UpperBound);
+      search = DN_BinarySearch<DN_U32>(array, DN_ArrayCountU(array), 1U /*find*/, DN_BinarySearchType_UpperBound);
       DN_UT_Assert(&result, !search.found);
       DN_UT_Assert(&result, search.index == 1);
 
-      search = DN_BinarySearch<uint32_t>(array, DN_ArrayCountU(array), 2U /*find*/, DN_BinarySearchType_UpperBound);
+      search = DN_BinarySearch<DN_U32>(array, DN_ArrayCountU(array), 2U /*find*/, DN_BinarySearchType_UpperBound);
       DN_UT_Assert(&result, !search.found);
       DN_UT_Assert(&result, search.index == 1);
     }
 
     for (DN_UT_Test(&result, "Search array of 2 items")) {
-      uint32_t              array[] = {1};
+      DN_U32              array[] = {1};
       DN_BinarySearchResult search  = {};
 
       // NOTE: Match =============================================================================
-      search = DN_BinarySearch<uint32_t>(array, DN_ArrayCountU(array), 0U /*find*/, DN_BinarySearchType_Match);
+      search = DN_BinarySearch<DN_U32>(array, DN_ArrayCountU(array), 0U /*find*/, DN_BinarySearchType_Match);
       DN_UT_Assert(&result, !search.found);
       DN_UT_Assert(&result, search.index == 0);
 
-      search = DN_BinarySearch<uint32_t>(array, DN_ArrayCountU(array), 1U /*find*/, DN_BinarySearchType_Match);
+      search = DN_BinarySearch<DN_U32>(array, DN_ArrayCountU(array), 1U /*find*/, DN_BinarySearchType_Match);
       DN_UT_Assert(&result, search.found);
       DN_UT_Assert(&result, search.index == 0);
 
-      search = DN_BinarySearch<uint32_t>(array, DN_ArrayCountU(array), 2U /*find*/, DN_BinarySearchType_Match);
+      search = DN_BinarySearch<DN_U32>(array, DN_ArrayCountU(array), 2U /*find*/, DN_BinarySearchType_Match);
       DN_UT_Assert(&result, !search.found);
       DN_UT_Assert(&result, search.index == 1);
 
       // NOTE: Lower bound =======================================================================
-      search = DN_BinarySearch<uint32_t>(array, DN_ArrayCountU(array), 0U /*find*/, DN_BinarySearchType_LowerBound);
+      search = DN_BinarySearch<DN_U32>(array, DN_ArrayCountU(array), 0U /*find*/, DN_BinarySearchType_LowerBound);
       DN_UT_Assert(&result, search.found);
       DN_UT_Assert(&result, search.index == 0);
 
-      search = DN_BinarySearch<uint32_t>(array, DN_ArrayCountU(array), 1U /*find*/, DN_BinarySearchType_LowerBound);
+      search = DN_BinarySearch<DN_U32>(array, DN_ArrayCountU(array), 1U /*find*/, DN_BinarySearchType_LowerBound);
       DN_UT_Assert(&result, search.found);
       DN_UT_Assert(&result, search.index == 0);
 
-      search = DN_BinarySearch<uint32_t>(array, DN_ArrayCountU(array), 2U /*find*/, DN_BinarySearchType_LowerBound);
+      search = DN_BinarySearch<DN_U32>(array, DN_ArrayCountU(array), 2U /*find*/, DN_BinarySearchType_LowerBound);
       DN_UT_Assert(&result, !search.found);
       DN_UT_Assert(&result, search.index == 1);
 
       // NOTE: Upper bound =======================================================================
-      search = DN_BinarySearch<uint32_t>(array, DN_ArrayCountU(array), 0U /*find*/, DN_BinarySearchType_UpperBound);
+      search = DN_BinarySearch<DN_U32>(array, DN_ArrayCountU(array), 0U /*find*/, DN_BinarySearchType_UpperBound);
       DN_UT_Assert(&result, search.found);
       DN_UT_Assert(&result, search.index == 0);
 
-      search = DN_BinarySearch<uint32_t>(array, DN_ArrayCountU(array), 1U /*find*/, DN_BinarySearchType_UpperBound);
+      search = DN_BinarySearch<DN_U32>(array, DN_ArrayCountU(array), 1U /*find*/, DN_BinarySearchType_UpperBound);
       DN_UT_Assert(&result, !search.found);
       DN_UT_Assert(&result, search.index == 1);
 
-      search = DN_BinarySearch<uint32_t>(array, DN_ArrayCountU(array), 2U /*find*/, DN_BinarySearchType_UpperBound);
+      search = DN_BinarySearch<DN_U32>(array, DN_ArrayCountU(array), 2U /*find*/, DN_BinarySearchType_UpperBound);
       DN_UT_Assert(&result, !search.found);
       DN_UT_Assert(&result, search.index == 1);
     }
 
     for (DN_UT_Test(&result, "Search array of 3 items")) {
-      uint32_t              array[] = {1, 2, 3};
+      DN_U32              array[] = {1, 2, 3};
       DN_BinarySearchResult search  = {};
 
       // NOTE: Match =============================================================================
-      search = DN_BinarySearch<uint32_t>(array, DN_ArrayCountU(array), 0U /*find*/, DN_BinarySearchType_Match);
+      search = DN_BinarySearch<DN_U32>(array, DN_ArrayCountU(array), 0U /*find*/, DN_BinarySearchType_Match);
       DN_UT_Assert(&result, !search.found);
       DN_UT_Assert(&result, search.index == 0);
 
-      search = DN_BinarySearch<uint32_t>(array, DN_ArrayCountU(array), 1U /*find*/, DN_BinarySearchType_Match);
+      search = DN_BinarySearch<DN_U32>(array, DN_ArrayCountU(array), 1U /*find*/, DN_BinarySearchType_Match);
       DN_UT_Assert(&result, search.found);
       DN_UT_Assert(&result, search.index == 0);
 
-      search = DN_BinarySearch<uint32_t>(array, DN_ArrayCountU(array), 2U /*find*/, DN_BinarySearchType_Match);
+      search = DN_BinarySearch<DN_U32>(array, DN_ArrayCountU(array), 2U /*find*/, DN_BinarySearchType_Match);
       DN_UT_Assert(&result, search.found);
       DN_UT_Assert(&result, search.index == 1);
 
-      search = DN_BinarySearch<uint32_t>(array, DN_ArrayCountU(array), 3U /*find*/, DN_BinarySearchType_Match);
+      search = DN_BinarySearch<DN_U32>(array, DN_ArrayCountU(array), 3U /*find*/, DN_BinarySearchType_Match);
       DN_UT_Assert(&result, search.found);
       DN_UT_Assert(&result, search.index == 2);
 
-      search = DN_BinarySearch<uint32_t>(array, DN_ArrayCountU(array), 4U /*find*/, DN_BinarySearchType_Match);
+      search = DN_BinarySearch<DN_U32>(array, DN_ArrayCountU(array), 4U /*find*/, DN_BinarySearchType_Match);
       DN_UT_Assert(&result, !search.found);
       DN_UT_Assert(&result, search.index == 3);
 
       // NOTE: Lower bound =======================================================================
-      search = DN_BinarySearch<uint32_t>(array, DN_ArrayCountU(array), 0U /*find*/, DN_BinarySearchType_LowerBound);
+      search = DN_BinarySearch<DN_U32>(array, DN_ArrayCountU(array), 0U /*find*/, DN_BinarySearchType_LowerBound);
       DN_UT_Assert(&result, search.found);
       DN_UT_Assert(&result, search.index == 0);
 
-      search = DN_BinarySearch<uint32_t>(array, DN_ArrayCountU(array), 1U /*find*/, DN_BinarySearchType_LowerBound);
+      search = DN_BinarySearch<DN_U32>(array, DN_ArrayCountU(array), 1U /*find*/, DN_BinarySearchType_LowerBound);
       DN_UT_Assert(&result, search.found);
       DN_UT_Assert(&result, search.index == 0);
 
-      search = DN_BinarySearch<uint32_t>(array, DN_ArrayCountU(array), 2U /*find*/, DN_BinarySearchType_LowerBound);
+      search = DN_BinarySearch<DN_U32>(array, DN_ArrayCountU(array), 2U /*find*/, DN_BinarySearchType_LowerBound);
       DN_UT_Assert(&result, search.found);
       DN_UT_Assert(&result, search.index == 1);
 
-      search = DN_BinarySearch<uint32_t>(array, DN_ArrayCountU(array), 3U /*find*/, DN_BinarySearchType_LowerBound);
+      search = DN_BinarySearch<DN_U32>(array, DN_ArrayCountU(array), 3U /*find*/, DN_BinarySearchType_LowerBound);
       DN_UT_Assert(&result, search.found);
       DN_UT_Assert(&result, search.index == 2);
 
-      search = DN_BinarySearch<uint32_t>(array, DN_ArrayCountU(array), 4U /*find*/, DN_BinarySearchType_LowerBound);
+      search = DN_BinarySearch<DN_U32>(array, DN_ArrayCountU(array), 4U /*find*/, DN_BinarySearchType_LowerBound);
       DN_UT_Assert(&result, !search.found);
       DN_UT_Assert(&result, search.index == 3);
 
       // NOTE: Upper bound =======================================================================
-      search = DN_BinarySearch<uint32_t>(array, DN_ArrayCountU(array), 0U /*find*/, DN_BinarySearchType_UpperBound);
+      search = DN_BinarySearch<DN_U32>(array, DN_ArrayCountU(array), 0U /*find*/, DN_BinarySearchType_UpperBound);
       DN_UT_Assert(&result, search.found);
       DN_UT_Assert(&result, search.index == 0);
 
-      search = DN_BinarySearch<uint32_t>(array, DN_ArrayCountU(array), 1U /*find*/, DN_BinarySearchType_UpperBound);
+      search = DN_BinarySearch<DN_U32>(array, DN_ArrayCountU(array), 1U /*find*/, DN_BinarySearchType_UpperBound);
       DN_UT_Assert(&result, search.found);
       DN_UT_Assert(&result, search.index == 1);
 
-      search = DN_BinarySearch<uint32_t>(array, DN_ArrayCountU(array), 2U /*find*/, DN_BinarySearchType_UpperBound);
+      search = DN_BinarySearch<DN_U32>(array, DN_ArrayCountU(array), 2U /*find*/, DN_BinarySearchType_UpperBound);
       DN_UT_Assert(&result, search.found);
       DN_UT_Assert(&result, search.index == 2);
 
-      search = DN_BinarySearch<uint32_t>(array, DN_ArrayCountU(array), 3U /*find*/, DN_BinarySearchType_UpperBound);
+      search = DN_BinarySearch<DN_U32>(array, DN_ArrayCountU(array), 3U /*find*/, DN_BinarySearchType_UpperBound);
       DN_UT_Assert(&result, !search.found);
       DN_UT_Assert(&result, search.index == 3);
 
-      search = DN_BinarySearch<uint32_t>(array, DN_ArrayCountU(array), 4U /*find*/, DN_BinarySearchType_UpperBound);
+      search = DN_BinarySearch<DN_U32>(array, DN_ArrayCountU(array), 4U /*find*/, DN_BinarySearchType_UpperBound);
       DN_UT_Assert(&result, !search.found);
       DN_UT_Assert(&result, search.index == 3);
     }
 
     for (DN_UT_Test(&result, "Search array of 4 items")) {
-      uint32_t              array[] = {1, 2, 3, 4};
+      DN_U32              array[] = {1, 2, 3, 4};
       DN_BinarySearchResult search  = {};
 
       // NOTE: Match =============================================================================
-      search = DN_BinarySearch<uint32_t>(array, DN_ArrayCountU(array), 0U /*find*/, DN_BinarySearchType_Match);
+      search = DN_BinarySearch<DN_U32>(array, DN_ArrayCountU(array), 0U /*find*/, DN_BinarySearchType_Match);
       DN_UT_Assert(&result, !search.found);
       DN_UT_Assert(&result, search.index == 0);
 
-      search = DN_BinarySearch<uint32_t>(array, DN_ArrayCountU(array), 1U /*find*/, DN_BinarySearchType_Match);
+      search = DN_BinarySearch<DN_U32>(array, DN_ArrayCountU(array), 1U /*find*/, DN_BinarySearchType_Match);
       DN_UT_Assert(&result, search.found);
       DN_UT_Assert(&result, search.index == 0);
 
-      search = DN_BinarySearch<uint32_t>(array, DN_ArrayCountU(array), 2U /*find*/, DN_BinarySearchType_Match);
+      search = DN_BinarySearch<DN_U32>(array, DN_ArrayCountU(array), 2U /*find*/, DN_BinarySearchType_Match);
       DN_UT_Assert(&result, search.found);
       DN_UT_Assert(&result, search.index == 1);
 
-      search = DN_BinarySearch<uint32_t>(array, DN_ArrayCountU(array), 3U /*find*/, DN_BinarySearchType_Match);
+      search = DN_BinarySearch<DN_U32>(array, DN_ArrayCountU(array), 3U /*find*/, DN_BinarySearchType_Match);
       DN_UT_Assert(&result, search.found);
       DN_UT_Assert(&result, search.index == 2);
 
-      search = DN_BinarySearch<uint32_t>(array, DN_ArrayCountU(array), 4U /*find*/, DN_BinarySearchType_Match);
+      search = DN_BinarySearch<DN_U32>(array, DN_ArrayCountU(array), 4U /*find*/, DN_BinarySearchType_Match);
       DN_UT_Assert(&result, search.found);
       DN_UT_Assert(&result, search.index == 3);
 
-      search = DN_BinarySearch<uint32_t>(array, DN_ArrayCountU(array), 5U /*find*/, DN_BinarySearchType_Match);
+      search = DN_BinarySearch<DN_U32>(array, DN_ArrayCountU(array), 5U /*find*/, DN_BinarySearchType_Match);
       DN_UT_Assert(&result, !search.found);
       DN_UT_Assert(&result, search.index == 4);
 
       // NOTE: Lower bound =======================================================================
-      search = DN_BinarySearch<uint32_t>(array, DN_ArrayCountU(array), 0U /*find*/, DN_BinarySearchType_LowerBound);
+      search = DN_BinarySearch<DN_U32>(array, DN_ArrayCountU(array), 0U /*find*/, DN_BinarySearchType_LowerBound);
       DN_UT_Assert(&result, search.found);
       DN_UT_Assert(&result, search.index == 0);
 
-      search = DN_BinarySearch<uint32_t>(array, DN_ArrayCountU(array), 1U /*find*/, DN_BinarySearchType_LowerBound);
+      search = DN_BinarySearch<DN_U32>(array, DN_ArrayCountU(array), 1U /*find*/, DN_BinarySearchType_LowerBound);
       DN_UT_Assert(&result, search.found);
       DN_UT_Assert(&result, search.index == 0);
 
-      search = DN_BinarySearch<uint32_t>(array, DN_ArrayCountU(array), 2U /*find*/, DN_BinarySearchType_LowerBound);
+      search = DN_BinarySearch<DN_U32>(array, DN_ArrayCountU(array), 2U /*find*/, DN_BinarySearchType_LowerBound);
       DN_UT_Assert(&result, search.found);
       DN_UT_Assert(&result, search.index == 1);
 
-      search = DN_BinarySearch<uint32_t>(array, DN_ArrayCountU(array), 3U /*find*/, DN_BinarySearchType_LowerBound);
+      search = DN_BinarySearch<DN_U32>(array, DN_ArrayCountU(array), 3U /*find*/, DN_BinarySearchType_LowerBound);
       DN_UT_Assert(&result, search.found);
       DN_UT_Assert(&result, search.index == 2);
 
-      search = DN_BinarySearch<uint32_t>(array, DN_ArrayCountU(array), 4U /*find*/, DN_BinarySearchType_LowerBound);
+      search = DN_BinarySearch<DN_U32>(array, DN_ArrayCountU(array), 4U /*find*/, DN_BinarySearchType_LowerBound);
       DN_UT_Assert(&result, search.found);
       DN_UT_Assert(&result, search.index == 3);
 
-      search = DN_BinarySearch<uint32_t>(array, DN_ArrayCountU(array), 5U /*find*/, DN_BinarySearchType_LowerBound);
+      search = DN_BinarySearch<DN_U32>(array, DN_ArrayCountU(array), 5U /*find*/, DN_BinarySearchType_LowerBound);
       DN_UT_Assert(&result, !search.found);
       DN_UT_Assert(&result, search.index == 4);
 
       // NOTE: Upper bound =======================================================================
-      search = DN_BinarySearch<uint32_t>(array, DN_ArrayCountU(array), 0U /*find*/, DN_BinarySearchType_UpperBound);
+      search = DN_BinarySearch<DN_U32>(array, DN_ArrayCountU(array), 0U /*find*/, DN_BinarySearchType_UpperBound);
       DN_UT_Assert(&result, search.found);
       DN_UT_Assert(&result, search.index == 0);
 
-      search = DN_BinarySearch<uint32_t>(array, DN_ArrayCountU(array), 1U /*find*/, DN_BinarySearchType_UpperBound);
+      search = DN_BinarySearch<DN_U32>(array, DN_ArrayCountU(array), 1U /*find*/, DN_BinarySearchType_UpperBound);
       DN_UT_Assert(&result, search.found);
       DN_UT_Assert(&result, search.index == 1);
 
-      search = DN_BinarySearch<uint32_t>(array, DN_ArrayCountU(array), 2U /*find*/, DN_BinarySearchType_UpperBound);
+      search = DN_BinarySearch<DN_U32>(array, DN_ArrayCountU(array), 2U /*find*/, DN_BinarySearchType_UpperBound);
       DN_UT_Assert(&result, search.found);
       DN_UT_Assert(&result, search.index == 2);
 
-      search = DN_BinarySearch<uint32_t>(array, DN_ArrayCountU(array), 3U /*find*/, DN_BinarySearchType_UpperBound);
+      search = DN_BinarySearch<DN_U32>(array, DN_ArrayCountU(array), 3U /*find*/, DN_BinarySearchType_UpperBound);
       DN_UT_Assert(&result, search.found);
       DN_UT_Assert(&result, search.index == 3);
 
-      search = DN_BinarySearch<uint32_t>(array, DN_ArrayCountU(array), 4U /*find*/, DN_BinarySearchType_UpperBound);
+      search = DN_BinarySearch<DN_U32>(array, DN_ArrayCountU(array), 4U /*find*/, DN_BinarySearchType_UpperBound);
       DN_UT_Assert(&result, !search.found);
       DN_UT_Assert(&result, search.index == 4);
 
-      search = DN_BinarySearch<uint32_t>(array, DN_ArrayCountU(array), 5U /*find*/, DN_BinarySearchType_UpperBound);
+      search = DN_BinarySearch<DN_U32>(array, DN_ArrayCountU(array), 5U /*find*/, DN_BinarySearchType_UpperBound);
       DN_UT_Assert(&result, !search.found);
       DN_UT_Assert(&result, search.index == 4);
     }
 
     for (DN_UT_Test(&result, "Search array with duplicate items")) {
-      uint32_t              array[] = {1, 1, 2, 2, 3};
+      DN_U32              array[] = {1, 1, 2, 2, 3};
       DN_BinarySearchResult search  = {};
 
       // NOTE: Match =============================================================================
-      search = DN_BinarySearch<uint32_t>(array, DN_ArrayCountU(array), 0U /*find*/, DN_BinarySearchType_Match);
+      search = DN_BinarySearch<DN_U32>(array, DN_ArrayCountU(array), 0U /*find*/, DN_BinarySearchType_Match);
       DN_UT_Assert(&result, !search.found);
       DN_UT_Assert(&result, search.index == 0);
 
-      search = DN_BinarySearch<uint32_t>(array, DN_ArrayCountU(array), 1U /*find*/, DN_BinarySearchType_Match);
+      search = DN_BinarySearch<DN_U32>(array, DN_ArrayCountU(array), 1U /*find*/, DN_BinarySearchType_Match);
       DN_UT_Assert(&result, search.found);
       DN_UT_Assert(&result, search.index == 0);
 
-      search = DN_BinarySearch<uint32_t>(array, DN_ArrayCountU(array), 2U /*find*/, DN_BinarySearchType_Match);
+      search = DN_BinarySearch<DN_U32>(array, DN_ArrayCountU(array), 2U /*find*/, DN_BinarySearchType_Match);
       DN_UT_Assert(&result, search.found);
       DN_UT_Assert(&result, search.index == 2);
 
-      search = DN_BinarySearch<uint32_t>(array, DN_ArrayCountU(array), 3U /*find*/, DN_BinarySearchType_Match);
+      search = DN_BinarySearch<DN_U32>(array, DN_ArrayCountU(array), 3U /*find*/, DN_BinarySearchType_Match);
       DN_UT_Assert(&result, search.found);
       DN_UT_Assert(&result, search.index == 4);
 
-      search = DN_BinarySearch<uint32_t>(array, DN_ArrayCountU(array), 4U /*find*/, DN_BinarySearchType_Match);
+      search = DN_BinarySearch<DN_U32>(array, DN_ArrayCountU(array), 4U /*find*/, DN_BinarySearchType_Match);
       DN_UT_Assert(&result, !search.found);
       DN_UT_Assert(&result, search.index == 5);
 
       // NOTE: Lower bound =======================================================================
-      search = DN_BinarySearch<uint32_t>(array, DN_ArrayCountU(array), 0U /*find*/, DN_BinarySearchType_LowerBound);
+      search = DN_BinarySearch<DN_U32>(array, DN_ArrayCountU(array), 0U /*find*/, DN_BinarySearchType_LowerBound);
       DN_UT_Assert(&result, search.found);
       DN_UT_Assert(&result, search.index == 0);
 
-      search = DN_BinarySearch<uint32_t>(array, DN_ArrayCountU(array), 1U /*find*/, DN_BinarySearchType_LowerBound);
+      search = DN_BinarySearch<DN_U32>(array, DN_ArrayCountU(array), 1U /*find*/, DN_BinarySearchType_LowerBound);
       DN_UT_Assert(&result, search.found);
       DN_UT_Assert(&result, search.index == 0);
 
-      search = DN_BinarySearch<uint32_t>(array, DN_ArrayCountU(array), 2U /*find*/, DN_BinarySearchType_LowerBound);
+      search = DN_BinarySearch<DN_U32>(array, DN_ArrayCountU(array), 2U /*find*/, DN_BinarySearchType_LowerBound);
       DN_UT_Assert(&result, search.found);
       DN_UT_Assert(&result, search.index == 2);
 
-      search = DN_BinarySearch<uint32_t>(array, DN_ArrayCountU(array), 3U /*find*/, DN_BinarySearchType_LowerBound);
+      search = DN_BinarySearch<DN_U32>(array, DN_ArrayCountU(array), 3U /*find*/, DN_BinarySearchType_LowerBound);
       DN_UT_Assert(&result, search.found);
       DN_UT_Assert(&result, search.index == 4);
 
-      search = DN_BinarySearch<uint32_t>(array, DN_ArrayCountU(array), 4U /*find*/, DN_BinarySearchType_LowerBound);
+      search = DN_BinarySearch<DN_U32>(array, DN_ArrayCountU(array), 4U /*find*/, DN_BinarySearchType_LowerBound);
       DN_UT_Assert(&result, !search.found);
       DN_UT_Assert(&result, search.index == 5);
 
       // NOTE: Upper bound =======================================================================
-      search = DN_BinarySearch<uint32_t>(array, DN_ArrayCountU(array), 0U /*find*/, DN_BinarySearchType_UpperBound);
+      search = DN_BinarySearch<DN_U32>(array, DN_ArrayCountU(array), 0U /*find*/, DN_BinarySearchType_UpperBound);
       DN_UT_Assert(&result, search.found);
       DN_UT_Assert(&result, search.index == 0);
 
-      search = DN_BinarySearch<uint32_t>(array, DN_ArrayCountU(array), 1U /*find*/, DN_BinarySearchType_UpperBound);
+      search = DN_BinarySearch<DN_U32>(array, DN_ArrayCountU(array), 1U /*find*/, DN_BinarySearchType_UpperBound);
       DN_UT_Assert(&result, search.found);
       DN_UT_Assert(&result, search.index == 2);
 
-      search = DN_BinarySearch<uint32_t>(array, DN_ArrayCountU(array), 2U /*find*/, DN_BinarySearchType_UpperBound);
+      search = DN_BinarySearch<DN_U32>(array, DN_ArrayCountU(array), 2U /*find*/, DN_BinarySearchType_UpperBound);
       DN_UT_Assert(&result, search.found);
       DN_UT_Assert(&result, search.index == 4);
 
-      search = DN_BinarySearch<uint32_t>(array, DN_ArrayCountU(array), 3U /*find*/, DN_BinarySearchType_UpperBound);
+      search = DN_BinarySearch<DN_U32>(array, DN_ArrayCountU(array), 3U /*find*/, DN_BinarySearchType_UpperBound);
       DN_UT_Assert(&result, !search.found);
       DN_UT_Assert(&result, search.index == 5);
     }
@@ -842,7 +842,7 @@ static DN_UTCore DN_Tests_BaseContainers()
     DN_TCScratch scratch = DN_TCScratchBegin(nullptr, 0);
     {
       DN_Arena           arena    = DN_ArenaFromVMem(0, 0, DN_ArenaFlags_Nil);
-      uint32_t const     MAP_SIZE = 64;
+      DN_U32 const     MAP_SIZE = 64;
       DN_DSMap<uint64_t> map      = DN_DSMapInit<uint64_t>(&arena, MAP_SIZE, DN_DSMapFlags_Nil);
       DN_DEFER
       {
@@ -895,7 +895,7 @@ static DN_UTCore DN_Tests_BaseContainers()
 
       DN_ArenaTempMemScope temp_mem_scope = DN_ArenaTempMemScope(scratch.arena);
       DN_Arena             arena          = DN_ArenaFromVMem(0, 0, DN_ArenaFlags_Nil);
-      uint32_t const       MAP_SIZE       = 64;
+      DN_U32 const       MAP_SIZE       = 64;
       DN_DSMap<uint64_t>   map            = DN_DSMapInit<uint64_t>(&arena, MAP_SIZE, DN_DSMapFlags_Nil);
       DN_DEFER
       {
@@ -1176,29 +1176,29 @@ static DN_UTCore DN_Tests_BaseContainers()
   DN_UT_LogF(&result, "DN_VArray\n");
   {
     {
-      DN_VArray<uint32_t> array = DN_OS_VArrayInitByteSize<uint32_t>(DN_Kilobytes(64));
+      DN_VArray<DN_U32> array = DN_OS_VArrayInitByteSize<DN_U32>(DN_Kilobytes(64));
       DN_DEFER
       {
         DN_OS_VArrayDeinit(&array);
       };
 
       for (DN_UT_Test(&result, "Test adding an array of items to the array")) {
-        uint32_t array_literal[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
-        DN_OS_VArrayAddArray<uint32_t>(&array, array_literal, DN_ArrayCountU(array_literal));
+        DN_U32 array_literal[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
+        DN_OS_VArrayAddArray<DN_U32>(&array, array_literal, DN_ArrayCountU(array_literal));
         DN_UT_Assert(&result, array.size == DN_ArrayCountU(array_literal));
         DN_UT_Assert(&result, DN_Memcmp(array.data, array_literal, DN_ArrayCountU(array_literal) * sizeof(array_literal[0])) == 0);
       }
 
       for (DN_UT_Test(&result, "Test stable erase, 1 item, the '2' value from the array")) {
         DN_OS_VArrayEraseRange(&array, 2 /*begin_index*/, 1 /*count*/, DN_ArrayErase_Stable);
-        uint32_t array_literal[] = {0, 1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
+        DN_U32 array_literal[] = {0, 1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
         DN_UT_Assert(&result, array.size == DN_ArrayCountU(array_literal));
         DN_UT_Assert(&result, DN_Memcmp(array.data, array_literal, DN_ArrayCountU(array_literal) * sizeof(array_literal[0])) == 0);
       }
 
       for (DN_UT_Test(&result, "Test unstable erase, 1 item, the '1' value from the array")) {
         DN_OS_VArrayEraseRange(&array, 1 /*begin_index*/, 1 /*count*/, DN_ArrayErase_Unstable);
-        uint32_t array_literal[] = {0, 15, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14};
+        DN_U32 array_literal[] = {0, 15, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14};
         DN_UT_Assert(&result, array.size == DN_ArrayCountU(array_literal));
         DN_UT_Assert(&result, DN_Memcmp(array.data, array_literal, DN_ArrayCountU(array_literal) * sizeof(array_literal[0])) == 0);
       }
@@ -1206,7 +1206,7 @@ static DN_UTCore DN_Tests_BaseContainers()
       DN_ArrayErase erase_enums[] = {DN_ArrayErase_Stable, DN_ArrayErase_Unstable};
       for (DN_UT_Test(&result, "Test un/stable erase, OOB")) {
         for (DN_ArrayErase erase : erase_enums) {
-          uint32_t array_literal[] = {0, 15, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14};
+          DN_U32 array_literal[] = {0, 15, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14};
           DN_OS_VArrayEraseRange(&array, DN_ArrayCountU(array_literal) /*begin_index*/, DN_ArrayCountU(array_literal) + 100 /*count*/, erase);
           DN_UT_Assert(&result, array.size == DN_ArrayCountU(array_literal));
           DN_UT_Assert(&result, DN_Memcmp(array.data, array_literal, DN_ArrayCountU(array_literal) * sizeof(array_literal[0])) == 0);
@@ -1215,51 +1215,51 @@ static DN_UTCore DN_Tests_BaseContainers()
 
       for (DN_UT_Test(&result, "Test flipped begin/end index stable erase, 2 items, the '15, 3' value from the array")) {
         DN_OS_VArrayEraseRange(&array, 2 /*begin_index*/, -2 /*count*/, DN_ArrayErase_Stable);
-        uint32_t array_literal[] = {0, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14};
+        DN_U32 array_literal[] = {0, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14};
         DN_UT_Assert(&result, array.size == DN_ArrayCountU(array_literal));
         DN_UT_Assert(&result, DN_Memcmp(array.data, array_literal, DN_ArrayCountU(array_literal) * sizeof(array_literal[0])) == 0);
       }
 
       for (DN_UT_Test(&result, "Test flipped begin/end index unstable erase, 2 items, the '4, 5' value from the array")) {
         DN_OS_VArrayEraseRange(&array, 2 /*begin_index*/, -2 /*count*/, DN_ArrayErase_Unstable);
-        uint32_t array_literal[] = {0, 13, 14, 6, 7, 8, 9, 10, 11, 12};
+        DN_U32 array_literal[] = {0, 13, 14, 6, 7, 8, 9, 10, 11, 12};
         DN_UT_Assert(&result, array.size == DN_ArrayCountU(array_literal));
         DN_UT_Assert(&result, DN_Memcmp(array.data, array_literal, DN_ArrayCountU(array_literal) * sizeof(array_literal[0])) == 0);
       }
 
       for (DN_UT_Test(&result, "Test stable erase range, 2+1 (oob) item, the '13, 14, +1 OOB' value from the array")) {
         DN_OS_VArrayEraseRange(&array, 8 /*begin_index*/, 3 /*count*/, DN_ArrayErase_Stable);
-        uint32_t array_literal[] = {0, 13, 14, 6, 7, 8, 9, 10};
+        DN_U32 array_literal[] = {0, 13, 14, 6, 7, 8, 9, 10};
         DN_UT_Assert(&result, array.size == DN_ArrayCountU(array_literal));
         DN_UT_Assert(&result, DN_Memcmp(array.data, array_literal, DN_ArrayCountU(array_literal) * sizeof(array_literal[0])) == 0);
       }
 
       for (DN_UT_Test(&result, "Test unstable erase range, 3+1 (oob) item, the '11, 12, +1 OOB' value from the array")) {
         DN_OS_VArrayEraseRange(&array, 6 /*begin_index*/, 3 /*count*/, DN_ArrayErase_Unstable);
-        uint32_t array_literal[] = {0, 13, 14, 6, 7, 8};
+        DN_U32 array_literal[] = {0, 13, 14, 6, 7, 8};
         DN_UT_Assert(&result, array.size == DN_ArrayCountU(array_literal));
         DN_UT_Assert(&result, DN_Memcmp(array.data, array_literal, DN_ArrayCountU(array_literal) * sizeof(array_literal[0])) == 0);
       }
 
       for (DN_UT_Test(&result, "Test stable erase -overflow OOB, erasing the '0, 13' value from the array")) {
         DN_OS_VArrayEraseRange(&array, 1 /*begin_index*/, -DN_ISIZE_MAX /*count*/, DN_ArrayErase_Stable);
-        uint32_t array_literal[] = {14, 6, 7, 8};
+        DN_U32 array_literal[] = {14, 6, 7, 8};
         DN_UT_Assert(&result, array.size == DN_ArrayCountU(array_literal));
         DN_UT_Assert(&result, DN_Memcmp(array.data, array_literal, DN_ArrayCountU(array_literal) * sizeof(array_literal[0])) == 0);
       }
 
       for (DN_UT_Test(&result, "Test unstable erase +overflow OOB, erasing the '7, 8' value from the array")) {
         DN_OS_VArrayEraseRange(&array, 2 /*begin_index*/, DN_ISIZE_MAX /*count*/, DN_ArrayErase_Unstable);
-        uint32_t array_literal[] = {14, 6};
+        DN_U32 array_literal[] = {14, 6};
         DN_UT_Assert(&result, array.size == DN_ArrayCountU(array_literal));
         DN_UT_Assert(&result, DN_Memcmp(array.data, array_literal, DN_ArrayCountU(array_literal) * sizeof(array_literal[0])) == 0);
       }
 
       for (DN_UT_Test(&result, "Test adding an array of items after erase")) {
-        uint32_t array_literal[] = {0, 1, 2, 3};
-        DN_OS_VArrayAddArray<uint32_t>(&array, array_literal, DN_ArrayCountU(array_literal));
+        DN_U32 array_literal[] = {0, 1, 2, 3};
+        DN_OS_VArrayAddArray<DN_U32>(&array, array_literal, DN_ArrayCountU(array_literal));
 
-        uint32_t expected_literal[] = {14, 6, 0, 1, 2, 3};
+        DN_U32 expected_literal[] = {14, 6, 0, 1, 2, 3};
         DN_UT_Assert(&result, array.size == DN_ArrayCountU(expected_literal));
         DN_UT_Assert(&result, DN_Memcmp(array.data, expected_literal, DN_ArrayCountU(expected_literal) * sizeof(expected_literal[0])) == 0);
       }
@@ -1342,7 +1342,7 @@ static DN_UTCore DN_Tests_Intrinsics()
   DN_UT_LogF(&result, "DN_Atomic\n");
   {
     for (DN_UT_Test(&result, "DN_AtomicAddU32")) {
-      uint32_t val = 0;
+      DN_U32 val = 0;
       DN_AtomicAddU32(&val, 1);
       DN_UT_AssertF(&result, val == 1, "val: %u", val);
     }
@@ -1354,7 +1354,7 @@ static DN_UTCore DN_Tests_Intrinsics()
     }
 
     for (DN_UT_Test(&result, "DN_AtomicSubU32")) {
-      uint32_t val = 1;
+      DN_U32 val = 1;
       DN_AtomicSubU32(&val, 1);
       DN_UT_AssertF(&result, val == 0, "val: %u", val);
     }
@@ -1733,7 +1733,7 @@ DN_UTCore DN_Tests_Keccak()
   DN_UT_LogF(&result, "DN_KC\n");
   {
     for (int hash_type = 0; hash_type < Hash_Count; hash_type++) {
-      DN_PCG32 rng = DN_PCG32_Init(0xd48e'be21'2af8'733d);
+      DN_PCG32 rng = DN_PCG32Init(0xd48e'be21'2af8'733d);
       for (DN_Str8 input : INPUTS) {
         DN_UT_BeginF(&result, "%.*s - Input: %.*s", DN_Str8PrintFmt(DN_UT_HASH_STRING_[hash_type]), DN_Cast(int) DN_Min(input.size, 54), input.data);
         DN_Tests_KeccakDispatch_(&result, hash_type, input);
@@ -1742,11 +1742,11 @@ DN_UTCore DN_Tests_Keccak()
 
       DN_UT_BeginF(&result, "%.*s - Deterministic random inputs", DN_Str8PrintFmt(DN_UT_HASH_STRING_[hash_type]));
       for (DN_USize index = 0; index < 128; index++) {
-        char     src[4096] = {};
-        uint32_t src_size  = DN_PCG32_Range(&rng, 0, sizeof(src));
+        char   src[4096] = {};
+        DN_U32 src_size  = DN_PCG32Range(&rng, 0, sizeof(src));
 
         for (DN_USize src_index = 0; src_index < src_size; src_index++)
-          src[src_index] = DN_Cast(char) DN_PCG32_Range(&rng, 0, 255);
+          src[src_index] = DN_Cast(char) DN_PCG32Range(&rng, 0, 255);
 
         DN_Str8 input = DN_Str8FromPtr(src, src_size);
         DN_Tests_KeccakDispatch_(&result, hash_type, input);
@@ -1764,9 +1764,9 @@ static DN_UTCore DN_Tests_M4()
   DN_UT_LogF(&result, "DN_M4\n");
   {
     for (DN_UT_Test(&result, "Simple translate and scale matrix")) {
-      DN_M4 translate  = DN_M4_TranslateF(1, 2, 3);
-      DN_M4 scale      = DN_M4_ScaleF(2, 2, 2);
-      DN_M4 mul_result = DN_M4_Mul(translate, scale);
+      DN_M4 translate  = DN_M4TranslateF(1, 2, 3);
+      DN_M4 scale      = DN_M4ScaleF(2, 2, 2);
+      DN_M4 mul_result = DN_M4Mul(translate, scale);
 
       const DN_M4 EXPECT = {
           {
@@ -1780,8 +1780,8 @@ static DN_UTCore DN_Tests_M4()
       DN_UT_AssertF(&result,
                     memcmp(mul_result.columns, EXPECT.columns, sizeof(EXPECT)) == 0,
                     "\nresult =\n%s\nexpected =\n%s",
-                    DN_M4_ColumnMajorString(mul_result).data,
-                    DN_M4_ColumnMajorString(EXPECT).data);
+                    DN_M4ColumnMajorString(mul_result).data,
+                    DN_M4ColumnMajorString(EXPECT).data);
     }
   }
   return result;
@@ -1944,9 +1944,9 @@ static DN_UTCore DN_Tests_Rect()
   DN_UT_LogF(&result, "DN_Rect\n");
   {
     for (DN_UT_Test(&result, "No intersection")) {
-      DN_Rect a  = DN_Rect_From2V2(DN_V2F32_From1N(0), DN_V2F32_From2N(100, 100));
-      DN_Rect b  = DN_Rect_From2V2(DN_V2F32_From2N(200, 0), DN_V2F32_From2N(200, 200));
-      DN_Rect ab = DN_Rect_Intersection(a, b);
+      DN_Rect a  = DN_RectFrom2V2(DN_V2F32From1N(0), DN_V2F32From2N(100, 100));
+      DN_Rect b  = DN_RectFrom2V2(DN_V2F32From2N(200, 0), DN_V2F32From2N(200, 200));
+      DN_Rect ab = DN_RectIntersection(a, b);
 
       DN_V2F32 ab_max = ab.pos + ab.size;
       DN_UT_AssertF(&result,
@@ -1959,9 +1959,9 @@ static DN_UTCore DN_Tests_Rect()
     }
 
     for (DN_UT_Test(&result, "A's min intersects B")) {
-      DN_Rect a  = DN_Rect_From2V2(DN_V2F32_From2N(50, 50), DN_V2F32_From2N(100, 100));
-      DN_Rect b  = DN_Rect_From2V2(DN_V2F32_From2N(0, 0), DN_V2F32_From2N(100, 100));
-      DN_Rect ab = DN_Rect_Intersection(a, b);
+      DN_Rect a  = DN_RectFrom2V2(DN_V2F32From2N(50, 50), DN_V2F32From2N(100, 100));
+      DN_Rect b  = DN_RectFrom2V2(DN_V2F32From2N(0, 0), DN_V2F32From2N(100, 100));
+      DN_Rect ab = DN_RectIntersection(a, b);
 
       DN_V2F32 ab_max = ab.pos + ab.size;
       DN_UT_AssertF(&result,
@@ -1974,9 +1974,9 @@ static DN_UTCore DN_Tests_Rect()
     }
 
     for (DN_UT_Test(&result, "B's min intersects A")) {
-      DN_Rect a  = DN_Rect_From2V2(DN_V2F32_From2N(0, 0), DN_V2F32_From2N(100, 100));
-      DN_Rect b  = DN_Rect_From2V2(DN_V2F32_From2N(50, 50), DN_V2F32_From2N(100, 100));
-      DN_Rect ab = DN_Rect_Intersection(a, b);
+      DN_Rect a  = DN_RectFrom2V2(DN_V2F32From2N(0, 0), DN_V2F32From2N(100, 100));
+      DN_Rect b  = DN_RectFrom2V2(DN_V2F32From2N(50, 50), DN_V2F32From2N(100, 100));
+      DN_Rect ab = DN_RectIntersection(a, b);
 
       DN_V2F32 ab_max = ab.pos + ab.size;
       DN_UT_AssertF(&result,
@@ -1989,9 +1989,9 @@ static DN_UTCore DN_Tests_Rect()
     }
 
     for (DN_UT_Test(&result, "A's max intersects B")) {
-      DN_Rect a  = DN_Rect_From2V2(DN_V2F32_From2N(-50, -50), DN_V2F32_From2N(100, 100));
-      DN_Rect b  = DN_Rect_From2V2(DN_V2F32_From2N(0, 0), DN_V2F32_From2N(100, 100));
-      DN_Rect ab = DN_Rect_Intersection(a, b);
+      DN_Rect a  = DN_RectFrom2V2(DN_V2F32From2N(-50, -50), DN_V2F32From2N(100, 100));
+      DN_Rect b  = DN_RectFrom2V2(DN_V2F32From2N(0, 0), DN_V2F32From2N(100, 100));
+      DN_Rect ab = DN_RectIntersection(a, b);
 
       DN_V2F32 ab_max = ab.pos + ab.size;
       DN_UT_AssertF(&result,
@@ -2004,9 +2004,9 @@ static DN_UTCore DN_Tests_Rect()
     }
 
     for (DN_UT_Test(&result, "B's max intersects A")) {
-      DN_Rect a  = DN_Rect_From2V2(DN_V2F32_From2N(0, 0), DN_V2F32_From2N(100, 100));
-      DN_Rect b  = DN_Rect_From2V2(DN_V2F32_From2N(-50, -50), DN_V2F32_From2N(100, 100));
-      DN_Rect ab = DN_Rect_Intersection(a, b);
+      DN_Rect a  = DN_RectFrom2V2(DN_V2F32From2N(0, 0), DN_V2F32From2N(100, 100));
+      DN_Rect b  = DN_RectFrom2V2(DN_V2F32From2N(-50, -50), DN_V2F32From2N(100, 100));
+      DN_Rect ab = DN_RectIntersection(a, b);
 
       DN_V2F32 ab_max = ab.pos + ab.size;
       DN_UT_AssertF(&result,
@@ -2019,9 +2019,9 @@ static DN_UTCore DN_Tests_Rect()
     }
 
     for (DN_UT_Test(&result, "B contains A")) {
-      DN_Rect a  = DN_Rect_From2V2(DN_V2F32_From2N(25, 25), DN_V2F32_From2N(25, 25));
-      DN_Rect b  = DN_Rect_From2V2(DN_V2F32_From2N(0, 0), DN_V2F32_From2N(100, 100));
-      DN_Rect ab = DN_Rect_Intersection(a, b);
+      DN_Rect a  = DN_RectFrom2V2(DN_V2F32From2N(25, 25), DN_V2F32From2N(25, 25));
+      DN_Rect b  = DN_RectFrom2V2(DN_V2F32From2N(0, 0), DN_V2F32From2N(100, 100));
+      DN_Rect ab = DN_RectIntersection(a, b);
 
       DN_V2F32 ab_max = ab.pos + ab.size;
       DN_UT_AssertF(&result,
@@ -2034,9 +2034,9 @@ static DN_UTCore DN_Tests_Rect()
     }
 
     for (DN_UT_Test(&result, "A contains B")) {
-      DN_Rect a  = DN_Rect_From2V2(DN_V2F32_From2N(0, 0), DN_V2F32_From2N(100, 100));
-      DN_Rect b  = DN_Rect_From2V2(DN_V2F32_From2N(25, 25), DN_V2F32_From2N(25, 25));
-      DN_Rect ab = DN_Rect_Intersection(a, b);
+      DN_Rect a  = DN_RectFrom2V2(DN_V2F32From2N(0, 0), DN_V2F32From2N(100, 100));
+      DN_Rect b  = DN_RectFrom2V2(DN_V2F32From2N(25, 25), DN_V2F32From2N(25, 25));
+      DN_Rect ab = DN_RectIntersection(a, b);
 
       DN_V2F32 ab_max = ab.pos + ab.size;
       DN_UT_AssertF(&result,
@@ -2049,9 +2049,9 @@ static DN_UTCore DN_Tests_Rect()
     }
 
     for (DN_UT_Test(&result, "A equals B")) {
-      DN_Rect a  = DN_Rect_From2V2(DN_V2F32_From2N(0, 0), DN_V2F32_From2N(100, 100));
+      DN_Rect a  = DN_RectFrom2V2(DN_V2F32From2N(0, 0), DN_V2F32From2N(100, 100));
       DN_Rect b  = a;
-      DN_Rect ab = DN_Rect_Intersection(a, b);
+      DN_Rect ab = DN_RectIntersection(a, b);
 
       DN_V2F32 ab_max = ab.pos + ab.size;
       DN_UT_AssertF(&result,
@@ -2132,8 +2132,8 @@ static DN_UTCore DN_Tests_Str8()
     }
 
     for (DN_UT_Test(&result, "Allocate string from arena")) {
-      DN_TCScratch scratch   = DN_TCScratchBegin(nullptr, 0);
-      DN_Str8      string = DN_Str8FromArena(scratch.arena, 2, DN_ZMem_No);
+      DN_TCScratch scratch = DN_TCScratchBegin(nullptr, 0);
+      DN_Str8      string  = DN_Str8AllocArena(scratch.arena, 2, DN_ZMem_No);
       DN_UT_AssertF(&result, string.size == 2, "size: %zu", string.size);
       DN_TCScratchEnd(&scratch);
     }
@@ -2538,6 +2538,7 @@ static DN_UTCore DN_Tests_Net()
         done = true;
       }
     }
+    net_interface.deinit(&net);
     DN_ArenaDeinit(&arena);
   }
 #endif // defined(DN_UNIT_TESTS_WITH_NET)

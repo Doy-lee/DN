@@ -30,9 +30,10 @@ DN_API DN_ArenaMemFuncs DN_ArenaMemFuncsGet(DN_ArenaMemFuncType type)
     };
 
     case DN_ArenaMemFuncType_VMem: {
-      DN_Assert(g_dn_->init_flags & DN_InitFlags_OS);
+      DN_Core *dn = DN_Get();
+      DN_Assert(dn->init_flags & DN_InitFlags_OS);
       result.type           = DN_ArenaMemFuncType_VMem;
-      result.vmem_page_size = g_dn_->os.page_size;
+      result.vmem_page_size = dn->os.page_size;
       result.vmem_reserve   = DN_OS_MemReserve;
       result.vmem_commit    = DN_OS_MemCommit;
       result.vmem_release   = DN_OS_MemRelease;
@@ -43,8 +44,9 @@ DN_API DN_ArenaMemFuncs DN_ArenaMemFuncsGet(DN_ArenaMemFuncType type)
 
 DN_API DN_ArenaMemFuncs DN_ArenaMemFuncsGetDefaults()
 {
+  DN_Core            *dn   = DN_Get();
   DN_ArenaMemFuncType type = DN_ArenaMemFuncType_Basic;
-  if (g_dn_->os_init) {
+  if (dn->os_init) {
     #if !defined(DN_PLATFORM_EMSCRIPTEN)
     type = DN_ArenaMemFuncType_VMem;
     #endif
@@ -55,23 +57,15 @@ DN_API DN_ArenaMemFuncs DN_ArenaMemFuncsGetDefaults()
 
 DN_API DN_Arena DN_ArenaFromHeap(DN_U64 size, DN_ArenaFlags flags)
 {
-  DN_ArenaMemFuncs mem_funcs = {};
-  mem_funcs.type             = DN_ArenaMemFuncType_Basic;
-  mem_funcs.basic_alloc      = DN_ArenaBasicAllocFromOSHeap;
-  mem_funcs.basic_dealloc    = DN_OS_MemDealloc;
-  DN_Arena result            = DN_ArenaFromMemFuncs(size, size, flags, mem_funcs);
+  DN_ArenaMemFuncs mem_funcs = DN_ArenaMemFuncsGet(DN_ArenaMemFuncType_Basic);
+  DN_Arena         result    = DN_ArenaFromMemFuncs(size, size, flags, mem_funcs);
   return result;
 }
 
 DN_API DN_Arena DN_ArenaFromVMem(DN_U64 reserve, DN_U64 commit, DN_ArenaFlags flags)
 {
-  DN_ArenaMemFuncs mem_funcs = {};
-  mem_funcs.type             = DN_ArenaMemFuncType_VMem;
-  mem_funcs.vmem_page_size   = g_dn_->os.page_size;
-  mem_funcs.vmem_reserve     = DN_OS_MemReserve;
-  mem_funcs.vmem_commit      = DN_OS_MemCommit;
-  mem_funcs.vmem_release     = DN_OS_MemRelease;
-  DN_Arena result            = DN_ArenaFromMemFuncs(reserve, commit, flags, mem_funcs);
+  DN_ArenaMemFuncs mem_funcs = DN_ArenaMemFuncsGet(DN_ArenaMemFuncType_VMem);
+  DN_Arena         result    = DN_ArenaFromMemFuncs(reserve, commit, flags, mem_funcs);
   return result;
 }
 
@@ -211,7 +205,8 @@ DN_API void DN_OS_LogPrint(DN_LogTypeParam type, void *user_data, DN_CallSite ca
 
 DN_API void DN_OS_SetLogPrintFuncToOS()
 {
-  DN_LogSetPrintFunc(DN_OS_LogPrint, &g_dn_->os);
+  DN_Core *dn = DN_Get();
+  DN_LogSetPrintFunc(DN_OS_LogPrint, &dn->os);
 }
 
 // NOTE: Date
@@ -761,7 +756,7 @@ DN_API DN_V2USize DN_OS_ThreadLaneRange(DN_OSThreadLane *lane, DN_USize values_c
   if (thread_has_leftovers)
     leftovers_before_this_thread_index = lane->index;
   else
-    leftovers_before_this_thread_index = leftovers_before_this_thread_index;
+    leftovers_before_this_thread_index = rem_values;
 
   DN_USize thread_start_index  = (values_per_thread * lane->index) + leftovers_before_this_thread_index;
   DN_USize thread_values_count = values_per_thread + (thread_has_leftovers ? 1 : 0);
@@ -1144,7 +1139,7 @@ bool DN_OS_VArrayReserve(DN_VArray<T> *array, DN_USize count)
     return false;
 
   DN_USize real_commit    = (array->size + count) * sizeof(T);
-  DN_USize aligned_commit = DN_AlignUpPowerOfTwo(real_commit, g_dn_->os.page_size);
+  DN_USize aligned_commit = DN_AlignUpPowerOfTwo(real_commit, DN_Get()->os.page_size);
   if (array->commit >= aligned_commit)
     return true;
   bool result   = DN_OS_MemCommit(array->data, aligned_commit, DN_MemPage_ReadWrite);

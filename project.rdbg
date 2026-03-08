@@ -1,10 +1,20 @@
 // raddbg 0.9.25 project file
 
+recent_file: path: "C:/Home/Cloud/Code/DN/Source/Extra/dn_net_curl.cpp"
+recent_file: path: "C:/Home/Cloud/Code/DN/Source/Extra/dn_tests.cpp"
+recent_file: path: "C:/Home/Cloud/Code/DN/Source/Extra/dn_tests_main.cpp"
+recent_file: path: "C:/Home/Cloud/Code/DN/Source/Standalone/dn_utest.h"
+recent_file: path: "C:/Home/Cloud/Code/DN/Source/OS/dn_os_w32.cpp"
+recent_file: path: "D:/a/_work/1/s/src/vctools/asan/llvm/compiler-rt/lib/asan/asan_thread.cpp"
+recent_file: path: "C:/Home/Cloud/Code/DN/Source/Base/dn_base.cpp"
+recent_file: path: "D:/a/_work/1/s/src/vctools/asan/llvm/compiler-rt/lib/asan/asan_interceptors_memintrinsics.cpp"
+recent_file: path: "D:/a/_work/1/s/src/vctools/asan/llvm/compiler-rt/lib/sanitizer_common/sanitizer_win.cpp"
+recent_file: path: "D:/a/_work/1/s/src/vctools/asan/llvm/compiler-rt/lib/asan/asan_rtl.cpp"
 recent_file: path: "Source/OS/dn_os_w32.cpp"
 target:
 {
   executable: "Build/dn_unit_tests_msvc.exe"
-  working_directory: "Build/"
+  working_directory: Build
   enabled: 1
 }
 debug_info:
@@ -15,5 +25,15 @@ debug_info:
 debug_info:
 {
   path: "C:/Home/Cloud/Dev/Win/msvc/msvc_host_x64_target_x64/14.41.17.11/VC/Tools/MSVC/14.41.34120/bin/Hostx64/x64/clang_rt.asan_dynamic-x86_64.pdb"
+  timestamp: 66163731918117
+}
+debug_info:
+{
+  path: "C:/Home/Cloud/Code/DN/Build/dn_unit_tests_msvc.pdb"
+  timestamp: 66208715842393
+}
+debug_info:
+{
+  path: "C:/Home/Sync/PC/W32/Apps/msvc/msvc_host_x64_target_x64/14.41.17.11/VC/Tools/MSVC/14.41.34120/bin/Hostx64/x64/clang_rt.asan_dynamic-x86_64.pdb"
   timestamp: 66163731918117
 }

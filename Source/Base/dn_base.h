@@ -1716,10 +1716,10 @@ DN_API DN_LogPrefixSize         DN_LogMakePrefix                                
 DN_API void                     DN_LogSetPrintFunc                                     (DN_LogPrintFunc *print_func, void *user_data);
 DN_API void                     DN_LogPrint                                            (DN_LogTypeParam type, DN_CallSite call_site, DN_FMT_ATTRIB char const *fmt, ...);
 DN_API DN_LogTypeParam          DN_LogTypeParamFromType                                (DN_LogType type);
-#define                         DN_LogDebugF(fmt, ...)                                 DN_LogPrint(DN_LogMakeU32LogTypeParam(DN_LogType_Debug), DN_CALL_SITE, fmt, ##__VA_ARGS__)
-#define                         DN_LogInfoF(fmt, ...)                                  DN_LogPrint(DN_LogMakeU32LogTypeParam(DN_LogType_Info), DN_CALL_SITE, fmt, ##__VA_ARGS__)
-#define                         DN_LogWarningF(fmt, ...)                               DN_LogPrint(DN_LogMakeU32LogTypeParam(DN_LogType_Warning), DN_CALL_SITE, fmt, ##__VA_ARGS__)
-#define                         DN_LogErrorF(fmt, ...)                                 DN_LogPrint(DN_LogMakeU32LogTypeParam(DN_LogType_Error), DN_CALL_SITE, fmt, ##__VA_ARGS__)
+#define                         DN_LogDebugF(fmt, ...)                                 DN_LogPrint(DN_LogTypeParamFromType(DN_LogType_Debug), DN_CALL_SITE, fmt, ##__VA_ARGS__)
+#define                         DN_LogInfoF(fmt, ...)                                  DN_LogPrint(DN_LogTypeParamFromType(DN_LogType_Info), DN_CALL_SITE, fmt, ##__VA_ARGS__)
+#define                         DN_LogWarningF(fmt, ...)                               DN_LogPrint(DN_LogTypeParamFromType(DN_LogType_Warning), DN_CALL_SITE, fmt, ##__VA_ARGS__)
+#define                         DN_LogErrorF(fmt, ...)                                 DN_LogPrint(DN_LogTypeParamFromType(DN_LogType_Error), DN_CALL_SITE, fmt, ##__VA_ARGS__)
 
 // NOTE: OS primitives that the OS layer can provide for the base layer but is optional.
 #if defined(DN_FREESTANDING)

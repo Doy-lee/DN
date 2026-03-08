@@ -318,16 +318,17 @@ DN_API DN_U64 DN_OS_PerfCounterFrequency()
   return result;
 }
 
-static DN_OSPosixCore *DN_OS_GetPOSIXCore_()
+static DN_OSPosixCore *DN_OS_PosixGetCore()
 {
-  DN_Assert(g_dn_ && g_dn_->os.platform_context);
-  DN_OSPosixCore *result = DN_Cast(DN_OSPosixCore *)g_dn_->os.platform_context;
+  DN_Core *dn = DN_Get();
+  DN_Assert(dn && dn->os_init);
+  DN_OSPosixCore *result = DN_Cast(DN_OSPosixCore *)dn->os.platform_context;
   return result;
 }
 
 DN_API DN_U64 DN_OS_PerfCounterNow()
 {
-  DN_OSPosixCore *posix = DN_OS_GetPOSIXCore_();
+  DN_OSPosixCore *posix = DN_OS_PosixGetCore();
   struct timespec ts;
   clock_gettime(posix->clock_monotonic_raw ? CLOCK_MONOTONIC_RAW : CLOCK_MONOTONIC, &ts);
   DN_U64 result = DN_Cast(DN_U64) ts.tv_sec * 1'000'000'000 + DN_Cast(DN_U64) ts.tv_nsec;
@@ -1050,7 +1051,7 @@ static DN_U64 DN_OS_PosixSyncPrimitiveToU64(DN_OSPosixSyncPrimitive *primitive)
 
 static DN_OSPosixSyncPrimitive *DN_POSIX_AllocSyncPrimitive_()
 {
-  DN_OSPosixCore          *posix  = DN_OS_GetPOSIXCore_();
+  DN_OSPosixCore          *posix  = DN_OS_PosixGetCore();
   DN_OSPosixSyncPrimitive *result = nullptr;
   pthread_mutex_lock(&posix->sync_primitive_free_list_mutex);
   {
@@ -1070,7 +1071,7 @@ static DN_OSPosixSyncPrimitive *DN_POSIX_AllocSyncPrimitive_()
 static void DN_OS_PosixDeallocSyncPrimitive_(DN_OSPosixSyncPrimitive *primitive)
 {
   if (primitive) {
-    DN_OSPosixCore *posix = DN_OS_GetPOSIXCore_();
+    DN_OSPosixCore *posix = DN_OS_PosixGetCore();
     pthread_mutex_lock(&posix->sync_primitive_free_list_mutex);
     primitive->next                 = posix->sync_primitive_free_list;
     posix->sync_primitive_free_list = primitive;

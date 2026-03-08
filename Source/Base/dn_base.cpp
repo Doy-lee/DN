@@ -1,7 +1,7 @@
 #define DN_BASE_CPP
 
 #if defined(_CLANGD)
-  #include "../dn_base.h"
+  #include "../dn.h"
 #endif
 
 DN_API bool DN_MemEq(void const *lhs, DN_USize lhs_size, void const *rhs, DN_USize rhs_size)
@@ -753,7 +753,7 @@ DN_API DN_U64 DN_SaturateCastIntToU64(int val)
   return result;
 }
 
-// NOTE: DN_Asan ////////////////////////////////////////////////////////////////////////// ////////
+// NOTE: DN_Asan
 static_assert(DN_IsPowerOfTwoAligned(DN_ASAN_POISON_GUARD_SIZE, DN_ASAN_POISON_ALIGNMENT),
               "ASAN poison guard size must be a power-of-two and aligned to ASAN's alignment"
               "requirement (8 bytes)");
@@ -851,12 +851,21 @@ static DN_ArenaBlock *DN_ArenaBlockFromMemFuncs_(DN_U64 reserve, DN_U64 commit, 
   return result;
 }
 
+static bool DN_ArenaHasPoison_(DN_ArenaFlags flags)
+{
+  DN_MSVC_WARNING_PUSH
+  DN_MSVC_WARNING_DISABLE(6237) // warning C6237: (<zero> && <expression>) is always zero.  <expression> is never evaluated and might have side effects.
+  bool result = DN_ASAN_POISON && DN_BitIsNotSet(flags, DN_ArenaFlags_NoPoison);
+  DN_MSVC_WARNING_POP
+  return result;
+}
+
 static DN_ArenaBlock *DN_ArenaBlockFlagsFromMemFuncs_(DN_U64 reserve, DN_U64 commit, DN_ArenaFlags flags, DN_ArenaMemFuncs mem_funcs)
 {
   bool           track_alloc    = (flags & DN_ArenaFlags_NoAllocTrack) == 0;
   bool           alloc_can_leak = flags & DN_ArenaFlags_AllocCanLeak;
   DN_ArenaBlock *result         = DN_ArenaBlockFromMemFuncs_(reserve, commit, track_alloc, alloc_can_leak, mem_funcs);
-  if (result && ((flags & DN_ArenaFlags_NoPoison) == 0))
+  if (result && DN_ArenaHasPoison_(flags))
     DN_ASanPoisonMemoryRegion(DN_Cast(char *) result + DN_ARENA_HEADER_SIZE, result->commit - DN_ARENA_HEADER_SIZE);
   return result;
 }
@@ -888,7 +897,7 @@ DN_API DN_Arena DN_ArenaFromBuffer(void *buffer, DN_USize size, DN_ArenaFlags fl
   block->commit        = size;
   block->reserve       = size;
   block->used          = DN_ARENA_HEADER_SIZE;
-  if (block && ((flags & DN_ArenaFlags_NoPoison) == 0))
+  if (block && DN_ArenaHasPoison_(flags))
     DN_ASanPoisonMemoryRegion(DN_Cast(char *) block + DN_ARENA_HEADER_SIZE, block->commit - DN_ARENA_HEADER_SIZE);
 
   DN_Arena result = {};
@@ -914,7 +923,10 @@ static void DN_ArenaBlockDeinit_(DN_Arena const *arena, DN_ArenaBlock *block)
   DN_USize release_size = block->reserve;
   if (DN_BitIsNotSet(arena->flags, DN_ArenaFlags_NoAllocTrack))
     DN_LeakTrackDealloc(&g_dn_->leak, block);
-  DN_ASanUnpoisonMemoryRegion(block, block->commit);
+
+  if (DN_ArenaHasPoison_(arena->flags))
+    DN_ASanUnpoisonMemoryRegion(block, block->commit);
+
   if (arena->flags & DN_ArenaFlags_MemFuncs) {
     if (arena->mem_funcs.type == DN_ArenaMemFuncType_Basic)
       arena->mem_funcs.basic_dealloc(block);
@@ -954,8 +966,7 @@ DN_API bool DN_ArenaCommitTo(DN_Arena *arena, DN_U64 pos)
   if (!arena->mem_funcs.vmem_commit(commit_ptr, commit_size, DN_MemPage_ReadWrite))
     return false;
 
-  bool poison = DN_ASAN_POISON && ((arena->flags & DN_ArenaFlags_NoPoison) == 0);
-  if (poison)
+  if (DN_ArenaHasPoison_(arena->flags))
     DN_ASanPoisonMemoryRegion(commit_ptr, commit_size);
 
   curr->commit = end_commit;
@@ -1003,7 +1014,7 @@ DN_API void *DN_ArenaAlloc(DN_Arena *arena, DN_U64 size, uint8_t align, DN_ZMem 
 
   try_alloc_again:
   DN_ArenaBlock *curr       = arena->curr;
-  bool           poison     = DN_ASAN_POISON && ((arena->flags & DN_ArenaFlags_NoPoison) == 0);
+  bool           poison     = DN_ArenaHasPoison_(arena->flags);
   uint8_t        real_align = poison ? DN_Max(align, DN_ASAN_POISON_ALIGNMENT) : align;
   DN_U64         offset_pos = DN_AlignUpPowerOfTwo(curr->used, real_align) + (poison ? DN_ASAN_POISON_GUARD_SIZE : 0);
   DN_U64         end_pos    = offset_pos + size;
@@ -1041,7 +1052,7 @@ DN_API void *DN_ArenaAlloc(DN_Arena *arena, DN_U64 size, uint8_t align, DN_ZMem 
   arena->stats.info.used += alloc_size;
   arena->stats.hwm.used   = DN_Max(arena->stats.hwm.used, arena->stats.info.used);
 
-  if (DN_BitIsNotSet(arena->flags, DN_ArenaFlags_SimAlloc))
+  if (poison && DN_BitIsNotSet(arena->flags, DN_ArenaFlags_SimAlloc))
     DN_ASanUnpoisonMemoryRegion(result, size);
 
   if (z_mem == DN_ZMem_Yes && DN_BitIsNotSet(arena->flags, DN_ArenaFlags_SimAlloc)) {
@@ -1096,9 +1107,11 @@ DN_API void DN_ArenaPopTo(DN_Arena *arena, DN_U64 init_used)
   arena->stats.info.used -= curr->used;
   arena->curr          = curr;
   curr->used           = used - curr->reserve_sum;
-  char    *poison_ptr  = (char *)curr + DN_AlignUpPowerOfTwo(curr->used, DN_ASAN_POISON_ALIGNMENT);
-  DN_USize poison_size = ((char *)curr + curr->commit) - poison_ptr;
-  DN_ASanPoisonMemoryRegion(poison_ptr, poison_size);
+  if (DN_ArenaHasPoison_(arena->flags)) {
+    char    *poison_ptr  = (char *)curr + DN_AlignUpPowerOfTwo(curr->used, DN_ASAN_POISON_ALIGNMENT);
+    DN_USize poison_size = ((char *)curr + curr->commit) - poison_ptr;
+    DN_ASanPoisonMemoryRegion(poison_ptr, poison_size);
+  }
   arena->stats.info.used += curr->used;
 }
 
@@ -1332,7 +1345,7 @@ DN_API DN_ErrSink* DN_ErrSinkBegin_(DN_ErrSink *err, DN_ErrSinkMode mode, DN_Cal
   if (err->stack_size == DN_ArrayCountU(err->stack)) {
     DN_Str8Builder builder = DN_Str8BuilderFromArena(err->arena);
     for (DN_ForItSize(it, DN_ErrSinkNode, err->stack, err->stack_size))
-      DN_Str8BuilderAppendF(&builder, "  [%04zu] %S:%u %.*s\n", it.index, it.data->call_site.file, it.data->call_site.line, DN_Str8PrintFmt(it.data->call_site.function));
+      DN_Str8BuilderAppendF(&builder, "  [%04zu] %.*s:%u %.*s\n", it.index, DN_Str8PrintFmt(it.data->call_site.file), it.data->call_site.line, DN_Str8PrintFmt(it.data->call_site.function));
     DN_Str8 msg = DN_Str8BuilderBuild(&builder, err->arena);
     DN_AssertF(err->stack_size < DN_ArrayCountU(err->stack), "Error sink has run out of error scopes, potential leak. Scopes were\n%.*s", DN_Str8PrintFmt(msg));
     DN_ArenaPopTo(err->arena, arena_pos);
@@ -4236,17 +4249,19 @@ DN_API DN_LogPrefixSize DN_LogMakePrefix(DN_LogStyle style, DN_LogTypeParam type
 
 DN_API void DN_LogSetPrintFunc(DN_LogPrintFunc *print_func, void *user_data)
 {
-  g_dn_->print_func         = print_func;
-  g_dn_->print_func_context = user_data;
+  DN_Core *dn            = DN_Get();
+  dn->print_func         = print_func;
+  dn->print_func_context = user_data;
 }
 
 DN_API void DN_LogPrint(DN_LogTypeParam type, DN_CallSite call_site, DN_FMT_ATTRIB char const *fmt, ...)
 {
-  DN_LogPrintFunc *func = g_dn_->print_func;
+  DN_Core         *dn   = DN_Get();
+  DN_LogPrintFunc *func = dn->print_func;
   if (func) {
     va_list args;
     va_start(args, fmt);
-    func(type, g_dn_->print_func_context, call_site, fmt, args);
+    func(type, dn->print_func_context, call_site, fmt, args);
     va_end(args);
   }
 }

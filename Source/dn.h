@@ -134,10 +134,10 @@ struct DN_Core
   #endif
 };
 
-extern DN_Core *g_dn_;
-
-DN_API void DN_Init      (DN_Core *dn, DN_InitFlags flags, DN_InitArgs *args);
-DN_API void DN_BeginFrame();
+DN_API void     DN_Init      (DN_Core *dn, DN_InitFlags flags, DN_InitArgs *args);
+DN_API void     DN_Set       (DN_Core *dn);
+DN_API DN_Core *DN_Get       ();
+DN_API void     DN_BeginFrame();
 
 #if DN_H_WITH_HELPERS
 #include "Extra/dn_helpers.h"

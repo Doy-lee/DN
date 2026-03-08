@@ -686,8 +686,8 @@ void DN_Demo()
   // The returned string's 'size' member variable does *not* include this
   // additional null-terminating byte.
   {
-    DN_TCScratch scratch   = DN_TCScratchBegin(nullptr, 0);
-    DN_Str8      string = DN_Str8FromArena(scratch.arena, /*size*/ 1, DN_ZMem_Yes);
+    DN_TCScratch scratch = DN_TCScratchBegin(nullptr, 0);
+    DN_Str8      string  = DN_Str8AllocArena(scratch.arena, /*size*/ 1, DN_ZMem_Yes);
     DN_Assert(string.size == 1);
     DN_Assert(string.data[string.size] == 0); // It is null-terminated!
     DN_TCScratchEnd(&scratch);

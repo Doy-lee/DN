@@ -41,9 +41,9 @@ DN_API void *DN_OS_MemReserve(DN_USize size, DN_MemCommit commit, DN_U32 page_fl
 
   void *result = VirtualAlloc(nullptr, size, flags, os_page_flags);
   if (flags & MEM_COMMIT) {
-    DN_Assert(g_dn_);
-    DN_AtomicAddU64(&g_dn_->os.vmem_allocs_total, 1);
-    DN_AtomicAddU64(&g_dn_->os.vmem_allocs_frame, 1);
+    DN_Core *dn = DN_Get();
+    DN_AtomicAddU64(&dn->os.vmem_allocs_total, 1);
+    DN_AtomicAddU64(&dn->os.vmem_allocs_frame, 1);
   }
   return result;
 }
@@ -55,9 +55,9 @@ DN_API bool DN_OS_MemCommit(void *ptr, DN_USize size, DN_U32 page_flags)
     return false;
   unsigned long os_page_flags = DN_OS_MemConvertPageToOSFlags_(page_flags);
   result                      = VirtualAlloc(ptr, size, MEM_COMMIT, os_page_flags) != nullptr;
-  DN_Assert(g_dn_);
-  DN_AtomicAddU64(&g_dn_->os.vmem_allocs_total, 1);
-  DN_AtomicAddU64(&g_dn_->os.vmem_allocs_frame, 1);
+  DN_Core *dn                 = DN_Get();
+  DN_AtomicAddU64(&dn->os.vmem_allocs_total, 1);
+  DN_AtomicAddU64(&dn->os.vmem_allocs_frame, 1);
   return result;
 }
 
@@ -83,10 +83,9 @@ DN_API int DN_OS_MemProtect(void *ptr, DN_USize size, DN_U32 page_flags)
   if (!ptr || size == 0)
     return 0;
 
-  static DN_Str8 const ALIGNMENT_ERROR_MSG =
-      DN_Str8Lit("Page protection requires pointers to be page aligned because we can only guard memory at a multiple of the page boundary.");
-  DN_AssertF(DN_IsPowerOfTwoAligned(DN_Cast(uintptr_t) ptr, g_dn_->os.page_size), "%s", ALIGNMENT_ERROR_MSG.data);
-  DN_AssertF(DN_IsPowerOfTwoAligned(size, g_dn_->os.page_size), "%s", ALIGNMENT_ERROR_MSG.data);
+  static DN_Str8 const ALIGNMENT_ERROR_MSG = DN_Str8Lit("Page protection requires pointers to be page aligned because we can only guard memory at a multiple of the page boundary.");
+  DN_AssertF(DN_IsPowerOfTwoAligned(DN_Cast(uintptr_t) ptr, DN_Get()->os.page_size), "%s", ALIGNMENT_ERROR_MSG.data);
+  DN_AssertF(DN_IsPowerOfTwoAligned(size, DN_Get()->os.page_size), "%s", ALIGNMENT_ERROR_MSG.data);
 
   unsigned long os_page_flags = DN_OS_MemConvertPageToOSFlags_(page_flags);
   unsigned long prev_flags    = 0;
@@ -100,13 +99,13 @@ DN_API int DN_OS_MemProtect(void *ptr, DN_USize size, DN_U32 page_flags)
 
 DN_API void *DN_OS_MemAlloc(DN_USize size, DN_ZMem z_mem)
 {
-  DN_RawAssert(g_dn_->init_flags & DN_InitFlags_OS && "DN must be initialised with the OS flag");
+  DN_Core *dn = DN_Get();
+  DN_RawAssert(dn->init_flags & DN_InitFlags_OS && "DN must be initialised with the OS flag");
   DN_U32 flags = z_mem == DN_ZMem_Yes ? HEAP_ZERO_MEMORY : 0;
   DN_Assert(size <= DN_Cast(DWORD)(-1));
   void *result = HeapAlloc(GetProcessHeap(), flags, DN_Cast(DWORD) size);
-  DN_Assert(g_dn_);
-  DN_AtomicAddU64(&g_dn_->os.mem_allocs_total, 1);
-  DN_AtomicAddU64(&g_dn_->os.mem_allocs_frame, 1);
+  DN_AtomicAddU64(&dn->os.mem_allocs_total, 1);
+  DN_AtomicAddU64(&dn->os.mem_allocs_frame, 1);
   return result;
 }
 
@@ -199,8 +198,7 @@ DN_API DN_U64 DN_OS_DateLocalUnixTimeSFromUnixTimeS(DN_U64 unix_ts_s)
 
 DN_API void DN_OS_GenBytesSecure(void *buffer, DN_U32 size)
 {
-  DN_Assert(g_dn_);
-  DN_OSW32Core *w32 = DN_Cast(DN_OSW32Core *) g_dn_->os.platform_context;
+  DN_OSW32Core *w32 = DN_Cast(DN_OSW32Core *) DN_Get()->os.platform_context;
   DN_Assert(w32->bcrypt_init_success);
 
   long gen_status = BCryptGenRandom(w32->bcrypt_rng_handle, DN_Cast(unsigned char *) buffer, size, 0 /*flags*/);
@@ -262,8 +260,7 @@ DN_API void DN_OS_SleepMs(DN_UInt milliseconds)
 
 DN_API DN_U64 DN_OS_PerfCounterFrequency()
 {
-  DN_Assert(g_dn_);
-  DN_OSW32Core *w32 = DN_Cast(DN_OSW32Core *) g_dn_->os.platform_context;
+  DN_OSW32Core *w32 = DN_Cast(DN_OSW32Core *) DN_Get()->os.platform_context;
   DN_Assert(w32->qpc_frequency.QuadPart);
   DN_U64 result = w32->qpc_frequency.QuadPart;
   return result;
@@ -1008,8 +1005,9 @@ DN_API DN_OSExecAsyncHandle DN_OS_ExecAsync(DN_Str8Slice cmd_line, DN_OSExecArgs
 
 DN_API DN_OSW32Core *DN_OS_W32GetCore()
 {
-  DN_Assert(g_dn_ && g_dn_->os.platform_context);
-  DN_OSW32Core *result = DN_Cast(DN_OSW32Core *)g_dn_->os.platform_context;
+  DN_Core *dn = DN_Get();
+  DN_Assert(dn && dn->os_init);
+  DN_OSW32Core *result = DN_Cast(DN_OSW32Core *)dn->os.platform_context;
   return result;
 }
 
@@ -1039,7 +1037,7 @@ static DN_OSW32SyncPrimitive *DN_OS_W32AllocSyncPrimitive_()
       w32->sync_primitive_free_list = w32->sync_primitive_free_list->next;
       result->next                  = nullptr;
     } else {
-      DN_OSCore *os = &g_dn_->os;
+      DN_OSCore *os = &DN_Get()->os;
       result        = DN_ArenaNew(&os->arena, DN_OSW32SyncPrimitive, DN_ZMem_Yes);
     }
   }

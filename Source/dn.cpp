@@ -22,7 +22,7 @@ DN_Core *g_dn_;
 
 DN_API void DN_Init(DN_Core *dn, DN_InitFlags flags, DN_InitArgs *args)
 {
-  g_dn_          = dn;
+  DN_Set(dn);
   dn->init_flags = flags;
 
   if (DN_BitIsSet(flags, DN_InitFlags_OS)) {
@@ -214,6 +214,17 @@ DN_API void DN_Init(DN_Core *dn, DN_InitFlags flags, DN_InitArgs *args)
 
   if (buf_size)
     DN_LogDebugF("%.*s", DN_Cast(int)buf_size, buf);
+}
+
+DN_API void DN_Set(DN_Core *dn)
+{
+  g_dn_ = dn;
+}
+
+DN_API DN_Core *DN_Get()
+{
+  DN_Core *result = g_dn_;
+  return result;
 }
 
 DN_API void DN_BeginFrame()

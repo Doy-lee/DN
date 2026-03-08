@@ -1,6 +1,8 @@
 #define DN_NET_CURL_CPP
 
 #if defined(_CLANGD)
+  #define DN_H_WITH_OS 1
+  #include "../dn.h"
   #include "dn_net.h"
   #include "dn_net_curl.h"
 #endif
@@ -88,7 +90,7 @@ static int32_t DN_NET_CurlThreadEntryPoint_(DN_OSThread *thread)
 {
   DN_NETCore     *net  = DN_Cast(DN_NETCore *) thread->user_context;
   DN_NETCurlCore *curl = DN_Cast(DN_NETCurlCore *) net->context;
-  DN_OS_ThreadSetName(DN_Str8FromPtr(curl->thread.name.data, curl->thread.name.size));
+  DN_OS_ThreadSetNameFmt("%.*s", DN_Str8PrintFmt(curl->thread.name));
 
   while (!curl->kill_thread) {
     DN_TCScratch tmem = DN_TCScratchBegin(nullptr, 0);
@@ -127,7 +129,7 @@ static int32_t DN_NET_CurlThreadEntryPoint_(DN_OSThread *thread)
           DN_Str8 payload = {};
           for (DN_OS_MutexScope(&curl->ring_mutex)) {
             DN_Assert(DN_RingHasData(&curl->ring, event.ws_send_size));
-            payload = DN_Str8FromArena(tmem.arena, event.ws_send_size, DN_ZMem_No);
+            payload = DN_Str8AllocArena(tmem.arena, event.ws_send_size, DN_ZMem_No);
             DN_RingRead(&curl->ring, payload.data, payload.size);
           }
 
@@ -300,7 +302,7 @@ static int32_t DN_NET_CurlThreadEntryPoint_(DN_OSThread *thread)
 
         // NOTE: Allocate and read (we use meta->bytesleft as per comment from initial recv)
         if (meta->bytesleft) {
-          DN_Str8 buffer  = DN_Str8FromArena(&req->arena, meta->bytesleft, DN_ZMem_No);
+          DN_Str8 buffer  = DN_Str8AllocArena(&req->arena, meta->bytesleft, DN_ZMem_No);
           DN_Assert(buffer.size == DN_Cast(DN_USize)meta->bytesleft);
           receive_result  = curl_ws_recv(curl_req->handle, buffer.data, buffer.size, &buffer.size, &meta);
           DN_Assert(buffer.size == DN_Cast(DN_USize)meta->len);
@@ -405,7 +407,7 @@ void DN_NET_CurlInit(DN_NETCore *net, char *base, DN_U64 base_size)
   curl->thread_curlm = DN_Cast(CURLM *) curl_multi_init();
 
   DN_FmtAppend(curl->thread.name.data, &curl->thread.name.size, sizeof(curl->thread.name.data), "NET (CURL)");
-  DN_OS_ThreadInit(&curl->thread, DN_NET_CurlThreadEntryPoint_, net);
+  DN_OS_ThreadInit(&curl->thread, DN_NET_CurlThreadEntryPoint_, nullptr, net);
 }
 
 void DN_NET_CurlDeinit(DN_NETCore *net)

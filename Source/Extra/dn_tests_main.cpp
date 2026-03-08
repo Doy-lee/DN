@@ -4,7 +4,6 @@
 
 #define DN_H_WITH_OS      1
 #define DN_H_WITH_CORE    1
-#define DN_H_WITH_MATH    1
 #define DN_H_WITH_HASH    1
 #define DN_H_WITH_HELPERS 1
 #define DN_H_WITH_ASYNC   1
@@ -34,8 +33,8 @@ DN_MSVC_WARNING_PUSH
 DN_MSVC_WARNING_DISABLE(6262) // Function uses '29804' bytes of stack.  Consider moving some data to heap.
 int main(int, char**)
 {
-  DN_Core core = {};
-  DN_Init(&core, DN_InitFlags_LogAllFeatures | DN_InitFlags_OS, nullptr);
+  DN_Core dn = {};
+  DN_Init(&dn, DN_InitFlags_LogAllFeatures | DN_InitFlags_OS | DN_InitFlags_ThreadContext, nullptr);
   DN_Tests_RunSuite(DN_TestsPrint_Yes);
   return 0;
 }
