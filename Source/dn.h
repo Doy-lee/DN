@@ -1,10 +1,16 @@
 #if !defined(DN_H)
 #define DN_H
 
-// NOTE: DN configuration
-//  Enabling DN modules
-//    By including this mega header 'dn.h' you must define the following symbols to 0 or 1 in order
-//    to include the module's implementation into the library as follows
+// NOTE: DN
+//  Getting Started
+//    Include this mega header `dn.h` and define the following symbols to `1` to conditionally
+//    enable the interfaces for those features. Additionally in the same or different translation
+//    unit, include `dn.cpp` with the same symbols defined to enable the implementation of these
+//    features.
+//
+//    See the configuration section for more information on other symbols that can be defined.
+//
+//    The following is a single translation unit example:
 /*
     #define DN_H_WITH_OS      1
     #define DN_H_WITH_CORE    1
@@ -18,52 +24,65 @@
     #define DN_CPP_WITH_DEMO 1
     #include "dn.cpp"
 */
-//  Platform Target
-//    Define one of the following directives to configure this library to compile for that platform.
-//    By default, the library will auto-detect the current host platform and select that as the
-//    target platform.
+//    Then initialise the library at runtime by calling DN_Init(...). The library is laid out as:
 //
-//      DN_PLATFORM_EMSCRIPTEN
-//      DN_PLATFORM_POSIX
-//      DN_PLATFORM_WIN32
+//    - The base layer (dn_base.h) which provides primitives that do not require a host operating
+//      system (e.g. freestanding) such as string manipulation, compiler intrinsics and containers.
+//      This layer is unconditionallly always available by compiling with this library.
 //
-//    For example
+//    - The OS layer (dn_os.h) which provides primitives that use the OS such as file IO, threading
+//      synchronisation, memory allocation. This layer is OPTIONAL.
 //
-//      #define DN_PLATFORM_WIN32
+//    - Extra layer provides helper utilities that are opt-in. These layers are OPTIONAL.
 //
-//    Will ensure that <Windows.h> is included and the OS layer is implemented using Win32
-//    primitives.
+//  Configuration
+//    Platform Target
+//      Define one of the following directives to configure this library to compile for that
+//      platform. By default, the library will auto-detect the current host platform and select that
+//      as the target platform.
 //
-//  Static functions
-//    All public functions in the DN library are prefixed with the macro '#define DN_API'. By
-//    default 'DN_API' is not defined to anything. Define
+//        DN_PLATFORM_EMSCRIPTEN
+//        DN_PLATFORM_POSIX
+//        DN_PLATFORM_WIN32
 //
-//      DN_STATIC_API
+//      For example
 //
-//    To replace all the prefixed with 'static' ensuring that the functions in the library do not
-//    export an entry into the linking table and thereby optimise compilation times as the linker
-//    will not try to resolve symbols from other translation units from the the unit including the
-//    DN library.
+//        #define DN_PLATFORM_WIN32
 //
-//  Using the in-built replacement header for <Windows.h> (requires dn_os_inc.h)
-//    If you are building DN for the Windows platform, <Windows.h> is a large legacy header that
-//    applications have to link to use Windows syscalls. By default DN library uses a replacement
-//    header for all the Windows functions that it uses in the OS layer removing the need to include
-//    <Windows.h> to improve compilation times. This can be disabled by defining:
+//      Will ensure that <Windows.h> is included and the OS layer is implemented using Win32
+//      primitives.
 //
-//      DN_NO_WINDOWS_H_REPLACEMENT_HEADER
+//    Static functions
+//      All public functions in the DN library are prefixed with the macro '#define DN_API'. By
+//      default 'DN_API' is not defined to anything. Define
 //
-//    To instead use <Windows.h>. DN automatically detects if <Windows.h> is included in an earlier
-//    translation unit and will automatically disable the in-built replacement header in which case
-//    this does not need to be defined.
+//        DN_STATIC_API
 //
-//  Freestanding
-//    The base layer can be used without an OS implementation by defining DN_FREESTANDING like:
+//      To replace all the functions prefixed with DN_API to be prefixed with 'static' ensuring that
+//      the functions in the library do not export an entry into the linking table.
+//      translation units.
 //
-//      #define DN_FREESTANDING
+//    Disabling the in-built <Windows.h> (if #define DN_H_WITH_OS 1)
+//      If you are building DN for the Windows platform, <Windows.h> is a large legacy header that
+//      applications have to include to use Windows APIs. By default this library uses a replacement
+//      header for all the Windows functions that it uses in the OS layer removing the need to
+//      include <Windows.h> to improve compilation times. This mini header will conflict with
+//      <Windows.h> if it needs to be included in your project. The mini header can be disabled by
+//      defining:
 //
-//    This means functionality that relies on the OS like printing, memory allocation, stack traces
-//    and so forth are disabled.
+//        DN_NO_WINDOWS_H_REPLACEMENT_HEADER
+//
+//      To instead use <Windows.h>. DN automatically detects if <Windows.h> is included in an earlier
+//      translation unit and will automatically disable the in-built replacement header in which case
+//      this does not need to be defined.
+//
+//    Freestanding
+//      The base layer can be used without an OS implementation by defining DN_FREESTANDING like:
+//
+//        #define DN_FREESTANDING
+//
+//      This means functionality that relies on the OS like printing, memory allocation, stack traces
+//      and so forth are disabled.
 
 #include "Base/dn_base.h"
 #include "Base/dn_base_assert.h"
@@ -83,9 +102,43 @@
 #include "OS/dn_os.h"
 #endif
 
-#if DN_H_WITH_CORE
-#include "dn_core.h"
-#endif
+struct DN_InitArgs
+{
+  DN_TCInitArgs thread_context_init_args;
+};
+
+typedef DN_USize DN_InitFlags;
+enum DN_InitFlags_
+{
+  DN_InitFlags_Nil            = 0,
+  DN_InitFlags_OS             = (1 << 0),
+  DN_InitFlags_LeakTracker    = (1 << 1) | DN_InitFlags_OS,
+  DN_InitFlags_LogLibFeatures = (1 << 2),
+  DN_InitFlags_LogCPUFeatures = (1 << 3) | DN_InitFlags_OS,
+  DN_InitFlags_ThreadContext  = (1 << 4) | DN_InitFlags_OS,
+  DN_InitFlags_LogAllFeatures = DN_InitFlags_LogLibFeatures | DN_InitFlags_LogCPUFeatures,
+};
+
+struct DN_Core
+{
+  DN_InitFlags     init_flags;
+  DN_TCCore        main_tc;
+  DN_USize         mem_allocs_frame;
+  DN_LeakTracker   leak;
+
+  DN_LogPrintFunc* print_func;
+  void*            print_func_context;
+
+  bool             os_init;
+  #if defined(DN_OS_H)
+  DN_OSCore        os;
+  #endif
+};
+
+extern DN_Core *g_dn_;
+
+DN_API void DN_Init      (DN_Core *dn, DN_InitFlags flags, DN_InitArgs *args);
+DN_API void DN_BeginFrame();
 
 #if DN_H_WITH_MATH
 #include "Extra/dn_math.h"

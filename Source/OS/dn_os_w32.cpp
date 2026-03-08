@@ -2,6 +2,7 @@
 
 #if defined(_CLANGD)
   #define DN_H_WITH_CORE 1
+  #define DN_H_WITH_OS 1
   #include "../dn.h"
   #include "dn_os_w32.h"
 #endif
@@ -1235,14 +1236,14 @@ DN_API void DN_OS_ConditionVariableBroadcast(DN_OSConditionVariable *cv)
   }
 }
 
-// NOTE: DN_OSThread ///////////////////////////////////////////////////////////////////////////////
+// NOTE: DN_OSThread
 static DWORD __stdcall DN_OS_ThreadFunc_(void *user_context)
 {
   DN_OS_ThreadExecute_(user_context);
   return 0;
 }
 
-DN_API bool DN_OS_ThreadInit(DN_OSThread *thread, DN_OSThreadFunc *func, void *user_context)
+DN_API bool DN_OS_ThreadInit(DN_OSThread *thread, DN_OSThreadFunc *func, DN_TCLane *lane, void *user_context)
 {
   bool result = false;
   if (!thread)
@@ -1251,6 +1252,10 @@ DN_API bool DN_OS_ThreadInit(DN_OSThread *thread, DN_OSThreadFunc *func, void *u
   thread->func           = func;
   thread->user_context   = user_context;
   thread->init_semaphore = DN_OS_SemaphoreInit(0 /*initial_count*/);
+  if (lane) {
+    thread->is_lane_set = true;
+    thread->lane        = *lane;
+  }
 
   // TODO(doyle): Check if semaphore is valid
   DWORD               thread_id        = 0;
@@ -1277,16 +1282,18 @@ DN_API bool DN_OS_ThreadInit(DN_OSThread *thread, DN_OSThreadFunc *func, void *u
   return result;
 }
 
-DN_API void DN_OS_ThreadDeinit(DN_OSThread *thread)
+DN_API bool DN_OS_ThreadJoin(DN_OSThread *thread)
 {
-  if (!thread || !thread->handle)
-    return;
-
-  WaitForSingleObject(thread->handle, INFINITE);
-  CloseHandle(thread->handle);
-  thread->handle    = INVALID_HANDLE_VALUE;
-  thread->thread_id = {};
-  DN_TCDeinit(&thread->context);
+  bool result = false;
+  if (thread && thread->handle) {
+    DWORD wait_result = WaitForSingleObject(thread->handle, INFINITE);
+    result            = wait_result == WAIT_OBJECT_0;
+    CloseHandle(thread->handle);
+    thread->handle    = INVALID_HANDLE_VALUE;
+    thread->thread_id = {};
+    DN_TCDeinit(&thread->context);
+  }
+  return result;
 }
 
 DN_API DN_U32 DN_OS_ThreadID()

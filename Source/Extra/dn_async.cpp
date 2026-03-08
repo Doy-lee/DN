@@ -64,7 +64,7 @@ DN_API void DN_ASYNC_Deinit(DN_ASYNCCore *async)
   DN_AtomicSetValue32(&async->join_threads, true);
   DN_OS_SemaphoreIncrement(&async->worker_sem, async->thread_count);
   for (DN_ForItSize(it, DN_OSThread, async->threads, async->thread_count))
-    DN_OS_ThreadDeinit(it.data);
+    DN_OS_ThreadJoin(it.data);
 }
 
 static bool DN_ASYNC_QueueTask_(DN_ASYNCCore *async, DN_ASYNCTask const *task, DN_U64 wait_time_ms) {

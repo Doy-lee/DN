@@ -1473,7 +1473,7 @@ DN_API bool DN_ErrSinkEndLogError_(DN_ErrSink *err, DN_CallSite call_site, DN_St
 
     // NOTE: Log the error
     DN_Str8 log = DN_Str8BuilderBuild(&builder, err->arena);
-    DN_LogEmitFromType(DN_LogMakeU32LogTypeParam(DN_LogType_Error), call_site, "%.*s", DN_Str8PrintFmt(log));
+    DN_LogPrint(DN_LogMakeU32LogTypeParam(DN_LogType_Error), call_site, "%.*s", DN_Str8PrintFmt(log));
 
     if (node->mode == DN_ErrSinkMode_DebugBreakOnErrorLog)
       DN_DebugBreak;
@@ -1552,6 +1552,7 @@ DN_API void DN_TCInit(DN_TCCore *tc, DN_U64 thread_id, DN_Arena *main_arena, DN_
   tc->temp_a_arena   = temp_a_arena;
   tc->temp_b_arena   = temp_b_arena;
   tc->err_sink.arena = err_sink_arena;
+  tc->lane.count     = 1;
 }
 
 DN_API void DN_TCInitFromMemFuncs(DN_TCCore *tc, DN_U64 thread_id, DN_TCInitArgs *args, DN_ArenaMemFuncs mem_funcs)
@@ -1668,6 +1669,21 @@ DN_API DN_ErrSink *DN_TCErrSink()
 {
   DN_TCCore  *tc     = DN_TCGet();
   DN_ErrSink *result = &tc->err_sink;
+  return result;
+}
+
+DN_API DN_TCLane *DN_TCLaneGet()
+{
+  DN_TCCore *tc     = DN_TCGet();
+  DN_TCLane *result = &tc->lane;
+  return result;
+}
+
+DN_API DN_TCLane DN_TCLaneEquip(DN_TCLane lane)
+{
+  DN_TCLane *curr   = DN_TCLaneGet();
+  DN_TCLane  result = *curr;
+  *curr             = lane;
   return result;
 }
 
@@ -4063,8 +4079,6 @@ DN_API DN_U32 DN_MurmurHash3HashU32FromBytesX64(void const *bytes, int len, DN_U
   return result;
 }
 
-static DN_LogEmitFromTypeFVFunc *g_dn_base_log_emit_from_type_fv_func_;
-static void                     *g_dn_base_log_emit_from_type_fv_user_context_;
 DN_API DN_Str8 DN_LogColourEscapeCodeStr8FromRGB(DN_LogColourType colour, DN_U8 r, DN_U8 g, DN_U8 b)
 {
   DN_THREAD_LOCAL char buffer[32];
@@ -4161,20 +4175,19 @@ DN_API DN_LogPrefixSize DN_LogMakePrefix(DN_LogStyle style, DN_LogTypeParam type
   return result;
 }
 
-DN_API void DN_LogSetEmitFromTypeFVFunc(DN_LogEmitFromTypeFVFunc *print_func, void *user_data)
+DN_API void DN_LogSetPrintFunc(DN_LogPrintFunc *print_func, void *user_data)
 {
-  g_dn_base_log_emit_from_type_fv_func_         = print_func;
-  g_dn_base_log_emit_from_type_fv_user_context_ = user_data;
+  g_dn_->print_func         = print_func;
+  g_dn_->print_func_context = user_data;
 }
 
-DN_API void DN_LogEmitFromType(DN_LogTypeParam type, DN_CallSite call_site, DN_FMT_ATTRIB char const *fmt, ...)
+DN_API void DN_LogPrint(DN_LogTypeParam type, DN_CallSite call_site, DN_FMT_ATTRIB char const *fmt, ...)
 {
-  DN_LogEmitFromTypeFVFunc *func         = g_dn_base_log_emit_from_type_fv_func_;
-  void                     *user_context = g_dn_base_log_emit_from_type_fv_user_context_;
+  DN_LogPrintFunc *func = g_dn_->print_func;
   if (func) {
     va_list args;
     va_start(args, fmt);
-    func(type, user_context, call_site, fmt, args);
+    func(type, g_dn_->print_func_context, call_site, fmt, args);
     va_end(args);
   }
 }

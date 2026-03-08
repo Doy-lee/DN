@@ -1,9 +1,9 @@
 #define DN_OS_CPP
 
 #if defined(_CLANGD)
-  #include "../Base/dn_base.h"
-  #include "../dn_os.h"
-  #include "../dn_os_w32.h"
+  #define DN_H_WITH_OS 1
+  #define DN_H_WITH_CORE 1
+  #include "../dn.h"
 #endif
 
 #if defined(DN_PLATFORM_POSIX)
@@ -20,7 +20,7 @@ static void *DN_ArenaBasicAllocFromOSHeap(DN_USize size)
 DN_API DN_ArenaMemFuncs DN_ArenaMemFuncsGet(DN_ArenaMemFuncType type)
 {
   DN_ArenaMemFuncs result = {};
-  result.type             = type;
+  result.type = type;
   switch (type) {
     case DN_ArenaMemFuncType_Nil: break;
     case DN_ArenaMemFuncType_Basic: {
@@ -30,6 +30,7 @@ DN_API DN_ArenaMemFuncs DN_ArenaMemFuncsGet(DN_ArenaMemFuncType type)
     };
 
     case DN_ArenaMemFuncType_VMem: {
+      DN_Assert(g_dn_->init_flags & DN_InitFlags_OS);
       result.type           = DN_ArenaMemFuncType_VMem;
       result.vmem_page_size = g_dn_->os.page_size;
       result.vmem_reserve   = DN_OS_MemReserve;
@@ -42,12 +43,13 @@ DN_API DN_ArenaMemFuncs DN_ArenaMemFuncsGet(DN_ArenaMemFuncType type)
 
 DN_API DN_ArenaMemFuncs DN_ArenaMemFuncsGetDefaults()
 {
-  DN_ArenaMemFuncs result = {};
-  #if defined(DN_PLATFORM_EMSCRIPTEN)
-  result = DN_ArenaMemFuncsGet(DN_ArenaMemFuncType_Basic);
-  #else
-  result = DN_ArenaMemFuncsGet(DN_ArenaMemFuncType_VMem);
-  #endif
+  DN_ArenaMemFuncType type = DN_ArenaMemFuncType_Basic;
+  if (g_dn_->os_init) {
+    #if !defined(DN_PLATFORM_EMSCRIPTEN)
+    type = DN_ArenaMemFuncType_VMem;
+    #endif
+  }
+  DN_ArenaMemFuncs result = DN_ArenaMemFuncsGet(type);
   return result;
 }
 
@@ -133,24 +135,24 @@ DN_API DN_Str8 DN_Str8BuilderBuildFromHeap(DN_Str8Builder const *builder)
   return result;
 }
 
-static void DN_OS_LOGEmitFromTypeTypeFV_(DN_LogTypeParam type, void *user_data, DN_CallSite call_site, DN_FMT_ATTRIB char const *fmt, va_list args)
+DN_API void DN_OS_LogPrint(DN_LogTypeParam type, void *user_data, DN_CallSite call_site, DN_FMT_ATTRIB char const *fmt, va_list args)
 {
   DN_Assert(user_data);
-  DN_OSCore *core = DN_Cast(DN_OSCore *)user_data;
+  DN_OSCore *os = DN_Cast(DN_OSCore *)user_data;
 
   // NOTE: Open log file for appending if requested
-  DN_TicketMutex_Begin(&core->log_file_mutex);
-  if (core->log_to_file && !core->log_file.handle && !core->log_file.error) {
+  DN_TicketMutex_Begin(&os->log_file_mutex);
+  if (os->log_to_file && !os->log_file.handle && !os->log_file.error) {
     DN_TCScratch scratch  = DN_TCScratchBegin(nullptr, 0);
     DN_Str8      exe_dir  = DN_OS_EXEDir(scratch.arena);
     DN_Str8      log_path = DN_OS_PathF(scratch.arena, "%.*s/dn.log", DN_Str8PrintFmt(exe_dir));
-    core->log_file        = DN_OS_FileOpen(log_path, DN_OSFileOpen_CreateAlways, DN_OSFileAccess_AppendOnly, nullptr);
+    os->log_file          = DN_OS_FileOpen(log_path, DN_OSFileOpen_CreateAlways, DN_OSFileAccess_AppendOnly, nullptr);
     DN_TCScratchEnd(&scratch);
   }
-  DN_TicketMutex_End(&core->log_file_mutex);
+  DN_TicketMutex_End(&os->log_file_mutex);
 
   DN_LogStyle style = {};
-  if (!core->log_no_colour) {
+  if (!os->log_no_colour) {
     style.colour = true;
     style.bold   = DN_LogBold_Yes;
     if (type.is_u32_enum) {
@@ -191,14 +193,14 @@ static void DN_OS_LOGEmitFromTypeTypeFV_(DN_LogTypeParam type, void *user_data, 
 
   va_list args_copy;
   va_copy(args_copy, args);
-  DN_TicketMutex_Begin(&core->log_file_mutex);
+  DN_TicketMutex_Begin(&os->log_file_mutex);
   {
-    DN_OS_FileWrite(&core->log_file, DN_Str8FromPtr(prefix_buffer, prefix_size.size), nullptr);
-    DN_OS_FileWriteF(&core->log_file, nullptr, "%*s ", DN_Cast(int)prefix_size.padding, "");
-    DN_OS_FileWriteFV(&core->log_file, nullptr, fmt, args_copy);
-    DN_OS_FileWrite(&core->log_file, DN_Str8Lit("\n"), nullptr);
+    DN_OS_FileWrite(&os->log_file, DN_Str8FromPtr(prefix_buffer, prefix_size.size), nullptr);
+    DN_OS_FileWriteF(&os->log_file, nullptr, "%*s ", DN_Cast(int)prefix_size.padding, "");
+    DN_OS_FileWriteFV(&os->log_file, nullptr, fmt, args_copy);
+    DN_OS_FileWrite(&os->log_file, DN_Str8Lit("\n"), nullptr);
   }
-  DN_TicketMutex_End(&core->log_file_mutex);
+  DN_TicketMutex_End(&os->log_file_mutex);
   va_end(args_copy);
 
   DN_OSPrintDest dest = (type.is_u32_enum && type.u32 == DN_LogType_Error) ? DN_OSPrintDest_Err : DN_OSPrintDest_Out;
@@ -207,76 +209,9 @@ static void DN_OS_LOGEmitFromTypeTypeFV_(DN_LogTypeParam type, void *user_data, 
   DN_OS_PrintLnFV(dest, fmt, args);
 }
 
-DN_API void DN_OS_EmitLogsWithOSPrintFunctions(DN_OSCore *os)
+DN_API void DN_OS_SetLogPrintFuncToOS()
 {
-  DN_Assert(os);
-  DN_LogSetEmitFromTypeFVFunc(DN_OS_LOGEmitFromTypeTypeFV_, os);
-}
-
-DN_API void DN_OS_DumpThreadContextArenaStat(DN_Str8 file_path)
-{
-#if defined(DN_DEBUG_THREAD_CONTEXT)
-  // NOTE: Open a file to write the arena stats to
-  FILE *file = nullptr;
-  fopen_s(&file, file_path.data, "a+b");
-  if (file) {
-    DN_LogErrorF("Failed to dump thread context arenas [file=%.*s]", DN_Str8PrintFmt(file_path));
-    return;
-  }
-
-  // NOTE: Copy the stats from library book-keeping
-  // NOTE: Extremely short critical section, copy the stats then do our
-  // work on it.
-  DN_ArenaStat stats[DN_ArrayCountU(g_dn_core->thread_context_arena_stats)];
-  int          stats_size = 0;
-
-  DN_TicketMutex_Begin(&g_dn_core->thread_context_mutex);
-  stats_size = g_dn_core->thread_context_arena_stats_count;
-  DN_Memcpy(stats, g_dn_core->thread_context_arena_stats, sizeof(stats[0]) * stats_size);
-  DN_TicketMutex_End(&g_dn_core->thread_context_mutex);
-
-  // NOTE: Print the cumulative stat
-  DN_DateHMSTimeStr now = DN_Date_HMSLocalTimeStrNow();
-  fprintf(file,
-          "Time=%.*s %.*s | Thread Context Arenas | Count=%d\n",
-          now.date_size,
-          now.date,
-          now.hms_size,
-          now.hms,
-          g_dn_core->thread_context_arena_stats_count);
-
-  // NOTE: Write the cumulative thread arena data
-  {
-    DN_ArenaStat stat = {};
-    for (DN_USize index = 0; index < stats_size; index++) {
-      DN_ArenaStat const *current = stats + index;
-      stat.capacity += current->capacity;
-      stat.used += current->used;
-      stat.wasted += current->wasted;
-      stat.blocks += current->blocks;
-
-      stat.capacity_hwm = DN_Max(stat.capacity_hwm, current->capacity_hwm);
-      stat.used_hwm     = DN_Max(stat.used_hwm, current->used_hwm);
-      stat.wasted_hwm   = DN_Max(stat.wasted_hwm, current->wasted_hwm);
-      stat.blocks_hwm   = DN_Max(stat.blocks_hwm, current->blocks_hwm);
-    }
-
-    DN_ArenaStatStr stats_string = DN_ArenaStatStr(&stat);
-    fprintf(file, "  [ALL] CURR %.*s\n", stats_string.size, stats_string.data);
-  }
-
-  // NOTE: Print individual thread arena data
-  for (DN_USize index = 0; index < stats_size; index++) {
-    DN_ArenaStat const *current        = stats + index;
-    DN_ArenaStatStr     current_string = DN_ArenaStatStr(current);
-    fprintf(file, "  [%03d] CURR %.*s\n", DN_Cast(int) index, current_string.size, current_string.data);
-  }
-
-  fclose(file);
-  DN_LogInfoF("Dumped thread context arenas [file=%.*s]", DN_Str8PrintFmt(file_path));
-#else
-  (void)file_path;
-#endif // #if defined(DN_DEBUG_THREAD_CONTEXT)
+  DN_LogSetPrintFunc(DN_OS_LogPrint, &g_dn_->os);
 }
 
 // NOTE: Date
@@ -759,14 +694,21 @@ static void DN_OS_ThreadExecute_(void *user_context)
   DN_ArenaMemFuncs mem_funcs = DN_ArenaMemFuncsGetDefaults();
   DN_TCInitFromMemFuncs(&thread->context, thread->thread_id, /*args=*/nullptr, mem_funcs);
   DN_TCEquip(&thread->context);
+  if (thread->is_lane_set)
+    DN_TCLaneEquip(thread->lane);
   DN_OS_SemaphoreWait(&thread->init_semaphore, DN_OS_SEMAPHORE_INFINITE_TIMEOUT);
   thread->func(thread);
 }
 
-DN_API void DN_OS_ThreadSetName(DN_Str8 name)
+DN_API void DN_OS_ThreadSetNameFmt(char const *fmt, ...)
 {
   DN_TCCore *tls = DN_TCGet();
-  tls->name      = DN_Str8x64FromFmt("%.*s", DN_Str8PrintFmt(name));
+  va_list args;
+  va_start(args, fmt);
+  tls->name = DN_Str8x64FromFmtV(fmt, args);
+  va_end(args);
+
+  DN_Str8 name = DN_Str8FromPtr(tls->name.data, tls->name.size);
 #if defined(DN_PLATFORM_WIN32)
   DN_OS_W32ThreadSetName(name);
 #else

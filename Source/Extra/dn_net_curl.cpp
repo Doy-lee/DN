@@ -413,7 +413,7 @@ void DN_NET_CurlDeinit(DN_NETCore *net)
   DN_NETCurlCore *curl = DN_Cast(DN_NETCurlCore *) net->context;
   curl->kill_thread    = true;
   curl_multi_wakeup(curl->thread_curlm);
-  DN_OS_ThreadDeinit(&curl->thread);
+  DN_OS_ThreadJoin(&curl->thread);
 }
 
 static DN_NETRequestHandle DN_NET_CurlDoRequest_(DN_NETCore *net, DN_Str8 url, DN_Str8 method, DN_NETDoHTTPArgs const *args, DN_NETRequestType type)

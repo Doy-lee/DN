@@ -1041,6 +1041,14 @@ struct DN_ErrSink
   DN_USize       stack_size;
 };
 
+struct DN_TCLane
+{
+  DN_USize index;
+  DN_USize count;
+  DN_U64   barrier_handle;
+  void*    shared_mem;
+};
+
 struct DN_TCScratch
 {
   DN_Arena*       arena;
@@ -1072,6 +1080,7 @@ struct DN_TCCore // (T)hread (C)ontext sitting in thread-local storage
   DN_Str8x64  name;
   DN_U64      thread_id;
   DN_CallSite call_site;
+  DN_TCLane   lane;
 
   DN_Arena    main_arena_;
   DN_Arena    temp_a_arena_;
@@ -1174,7 +1183,7 @@ struct DN_StackTraceWalkResultIterator
   DN_U16                index;
 };
 
-typedef void DN_LogEmitFromTypeFVFunc(DN_LogTypeParam type, void *user_data, DN_CallSite call_site, DN_FMT_ATTRIB char const *fmt, va_list args);
+typedef void DN_LogPrintFunc(DN_LogTypeParam type, void *user_data, DN_CallSite call_site, DN_FMT_ATTRIB char const *fmt, va_list args);
 
 #if !defined(DN_STB_SPRINTF_HEADER_ONLY)
   #define STB_SPRINTF_IMPLEMENTATION
@@ -1188,8 +1197,6 @@ DN_GCC_WARNING_DISABLE(-Wunused-function)
 #include "../External/stb_sprintf.h"
 DN_GCC_WARNING_POP
 DN_MSVC_WARNING_POP
-
-DN_API void                     DN_BeginFrame                                          ();
 
 #define                         DN_SPrintF(...)                                        STB_SPRINTF_DECORATE(sprintf)(__VA_ARGS__)
 #define                         DN_SNPrintF(...)                                       STB_SPRINTF_DECORATE(snprintf)(__VA_ARGS__)
@@ -1367,6 +1374,7 @@ DN_API DN_Arena*                DN_TCFrameArena                                 
 DN_API DN_ErrSink*              DN_TCErrSink                                           ();
 #define                         DN_TCErrSinkBegin(mode)                                DN_ErrSinkBegin(DN_TCErrSink(), mode)
 #define                         DN_TCErrSinkBeginDefault()                             DN_ErrSinkBeginDefault(DN_TCErrSink())
+DN_API DN_TCLane                DN_TCLaneEquip                                         (DN_TCLane lane);
 
 DN_API bool                     DN_CharIsAlphabet                                      (char ch);
 DN_API bool                     DN_CharIsDigit                                         (char ch);
@@ -1602,13 +1610,13 @@ DN_API DN_U32                   DN_MurmurHash3HashU32FromBytesX64               
 DN_API DN_Str8                  DN_LogColourEscapeCodeStr8FromRGB                      (DN_LogColourType colour, DN_U8 r, DN_U8 g, DN_U8 b);
 DN_API DN_Str8                  DN_LogColourEscapeCodeStr8FromU32                      (DN_LogColourType colour, DN_U32 value);
 DN_API DN_LogPrefixSize         DN_LogMakePrefix                                       (DN_LogStyle style, DN_LogTypeParam type, DN_CallSite call_site, DN_LogDate date, char *dest, DN_USize dest_size);
-DN_API void                     DN_LogSetEmitFromTypeFVFunc                            (DN_LogEmitFromTypeFVFunc *print_func, void *user_data);
-DN_API void                     DN_LogEmitFromType                                     (DN_LogTypeParam type, DN_CallSite call_site, DN_FMT_ATTRIB char const *fmt, ...);
+DN_API void                     DN_LogSetPrintFunc                                     (DN_LogPrintFunc *print_func, void *user_data);
+DN_API void                     DN_LogPrint                                            (DN_LogTypeParam type, DN_CallSite call_site, DN_FMT_ATTRIB char const *fmt, ...);
 DN_API DN_LogTypeParam          DN_LogMakeU32LogTypeParam                              (DN_LogType type);
-#define                         DN_LogDebugF(fmt, ...)                                 DN_LogEmitFromType(DN_LogMakeU32LogTypeParam(DN_LogType_Debug), DN_CALL_SITE, fmt, ##__VA_ARGS__)
-#define                         DN_LogInfoF(fmt, ...)                                  DN_LogEmitFromType(DN_LogMakeU32LogTypeParam(DN_LogType_Info), DN_CALL_SITE, fmt, ##__VA_ARGS__)
-#define                         DN_LogWarningF(fmt, ...)                               DN_LogEmitFromType(DN_LogMakeU32LogTypeParam(DN_LogType_Warning), DN_CALL_SITE, fmt, ##__VA_ARGS__)
-#define                         DN_LogErrorF(fmt, ...)                                 DN_LogEmitFromType(DN_LogMakeU32LogTypeParam(DN_LogType_Error), DN_CALL_SITE, fmt, ##__VA_ARGS__)
+#define                         DN_LogDebugF(fmt, ...)                                 DN_LogPrint(DN_LogMakeU32LogTypeParam(DN_LogType_Debug), DN_CALL_SITE, fmt, ##__VA_ARGS__)
+#define                         DN_LogInfoF(fmt, ...)                                  DN_LogPrint(DN_LogMakeU32LogTypeParam(DN_LogType_Info), DN_CALL_SITE, fmt, ##__VA_ARGS__)
+#define                         DN_LogWarningF(fmt, ...)                               DN_LogPrint(DN_LogMakeU32LogTypeParam(DN_LogType_Warning), DN_CALL_SITE, fmt, ##__VA_ARGS__)
+#define                         DN_LogErrorF(fmt, ...)                                 DN_LogPrint(DN_LogMakeU32LogTypeParam(DN_LogType_Error), DN_CALL_SITE, fmt, ##__VA_ARGS__)
 
 // NOTE: OS primitives that the OS layer can provide for the base layer but is optional.
 #if defined(DN_FREESTANDING)

@@ -1289,7 +1289,7 @@ static void *DN_OS_ThreadFunc_(void *user_context)
   return nullptr;
 }
 
-DN_API bool DN_OS_ThreadInit(DN_OSThread *thread, DN_OSThreadFunc *func, void *user_context)
+DN_API bool DN_OS_ThreadInit(DN_OSThread *thread, DN_OSThreadFunc *func, DN_TCLane *lane, void *user_context)
 {
   bool result = false;
   if (!thread)
@@ -1298,6 +1298,7 @@ DN_API bool DN_OS_ThreadInit(DN_OSThread *thread, DN_OSThreadFunc *func, void *u
   thread->func           = func;
   thread->user_context   = user_context;
   thread->init_semaphore = DN_OS_SemaphoreInit(0 /*initial_count*/);
+  thread->lane           = lane;
 
   // TODO(doyle): Check if semaphore is valid
   // NOTE: pthread_t is essentially the thread ID. In Windows, the handle and
@@ -1331,18 +1332,19 @@ DN_API bool DN_OS_ThreadInit(DN_OSThread *thread, DN_OSThreadFunc *func, void *u
   return result;
 }
 
-DN_API void DN_OS_ThreadDeinit(DN_OSThread *thread)
+DN_API bool DN_OS_ThreadJoin(DN_OSThread *thread)
 {
-  if (!thread || !thread->handle)
-    return;
+  bool result = false;
+  if (thread && thread->handle) {
+    pthread_t thread_id = {};
+    DN_Memcpy(&thread_id, &thread->thread_id, sizeof(thread_id));
 
-  pthread_t thread_id = {};
-  DN_Memcpy(&thread_id, &thread->thread_id, sizeof(thread_id));
-
-  void *return_val = nullptr;
-  pthread_join(thread_id, &return_val);
-  thread->handle    = {};
-  thread->thread_id = {};
+    void *return_val  = nullptr;
+    result            = pthread_join(thread_id, &return_val) == 0;
+    thread->handle    = {};
+    thread->thread_id = {};
+  }
+  return result;
 }
 
 DN_API DN_U32 DN_OS_ThreadID()

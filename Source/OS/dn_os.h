@@ -203,6 +203,8 @@ struct DN_OSThread
 {
   DN_Str8x64       name;
   DN_TCCore        context;
+  DN_TCLane        lane;
+  bool             is_lane_set;
   void            *handle;
   DN_U64           thread_id;
   void            *user_context;
@@ -248,32 +250,30 @@ struct DN_OSHttpResponse
 
 struct DN_OSCore
 {
-  DN_CPUReport                    cpu_report;
+  DN_CPUReport           cpu_report;
 
   // NOTE: Logging
-  DN_LogEmitFromTypeFVFunc *      log_callback;             // Set this pointer to override the logging routine
-  void *                          log_user_data;            // User pointer passed into 'log_callback'
-  bool                            log_to_file;              // Output logs to file as well as standard out
-  DN_OSFile                       log_file;                 // TODO(dn): Hmmm, how should we do this... ?
-  DN_TicketMutex                  log_file_mutex;           // Is locked when instantiating the log_file for the first time
-  bool                            log_no_colour;            // Disable colours in the logging output
+  bool                   log_to_file;              // Output logs to file as well as standard out
+  DN_OSFile              log_file;                 // TODO(dn): Hmmm, how should we do this... ?
+  DN_TicketMutex         log_file_mutex;           // Is locked when instantiating the log_file for the first time
+  bool                   log_no_colour;            // Disable colours in the logging output
 
   // NOTE: OS
-  DN_U32                          logical_processor_count;
-  DN_U32                          page_size;
-  DN_U32                          alloc_granularity;
+  DN_U32                 logical_processor_count;
+  DN_U32                 page_size;
+  DN_U32                 alloc_granularity;
 
   // NOTE: Memory
   // Total OS mem allocs in lifetime of program (e.g. malloc, VirtualAlloc, HeapAlloc ...). This
   // only includes allocations routed through the library such as the growing nature of arenas or
   // using the memory allocation routines in the library like DN_OS_MemCommit and so forth.
-  DN_U64                          vmem_allocs_total;
-  DN_U64                          vmem_allocs_frame;        // Total OS virtual memory allocs since the last 'DN_Core_FrameBegin' was invoked
-  DN_U64                          mem_allocs_total;
-  DN_U64                          mem_allocs_frame;         // Total OS heap allocs since the last 'DN_Core_FrameBegin' was invoked
+  DN_U64                 vmem_allocs_total;
+  DN_U64                 vmem_allocs_frame;        // Total OS virtual memory allocs since the last 'DN_Core_FrameBegin' was invoked
+  DN_U64                 mem_allocs_total;
+  DN_U64                 mem_allocs_frame;         // Total OS heap allocs since the last 'DN_Core_FrameBegin' was invoked
 
-  DN_Arena                        arena;
-  void                           *platform_context;
+  DN_Arena               arena;
+  void                  *platform_context;
 };
 
 struct DN_OSDiskSpace
@@ -293,7 +293,8 @@ DN_API DN_Str8                   DN_Str8FromHeapF                             (D
 DN_API DN_Str8                   DN_Str8FromHeap                              (DN_USize size, DN_ZMem z_mem);
 DN_API DN_Str8                   DN_Str8BuilderBuildFromHeap                  (DN_Str8Builder const *builder);
 
-DN_API void                      DN_OS_EmitLogsWithOSPrintFunctions           (DN_OSCore *os);
+DN_API void                      DN_OS_LogPrint                               (DN_LogTypeParam type, void *user_data, DN_CallSite call_site, DN_FMT_ATTRIB char const *fmt, va_list args);
+DN_API void                      DN_OS_SetLogPrintFuncToOS                    ();
 DN_API void                      DN_OS_DumpThreadContextArenaStat             (DN_Str8 file_path);
 
 DN_API void *                    DN_OS_MemReserve                             (DN_USize size, DN_MemCommit commit, DN_MemPage page_flags);
@@ -410,10 +411,10 @@ DN_API bool                      DN_OS_ConditionVariableWaitUntil             (D
 DN_API void                      DN_OS_ConditionVariableSignal                (DN_OSConditionVariable *cv);
 DN_API void                      DN_OS_ConditionVariableBroadcast             (DN_OSConditionVariable *cv);
 
-DN_API bool                      DN_OS_ThreadInit                             (DN_OSThread *thread, DN_OSThreadFunc *func, void *user_context);
-DN_API void                      DN_OS_ThreadDeinit                           (DN_OSThread *thread);
+DN_API bool                      DN_OS_ThreadInit                             (DN_OSThread *thread, DN_OSThreadFunc *func, DN_TCLane *lane, void *user_context);
+DN_API bool                      DN_OS_ThreadJoin                             (DN_OSThread *thread);
 DN_API DN_U32                    DN_OS_ThreadID                               ();
-DN_API void                      DN_OS_ThreadSetName                          (DN_Str8 name);
+DN_API void                      DN_OS_ThreadSetNameFmt                       (char const *fmt, ...);
 
 DN_API void                      DN_OS_HttpRequestAsync                       (DN_OSHttpResponse *response, DN_Arena *arena, DN_Str8 host, DN_Str8 path, DN_OSHttpRequestSecure secure, DN_Str8 method, DN_Str8 body, DN_Str8 headers);
 DN_API void                      DN_OS_HttpRequestWait                        (DN_OSHttpResponse *response);
