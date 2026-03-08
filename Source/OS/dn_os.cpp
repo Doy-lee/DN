@@ -408,10 +408,10 @@ DN_API DN_Str8 DN_OS_FileReadAll(DN_Allocator alloc_type, void *allocator, DN_St
   if (alloc_type == DN_Allocator_Arena) {
     DN_Arena *arena = DN_Cast(DN_Arena *) allocator;
     arena_tmp       = DN_ArenaTempMemBegin(arena);
-    result          = DN_Str8FromArena(arena, path_info.size, DN_ZMem_No);
+    result          = DN_Str8AllocArena(arena, path_info.size, DN_ZMem_No);
   } else {
     DN_Pool *pool = DN_Cast(DN_Pool *) allocator;
-    result        = DN_Str8FromPool(pool, path_info.size);
+    result        = DN_Str8AllocPool(pool, path_info.size);
   }
 
   if (!result.data) {
@@ -639,7 +639,7 @@ DN_API DN_Str8 DN_OS_PathBuildWithSeparator(DN_Arena *arena, DN_OSPath const *fs
 
   // NOTE: Each link except the last one needs the path separator appended to it, '/' or '\\'
   DN_USize string_size = (fs_path->has_prefix_path_separator ? path_separator.size : 0) + fs_path->string_size + ((fs_path->links_size - 1) * path_separator.size);
-  result               = DN_Str8FromArena(arena, string_size, DN_ZMem_No);
+  result               = DN_Str8AllocArena(arena, string_size, DN_ZMem_No);
   if (result.data) {
     char *dest = result.data;
     if (fs_path->has_prefix_path_separator) {
@@ -664,17 +664,14 @@ DN_API DN_Str8 DN_OS_PathBuildWithSeparator(DN_Arena *arena, DN_OSPath const *fs
 }
 
 // NOTE: DN_OSExec
-DN_API DN_OSExecResult DN_OS_Exec(DN_Slice<DN_Str8> cmd_line,
-                                  DN_OSExecArgs    *args,
-                                  DN_Arena         *arena,
-                                  DN_ErrSink       *error)
+DN_API DN_OSExecResult DN_OS_Exec(DN_Str8Slice cmd_line, DN_OSExecArgs *args, DN_Arena *arena, DN_ErrSink *error)
 {
   DN_OSExecAsyncHandle async_handle = DN_OS_ExecAsync(cmd_line, args, error);
   DN_OSExecResult      result       = DN_OS_ExecWait(async_handle, arena, error);
   return result;
 }
 
-DN_API DN_OSExecResult DN_OS_ExecOrAbort(DN_Slice<DN_Str8> cmd_line, DN_OSExecArgs *args, DN_Arena *arena)
+DN_API DN_OSExecResult DN_OS_ExecOrAbort(DN_Str8Slice cmd_line, DN_OSExecArgs *args, DN_Arena *arena)
 {
   DN_ErrSink     *error  = DN_TCErrSinkBegin(DN_ErrSinkMode_Nil);
   DN_OSExecResult result = DN_OS_Exec(cmd_line, args, arena, error);
@@ -694,8 +691,12 @@ static void DN_OS_ThreadExecute_(void *user_context)
   DN_ArenaMemFuncs mem_funcs = DN_ArenaMemFuncsGetDefaults();
   DN_TCInitFromMemFuncs(&thread->context, thread->thread_id, /*args=*/nullptr, mem_funcs);
   DN_TCEquip(&thread->context);
-  if (thread->is_lane_set)
-    DN_TCLaneEquip(thread->lane);
+  if (thread->is_lane_set) {
+    DN_OS_TCThreadLaneEquip(thread->lane);
+    DN_OS_ThreadSetNameFmt("L%02zu/%02zu T%zu", thread->lane.index, thread->lane.count, thread->thread_id);
+  } else {
+    DN_OS_ThreadSetNameFmt("T%zu", thread->lane.index, thread->lane.count, thread->thread_id);
+  }
   DN_OS_SemaphoreWait(&thread->init_semaphore, DN_OS_SEMAPHORE_INFINITE_TIMEOUT);
   thread->func(thread);
 }
@@ -716,7 +717,85 @@ DN_API void DN_OS_ThreadSetNameFmt(char const *fmt, ...)
 #endif
 }
 
-// NOTE: DN_OSHttp /////////////////////////////////////////////////////////////////////////////////
+DN_API DN_OSThreadLane DN_OS_ThreadLaneInit(DN_USize index, DN_USize thread_count, DN_OSBarrier barrier, DN_UPtr *shared_mem)
+{
+  DN_OSThreadLane result = {};
+  result.index           = index;
+  result.count           = thread_count;
+  result.barrier         = barrier;
+  result.shared_mem      = shared_mem;
+  return result;
+}
+
+DN_API void DN_OS_ThreadLaneSync(DN_OSThreadLane *lane, void **ptr_to_share)
+{
+  if (!lane)
+    return;
+
+  // NOTE: Write the pointer into shared memory (if we're the lane producing the data)
+  bool sharing = false;
+  if (ptr_to_share && *ptr_to_share) {
+    DN_Memcpy(lane->shared_mem, ptr_to_share, sizeof(*ptr_to_share));
+    sharing = true;
+  }
+
+  DN_OS_BarrierWait(&lane->barrier); // NOTE: Ensure sharing lane has completed the write
+
+  // NOTE: Read pointer from shared memory (if we're the other lanes that read the data)
+  if (ptr_to_share && !(*ptr_to_share)) {
+    sharing = true;
+    DN_Memcpy(ptr_to_share, lane->shared_mem, sizeof(*ptr_to_share));
+  }
+
+  if (sharing)
+    DN_OS_BarrierWait(&lane->barrier); // NOTE: Ensure the reading lanes have completed the read
+}
+
+DN_API DN_V2USize DN_OS_ThreadLaneRange(DN_OSThreadLane *lane, DN_USize values_count)
+{
+  DN_USize values_per_thread                  = values_count / lane->count;
+  DN_USize rem_values                         = values_count % lane->count;
+  bool     thread_has_leftovers               = lane->index < rem_values;
+  DN_USize leftovers_before_this_thread_index = 0;
+
+  if (thread_has_leftovers)
+    leftovers_before_this_thread_index = lane->index;
+  else
+    leftovers_before_this_thread_index = leftovers_before_this_thread_index;
+
+  DN_USize thread_start_index  = (values_per_thread * lane->index) + leftovers_before_this_thread_index;
+  DN_USize thread_values_count = values_per_thread + (thread_has_leftovers ? 1 : 0);
+
+  DN_V2USize result = {};
+  result.begin      = thread_start_index;
+  result.end        = result.begin + thread_values_count;
+  return result;
+}
+
+DN_API DN_OSThreadLane *DN_OS_TCThreadLane()
+{
+  DN_TCCore       *tc     = DN_TCGet();
+  DN_OSThreadLane *result = tc ? DN_Cast(DN_OSThreadLane *) tc->lane_opaque : nullptr;
+  return result;
+}
+
+DN_API void DN_OS_TCThreadLaneSync(void **ptr_to_share)
+{
+  DN_OSThreadLane *lane = DN_OS_TCThreadLane();
+  DN_OS_ThreadLaneSync(lane, ptr_to_share);
+}
+
+DN_API DN_OSThreadLane DN_OS_TCThreadLaneEquip(DN_OSThreadLane lane)
+{
+  DN_TCCore       *tc   = DN_TCGet();
+  DN_OSThreadLane *curr = DN_Cast(DN_OSThreadLane *) tc->lane_opaque;
+  DN_StaticAssert(sizeof(tc->lane_opaque) >= sizeof(DN_OSThreadLane));
+  DN_OSThreadLane result = *curr;
+  *curr                  = lane;
+  return result;
+}
+
+// NOTE: DN_OSHttp
 DN_API void DN_OS_HttpRequestWait(DN_OSHttpResponse *response)
 {
   if (response && response->on_complete_semaphore.handle != 0)
@@ -925,21 +1004,13 @@ DN_VArray<T> DN_OS_VArrayInit(DN_USize max)
   return result;
 }
 
-template <typename T>
-DN_VArray<T> DN_OS_VArrayInitSlice(DN_Slice<T> slice, DN_USize max)
-{
-  DN_USize     real_max = DN_Max(slice.size, max);
-  DN_VArray<T> result   = DN_OS_VArrayInit<T>(real_max);
-  if (DN_OS_VArrayIsValid(&result))
-    DN_OS_VArrayAddArray(&result, slice.data, slice.size);
-  return result;
-}
-
 template <typename T, DN_USize N>
 DN_VArray<T> DN_OS_VArrayInitCArray(T const (&items)[N], DN_USize max)
 {
   DN_USize     real_max = DN_Max(N, max);
-  DN_VArray<T> result   = DN_OS_VArrayInitSlice(DN_Slice_Init(items, N), real_max);
+  DN_VArray<T> result   = DN_OS_VArrayInit<T>(real_max);
+  if (DN_OS_VArrayIsValid(&result))
+    DN_OS_VArrayAddArray(&result, items, N);
   return result;
 }
 

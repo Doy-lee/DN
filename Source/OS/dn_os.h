@@ -161,9 +161,9 @@ struct DN_OSExecResult
 
 struct DN_OSExecArgs
 {
-  DN_OSExecFlags    flags;
-  DN_Str8           working_dir;
-  DN_Slice<DN_Str8> environment;
+  DN_OSExecFlags flags;
+  DN_Str8        working_dir;
+  DN_Str8Slice   environment;
 };
 
 // NOTE: DN_OSSemaphore
@@ -199,11 +199,19 @@ struct DN_OSConditionVariable
 // NOTE: DN_OSThread
 typedef DN_I32(DN_OSThreadFunc)(struct DN_OSThread *);
 
+struct DN_OSThreadLane
+{
+  DN_USize     index;
+  DN_USize     count;
+  DN_OSBarrier barrier;
+  void*        shared_mem;
+};
+
 struct DN_OSThread
 {
   DN_Str8x64       name;
   DN_TCCore        context;
-  DN_TCLane        lane;
+  DN_OSThreadLane  lane;
   bool             is_lane_set;
   void            *handle;
   DN_U64           thread_id;
@@ -295,7 +303,6 @@ DN_API DN_Str8                   DN_Str8BuilderBuildFromHeap                  (D
 
 DN_API void                      DN_OS_LogPrint                               (DN_LogTypeParam type, void *user_data, DN_CallSite call_site, DN_FMT_ATTRIB char const *fmt, va_list args);
 DN_API void                      DN_OS_SetLogPrintFuncToOS                    ();
-DN_API void                      DN_OS_DumpThreadContextArenaStat             (DN_Str8 file_path);
 
 DN_API void *                    DN_OS_MemReserve                             (DN_USize size, DN_MemCommit commit, DN_MemPage page_flags);
 DN_API bool                      DN_OS_MemCommit                              (void *ptr, DN_USize size, DN_U32 page_flags);
@@ -385,9 +392,9 @@ DN_API DN_Str8                   DN_OS_PathF                                  (D
 DN_API void                      DN_OS_Exit                                   (int32_t exit_code);
 DN_API DN_OSExecResult           DN_OS_ExecPump                               (DN_OSExecAsyncHandle handle, char *stdout_buffer, size_t *stdout_size, char *stderr_buffer, size_t *stderr_size, DN_U32 timeout_ms, DN_ErrSink  *err);
 DN_API DN_OSExecResult           DN_OS_ExecWait                               (DN_OSExecAsyncHandle handle, DN_Arena *arena, DN_ErrSink *err);
-DN_API DN_OSExecAsyncHandle      DN_OS_ExecAsync                              (DN_Slice<DN_Str8> cmd_line, DN_OSExecArgs *args, DN_ErrSink *err);
-DN_API DN_OSExecResult           DN_OS_Exec                                   (DN_Slice<DN_Str8> cmd_line, DN_OSExecArgs *args, DN_Arena *arena, DN_ErrSink *err);
-DN_API DN_OSExecResult           DN_OS_ExecOrAbort                            (DN_Slice<DN_Str8> cmd_line, DN_OSExecArgs *args, DN_Arena *arena);
+DN_API DN_OSExecAsyncHandle      DN_OS_ExecAsync                              (DN_Str8Slice cmd_line, DN_OSExecArgs *args, DN_ErrSink *err);
+DN_API DN_OSExecResult           DN_OS_Exec                                   (DN_Str8Slice cmd_line, DN_OSExecArgs *args, DN_Arena *arena, DN_ErrSink *err);
+DN_API DN_OSExecResult           DN_OS_ExecOrAbort                            (DN_Str8Slice cmd_line, DN_OSExecArgs *args, DN_Arena *arena);
 
 DN_API DN_OSSemaphore            DN_OS_SemaphoreInit                          (DN_U32 initial_count);
 DN_API void                      DN_OS_SemaphoreDeinit                        (DN_OSSemaphore *semaphore);
@@ -411,10 +418,18 @@ DN_API bool                      DN_OS_ConditionVariableWaitUntil             (D
 DN_API void                      DN_OS_ConditionVariableSignal                (DN_OSConditionVariable *cv);
 DN_API void                      DN_OS_ConditionVariableBroadcast             (DN_OSConditionVariable *cv);
 
-DN_API bool                      DN_OS_ThreadInit                             (DN_OSThread *thread, DN_OSThreadFunc *func, DN_TCLane *lane, void *user_context);
+DN_API bool                      DN_OS_ThreadInit                             (DN_OSThread *thread, DN_OSThreadFunc *func, DN_OSThreadLane *lane, void *user_context);
 DN_API bool                      DN_OS_ThreadJoin                             (DN_OSThread *thread);
 DN_API DN_U32                    DN_OS_ThreadID                               ();
 DN_API void                      DN_OS_ThreadSetNameFmt                       (char const *fmt, ...);
+
+DN_API DN_OSThreadLane           DN_OS_ThreadLaneInit                         (DN_USize index, DN_USize thread_count, DN_OSBarrier barrier, DN_UPtr *share_mem);
+DN_API void                      DN_OS_ThreadLaneSync                         (DN_OSThreadLane *lane, void **ptr_to_share);
+DN_API DN_V2USize                DN_OS_ThreadLaneRange                        (DN_OSThreadLane *lane, DN_USize values_count);
+
+DN_API DN_OSThreadLane*          DN_OS_TCThreadLane                           ();
+DN_API void                      DN_OS_TCThreadLaneSync                       (void **ptr_to_share);
+DN_API DN_OSThreadLane           DN_OS_TCThreadLaneEquip                      (DN_OSThreadLane lane);
 
 DN_API void                      DN_OS_HttpRequestAsync                       (DN_OSHttpResponse *response, DN_Arena *arena, DN_Str8 host, DN_Str8 path, DN_OSHttpRequestSecure secure, DN_Str8 method, DN_Str8 body, DN_Str8 headers);
 DN_API void                      DN_OS_HttpRequestWait                        (DN_OSHttpResponse *response);
@@ -495,7 +510,6 @@ template <typename T> struct DN_VArray
 
 template <typename T>                           DN_VArray<T>          DN_OS_VArrayInitByteSize          (DN_USize byte_size);
 template <typename T>                           DN_VArray<T>          DN_OS_VArrayInit                  (DN_USize max);
-template <typename T>                           DN_VArray<T>          DN_OS_VArrayInitSlice             (DN_Slice<T> slice, DN_USize max);
 template <typename T, DN_USize N>               DN_VArray<T>          DN_OS_VArrayInitCArray            (T const (&items)[N], DN_USize max);
 template <typename T>                           void                  DN_OS_VArrayDeinit                (DN_VArray<T> *array);
 template <typename T>                           bool                  DN_OS_VArrayIsValid               (DN_VArray<T> const *array);

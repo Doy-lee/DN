@@ -856,20 +856,20 @@ DN_API DN_OSExecResult DN_OS_ExecWait(DN_OSExecAsyncHandle handle, DN_Arena *are
   return result;
 }
 
-DN_API DN_OSExecAsyncHandle DN_OS_ExecAsync(DN_Slice<DN_Str8> cmd_line, DN_OSExecArgs *args, DN_ErrSink *err)
+DN_API DN_OSExecAsyncHandle DN_OS_ExecAsync(DN_Str8Slice cmd_line, DN_OSExecArgs *args, DN_ErrSink *err)
 {
   // NOTE: Pre-amble
   DN_OSExecAsyncHandle result = {};
-  if (cmd_line.size == 0)
+  if (cmd_line.count == 0)
     return result;
 
   DN_TCScratch scratch       = DN_TCScratchBegin(nullptr, 0);
-  DN_Str8      cmd_rendered  = DN_Slice_Str8Render(scratch.arena, cmd_line, DN_Str8Lit(" "));
-DN_Str16     cmd16         = DN_OS_W32Str8ToStr16(scratch.arena, cmd_rendered);
+  DN_Str8      cmd_rendered  = DN_Str8SliceRender(cmd_line, DN_Str8Lit(" "), scratch.arena);
+  DN_Str16     cmd16         = DN_OS_W32Str8ToStr16(scratch.arena, cmd_rendered);
   DN_Str16     working_dir16 = DN_OS_W32Str8ToStr16(scratch.arena, args->working_dir);
 
   DN_Str8Builder env_builder = DN_Str8BuilderFromArena(scratch.arena);
-  DN_Str8BuilderAppendArrayRef(&env_builder, args->environment.data, args->environment.size);
+  DN_Str8BuilderAppendArrayRef(&env_builder, args->environment.data, args->environment.count);
   if (env_builder.string_size)
     DN_Str8BuilderAppendRef(&env_builder, DN_Str8Lit("\0"));
 
@@ -1243,7 +1243,7 @@ static DWORD __stdcall DN_OS_ThreadFunc_(void *user_context)
   return 0;
 }
 
-DN_API bool DN_OS_ThreadInit(DN_OSThread *thread, DN_OSThreadFunc *func, DN_TCLane *lane, void *user_context)
+DN_API bool DN_OS_ThreadInit(DN_OSThread *thread, DN_OSThreadFunc *func, DN_OSThreadLane *lane, void *user_context)
 {
   bool result = false;
   if (!thread)
@@ -1704,7 +1704,7 @@ DN_API DN_Str8 DN_OS_W32Str16ToStr8(DN_Arena *arena, DN_Str16 src)
   // NOTE: Str8 allocate ensures there's one extra byte for
   // null-termination already so no-need to +1 the required size
   DN_ArenaTempMemScope temp_mem = DN_ArenaTempMemScope(arena);
-  DN_Str8              buffer   = DN_Str8FromArena(arena, required_size, DN_ZMem_No);
+  DN_Str8              buffer   = DN_Str8AllocArena(arena, required_size, DN_ZMem_No);
   if (buffer.size == 0)
     return result;
 

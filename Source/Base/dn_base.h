@@ -346,103 +346,6 @@ typedef DN_I32       DN_B32;
 #define DN_ISIZE_MAX INTPTR_MAX
 #define DN_ISIZE_MIN INTPTR_MIN
 
-enum DN_ZMem
-{
-  DN_ZMem_No,  // Memory can be handed out without zero-ing it out
-  DN_ZMem_Yes, // Memory should be zero-ed out before giving to the callee
-};
-
-struct DN_Str8
-{
-  char    *data; // The bytes of the string
-  DN_USize size; // The number of bytes in the string
-};
-
-struct DN_Str8Slice
-{
-  DN_Str8 *data;
-  DN_USize count;
-};
-
-struct DN_Str8x16  { char data[16];  DN_USize size; };
-struct DN_Str8x32  { char data[32];  DN_USize size; };
-struct DN_Str8x64  { char data[64];  DN_USize size; };
-struct DN_Str8x128 { char data[128]; DN_USize size; };
-struct DN_Str8x256 { char data[256]; DN_USize size; };
-
-struct DN_Hex32    { char data[32];  };
-struct DN_Hex64    { char data[64];  };
-struct DN_Hex128   { char data[128]; };
-
-struct DN_HexU64Str8
-{
-  char  data[(sizeof(DN_U64) * 2) + 1 /*null-terminator*/];
-  DN_U8 size;
-};
-
-enum DN_HexFromU64Type
-{
-  DN_HexFromU64Type_Nil,
-  DN_HexFromU64Type_Uppercase,
-};
-
-struct DN_Str16 // A pointer and length style string that holds slices to UTF16 bytes.
-{
-  wchar_t *data; // The UTF16 bytes of the string
-  DN_USize size; // The number of characters in the string
-};
-
-struct DN_U8x16 { DN_U8 data[16]; };
-struct DN_U8x32 { DN_U8 data[32]; };
-struct DN_U8x64 { DN_U8 data[64]; };
-
-template <typename T>
-struct DN_Slice // A pointer and length container of data
-{
-  T       *data;
-  DN_USize size;
-
-  T *begin() { return data; }
-  T *end() { return data + size; }
-  T const *begin() const { return data; }
-  T const *end() const { return data + size; }
-};
-
-struct DN_CallSite
-{
-  DN_Str8 file;
-  DN_Str8 function;
-  DN_U32  line;
-};
-
-#define DN_CALL_SITE DN_CallSite { DN_Str8Lit(__FILE__), DN_Str8Lit(__func__), __LINE__ }
-
-// NOTE: Defer Macro
-#if defined(__cplusplus)
-template <typename Procedure>
-struct DN_Defer
-{
-  Procedure proc;
-  DN_Defer(Procedure p) : proc(p) {}
-  ~DN_Defer() { proc(); }
-};
-
-struct DN_DeferHelper
-{
-  template <typename Lambda>
-  DN_Defer<Lambda> operator+(Lambda lambda) { return DN_Defer<Lambda>(lambda); };
-};
-
-#define DN_UniqueName(prefix) DN_TokenCombine(prefix, __LINE__)
-#define DN_DEFER              const auto DN_UniqueName(defer_lambda_) = DN_DeferHelper() + [&]()
-#endif // defined(__cplusplus)
-
-#define DN_DeferLoop(begin, end)            \
-  bool DN_UniqueName(once) = (begin, true); \
-  DN_UniqueName(once);                      \
-  end, DN_UniqueName(once) = false
-
-
 // NOTE: Intrinsics
 // NOTE: DN_AtomicAdd/Exchange return the previous value store in the target
 #if defined(DN_COMPILER_MSVC) || defined(DN_COMPILER_CLANG_CL)
@@ -505,6 +408,42 @@ struct DN_DeferHelper
 #else
   #define DN_CountLeadingZerosUSize(value) DN_CountLeadingZerosU32(value)
 #endif
+
+enum DN_ZMem
+{
+  DN_ZMem_No,  // Memory can be handed out without zero-ing it out
+  DN_ZMem_Yes, // Memory should be zero-ed out before giving to the callee
+};
+
+struct DN_Str8
+{
+  char    *data; // The bytes of the string
+  DN_USize size; // The number of bytes in the string
+};
+
+struct DN_Str8Slice
+{
+  DN_Str8 *data;
+  DN_USize count;
+};
+
+struct DN_Str8x16  { char data[16];  DN_USize size; };
+struct DN_Str8x32  { char data[32];  DN_USize size; };
+struct DN_Str8x64  { char data[64];  DN_USize size; };
+struct DN_Str8x128 { char data[128]; DN_USize size; };
+struct DN_Str8x256 { char data[256]; DN_USize size; };
+
+struct DN_Str16 // A pointer and length style string that holds slices to UTF16 bytes.
+{
+  wchar_t *data; // The UTF16 bytes of the string
+  DN_USize size; // The number of characters in the string
+};
+
+struct DN_Str16Slice
+{
+  DN_Str16 *data;
+  DN_USize count;
+};
 
 struct DN_CPURegisters
 {
@@ -610,6 +549,73 @@ struct DN_TicketMutex
   unsigned int volatile ticket;  // The next ticket to give out to the thread taking the mutex
   unsigned int volatile serving; // The ticket ID to block the mutex on until it is returned
 };
+
+
+struct DN_Hex32    { char data[32];  };
+struct DN_Hex64    { char data[64];  };
+struct DN_Hex128   { char data[128]; };
+
+struct DN_HexU64Str8
+{
+  char  data[(sizeof(DN_U64) * 2) + 1 /*null-terminator*/];
+  DN_U8 size;
+};
+
+enum DN_HexFromU64Type
+{
+  DN_HexFromU64Type_Nil,
+  DN_HexFromU64Type_Uppercase,
+};
+
+
+struct DN_U8x16 { DN_U8 data[16]; };
+struct DN_U8x32 { DN_U8 data[32]; };
+struct DN_U8x64 { DN_U8 data[64]; };
+
+DN_MSVC_WARNING_PUSH
+DN_MSVC_WARNING_DISABLE(4201) // warning C4201: nonstandard extension used: nameless struct/union
+union DN_V2USize
+{
+  struct { DN_USize x,     y; };
+  struct { DN_USize w,     h; };
+  struct { DN_USize min,   max; };
+  struct { DN_USize begin, end; };
+  DN_USize data[2];
+};
+DN_MSVC_WARNING_POP
+
+struct DN_CallSite
+{
+  DN_Str8 file;
+  DN_Str8 function;
+  DN_U32  line;
+};
+
+#define DN_CALL_SITE DN_CallSite { DN_Str8Lit(__FILE__), DN_Str8Lit(__func__), __LINE__ }
+
+#if defined(__cplusplus)
+template <typename Procedure>
+struct DN_Defer
+{
+  Procedure proc;
+  DN_Defer(Procedure p) : proc(p) {}
+  ~DN_Defer() { proc(); }
+};
+
+struct DN_DeferHelper
+{
+  template <typename Lambda>
+  DN_Defer<Lambda> operator+(Lambda lambda) { return DN_Defer<Lambda>(lambda); };
+};
+
+#define DN_UniqueName(prefix) DN_TokenCombine(prefix, __LINE__)
+#define DN_DEFER              const auto DN_UniqueName(defer_lambda_) = DN_DeferHelper() + [&]()
+#endif // defined(__cplusplus)
+
+#define DN_DeferLoop(begin, end)            \
+  bool DN_UniqueName(once) = (begin, true); \
+  DN_UniqueName(once);                      \
+  end, DN_UniqueName(once) = false
 
 struct DN_U64FromResult
 {
@@ -865,7 +871,8 @@ struct DN_Str8FindResult
   DN_Str8  start_to_before_match;        // Substring from the start of the buffer up until the found string, not including it
 };
 
-enum DN_Str8FindFlag
+typedef DN_USize DN_Str8FindFlag;
+enum DN_Str8FindFlag_
 {
   DN_Str8FindFlag_Digit      = 1 << 0, // 0-9
   DN_Str8FindFlag_Whitespace = 1 << 1, // '\r', '\t', '\n', ' '
@@ -1041,14 +1048,6 @@ struct DN_ErrSink
   DN_USize       stack_size;
 };
 
-struct DN_TCLane
-{
-  DN_USize index;
-  DN_USize count;
-  DN_U64   barrier_handle;
-  void*    shared_mem;
-};
-
 struct DN_TCScratch
 {
   DN_Arena*       arena;
@@ -1080,7 +1079,7 @@ struct DN_TCCore // (T)hread (C)ontext sitting in thread-local storage
   DN_Str8x64  name;
   DN_U64      thread_id;
   DN_CallSite call_site;
-  DN_TCLane   lane;
+  char        lane_opaque[sizeof(DN_U64) * 4];
 
   DN_Arena    main_arena_;
   DN_Arena    temp_a_arena_;
@@ -1184,6 +1183,105 @@ struct DN_StackTraceWalkResultIterator
 };
 
 typedef void DN_LogPrintFunc(DN_LogTypeParam type, void *user_data, DN_CallSite call_site, DN_FMT_ATTRIB char const *fmt, va_list args);
+
+DN_MSVC_WARNING_PUSH
+DN_MSVC_WARNING_DISABLE(4201) // warning C4201: nonstandard extension used: nameless struct/union
+union DN_V2I32
+{
+  struct { DN_I32 x, y; };
+  struct { DN_I32 w, h; };
+  DN_I32 data[2];
+};
+
+union DN_V2U16
+{
+  struct { DN_U16 x, y; };
+  struct { DN_U16 w, h; };
+  DN_U16 data[2];
+};
+
+union DN_V2U32
+{
+  struct { DN_U32 x,   y; };
+  struct { DN_U32 w,   h; };
+  struct { DN_U32 min, max; };
+  DN_U32 data[2];
+};
+
+union DN_V2F32
+{
+  struct { DN_F32 x, y; };
+  struct { DN_F32 w, h; };
+  DN_F32 data[2];
+};
+DN_DArrayStructDecl(DN_V2F32);
+
+union DN_V3F32
+{
+  struct { DN_F32 x, y, z; };
+  struct { DN_F32 r, g, b; };
+  DN_V2F32  xy;
+  DN_F32    data[3];
+};
+
+union DN_V4F32
+{
+  struct { DN_F32 x, y, z, w; };
+  struct { DN_F32 r, g, b, a; };
+  DN_V3F32  rgb;
+  DN_V3F32  xyz;
+  DN_F32    data[4];
+};
+DN_DArrayStructDecl(DN_V4F32);
+DN_MSVC_WARNING_POP
+
+struct DN_M4
+{
+  DN_F32 columns[4][4]; // Column major matrix
+};
+
+union DN_M2x3
+{
+  DN_F32 e[6];
+  DN_F32 row[2][3];
+};
+
+struct DN_Rect
+{
+  DN_V2F32 pos, size;
+};
+
+struct DN_RectMinMax
+{
+  DN_V2F32 min, max;
+};
+
+enum DN_RectCutClip
+{
+  DN_RectCutClip_No,
+  DN_RectCutClip_Yes,
+};
+
+enum DN_RectCutSide
+{
+  DN_RectCutSide_Left,
+  DN_RectCutSide_Right,
+  DN_RectCutSide_Top,
+  DN_RectCutSide_Bottom,
+};
+
+struct DN_RectCut
+{
+  DN_Rect*       rect;
+  DN_RectCutSide side;
+};
+
+struct DN_RaycastV2
+{
+  bool   hit; // True if there was an intersection, false if the lines are parallel
+  DN_F32 t_a; // Distance along `dir_a` that the intersection occurred, e.g. `origin_a + (dir_a * t_a)`
+  DN_F32 t_b; // Distance along `dir_b` that the intersection occurred, e.g. `origin_b + (dir_b * t_b)`
+};
 
 #if !defined(DN_STB_SPRINTF_HEADER_ONLY)
   #define STB_SPRINTF_IMPLEMENTATION
@@ -1325,8 +1423,8 @@ DN_API void                     DN_ArenaTempMemEnd                              
 #define                         DN_ArenaNewArray(arena, T, count, zmem)                (T *)DN_ArenaAlloc(arena, sizeof(T) * (count), alignof(T), zmem)
 #define                         DN_ArenaNewArrayZ(arena, T, count)                     (T *)DN_ArenaAlloc(arena, sizeof(T) * (count), alignof(T), DN_ZMem_Yes)
 
-#define                         DN_ArenaNewCopy(arena, T, src)                         (T *)DN_ArenaCopy (arena, (src),                sizeof(T),            alignof(T))
-#define                         DN_ArenaNewArrayCopy(arena, T, src, count)             (T *)DN_ArenaCopy (arena, (src),                sizeof(T)  * (count), alignof(T))
+#define                         DN_ArenaNewCopy(arena, T, src)                         (T *)DN_ArenaCopy(arena, (src), sizeof(T),            alignof(T))
+#define                         DN_ArenaNewArrayCopy(arena, T, src, count)             (T *)DN_ArenaCopy(arena, (src), sizeof(T)  * (count), alignof(T))
 
 DN_API DN_Pool                  DN_PoolFromArena                                       (DN_Arena *arena, DN_U8 align);
 DN_API bool                     DN_PoolIsValid                                         (DN_Pool const *pool);
@@ -1374,7 +1472,6 @@ DN_API DN_Arena*                DN_TCFrameArena                                 
 DN_API DN_ErrSink*              DN_TCErrSink                                           ();
 #define                         DN_TCErrSinkBegin(mode)                                DN_ErrSinkBegin(DN_TCErrSink(), mode)
 #define                         DN_TCErrSinkBeginDefault()                             DN_ErrSinkBeginDefault(DN_TCErrSink())
-DN_API DN_TCLane                DN_TCLaneEquip                                         (DN_TCLane lane);
 
 DN_API bool                     DN_CharIsAlphabet                                      (char ch);
 DN_API bool                     DN_CharIsDigit                                         (char ch);
@@ -1410,9 +1507,9 @@ DN_API DN_USize                 DN_CStr16Size                                   
 #define                         DN_Str8PrintFmt(string)                                (int)((string).size), (string).data
 #define                         DN_Str8FromPtr(data, size)                             DN_Literal(DN_Str8){(char *)(data), (DN_USize)(size)}
 #define                         DN_Str8FromStruct(ptr)                                 DN_Str8FromPtr((ptr)->data, (ptr)->size)
+DN_API DN_Str8                  DN_Str8AllocArena                                      (DN_Arena *arena, DN_USize size, DN_ZMem z_mem);
+DN_API DN_Str8                  DN_Str8AllocPool                                        (DN_Pool *pool, DN_USize size);
 DN_API DN_Str8                  DN_Str8FromCStr8                                       (char const *src);
-DN_API DN_Str8                  DN_Str8FromArena                                       (DN_Arena *arena, DN_USize size, DN_ZMem z_mem);
-DN_API DN_Str8                  DN_Str8FromPool                                        (DN_Pool *pool, DN_USize size);
 DN_API DN_Str8                  DN_Str8FromPtrArena                                    (DN_Arena *arena, void const *data, DN_USize size);
 DN_API DN_Str8                  DN_Str8FromPtrPool                                     (DN_Pool *pool, void const *data, DN_USize size);
 DN_API DN_Str8                  DN_Str8FromStr8Arena                                   (DN_Arena *arena, DN_Str8 string);
@@ -1455,7 +1552,7 @@ DN_API DN_USize                 DN_Str8Split                                    
 DN_API DN_Str8SplitResult       DN_Str8SplitArena                                      (DN_Arena *arena, DN_Str8 string, DN_Str8 delimiter, DN_Str8SplitIncludeEmptyStrings mode);
 DN_API DN_Str8FindResult        DN_Str8FindStr8Array                                   (DN_Str8 string, DN_Str8 const *find, DN_USize find_size, DN_Str8EqCase eq_case);
 DN_API DN_Str8FindResult        DN_Str8FindStr8                                        (DN_Str8 string, DN_Str8 find, DN_Str8EqCase eq_case);
-DN_API DN_Str8FindResult        DN_Str8Find                                            (DN_Str8 string, uint32_t flags);
+DN_API DN_Str8FindResult        DN_Str8Find                                            (DN_Str8 string, DN_Str8FindFlag flags);
 DN_API DN_Str8                  DN_Str8Segment                                         (DN_Arena *arena, DN_Str8 src, DN_USize segment_size, char segment_char);
 DN_API DN_Str8                  DN_Str8ReverseSegment                                  (DN_Arena *arena, DN_Str8 src, DN_USize segment_size, char segment_char);
 DN_API bool                     DN_Str8Eq                                              (DN_Str8 lhs, DN_Str8 rhs, DN_Str8EqCase eq_case = DN_Str8EqCase_Sensitive);
@@ -1491,6 +1588,12 @@ DN_API DN_Str8                  DN_Str8Replace                                  
 DN_API DN_Str8                  DN_Str8ReplaceSensitive                                (DN_Str8 string, DN_Str8 find, DN_Str8 replace, DN_USize start_index, DN_Arena *arena);
 DN_API DN_Str8                  DN_Str8ReplaceInsensitive                              (DN_Str8 string, DN_Str8 find, DN_Str8 replace, DN_USize start_index, DN_Arena *arena);
 
+DN_API DN_Str8                  DN_Str8SliceRender                                     (DN_Str8Slice array, DN_Str8 separator, DN_Arena *arena);
+DN_API DN_Str8                  DN_Str8RenderSpaceSep                                  (DN_Str8Slice array, DN_Arena *arena);
+
+DN_API DN_Str16                 DN_Str16SliceRender                                    (DN_Str16Slice array, DN_Str16 separator, DN_Arena *arena);
+DN_API DN_Str16                 DN_Str16RenderSpaceSep                                 (DN_Str16Slice array, DN_Arena *arena);
+
 DN_API DN_Str8Builder           DN_Str8BuilderFromArena                                (DN_Arena *arena);
 DN_API DN_Str8Builder           DN_Str8BuilderFromStr8PtrRef                           (DN_Arena *arena, DN_Str8 const *strings, DN_USize size);
 DN_API DN_Str8Builder           DN_Str8BuilderFromStr8PtrCopy                          (DN_Arena *arena, DN_Str8 const *strings, DN_USize size);
@@ -1523,8 +1626,8 @@ DN_API DN_Str8                  DN_Str8BuilderBuild                             
 DN_API DN_Str8                  DN_Str8BuilderBuildDelimited                           (DN_Str8Builder const *builder, DN_Str8 delimiter, DN_Arena *arena);
 DN_API DN_Str8Slice             DN_Str8BuilderBuildSlice                               (DN_Str8Builder const *builder, DN_Arena *arena);
 
-DN_API int                      DN_EncodeUTF8Codepoint                                 (uint8_t utf8[4], uint32_t codepoint);
-DN_API int                      DN_EncodeUTF16Codepoint                                (uint16_t utf16[2], uint32_t codepoint);
+DN_API int                      DN_EncodeUTF8Codepoint                                 (DN_U8 utf8[4], DN_U32 codepoint);
+DN_API int                      DN_EncodeUTF16Codepoint                                (DN_U16 utf16[2], DN_U32 codepoint);
 
 DN_API DN_U8                    DN_U8FromHexNibble                                     (char hex);
 DN_API DN_NibbleFromU8Result    DN_NibbleFromU8                                        (DN_U8 u8);
@@ -1612,7 +1715,7 @@ DN_API DN_Str8                  DN_LogColourEscapeCodeStr8FromU32               
 DN_API DN_LogPrefixSize         DN_LogMakePrefix                                       (DN_LogStyle style, DN_LogTypeParam type, DN_CallSite call_site, DN_LogDate date, char *dest, DN_USize dest_size);
 DN_API void                     DN_LogSetPrintFunc                                     (DN_LogPrintFunc *print_func, void *user_data);
 DN_API void                     DN_LogPrint                                            (DN_LogTypeParam type, DN_CallSite call_site, DN_FMT_ATTRIB char const *fmt, ...);
-DN_API DN_LogTypeParam          DN_LogMakeU32LogTypeParam                              (DN_LogType type);
+DN_API DN_LogTypeParam          DN_LogTypeParamFromType                                (DN_LogType type);
 #define                         DN_LogDebugF(fmt, ...)                                 DN_LogPrint(DN_LogMakeU32LogTypeParam(DN_LogType_Debug), DN_CALL_SITE, fmt, ##__VA_ARGS__)
 #define                         DN_LogInfoF(fmt, ...)                                  DN_LogPrint(DN_LogMakeU32LogTypeParam(DN_LogType_Info), DN_CALL_SITE, fmt, ##__VA_ARGS__)
 #define                         DN_LogWarningF(fmt, ...)                               DN_LogPrint(DN_LogMakeU32LogTypeParam(DN_LogType_Warning), DN_CALL_SITE, fmt, ##__VA_ARGS__)
@@ -1620,7 +1723,6 @@ DN_API DN_LogTypeParam          DN_LogMakeU32LogTypeParam                       
 
 // NOTE: OS primitives that the OS layer can provide for the base layer but is optional.
 #if defined(DN_FREESTANDING)
-#define                        DN_StackTraceWalkStr8FromHeap(...) DN_Str8Lit("N/A")
 #define                        DN_StackTraceWalk(...)
 #define                        DN_StackTraceWalkResultIterate(...)
 #define                        DN_StackTraceWalkResultToStr8(...) DN_Str8Lit("N/A")
@@ -1631,14 +1733,281 @@ DN_API DN_LogTypeParam          DN_LogMakeU32LogTypeParam                       
 #define                        DN_StackTracePrint(...)
 #define                        DN_StackTraceReloadSymbols(...)
 #else
-DN_API DN_StackTraceWalkResult DN_StackTraceWalk             (DN_Arena *arena, DN_U16 limit);
-DN_API bool                    DN_StackTraceWalkResultIterate(DN_StackTraceWalkResultIterator *it, DN_StackTraceWalkResult const *walk);
-DN_API DN_Str8                 DN_StackTraceWalkResultToStr8 (DN_Arena *arena, DN_StackTraceWalkResult const *walk, DN_U16 skip);
-DN_API DN_Str8                 DN_StackTraceWalkStr8         (DN_Arena *arena, DN_U16 limit, DN_U16 skip);
-DN_API DN_Str8                 DN_StackTraceWalkStr8FromHeap (DN_U16 limit, DN_U16 skip);
-DN_API DN_StackTraceFrameSlice DN_StackTraceGetFrames        (DN_Arena *arena, DN_U16 limit);
-DN_API DN_StackTraceFrame      DN_StackTraceRawFrameToFrame  (DN_Arena *arena, DN_StackTraceRawFrame raw_frame);
-DN_API void                    DN_StackTracePrint            (DN_U16 limit);
-DN_API void                    DN_StackTraceReloadSymbols    ();
+DN_API DN_StackTraceWalkResult DN_StackTraceWalk                                       (DN_Arena *arena, DN_U16 limit);
+DN_API bool                    DN_StackTraceWalkResultIterate                          (DN_StackTraceWalkResultIterator *it, DN_StackTraceWalkResult const *walk);
+DN_API DN_Str8                 DN_StackTraceWalkResultToStr8                           (DN_Arena *arena, DN_StackTraceWalkResult const *walk, DN_U16 skip);
+DN_API DN_Str8                 DN_StackTraceWalkStr8                                   (DN_Arena *arena, DN_U16 limit, DN_U16 skip);
+DN_API DN_Str8                 DN_StackTraceWalkStr8FromHeap                           (DN_U16 limit, DN_U16 skip);
+DN_API DN_StackTraceFrameSlice DN_StackTraceGetFrames                                  (DN_Arena *arena, DN_U16 limit);
+DN_API DN_StackTraceFrame      DN_StackTraceRawFrameToFrame                            (DN_Arena *arena, DN_StackTraceRawFrame raw_frame);
+DN_API void                    DN_StackTracePrint                                      (DN_U16 limit);
+DN_API void                    DN_StackTraceReloadSymbols                              ();
 #endif
+
+#define                        DN_V2I32Zero                                            DN_Literal(DN_V2I32){{(DN_I32)(0),    (DN_I32)(0)}}
+#define                        DN_V2I32One                                             DN_Literal(DN_V2I32){{(DN_I32)(1),    (DN_I32)(1)}}
+#define                        DN_V2I32From1N(x)                                       DN_Literal(DN_V2I32){{(DN_I32)(x),    (DN_I32)(x)}}
+#define                        DN_V2I32From2N(x, y)                                    DN_Literal(DN_V2I32){{(DN_I32)(x),    (DN_I32)(y)}}
+#define                        DN_V2I32InitV2(xy)                                      DN_Literal(DN_V2I32){{(DN_I32)(xy).x, (DN_I32)(xy).y}}
+
+DN_API bool                    operator!=                                              (DN_V2I32  lhs, DN_V2I32 rhs);
+DN_API bool                    operator==                                              (DN_V2I32  lhs, DN_V2I32 rhs);
+DN_API bool                    operator>=                                              (DN_V2I32  lhs, DN_V2I32 rhs);
+DN_API bool                    operator<=                                              (DN_V2I32  lhs, DN_V2I32 rhs);
+DN_API bool                    operator<                                               (DN_V2I32  lhs, DN_V2I32 rhs);
+DN_API bool                    operator>                                               (DN_V2I32  lhs, DN_V2I32 rhs);
+DN_API DN_V2I32                operator-                                               (DN_V2I32  lhs, DN_V2I32 rhs);
+DN_API DN_V2I32                operator-                                               (DN_V2I32                 lhs);
+DN_API DN_V2I32                operator+                                               (DN_V2I32  lhs, DN_V2I32 rhs);
+DN_API DN_V2I32                operator*                                               (DN_V2I32  lhs, DN_V2I32 rhs);
+DN_API DN_V2I32                operator*                                               (DN_V2I32  lhs, DN_F32   rhs);
+DN_API DN_V2I32                operator*                                               (DN_V2I32  lhs, DN_I32   rhs);
+DN_API DN_V2I32                operator/                                               (DN_V2I32  lhs, DN_V2I32 rhs);
+DN_API DN_V2I32                operator/                                               (DN_V2I32  lhs, DN_F32   rhs);
+DN_API DN_V2I32                operator/                                               (DN_V2I32  lhs, DN_I32   rhs);
+DN_API DN_V2I32&               operator*=                                              (DN_V2I32& lhs, DN_V2I32 rhs);
+DN_API DN_V2I32&               operator*=                                              (DN_V2I32& lhs, DN_F32   rhs);
+DN_API DN_V2I32&               operator*=                                              (DN_V2I32& lhs, DN_I32   rhs);
+DN_API DN_V2I32&               operator/=                                              (DN_V2I32& lhs, DN_V2I32 rhs);
+DN_API DN_V2I32&               operator/=                                              (DN_V2I32& lhs, DN_F32   rhs);
+DN_API DN_V2I32&               operator/=                                              (DN_V2I32& lhs, DN_I32   rhs);
+DN_API DN_V2I32&               operator-=                                              (DN_V2I32& lhs, DN_V2I32 rhs);
+DN_API DN_V2I32&               operator+=                                              (DN_V2I32& lhs, DN_V2I32 rhs);
+
+DN_API DN_V2I32                DN_V2I32Min                                             (DN_V2I32 a, DN_V2I32 b);
+DN_API DN_V2I32                DN_V2I32Max                                             (DN_V2I32 a, DN_V2I32 b);
+DN_API DN_V2I32                DN_V2I32Abs                                             (DN_V2I32 a);
+
+#define                        DN_V2U16Zero                                            DN_Literal(DN_V2U16){{(DN_U16)(0), (DN_U16)(0)}}
+#define                        DN_V2U16One                                             DN_Literal(DN_V2U16){{(DN_U16)(1), (DN_U16)(1)}}
+#define                        DN_V2U16From1N(x)                                       DN_Literal(DN_V2U16){{(DN_U16)(x), (DN_U16)(x)}}
+#define                        DN_V2U16From2N(x, y)                                    DN_Literal(DN_V2U16){{(DN_U16)(x), (DN_U16)(y)}}
+
+DN_API bool                    operator!=                                              (DN_V2U16  lhs, DN_V2U16 rhs);
+DN_API bool                    operator==                                              (DN_V2U16  lhs, DN_V2U16 rhs);
+DN_API bool                    operator>=                                              (DN_V2U16  lhs, DN_V2U16 rhs);
+DN_API bool                    operator<=                                              (DN_V2U16  lhs, DN_V2U16 rhs);
+DN_API bool                    operator<                                               (DN_V2U16  lhs, DN_V2U16 rhs);
+DN_API bool                    operator>                                               (DN_V2U16  lhs, DN_V2U16 rhs);
+DN_API DN_V2U16                operator-                                               (DN_V2U16  lhs, DN_V2U16 rhs);
+DN_API DN_V2U16                operator+                                               (DN_V2U16  lhs, DN_V2U16 rhs);
+DN_API DN_V2U16                operator*                                               (DN_V2U16  lhs, DN_V2U16 rhs);
+DN_API DN_V2U16                operator*                                               (DN_V2U16  lhs, DN_F32 rhs);
+DN_API DN_V2U16                operator*                                               (DN_V2U16  lhs, DN_I32 rhs);
+DN_API DN_V2U16                operator/                                               (DN_V2U16  lhs, DN_V2U16 rhs);
+DN_API DN_V2U16                operator/                                               (DN_V2U16  lhs, DN_F32 rhs);
+DN_API DN_V2U16                operator/                                               (DN_V2U16  lhs, DN_I32 rhs);
+DN_API DN_V2U16&               operator*=                                              (DN_V2U16& lhs, DN_V2U16 rhs);
+DN_API DN_V2U16&               operator*=                                              (DN_V2U16& lhs, DN_F32 rhs);
+DN_API DN_V2U16&               operator*=                                              (DN_V2U16& lhs, DN_I32 rhs);
+DN_API DN_V2U16&               operator/=                                              (DN_V2U16& lhs, DN_V2U16 rhs);
+DN_API DN_V2U16&               operator/=                                              (DN_V2U16& lhs, DN_F32 rhs);
+DN_API DN_V2U16&               operator/=                                              (DN_V2U16& lhs, DN_I32 rhs);
+DN_API DN_V2U16&               operator-=                                              (DN_V2U16& lhs, DN_V2U16 rhs);
+DN_API DN_V2U16&               operator+=                                              (DN_V2U16& lhs, DN_V2U16 rhs);
+
+#define                        DN_V2U32Zero                                            DN_Literal(DN_V2U32){{(DN_U32)(0), (DN_U32)(0)}}
+#define                        DN_V2U32One                                             DN_Literal(DN_V2U32){{(DN_U32)(1), (DN_U32)(1)}}
+#define                        DN_V2U32From1N(x)                                       DN_Literal(DN_V2U32){{(DN_U32)(x), (DN_U32)(x)}}
+#define                        DN_V2U32From2N(x, y)                                    DN_Literal(DN_V2U32){{(DN_U32)(x), (DN_U32)(y)}}
+
+#define                        DN_V2F32Zero                                            DN_Literal(DN_V2F32){{(DN_F32)(0),    (DN_F32)(0)}}
+#define                        DN_V2F32One                                             DN_Literal(DN_V2F32){{(DN_F32)(1),    (DN_F32)(1)}}
+#define                        DN_V2F32From1N(x)                                       DN_Literal(DN_V2F32){{(DN_F32)(x),    (DN_F32)(x)}}
+#define                        DN_V2F32From2N(x, y)                                    DN_Literal(DN_V2F32){{(DN_F32)(x),    (DN_F32)(y)}}
+#define                        DN_V2F32FromV2I32(xy)                                   DN_Literal(DN_V2F32){{(DN_F32)(xy).x, (DN_F32)(xy).y}}
+#define                        DN_V2F32FromV2U32(xy)                                   DN_Literal(DN_V2F32){{(DN_F32)(xy).x, (DN_F32)(xy).y}}
+
+DN_API bool                    operator!=                                              (DN_V2F32  lhs, DN_V2F32  rhs);
+DN_API bool                    operator==                                              (DN_V2F32  lhs, DN_V2F32  rhs);
+DN_API bool                    operator>=                                              (DN_V2F32  lhs, DN_V2F32  rhs);
+DN_API bool                    operator<=                                              (DN_V2F32  lhs, DN_V2F32  rhs);
+DN_API bool                    operator<                                               (DN_V2F32  lhs, DN_V2F32  rhs);
+DN_API bool                    operator>                                               (DN_V2F32  lhs, DN_V2F32  rhs);
+
+DN_API DN_V2F32                operator-                                               (DN_V2F32  lhs);
+DN_API DN_V2F32                operator-                                               (DN_V2F32  lhs, DN_V2F32  rhs);
+DN_API DN_V2F32                operator-                                               (DN_V2F32  lhs, DN_V2I32  rhs);
+DN_API DN_V2F32                operator-                                               (DN_V2F32  lhs, DN_F32    rhs);
+DN_API DN_V2F32                operator-                                               (DN_V2F32  lhs, DN_I32    rhs);
+
+DN_API DN_V2F32                operator+                                               (DN_V2F32  lhs, DN_V2F32  rhs);
+DN_API DN_V2F32                operator+                                               (DN_V2F32  lhs, DN_V2I32  rhs);
+DN_API DN_V2F32                operator+                                               (DN_V2F32  lhs, DN_F32    rhs);
+DN_API DN_V2F32                operator+                                               (DN_V2F32  lhs, DN_I32    rhs);
+
+DN_API DN_V2F32                operator*                                               (DN_V2F32  lhs, DN_V2F32  rhs);
+DN_API DN_V2F32                operator*                                               (DN_V2F32  lhs, DN_V2I32  rhs);
+DN_API DN_V2F32                operator*                                               (DN_V2F32  lhs, DN_F32    rhs);
+DN_API DN_V2F32                operator*                                               (DN_V2F32  lhs, DN_I32    rhs);
+
+DN_API DN_V2F32                operator/                                               (DN_V2F32  lhs, DN_V2F32  rhs);
+DN_API DN_V2F32                operator/                                               (DN_V2F32  lhs, DN_V2I32  rhs);
+DN_API DN_V2F32                operator/                                               (DN_V2F32  lhs, DN_F32    rhs);
+DN_API DN_V2F32                operator/                                               (DN_V2F32  lhs, DN_I32    rhs);
+
+DN_API DN_V2F32&               operator*=                                              (DN_V2F32&  lhs, DN_V2F32 rhs);
+DN_API DN_V2F32&               operator*=                                              (DN_V2F32&  lhs, DN_V2I32 rhs);
+DN_API DN_V2F32&               operator*=                                              (DN_V2F32&  lhs, DN_F32   rhs);
+DN_API DN_V2F32&               operator*=                                              (DN_V2F32&  lhs, DN_I32   rhs);
+
+DN_API DN_V2F32&               operator/=                                              (DN_V2F32&  lhs, DN_V2F32 rhs);
+DN_API DN_V2F32&               operator/=                                              (DN_V2F32&  lhs, DN_V2I32 rhs);
+DN_API DN_V2F32&               operator/=                                              (DN_V2F32&  lhs, DN_F32   rhs);
+DN_API DN_V2F32&               operator/=                                              (DN_V2F32&  lhs, DN_I32   rhs);
+
+DN_API DN_V2F32&               operator-=                                              (DN_V2F32&  lhs, DN_V2F32 rhs);
+DN_API DN_V2F32&               operator-=                                              (DN_V2F32&  lhs, DN_V2I32 rhs);
+DN_API DN_V2F32&               operator-=                                              (DN_V2F32&  lhs, DN_F32   rhs);
+DN_API DN_V2F32&               operator-=                                              (DN_V2F32&  lhs, DN_I32   rhs);
+
+DN_API DN_V2F32&               operator+=                                              (DN_V2F32&  lhs, DN_V2F32 rhs);
+DN_API DN_V2F32&               operator+=                                              (DN_V2F32&  lhs, DN_V2I32 rhs);
+DN_API DN_V2F32&               operator+=                                              (DN_V2F32&  lhs, DN_F32   rhs);
+DN_API DN_V2F32&               operator+=                                              (DN_V2F32&  lhs, DN_I32   rhs);
+
+DN_API DN_V2F32                DN_V2F32Min                                             (DN_V2F32 a, DN_V2F32 b);
+DN_API DN_V2F32                DN_V2F32Max                                             (DN_V2F32 a, DN_V2F32 b);
+DN_API DN_V2F32                DN_V2F32Abs                                             (DN_V2F32 a);
+DN_API DN_F32                  DN_V2F32Dot                                             (DN_V2F32 a, DN_V2F32 b);
+DN_API DN_F32                  DN_V2F32LengthSq2V2                                     (DN_V2F32 lhs, DN_V2F32 rhs);
+DN_API bool                    DN_V2F32LengthSqIsWithin2V2                             (DN_V2F32 lhs, DN_V2F32 rhs, DN_F32 within_amount_sq);
+DN_API DN_F32                  DN_V2F32Length2V2                                       (DN_V2F32 lhs, DN_V2F32 rhs);
+DN_API DN_F32                  DN_V2F32LengthSq                                        (DN_V2F32 lhs);
+DN_API DN_F32                  DN_V2F32Length                                          (DN_V2F32 lhs);
+DN_API DN_V2F32                DN_V2F32Normalise                                       (DN_V2F32 a);
+DN_API DN_V2F32                DN_V2F32Perpendicular                                   (DN_V2F32 a);
+DN_API DN_V2F32                DN_V2F32Reflect                                         (DN_V2F32 in, DN_V2F32 surface);
+DN_API DN_F32                  DN_V2F32Area                                            (DN_V2F32 a);
+
+#define                        DN_V3F32From1N(x)                                       DN_Literal(DN_V3F32){{(DN_F32)(x),    (DN_F32)(x),    (DN_F32)(x)}}
+#define                        DN_V3F32From3N(x, y, z)                                 DN_Literal(DN_V3F32){{(DN_F32)(x),    (DN_F32)(y),    (DN_F32)(z)}}
+#define                        DN_V3F32FromV2F32And1N(xy, z)                           DN_Literal(DN_V3F32){{(DN_F32)(xy.x), (DN_F32)(xy.y), (DN_F32)(z)}}
+
+DN_API bool                    operator==                                              (DN_V3F32  lhs, DN_V3F32  rhs);
+DN_API bool                    operator!=                                              (DN_V3F32  lhs, DN_V3F32  rhs);
+DN_API bool                    operator>=                                              (DN_V3F32  lhs, DN_V3F32  rhs);
+DN_API bool                    operator<=                                              (DN_V3F32  lhs, DN_V3F32  rhs);
+DN_API bool                    operator<                                               (DN_V3F32  lhs, DN_V3F32  rhs);
+DN_API bool                    operator>                                               (DN_V3F32  lhs, DN_V3F32  rhs);
+DN_API DN_V3F32                operator-                                               (DN_V3F32  lhs, DN_V3F32  rhs);
+DN_API DN_V3F32                operator-                                               (DN_V3F32  lhs);
+DN_API DN_V3F32                operator+                                               (DN_V3F32  lhs, DN_V3F32 rhs);
+DN_API DN_V3F32                operator*                                               (DN_V3F32  lhs, DN_V3F32 rhs);
+DN_API DN_V3F32                operator*                                               (DN_V3F32  lhs, DN_F32   rhs);
+DN_API DN_V3F32                operator*                                               (DN_V3F32  lhs, DN_I32   rhs);
+DN_API DN_V3F32                operator/                                               (DN_V3F32  lhs, DN_V3F32 rhs);
+DN_API DN_V3F32                operator/                                               (DN_V3F32  lhs, DN_F32   rhs);
+DN_API DN_V3F32                operator/                                               (DN_V3F32  lhs, DN_I32   rhs);
+DN_API DN_V3F32&               operator*=                                              (DN_V3F32 &lhs, DN_V3F32 rhs);
+DN_API DN_V3F32&               operator*=                                              (DN_V3F32 &lhs, DN_F32   rhs);
+DN_API DN_V3F32&               operator*=                                              (DN_V3F32 &lhs, DN_I32   rhs);
+DN_API DN_V3F32&               operator/=                                              (DN_V3F32 &lhs, DN_V3F32 rhs);
+DN_API DN_V3F32&               operator/=                                              (DN_V3F32 &lhs, DN_F32   rhs);
+DN_API DN_V3F32&               operator/=                                              (DN_V3F32 &lhs, DN_I32   rhs);
+DN_API DN_V3F32&               operator-=                                              (DN_V3F32 &lhs, DN_V3F32 rhs);
+DN_API DN_V3F32&               operator+=                                              (DN_V3F32 &lhs, DN_V3F32 rhs);
+DN_API DN_F32                  DN_V3F32LengthSq                                        (DN_V3F32 a);
+DN_API DN_F32                  DN_V3F32Length                                          (DN_V3F32 a);
+DN_API DN_V3F32                DN_V3F32Normalise                                       (DN_V3F32 a);
+
+#define                        DN_V4F32From1N(x)                                       DN_Literal(DN_V4F32){{(DN_F32)(x), (DN_F32)(x), (DN_F32)(x), (DN_F32)(x)}}
+#define                        DN_V4F32From4N(x, y, z, w)                              DN_Literal(DN_V4F32){{(DN_F32)(x), (DN_F32)(y), (DN_F32)(z), (DN_F32)(w)}}
+#define                        DN_V4F32FromV3And1N(xyz, w)                             DN_Literal(DN_V4F32){{xyz.x,        xyz.y,        xyz.z,        w}}
+#define                        DN_V4F32FromRGBAU8(r, g, b, a)                          DN_Literal(DN_V4F32){{r / 255.f, g / 255.f, b / 255.f, a / 255.f}}
+#define                        DN_V4F32FromRGBU8(r, g, b)                              DN_Literal(DN_V4F32){{r / 255.f, g / 255.f, b / 255.f,       1.f}}
+DN_API DN_V4F32                DN_V4F32FromRGBU32                                      (DN_U32 u32);
+DN_API DN_V4F32                DN_V4F32FromRGBAU32                                     (DN_U32 u32);
+#define                        DN_V4F32FromV4Alpha(v4, alpha)                          DN_V4F32FromV3And1N(v4.xyz, alpha)
+DN_API bool                    operator==                                              (DN_V4F32  lhs, DN_V4F32  rhs);
+DN_API bool                    operator!=                                              (DN_V4F32  lhs, DN_V4F32  rhs);
+DN_API bool                    operator<=                                              (DN_V4F32  lhs, DN_V4F32  rhs);
+DN_API bool                    operator<                                               (DN_V4F32  lhs, DN_V4F32  rhs);
+DN_API bool                    operator>                                               (DN_V4F32  lhs, DN_V4F32  rhs);
+DN_API DN_V4F32                operator-                                               (DN_V4F32  lhs, DN_V4F32  rhs);
+DN_API DN_V4F32                operator-                                               (DN_V4F32  lhs);
+DN_API DN_V4F32                operator+                                               (DN_V4F32  lhs, DN_V4F32 rhs);
+DN_API DN_V4F32                operator*                                               (DN_V4F32  lhs, DN_V4F32 rhs);
+DN_API DN_V4F32                operator*                                               (DN_V4F32  lhs, DN_F32   rhs);
+DN_API DN_V4F32                operator*                                               (DN_V4F32  lhs, DN_I32   rhs);
+DN_API DN_V4F32                operator/                                               (DN_V4F32  lhs, DN_F32   rhs);
+DN_API DN_V4F32&               operator*=                                              (DN_V4F32 &lhs, DN_V4F32 rhs);
+DN_API DN_V4F32&               operator*=                                              (DN_V4F32 &lhs, DN_F32   rhs);
+DN_API DN_V4F32&               operator*=                                              (DN_V4F32 &lhs, DN_I32   rhs);
+DN_API DN_V4F32&               operator-=                                              (DN_V4F32 &lhs, DN_V4F32 rhs);
+DN_API DN_V4F32&               operator+=                                              (DN_V4F32 &lhs, DN_V4F32 rhs);
+DN_API DN_F32                  DN_V4F32Dot                                             (DN_V4F32 a, DN_V4F32 b);
+
+DN_API DN_M4                   DN_M4Identity                                           ();
+DN_API DN_M4                   DN_M4ScaleF                                             (DN_F32 x, DN_F32 y, DN_F32 z);
+DN_API DN_M4                   DN_M4Scale                                              (DN_V3F32 xyz);
+DN_API DN_M4                   DN_M4TranslateF                                         (DN_F32 x, DN_F32 y, DN_F32 z);
+DN_API DN_M4                   DN_M4Translate                                          (DN_V3F32 xyz);
+DN_API DN_M4                   DN_M4Transpose                                          (DN_M4 mat);
+DN_API DN_M4                   DN_M4Rotate                                             (DN_V3F32 axis, DN_F32 radians);
+DN_API DN_M4                   DN_M4Orthographic                                       (DN_F32 left, DN_F32 right, DN_F32 bottom, DN_F32 top, DN_F32 z_near, DN_F32 z_far);
+DN_API DN_M4                   DN_M4Perspective                                        (DN_F32 fov /*radians*/, DN_F32 aspect, DN_F32 z_near, DN_F32 z_far);
+DN_API DN_M4                   DN_M4Add                                                (DN_M4 lhs, DN_M4 rhs);
+DN_API DN_M4                   DN_M4Sub                                                (DN_M4 lhs, DN_M4 rhs);
+DN_API DN_M4                   DN_M4Mul                                                (DN_M4 lhs, DN_M4 rhs);
+DN_API DN_M4                   DN_M4Div                                                (DN_M4 lhs, DN_M4 rhs);
+DN_API DN_M4                   DN_M4AddF                                               (DN_M4 lhs, DN_F32 rhs);
+DN_API DN_M4                   DN_M4SubF                                               (DN_M4 lhs, DN_F32 rhs);
+DN_API DN_M4                   DN_M4MulF                                               (DN_M4 lhs, DN_F32 rhs);
+DN_API DN_M4                   DN_M4DivF                                               (DN_M4 lhs, DN_F32 rhs);
+DN_API DN_Str8x256             DN_M4ColumnMajorString                                  (DN_M4 mat);
+
+DN_API bool                    operator==                                              (DN_M2x3 const &lhs, DN_M2x3 const &rhs);
+DN_API bool                    operator!=                                              (DN_M2x3 const &lhs, DN_M2x3 const &rhs);
+DN_API DN_M2x3                 DN_M2x3Identity                                         ();
+DN_API DN_M2x3                 DN_M2x3Translate                                        (DN_V2F32 offset);
+DN_API DN_V2F32                DN_M2x3ScaleGet                                         (DN_M2x3 m2x3);
+DN_API DN_M2x3                 DN_M2x3Scale                                            (DN_V2F32 scale);
+DN_API DN_M2x3                 DN_M2x3Rotate                                           (DN_F32 radians);
+DN_API DN_M2x3                 DN_M2x3Mul                                              (DN_M2x3 m1, DN_M2x3 m2);
+DN_API DN_V2F32                DN_M2x3Mul2F32                                          (DN_M2x3 m1, DN_F32 x, DN_F32 y);
+DN_API DN_V2F32                DN_M2x3MulV2F32                                         (DN_M2x3 m1, DN_V2F32 v2);
+
+#define                        DN_RectFrom2V2(pos, size)                               DN_Literal(DN_Rect){(pos), (size)}
+#define                        DN_RectFrom4N(x, y, w, h)                               DN_Literal(DN_Rect){DN_Literal(DN_V2F32){{x, y}}, DN_Literal(DN_V2F32){{w, h}}}
+#define                        DN_RectZero                                             DN_RectFrom4N(0, 0, 0, 0)
+
+DN_API bool                    operator==                                              (const DN_Rect& lhs, const DN_Rect& rhs);
+DN_API DN_V2F32                DN_RectCenter                                           (DN_Rect rect);
+DN_API bool                    DN_RectContainsPoint                                    (DN_Rect rect, DN_V2F32 p);
+DN_API bool                    DN_RectContainsRect                                     (DN_Rect a, DN_Rect b);
+DN_API DN_Rect                 DN_RectExpand                                           (DN_Rect a, DN_F32 amount);
+DN_API DN_Rect                 DN_RectExpandV2                                         (DN_Rect a, DN_V2F32 amount);
+DN_API bool                    DN_RectIntersects                                       (DN_Rect a, DN_Rect b);
+DN_API DN_Rect                 DN_RectIntersection                                     (DN_Rect a, DN_Rect b);
+DN_API DN_Rect                 DN_RectUnion                                            (DN_Rect a, DN_Rect b);
+DN_API DN_RectMinMax           DN_RectGetMinMax                                        (DN_Rect a);
+DN_API DN_F32                  DN_RectArea                                             (DN_Rect a);
+DN_API DN_V2F32                DN_RectInterpV2F32                                      (DN_Rect rect, DN_V2F32 t01);
+DN_API DN_V2F32                DN_RectTopLeft                                          (DN_Rect rect);
+DN_API DN_V2F32                DN_RectTopRight                                         (DN_Rect rect);
+DN_API DN_V2F32                DN_RectBottomLeft                                       (DN_Rect rect);
+DN_API DN_V2F32                DN_RectBottomRight                                      (DN_Rect rect);
+
+DN_API DN_Rect                 DN_RectCutLeftClip                                      (DN_Rect *rect, DN_F32 amount, DN_RectCutClip clip);
+DN_API DN_Rect                 DN_RectCutRightClip                                     (DN_Rect *rect, DN_F32 amount, DN_RectCutClip clip);
+DN_API DN_Rect                 DN_RectCutTopClip                                       (DN_Rect *rect, DN_F32 amount, DN_RectCutClip clip);
+DN_API DN_Rect                 DN_RectCutBottomClip                                    (DN_Rect *rect, DN_F32 amount, DN_RectCutClip clip);
+
+#define                        DN_RectCutLeft(rect, amount)                            DN_RectCutLeftClip(rect, amount, DN_RectCutClip_Yes)
+#define                        DN_RectCutRight(rect, amount)                           DN_RectCutRightClip(rect, amount, DN_RectCutClip_Yes)
+#define                        DN_RectCutTop(rect, amount)                             DN_RectCutTopClip(rect, amount, DN_RectCutClip_Yes)
+#define                        DN_RectCutBottom(rect, amount)                          DN_RectCutBottomClip(rect, amount, DN_RectCutClip_Yes)
+
+#define                        DN_RectCutLeftNoClip(rect, amount)                      DN_RectCutLeftClip(rect, amount, DN_RectCutClip_No)
+#define                        DN_RectCutRightNoClip(rect, amount)                     DN_RectCutRightClip(rect, amount, DN_RectCutClip_No)
+#define                        DN_RectCutTopNoClip(rect, amount)                       DN_RectCutTopClip(rect, amount, DN_RectCutClip_No)
+#define                        DN_RectCutBottomNoClip(rect, amount)                    DN_RectCutBottomClip(rect, amount, DN_RectCutClip_No)
+
+DN_API DN_Rect                 DN_RectCutCut                                           (DN_RectCut rect_cut, DN_V2F32 size, DN_RectCutClip clip);
+#define                        DN_RectCutInit(rect, side)                              DN_Literal(DN_RectCut){rect, side}
+
+DN_API DN_RaycastV2            DN_RaycastLineIntersectV2                               (DN_V2F32 origin_a, DN_V2F32 dir_a, DN_V2F32 origin_b, DN_V2F32 dir_b);
+DN_API DN_V2F32                DN_LerpV2F32                                            (DN_V2F32 a, DN_F32 t, DN_V2F32 b);
+DN_API DN_F32                  DN_LerpF32                                              (DN_F32 a, DN_F32 t, DN_F32 b);
 #endif // !defined(DN_BASE_H)

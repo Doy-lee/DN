@@ -14,7 +14,6 @@
 /*
     #define DN_H_WITH_OS      1
     #define DN_H_WITH_CORE    1
-    #define DN_H_WITH_MATH    1
     #define DN_H_WITH_HELPERS 1
     #define DN_H_WITH_ASYNC   1
     #define DN_H_WITH_NET     1
@@ -139,10 +138,6 @@ extern DN_Core *g_dn_;
 
 DN_API void DN_Init      (DN_Core *dn, DN_InitFlags flags, DN_InitArgs *args);
 DN_API void DN_BeginFrame();
-
-#if DN_H_WITH_MATH
-#include "Extra/dn_math.h"
-#endif
 
 #if DN_H_WITH_HELPERS
 #include "Extra/dn_helpers.h"

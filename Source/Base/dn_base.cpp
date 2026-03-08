@@ -1473,7 +1473,7 @@ DN_API bool DN_ErrSinkEndLogError_(DN_ErrSink *err, DN_CallSite call_site, DN_St
 
     // NOTE: Log the error
     DN_Str8 log = DN_Str8BuilderBuild(&builder, err->arena);
-    DN_LogPrint(DN_LogMakeU32LogTypeParam(DN_LogType_Error), call_site, "%.*s", DN_Str8PrintFmt(log));
+    DN_LogPrint(DN_LogTypeParamFromType(DN_LogType_Error), call_site, "%.*s", DN_Str8PrintFmt(log));
 
     if (node->mode == DN_ErrSinkMode_DebugBreakOnErrorLog)
       DN_DebugBreak;
@@ -1552,7 +1552,6 @@ DN_API void DN_TCInit(DN_TCCore *tc, DN_U64 thread_id, DN_Arena *main_arena, DN_
   tc->temp_a_arena   = temp_a_arena;
   tc->temp_b_arena   = temp_b_arena;
   tc->err_sink.arena = err_sink_arena;
-  tc->lane.count     = 1;
 }
 
 DN_API void DN_TCInitFromMemFuncs(DN_TCCore *tc, DN_U64 thread_id, DN_TCInitArgs *args, DN_ArenaMemFuncs mem_funcs)
@@ -1669,21 +1668,6 @@ DN_API DN_ErrSink *DN_TCErrSink()
 {
   DN_TCCore  *tc     = DN_TCGet();
   DN_ErrSink *result = &tc->err_sink;
-  return result;
-}
-
-DN_API DN_TCLane *DN_TCLaneGet()
-{
-  DN_TCCore *tc     = DN_TCGet();
-  DN_TCLane *result = &tc->lane;
-  return result;
-}
-
-DN_API DN_TCLane DN_TCLaneEquip(DN_TCLane lane)
-{
-  DN_TCLane *curr   = DN_TCLaneGet();
-  DN_TCLane  result = *curr;
-  *curr             = lane;
   return result;
 }
 
@@ -1989,14 +1973,7 @@ DN_API bool DN_Str16Eq(DN_Str16 lhs, DN_Str16 rhs)
   return result;
 }
 
-DN_API DN_Str8 DN_Str8FromCStr8(char const *src)
-{
-  DN_USize size   = DN_CStr8Size(src);
-  DN_Str8  result = DN_Str8FromPtr(src, size);
-  return result;
-}
-
-DN_API DN_Str8 DN_Str8FromArena(DN_Arena *arena, DN_USize size, DN_ZMem z_mem)
+DN_API DN_Str8 DN_Str8AllocArena(DN_Arena *arena, DN_USize size, DN_ZMem z_mem)
 {
   DN_Str8 result = {};
   result.data    = DN_ArenaNewArray(arena, char, size + 1, z_mem);
@@ -2006,7 +1983,7 @@ DN_API DN_Str8 DN_Str8FromArena(DN_Arena *arena, DN_USize size, DN_ZMem z_mem)
   return result;
 }
 
-DN_API DN_Str8 DN_Str8FromPool(DN_Pool *pool, DN_USize size)
+DN_API DN_Str8 DN_Str8AllocPool(DN_Pool *pool, DN_USize size)
 {
   DN_Str8 result = {};
   result.data    = DN_PoolNewArray(pool, char, size + 1);
@@ -2016,9 +1993,16 @@ DN_API DN_Str8 DN_Str8FromPool(DN_Pool *pool, DN_USize size)
   return result;
 }
 
+DN_API DN_Str8 DN_Str8FromCStr8(char const *src)
+{
+  DN_USize size   = DN_CStr8Size(src);
+  DN_Str8  result = DN_Str8FromPtr(src, size);
+  return result;
+}
+
 DN_API DN_Str8 DN_Str8FromPtrArena(DN_Arena *arena, void const *data, DN_USize size)
 {
-  DN_Str8 result = DN_Str8FromArena(arena, size, DN_ZMem_No);
+  DN_Str8 result = DN_Str8AllocArena(arena, size, DN_ZMem_No);
   if (result.size)
     DN_Memcpy(result.data, data, size);
   return result;
@@ -2026,7 +2010,7 @@ DN_API DN_Str8 DN_Str8FromPtrArena(DN_Arena *arena, void const *data, DN_USize s
 
 DN_API DN_Str8 DN_Str8FromPtrPool(DN_Pool *pool, void const *data, DN_USize size)
 {
-  DN_Str8 result = DN_Str8FromPool(pool, size);
+  DN_Str8 result = DN_Str8AllocPool(pool, size);
   if (result.size)
     DN_Memcpy(result.data, data, size);
   return result;
@@ -2068,7 +2052,7 @@ DN_API DN_Str8 DN_Str8FromFmtArena(DN_Arena *arena, DN_FMT_ATTRIB char const *fm
 DN_API DN_Str8 DN_Str8FromFmtVArena(DN_Arena *arena, DN_FMT_ATTRIB char const *fmt, va_list args)
 {
   DN_USize size   = DN_FmtVSize(fmt, args);
-  DN_Str8  result = DN_Str8FromArena(arena, size, DN_ZMem_No);
+  DN_Str8  result = DN_Str8AllocArena(arena, size, DN_ZMem_No);
   if (result.data) {
     DN_USize written = 0;
     DN_FmtVAppend(result.data, &written, result.size + 1, fmt, args);
@@ -2082,7 +2066,7 @@ DN_API DN_Str8 DN_Str8FromFmtPool(DN_Pool *pool, DN_FMT_ATTRIB char const *fmt, 
   va_list args;
   va_start(args, fmt);
   DN_USize size   = DN_FmtVSize(fmt, args);
-  DN_Str8  result = DN_Str8FromPool(pool, size);
+  DN_Str8  result = DN_Str8AllocPool(pool, size);
   if (result.data) {
     DN_USize written = 0;
     DN_FmtVAppend(result.data, &written, result.size + 1, fmt, args);
@@ -2437,7 +2421,7 @@ DN_API DN_Str8FindResult DN_Str8FindStr8(DN_Str8 string, DN_Str8 find, DN_Str8Eq
   return result;
 }
 
-DN_API DN_Str8FindResult DN_Str8Find(DN_Str8 string, uint32_t flags)
+DN_API DN_Str8FindResult DN_Str8Find(DN_Str8 string, DN_Str8FindFlag flags)
 {
   DN_Str8FindResult result = {};
   for (size_t index = 0; !result.found && index < string.size; index++) {
@@ -2468,7 +2452,7 @@ DN_API DN_Str8 DN_Str8Segment(DN_Arena *arena, DN_Str8 src, DN_USize segment_siz
     segments--;
 
   DN_USize segment_counter = 0;
-  DN_Str8  result          = DN_Str8FromArena(arena, src.size + segments, DN_ZMem_Yes);
+  DN_Str8  result          = DN_Str8AllocArena(arena, src.size + segments, DN_ZMem_Yes);
   DN_USize write_index     = 0;
   for (DN_ForIndexU(src_index, src.size)) {
     result.data[write_index++] = src.data[src_index];
@@ -2496,7 +2480,7 @@ DN_API DN_Str8 DN_Str8ReverseSegment(DN_Arena *arena, DN_Str8 src, DN_USize segm
 
   DN_USize write_counter   = 0;
   DN_USize segment_counter = 0;
-  DN_Str8  result          = DN_Str8FromArena(arena, src.size + segments, DN_ZMem_Yes);
+  DN_Str8  result          = DN_Str8AllocArena(arena, src.size + segments, DN_ZMem_Yes);
   DN_USize write_index     = result.size - 1;
 
   DN_MSVC_WARNING_PUSH
@@ -2711,7 +2695,7 @@ DN_API DN_Str8 DN_Str8AppendFV(DN_Arena *arena, DN_Str8 string, char const *fmt,
 {
   // TODO: Calculate size and write into one buffer instead of 2 appends
   DN_Str8 append = DN_Str8FromFmtVArena(arena, fmt, args);
-  DN_Str8 result = DN_Str8FromArena(arena, string.size + append.size, DN_ZMem_No);
+  DN_Str8 result = DN_Str8AllocArena(arena, string.size + append.size, DN_ZMem_No);
   DN_Memcpy(result.data, string.data, string.size);
   DN_Memcpy(result.data + string.size, append.data, append.size);
   return result;
@@ -2729,7 +2713,7 @@ DN_API DN_Str8 DN_Str8FillF(DN_Arena *arena, DN_USize count, char const *fmt, ..
 DN_API DN_Str8 DN_Str8FillFV(DN_Arena *arena, DN_USize count, char const *fmt, va_list args)
 {
   DN_Str8 fill = DN_Str8FromFmtVArena(arena, fmt, args);
-  DN_Str8 result = DN_Str8FromArena(arena, count * fill.size, DN_ZMem_No);
+  DN_Str8 result = DN_Str8AllocArena(arena, count * fill.size, DN_ZMem_No);
   for (DN_USize index = 0; index < count; index++) {
     void *dest = result.data + (index * fill.size);
     DN_Memcpy(dest, fill.data, fill.size);
@@ -2845,6 +2829,81 @@ DN_API DN_Str8 DN_Str8ReplaceSensitive(DN_Str8 string, DN_Str8 find, DN_Str8 rep
 DN_API DN_Str8 DN_Str8ReplaceInsensitive(DN_Str8 string, DN_Str8 find, DN_Str8 replace, DN_USize start_index, DN_Arena *arena)
 {
   DN_Str8 result = DN_Str8Replace(string, find, replace, start_index, arena, DN_Str8EqCase_Insensitive);
+  return result;
+}
+
+DN_API DN_Str8 DN_Str8SliceRender(DN_Str8Slice slice, DN_Str8 separator, DN_Arena *arena)
+{
+  DN_Str8 result = {};
+  if (!arena)
+    return result;
+
+  DN_USize total_size = 0;
+  for (DN_USize index = 0; index < slice.count; index++) {
+    if (index)
+      total_size += separator.size;
+    DN_Str8 item = slice.data[index];
+    total_size += item.size;
+  }
+
+  result = DN_Str8AllocArena(arena, total_size, DN_ZMem_No);
+  if (result.data) {
+    DN_USize write_index = 0;
+    for (DN_USize index = 0; index < slice.count; index++) {
+      if (index) {
+        DN_Memcpy(result.data + write_index, separator.data, separator.size);
+        write_index += separator.size;
+      }
+      DN_Str8 item = slice.data[index];
+      DN_Memcpy(result.data + write_index, item.data, item.size);
+      write_index += item.size;
+    }
+  }
+
+  return result;
+}
+
+DN_API DN_Str8 DN_Str8RenderSpaceSep(DN_Str8Slice slice, DN_Arena *arena)
+{
+  DN_Str8 result = DN_Str8SliceRender(slice, DN_Str8Lit(" "), arena);
+  return result;
+}
+
+DN_API DN_Str16 DN_Str16SliceRender(DN_Str16Slice slice, DN_Str16 separator, DN_Arena *arena)
+{
+  DN_Str16 result = {};
+  if (!arena)
+    return result;
+
+  DN_USize total_size = 0;
+  for (DN_USize index = 0; index < slice.count; index++) {
+    if (index)
+      total_size += separator.size;
+    DN_Str16 item = slice.data[index];
+    total_size += item.size;
+  }
+
+  result = {DN_ArenaNewArray(arena, wchar_t, total_size + 1, DN_ZMem_No), total_size};
+  if (result.data) {
+    DN_USize write_index = 0;
+    for (DN_USize index = 0; index < slice.count; index++) {
+      if (index) {
+        DN_Memcpy(result.data + write_index, separator.data, separator.size * sizeof(result.data[0]));
+        write_index += separator.size;
+      }
+      DN_Str16 item = slice.data[index];
+      DN_Memcpy(result.data + write_index, item.data, item.size * sizeof(result.data[0]));
+      write_index += item.size;
+    }
+  }
+
+  result.data[total_size] = 0;
+  return result;
+}
+
+DN_API DN_Str16 DN_Str16RenderSpaceSep(DN_Str16Slice slice, DN_Arena *arena)
+{
+  DN_Str16 result = DN_Str16SliceRender(slice, DN_Str16Lit(L" "), arena);
   return result;
 }
 
@@ -3144,7 +3203,7 @@ DN_API DN_Str8Slice DN_Str8BuilderBuildSlice(DN_Str8Builder const *builder, DN_A
 }
 
 // NOTE: DN_UTF
-DN_API int DN_UTF8EncodeCodepoint(uint8_t utf8[4], uint32_t codepoint)
+DN_API int DN_UTF8EncodeCodepoint(DN_U8 utf8[4], DN_U32 codepoint)
 {
   // NOTE: Table from https://www.reedbeta.com/blog/programmers-intro-to-unicode/
   // ----------------------------------------+----------------------------+--------------------+
@@ -3185,7 +3244,7 @@ DN_API int DN_UTF8EncodeCodepoint(uint8_t utf8[4], uint32_t codepoint)
   return 0;
 }
 
-DN_API int DN_UTF16EncodeCodepoint(uint16_t utf16[2], uint32_t codepoint)
+DN_API int DN_UTF16EncodeCodepoint(DN_U16 utf16[2], DN_U32 codepoint)
 {
   // NOTE: Table from https://www.reedbeta.com/blog/programmers-intro-to-unicode/
   // ----------------------------------------+------------------------------------+------------------+
@@ -3196,14 +3255,14 @@ DN_API int DN_UTF16EncodeCodepoint(uint16_t utf16[2], uint32_t codepoint)
   // ----------------------------------------+------------------------------------+------------------+
 
   if (codepoint <= 0b1111'1111'1111'1111) {
-    utf16[0] = DN_Cast(uint16_t) codepoint;
+    utf16[0] = DN_Cast(DN_U16) codepoint;
     return 1;
   }
 
   if (codepoint <= 0b1111'1111'1111'1111'1111) {
-    uint32_t surrogate_codepoint = codepoint + 0x10000;
-    utf16[0]                     = 0b1101'1000'0000'0000 | ((surrogate_codepoint >> 10) & 0b11'1111'1111); // x
-    utf16[1]                     = 0b1101'1100'0000'0000 | ((surrogate_codepoint >> 0) & 0b11'1111'1111);  // y
+    DN_U32 surrogate_codepoint = codepoint + 0x10000;
+    utf16[0]                   = 0b1101'1000'0000'0000 | ((surrogate_codepoint >> 10) & 0b11'1111'1111); // x
+    utf16[1]                   = 0b1101'1100'0000'0000 | ((surrogate_codepoint >> 0) & 0b11'1111'1111);  // y
     return 2;
   }
 
@@ -3791,7 +3850,7 @@ DN_API DN_U64 DN_PCG32Next64(DN_PCG32 *rng)
 DN_API DN_U32 DN_PCG32Range(DN_PCG32 *rng, DN_U32 low, DN_U32 high)
 {
   DN_U32 bound     = high - low;
-  DN_U32 threshold = -(int32_t)bound % bound;
+  DN_U32 threshold = -(DN_I32)bound % bound;
 
   for (;;) {
     DN_U32 r = DN_PCG32Next(rng);
@@ -3803,7 +3862,7 @@ DN_API DN_U32 DN_PCG32Range(DN_PCG32 *rng, DN_U32 low, DN_U32 high)
 DN_API DN_F32 DN_PCG32NextF32(DN_PCG32 *rng)
 {
   DN_U32 x = DN_PCG32Next(rng);
-  return (DN_F32)(int32_t)(x >> 8) * 0x1.0p-24f;
+  return (DN_F32)(DN_I32)(x >> 8) * 0x1.0p-24f;
 }
 
 DN_API DN_F64 DN_PCG32NextF64(DN_PCG32 *rng)
@@ -4192,10 +4251,1590 @@ DN_API void DN_LogPrint(DN_LogTypeParam type, DN_CallSite call_site, DN_FMT_ATTR
   }
 }
 
-DN_API DN_LogTypeParam DN_LogMakeU32LogTypeParam(DN_LogType type)
+DN_API DN_LogTypeParam DN_LogTypeParamFromType(DN_LogType type)
 {
   DN_LogTypeParam result = {};
   result.is_u32_enum     = true;
   result.u32             = type;
+  return result;
+}
+
+DN_API bool operator==(DN_V2I32 lhs, DN_V2I32 rhs)
+{
+  bool result = (lhs.x == rhs.x) && (lhs.y == rhs.y);
+  return result;
+}
+
+DN_API bool operator!=(DN_V2I32 lhs, DN_V2I32 rhs)
+{
+  bool result = !(lhs == rhs);
+  return result;
+}
+
+DN_API bool operator>=(DN_V2I32 lhs, DN_V2I32 rhs)
+{
+  bool result = (lhs.x >= rhs.x) && (lhs.y >= rhs.y);
+  return result;
+}
+
+DN_API bool operator<=(DN_V2I32 lhs, DN_V2I32 rhs)
+{
+  bool result = (lhs.x <= rhs.x) && (lhs.y <= rhs.y);
+  return result;
+}
+
+DN_API bool operator<(DN_V2I32 lhs, DN_V2I32 rhs)
+{
+  bool result = (lhs.x < rhs.x) && (lhs.y < rhs.y);
+  return result;
+}
+
+DN_API bool operator>(DN_V2I32 lhs, DN_V2I32 rhs)
+{
+  bool result = (lhs.x > rhs.x) && (lhs.y > rhs.y);
+  return result;
+}
+
+DN_API DN_V2I32 operator-(DN_V2I32 lhs, DN_V2I32 rhs)
+{
+  DN_V2I32 result = DN_V2I32From2N(lhs.x - rhs.x, lhs.y - rhs.y);
+  return result;
+}
+
+DN_API DN_V2I32 operator-(DN_V2I32 lhs)
+{
+  DN_V2I32 result = DN_V2I32From2N(-lhs.x, -lhs.y);
+  return result;
+}
+
+DN_API DN_V2I32 operator+(DN_V2I32 lhs, DN_V2I32 rhs)
+{
+  DN_V2I32 result = DN_V2I32From2N(lhs.x + rhs.x, lhs.y + rhs.y);
+  return result;
+}
+
+DN_API DN_V2I32 operator*(DN_V2I32 lhs, DN_V2I32 rhs)
+{
+  DN_V2I32 result = DN_V2I32From2N(lhs.x * rhs.x, lhs.y * rhs.y);
+  return result;
+}
+
+DN_API DN_V2I32 operator*(DN_V2I32 lhs, DN_F32 rhs)
+{
+  DN_V2I32 result = DN_V2I32From2N(lhs.x * rhs, lhs.y * rhs);
+  return result;
+}
+
+DN_API DN_V2I32 operator*(DN_V2I32 lhs, DN_I32 rhs)
+{
+  DN_V2I32 result = DN_V2I32From2N(lhs.x * rhs, lhs.y * rhs);
+  return result;
+}
+
+DN_API DN_V2I32 operator/(DN_V2I32 lhs, DN_V2I32 rhs)
+{
+  DN_V2I32 result = DN_V2I32From2N(lhs.x / rhs.x, lhs.y / rhs.y);
+  return result;
+}
+
+DN_API DN_V2I32 operator/(DN_V2I32 lhs, DN_F32 rhs)
+{
+  DN_V2I32 result = DN_V2I32From2N(lhs.x / rhs, lhs.y / rhs);
+  return result;
+}
+
+DN_API DN_V2I32 operator/(DN_V2I32 lhs, DN_I32 rhs)
+{
+  DN_V2I32 result = DN_V2I32From2N(lhs.x / rhs, lhs.y / rhs);
+  return result;
+}
+
+DN_API DN_V2I32 &operator*=(DN_V2I32 &lhs, DN_V2I32 rhs)
+{
+  lhs = lhs * rhs;
+  return lhs;
+}
+
+DN_API DN_V2I32 &operator*=(DN_V2I32 &lhs, DN_F32 rhs)
+{
+  lhs = lhs * rhs;
+  return lhs;
+}
+
+DN_API DN_V2I32 &operator*=(DN_V2I32 &lhs, DN_I32 rhs)
+{
+  lhs = lhs * rhs;
+  return lhs;
+}
+
+DN_API DN_V2I32 &operator/=(DN_V2I32 &lhs, DN_V2I32 rhs)
+{
+  lhs = lhs / rhs;
+  return lhs;
+}
+
+DN_API DN_V2I32 &operator/=(DN_V2I32 &lhs, DN_F32 rhs)
+{
+  lhs = lhs / rhs;
+  return lhs;
+}
+
+DN_API DN_V2I32 &operator/=(DN_V2I32 &lhs, DN_I32 rhs)
+{
+  lhs = lhs / rhs;
+  return lhs;
+}
+
+DN_API DN_V2I32 &operator-=(DN_V2I32 &lhs, DN_V2I32 rhs)
+{
+  lhs = lhs - rhs;
+  return lhs;
+}
+
+DN_API DN_V2I32 &operator+=(DN_V2I32 &lhs, DN_V2I32 rhs)
+{
+  lhs = lhs + rhs;
+  return lhs;
+}
+
+DN_API DN_V2I32 DN_V2I32Min(DN_V2I32 a, DN_V2I32 b)
+{
+  DN_V2I32 result = DN_V2I32From2N(DN_Min(a.x, b.x), DN_Min(a.y, b.y));
+  return result;
+}
+
+DN_API DN_V2I32 DN_V2I32Max(DN_V2I32 a, DN_V2I32 b)
+{
+  DN_V2I32 result = DN_V2I32From2N(DN_Max(a.x, b.x), DN_Max(a.y, b.y));
+  return result;
+}
+
+DN_API DN_V2I32 DN_V2I32Abs(DN_V2I32 a)
+{
+  DN_V2I32 result = DN_V2I32From2N(DN_Abs(a.x), DN_Abs(a.y));
+  return result;
+}
+
+DN_API bool operator!=(DN_V2U16 lhs, DN_V2U16 rhs)
+{
+  bool result = !(lhs == rhs);
+  return result;
+}
+
+DN_API bool operator==(DN_V2U16 lhs, DN_V2U16 rhs)
+{
+  bool result = (lhs.x == rhs.x) && (lhs.y == rhs.y);
+  return result;
+}
+
+DN_API bool operator>=(DN_V2U16 lhs, DN_V2U16 rhs)
+{
+  bool result = (lhs.x >= rhs.x) && (lhs.y >= rhs.y);
+  return result;
+}
+
+DN_API bool operator<=(DN_V2U16 lhs, DN_V2U16 rhs)
+{
+  bool result = (lhs.x <= rhs.x) && (lhs.y <= rhs.y);
+  return result;
+}
+
+DN_API bool operator<(DN_V2U16 lhs, DN_V2U16 rhs)
+{
+  bool result = (lhs.x < rhs.x) && (lhs.y < rhs.y);
+  return result;
+}
+
+DN_API bool operator>(DN_V2U16 lhs, DN_V2U16 rhs)
+{
+  bool result = (lhs.x > rhs.x) && (lhs.y > rhs.y);
+  return result;
+}
+
+DN_API DN_V2U16 operator-(DN_V2U16 lhs, DN_V2U16 rhs)
+{
+  DN_V2U16 result = DN_V2U16From2N(lhs.x - rhs.x, lhs.y - rhs.y);
+  return result;
+}
+
+DN_API DN_V2U16 operator+(DN_V2U16 lhs, DN_V2U16 rhs)
+{
+  DN_V2U16 result = DN_V2U16From2N(lhs.x + rhs.x, lhs.y + rhs.y);
+  return result;
+}
+
+DN_API DN_V2U16 operator*(DN_V2U16 lhs, DN_V2U16 rhs)
+{
+  DN_V2U16 result = DN_V2U16From2N(lhs.x * rhs.x, lhs.y * rhs.y);
+  return result;
+}
+
+DN_API DN_V2U16 operator*(DN_V2U16 lhs, DN_F32 rhs)
+{
+  DN_V2U16 result = DN_V2U16From2N(lhs.x * rhs, lhs.y * rhs);
+  return result;
+}
+
+DN_API DN_V2U16 operator*(DN_V2U16 lhs, DN_I32 rhs)
+{
+  DN_V2U16 result = DN_V2U16From2N(lhs.x * rhs, lhs.y * rhs);
+  return result;
+}
+
+DN_API DN_V2U16 operator/(DN_V2U16 lhs, DN_V2U16 rhs)
+{
+  DN_V2U16 result = DN_V2U16From2N(lhs.x / rhs.x, lhs.y / rhs.y);
+  return result;
+}
+
+DN_API DN_V2U16 operator/(DN_V2U16 lhs, DN_F32 rhs)
+{
+  DN_V2U16 result = DN_V2U16From2N(lhs.x / rhs, lhs.y / rhs);
+  return result;
+}
+
+DN_API DN_V2U16 operator/(DN_V2U16 lhs, DN_I32 rhs)
+{
+  DN_V2U16 result = DN_V2U16From2N(lhs.x / rhs, lhs.y / rhs);
+  return result;
+}
+
+DN_API DN_V2U16 &operator*=(DN_V2U16 &lhs, DN_V2U16 rhs)
+{
+  lhs = lhs * rhs;
+  return lhs;
+}
+
+DN_API DN_V2U16 &operator*=(DN_V2U16 &lhs, DN_F32 rhs)
+{
+  lhs = lhs * rhs;
+  return lhs;
+}
+
+DN_API DN_V2U16 &operator*=(DN_V2U16 &lhs, DN_I32 rhs)
+{
+  lhs = lhs * rhs;
+  return lhs;
+}
+
+DN_API DN_V2U16 &operator/=(DN_V2U16 &lhs, DN_V2U16 rhs)
+{
+  lhs = lhs / rhs;
+  return lhs;
+}
+
+DN_API DN_V2U16 &operator/=(DN_V2U16 &lhs, DN_F32 rhs)
+{
+  lhs = lhs / rhs;
+  return lhs;
+}
+
+DN_API DN_V2U16 &operator/=(DN_V2U16 &lhs, DN_I32 rhs)
+{
+  lhs = lhs / rhs;
+  return lhs;
+}
+
+DN_API DN_V2U16 &operator-=(DN_V2U16 &lhs, DN_V2U16 rhs)
+{
+  lhs = lhs - rhs;
+  return lhs;
+}
+
+DN_API DN_V2U16 &operator+=(DN_V2U16 &lhs, DN_V2U16 rhs)
+{
+  lhs = lhs + rhs;
+  return lhs;
+}
+
+DN_API bool operator!=(DN_V2F32 lhs, DN_V2F32 rhs)
+{
+  bool result = !(lhs == rhs);
+  return result;
+}
+
+DN_API bool operator==(DN_V2F32 lhs, DN_V2F32 rhs)
+{
+  bool result = (lhs.x == rhs.x) && (lhs.y == rhs.y);
+  return result;
+}
+
+DN_API bool operator>=(DN_V2F32 lhs, DN_V2F32 rhs)
+{
+  bool result = (lhs.x >= rhs.x) && (lhs.y >= rhs.y);
+  return result;
+}
+
+DN_API bool operator<=(DN_V2F32 lhs, DN_V2F32 rhs)
+{
+  bool result = (lhs.x <= rhs.x) && (lhs.y <= rhs.y);
+  return result;
+}
+
+DN_API bool operator<(DN_V2F32 lhs, DN_V2F32 rhs)
+{
+  bool result = (lhs.x < rhs.x) && (lhs.y < rhs.y);
+  return result;
+}
+
+DN_API bool operator>(DN_V2F32 lhs, DN_V2F32 rhs)
+{
+  bool result = (lhs.x > rhs.x) && (lhs.y > rhs.y);
+  return result;
+}
+
+DN_API DN_V2F32 operator-(DN_V2F32 lhs)
+{
+  DN_V2F32 result = DN_V2F32From2N(-lhs.x, -lhs.y);
+  return result;
+}
+
+DN_API DN_V2F32 operator-(DN_V2F32 lhs, DN_V2F32 rhs)
+{
+  DN_V2F32 result = DN_V2F32From2N(lhs.x - rhs.x, lhs.y - rhs.y);
+  return result;
+}
+
+DN_API DN_V2F32 operator-(DN_V2F32 lhs, DN_V2I32 rhs)
+{
+  DN_V2F32 result = DN_V2F32From2N(lhs.x - rhs.x, lhs.y - rhs.y);
+  return result;
+}
+
+DN_API DN_V2F32 operator-(DN_V2F32 lhs, DN_F32 rhs)
+{
+  DN_V2F32 result = DN_V2F32From2N(lhs.x - rhs, lhs.y - rhs);
+  return result;
+}
+
+DN_API DN_V2F32 operator-(DN_V2F32 lhs, DN_I32 rhs)
+{
+  DN_V2F32 result = DN_V2F32From2N(lhs.x - rhs, lhs.y - rhs);
+  return result;
+}
+
+DN_API DN_V2F32 operator+(DN_V2F32 lhs, DN_V2F32 rhs)
+{
+  DN_V2F32 result = DN_V2F32From2N(lhs.x + rhs.x, lhs.y + rhs.y);
+  return result;
+}
+
+DN_API DN_V2F32 operator+(DN_V2F32 lhs, DN_V2I32 rhs)
+{
+  DN_V2F32 result = DN_V2F32From2N(lhs.x + rhs.x, lhs.y + rhs.y);
+  return result;
+}
+
+DN_API DN_V2F32 operator+(DN_V2F32 lhs, DN_F32 rhs)
+{
+  DN_V2F32 result = DN_V2F32From2N(lhs.x + rhs, lhs.y + rhs);
+  return result;
+}
+
+DN_API DN_V2F32 operator+(DN_V2F32 lhs, DN_I32 rhs)
+{
+  DN_V2F32 result = DN_V2F32From2N(lhs.x + rhs, lhs.y + rhs);
+  return result;
+}
+
+DN_API DN_V2F32 operator*(DN_V2F32 lhs, DN_V2F32 rhs)
+{
+  DN_V2F32 result = DN_V2F32From2N(lhs.x * rhs.x, lhs.y * rhs.y);
+  return result;
+}
+
+DN_API DN_V2F32 operator*(DN_V2F32 lhs, DN_V2I32 rhs)
+{
+  DN_V2F32 result = DN_V2F32From2N(lhs.x * rhs.x, lhs.y * rhs.y);
+  return result;
+}
+
+DN_API DN_V2F32 operator*(DN_V2F32 lhs, DN_F32 rhs)
+{
+  DN_V2F32 result = DN_V2F32From2N(lhs.x * rhs, lhs.y * rhs);
+  return result;
+}
+
+DN_API DN_V2F32 operator*(DN_V2F32 lhs, DN_I32 rhs)
+{
+  DN_V2F32 result = DN_V2F32From2N(lhs.x * rhs, lhs.y * rhs);
+  return result;
+}
+
+DN_API DN_V2F32 operator/(DN_V2F32 lhs, DN_V2F32 rhs)
+{
+  DN_V2F32 result = DN_V2F32From2N(lhs.x / rhs.x, lhs.y / rhs.y);
+  return result;
+}
+
+DN_API DN_V2F32 operator/(DN_V2F32 lhs, DN_V2I32 rhs)
+{
+  DN_V2F32 result = DN_V2F32From2N(lhs.x / rhs.x, lhs.y / rhs.y);
+  return result;
+}
+
+DN_API DN_V2F32 operator/(DN_V2F32 lhs, DN_F32 rhs)
+{
+  DN_V2F32 result = DN_V2F32From2N(lhs.x / rhs, lhs.y / rhs);
+  return result;
+}
+
+DN_API DN_V2F32 operator/(DN_V2F32 lhs, DN_I32 rhs)
+{
+  DN_V2F32 result = DN_V2F32From2N(lhs.x / rhs, lhs.y / rhs);
+  return result;
+}
+
+DN_API DN_V2F32 &operator*=(DN_V2F32 &lhs, DN_V2F32 rhs)
+{
+  lhs = lhs * rhs;
+  return lhs;
+}
+
+DN_API DN_V2F32 &operator*=(DN_V2F32 &lhs, DN_V2I32 rhs)
+{
+  lhs = lhs * rhs;
+  return lhs;
+}
+
+DN_API DN_V2F32 &operator*=(DN_V2F32 &lhs, DN_F32 rhs)
+{
+  lhs = lhs * rhs;
+  return lhs;
+}
+
+DN_API DN_V2F32 &operator*=(DN_V2F32 &lhs, DN_I32 rhs)
+{
+  lhs = lhs * rhs;
+  return lhs;
+}
+
+DN_API DN_V2F32 &operator/=(DN_V2F32 &lhs, DN_V2F32 rhs)
+{
+  lhs = lhs / rhs;
+  return lhs;
+}
+
+DN_API DN_V2F32 &operator/=(DN_V2F32 &lhs, DN_V2I32 rhs)
+{
+  lhs = lhs / rhs;
+  return lhs;
+}
+
+DN_API DN_V2F32 &operator/=(DN_V2F32 &lhs, DN_F32 rhs)
+{
+  lhs = lhs / rhs;
+  return lhs;
+}
+
+DN_API DN_V2F32 &operator/=(DN_V2F32 &lhs, DN_I32 rhs)
+{
+  lhs = lhs / rhs;
+  return lhs;
+}
+
+DN_API DN_V2F32 &operator-=(DN_V2F32 &lhs, DN_V2F32 rhs)
+{
+  lhs = lhs - rhs;
+  return lhs;
+}
+
+DN_API DN_V2F32 &operator-=(DN_V2F32 &lhs, DN_V2I32 rhs)
+{
+  lhs = lhs - rhs;
+  return lhs;
+}
+
+DN_API DN_V2F32 &operator-=(DN_V2F32 &lhs, DN_F32 rhs)
+{
+  lhs = lhs - rhs;
+  return lhs;
+}
+
+DN_API DN_V2F32 &operator-=(DN_V2F32 &lhs, DN_I32 rhs)
+{
+  lhs = lhs - rhs;
+  return lhs;
+}
+
+DN_API DN_V2F32 &operator+=(DN_V2F32 &lhs, DN_V2F32 rhs)
+{
+  lhs = lhs + rhs;
+  return lhs;
+}
+
+DN_API DN_V2F32 &operator+=(DN_V2F32 &lhs, DN_V2I32 rhs)
+{
+  lhs = lhs + rhs;
+  return lhs;
+}
+
+DN_API DN_V2F32 &operator+=(DN_V2F32 &lhs, DN_F32 rhs)
+{
+  lhs = lhs + rhs;
+  return lhs;
+}
+
+DN_API DN_V2F32 &operator+=(DN_V2F32 &lhs, DN_I32 rhs)
+{
+  lhs = lhs + rhs;
+  return lhs;
+}
+
+DN_API DN_V2F32 DN_V2F32Min(DN_V2F32 a, DN_V2F32 b)
+{
+  DN_V2F32 result = DN_V2F32From2N(DN_Min(a.x, b.x), DN_Min(a.y, b.y));
+  return result;
+}
+
+DN_API DN_V2F32 DN_V2F32Max(DN_V2F32 a, DN_V2F32 b)
+{
+  DN_V2F32 result = DN_V2F32From2N(DN_Max(a.x, b.x), DN_Max(a.y, b.y));
+  return result;
+}
+
+DN_API DN_V2F32 DN_V2F32Abs(DN_V2F32 a)
+{
+  DN_V2F32 result = DN_V2F32From2N(DN_Abs(a.x), DN_Abs(a.y));
+  return result;
+}
+
+DN_API DN_F32 DN_V2F32Dot(DN_V2F32 a, DN_V2F32 b)
+{
+  // NOTE: Scalar projection of B onto A /////////////////////////////////////////////////////////
+  //
+  // Scalar projection calculates the signed distance between `b` and `a`
+  // where `a` is a unit vector then, the dot product calculates the projection
+  // of `b` onto the infinite line that the direction of `a` represents. This
+  // calculation is the signed distance.
+  //
+  // signed_distance = dot_product(a, b) = (a.x * b.x) + (a.y * b.y)
+  //
+  // Y
+  // ^      b
+  // |     /|
+  // |    / |
+  // |   /  |
+  // |  /   | Projection
+  // | /    |
+  // |/     V
+  // +--->--------> X
+  // .   a  .
+  // .      .
+  // |------| <- Calculated signed distance
+  //
+  // The signed-ness of the result indicates the relationship:
+  //
+  // Distance <0  means `b` is behind           `a`
+  // Distance >0  means `b` is in-front of      `a`
+  // Distance ==0 means `b` is perpendicular to `a`
+  //
+  // If `a` is not normalized then the signed-ness of the result still holds
+  // however result no longer represents the actual distance between the
+  // 2 objects. One of the vectors must be normalised (e.g. turned into a unit
+  // vector).
+  //
+  // NOTE: DN_V projection /////////////////////////////////////////////////////////////////////
+  //
+  // DN_V projection calculates the exact X,Y coordinates of where `b` meets
+  // `a` when it was projected. This is calculated by multipying the
+  // 'scalar projection' result by the unit vector of `a`
+  //
+  // vector_projection = a * signed_distance = a * dot_product(a, b)
+
+  DN_F32 result = (a.x * b.x) + (a.y * b.y);
+  return result;
+}
+
+DN_API DN_F32 DN_V2F32LengthSq2V2(DN_V2F32 lhs, DN_V2F32 rhs)
+{
+  // NOTE: Pythagoras's theorem (a^2 + b^2 = c^2) without the square root
+  DN_F32 a         = rhs.x - lhs.x;
+  DN_F32 b         = rhs.y - lhs.y;
+  DN_F32 c_squared = DN_Squared(a) + DN_Squared(b);
+  DN_F32 result    = c_squared;
+  return result;
+}
+
+DN_API bool DN_V2F32LengthSqIsWithin2V2(DN_V2F32 lhs, DN_V2F32 rhs, DN_F32 within_amount_sq)
+{
+  DN_F32 dist   = DN_V2F32LengthSq2V2(lhs, rhs);
+  bool   result = dist <= within_amount_sq;
+  return result;
+}
+
+DN_API DN_F32 DN_V2F32Length2V2(DN_V2F32 lhs, DN_V2F32 rhs)
+{
+  DN_F32 result_squared = DN_V2F32LengthSq2V2(lhs, rhs);
+  DN_F32 result         = DN_SqrtF32(result_squared);
+  return result;
+}
+
+DN_API DN_F32 DN_V2F32LengthSq(DN_V2F32 lhs)
+{
+  // NOTE: Pythagoras's theorem without the square root
+  DN_F32 c_squared = DN_Squared(lhs.x) + DN_Squared(lhs.y);
+  DN_F32 result    = c_squared;
+  return result;
+}
+
+DN_API DN_F32 DN_V2F32Length(DN_V2F32 lhs)
+{
+  DN_F32 c_squared = DN_V2F32LengthSq(lhs);
+  DN_F32 result    = DN_SqrtF32(c_squared);
+  return result;
+}
+
+DN_API DN_V2F32 DN_V2F32Normalise(DN_V2F32 a)
+{
+  DN_F32   length = DN_V2F32Length(a);
+  DN_V2F32 result = a / length;
+  return result;
+}
+
+DN_API DN_V2F32 DN_V2F32Perpendicular(DN_V2F32 a)
+{
+  // NOTE: Matrix form of a 2D vector can be defined as
+  //
+  // x' = x cos(t) - y sin(t)
+  // y' = x sin(t) + y cos(t)
+  //
+  // Calculate a line perpendicular to a vector means rotating the vector by
+  // 90 degrees
+  //
+  // x' = x cos(90) - y sin(90)
+  // y' = x sin(90) + y cos(90)
+  //
+  // Where `cos(90) = 0` and `sin(90) = 1` then,
+  //
+  // x' = -y
+  // y' = +x
+
+  DN_V2F32 result = DN_V2F32From2N(-a.y, a.x);
+  return result;
+}
+
+DN_API DN_V2F32 DN_V2F32Reflect(DN_V2F32 in, DN_V2F32 surface)
+{
+  DN_V2F32 normal      = DN_V2F32Perpendicular(surface);
+  DN_V2F32 normal_norm = DN_V2F32Normalise(normal);
+  DN_F32   signed_dist = DN_V2F32Dot(in, normal_norm);
+  DN_V2F32 result      = DN_V2F32From2N(in.x, in.y + (-signed_dist * 2.f));
+  return result;
+}
+
+DN_API DN_F32 DN_V2F32Area(DN_V2F32 a)
+{
+  DN_F32 result = a.w * a.h;
+  return result;
+}
+
+DN_API bool operator!=(DN_V3F32 lhs, DN_V3F32 rhs)
+{
+  bool result = !(lhs == rhs);
+  return result;
+}
+
+DN_API bool operator==(DN_V3F32 lhs, DN_V3F32 rhs)
+{
+  bool result = (lhs.x == rhs.x) && (lhs.y == rhs.y) && (lhs.z == rhs.z);
+  return result;
+}
+
+DN_API bool operator>=(DN_V3F32 lhs, DN_V3F32 rhs)
+{
+  bool result = (lhs.x >= rhs.x) && (lhs.y >= rhs.y) && (lhs.z >= rhs.z);
+  return result;
+}
+
+DN_API bool operator<=(DN_V3F32 lhs, DN_V3F32 rhs)
+{
+  bool result = (lhs.x <= rhs.x) && (lhs.y <= rhs.y) && (lhs.z <= rhs.z);
+  return result;
+}
+
+DN_API bool operator<(DN_V3F32 lhs, DN_V3F32 rhs)
+{
+  bool result = (lhs.x < rhs.x) && (lhs.y < rhs.y) && (lhs.z < rhs.z);
+  return result;
+}
+
+DN_API bool operator>(DN_V3F32 lhs, DN_V3F32 rhs)
+{
+  bool result = (lhs.x > rhs.x) && (lhs.y > rhs.y) && (lhs.z > rhs.z);
+  return result;
+}
+
+DN_API DN_V3F32 operator-(DN_V3F32 lhs, DN_V3F32 rhs)
+{
+  DN_V3F32 result = DN_V3F32From3N(lhs.x - rhs.x, lhs.y - rhs.y, lhs.z - rhs.z);
+  return result;
+}
+
+DN_API DN_V3F32 operator-(DN_V3F32 lhs)
+{
+  DN_V3F32 result = DN_V3F32From3N(-lhs.x, -lhs.y, -lhs.z);
+  return result;
+}
+
+DN_API DN_V3F32 operator+(DN_V3F32 lhs, DN_V3F32 rhs)
+{
+  DN_V3F32 result = DN_V3F32From3N(lhs.x + rhs.x, lhs.y + rhs.y, lhs.z + rhs.z);
+  return result;
+}
+
+DN_API DN_V3F32 operator*(DN_V3F32 lhs, DN_V3F32 rhs)
+{
+  DN_V3F32 result = DN_V3F32From3N(lhs.x * rhs.x, lhs.y * rhs.y, lhs.z * rhs.z);
+  return result;
+}
+
+DN_API DN_V3F32 operator*(DN_V3F32 lhs, DN_F32 rhs)
+{
+  DN_V3F32 result = DN_V3F32From3N(lhs.x * rhs, lhs.y * rhs, lhs.z * rhs);
+  return result;
+}
+
+DN_API DN_V3F32 operator*(DN_V3F32 lhs, DN_I32 rhs)
+{
+  DN_V3F32 result = DN_V3F32From3N(lhs.x * rhs, lhs.y * rhs, lhs.z * rhs);
+  return result;
+}
+
+DN_API DN_V3F32 operator/(DN_V3F32 lhs, DN_V3F32 rhs)
+{
+  DN_V3F32 result = DN_V3F32From3N(lhs.x / rhs.x, lhs.y / rhs.y, lhs.z / rhs.z);
+  return result;
+}
+
+DN_API DN_V3F32 operator/(DN_V3F32 lhs, DN_F32 rhs)
+{
+  DN_V3F32 result = DN_V3F32From3N(lhs.x / rhs, lhs.y / rhs, lhs.z / rhs);
+  return result;
+}
+
+DN_API DN_V3F32 operator/(DN_V3F32 lhs, DN_I32 rhs)
+{
+  DN_V3F32 result = DN_V3F32From3N(lhs.x / rhs, lhs.y / rhs, lhs.z / rhs);
+  return result;
+}
+
+DN_API DN_V3F32 &operator*=(DN_V3F32 &lhs, DN_V3F32 rhs)
+{
+  lhs = lhs * rhs;
+  return lhs;
+}
+
+DN_API DN_V3F32 &operator*=(DN_V3F32 &lhs, DN_F32 rhs)
+{
+  lhs = lhs * rhs;
+  return lhs;
+}
+
+DN_API DN_V3F32 &operator*=(DN_V3F32 &lhs, DN_I32 rhs)
+{
+  lhs = lhs * rhs;
+  return lhs;
+}
+
+DN_API DN_V3F32 &operator/=(DN_V3F32 &lhs, DN_V3F32 rhs)
+{
+  lhs = lhs / rhs;
+  return lhs;
+}
+
+DN_API DN_V3F32 &operator/=(DN_V3F32 &lhs, DN_F32 rhs)
+{
+  lhs = lhs / rhs;
+  return lhs;
+}
+
+DN_API DN_V3F32 &operator/=(DN_V3F32 &lhs, DN_I32 rhs)
+{
+  lhs = lhs / rhs;
+  return lhs;
+}
+
+DN_API DN_V3F32 &operator-=(DN_V3F32 &lhs, DN_V3F32 rhs)
+{
+  lhs = lhs - rhs;
+  return lhs;
+}
+
+DN_API DN_V3F32 &operator+=(DN_V3F32 &lhs, DN_V3F32 rhs)
+{
+  lhs = lhs + rhs;
+  return lhs;
+}
+
+DN_API DN_F32 DN_V3_LengthSq(DN_V3F32 a)
+{
+  DN_F32 result = DN_Squared(a.x) + DN_Squared(a.y) + DN_Squared(a.z);
+  return result;
+}
+
+DN_API DN_F32 DN_V3_Length(DN_V3F32 a)
+{
+  DN_F32 length_sq = DN_Squared(a.x) + DN_Squared(a.y) + DN_Squared(a.z);
+  DN_F32 result    = DN_SqrtF32(length_sq);
+  return result;
+}
+
+DN_API DN_V3F32 DN_V3_Normalise(DN_V3F32 a)
+{
+  DN_F32   length = DN_V3_Length(a);
+  DN_V3F32 result = a / length;
+  return result;
+}
+
+DN_API DN_V4F32 DN_V4F32FromRGBU32(DN_U32 u32)
+{
+  DN_U8    r      = (DN_U8)((u32 & 0x00FF0000) >> 16);
+  DN_U8    g      = (DN_U8)((u32 & 0x0000FF00) >> 8);
+  DN_U8    b      = (DN_U8)((u32 & 0x000000FF) >> 0);
+  DN_V4F32 result = DN_V4F32FromRGBU8(r, g, b);
+  return result;
+}
+
+DN_API DN_V4F32 DN_V4F32FromRGBAU32(DN_U32 u32)
+{
+  DN_U8    r      = (DN_U8)((u32 & 0xFF000000) >> 24);
+  DN_U8    g      = (DN_U8)((u32 & 0x00FF0000) >> 16);
+  DN_U8    b      = (DN_U8)((u32 & 0x0000FF00) >> 8);
+  DN_U8    a      = (DN_U8)((u32 & 0x000000FF) >> 0);
+  DN_V4F32 result = DN_V4F32FromRGBAU8(r, g, b, a);
+  return result;
+}
+
+DN_API bool operator==(DN_V4F32 lhs, DN_V4F32 rhs)
+{
+  bool result = (lhs.x == rhs.x) && (lhs.y == rhs.y) && (lhs.z == rhs.z) && (lhs.w == rhs.w);
+  return result;
+}
+
+DN_API bool operator!=(DN_V4F32 lhs, DN_V4F32 rhs)
+{
+  bool result = !(lhs == rhs);
+  return result;
+}
+
+DN_API bool operator>=(DN_V4F32 lhs, DN_V4F32 rhs)
+{
+  bool result = (lhs.x >= rhs.x) && (lhs.y >= rhs.y) && (lhs.z >= rhs.z) && (lhs.w >= rhs.w);
+  return result;
+}
+
+DN_API bool operator<=(DN_V4F32 lhs, DN_V4F32 rhs)
+{
+  bool result = (lhs.x <= rhs.x) && (lhs.y <= rhs.y) && (lhs.z <= rhs.z) && (lhs.w <= rhs.w);
+  return result;
+}
+
+DN_API bool operator<(DN_V4F32 lhs, DN_V4F32 rhs)
+{
+  bool result = (lhs.x < rhs.x) && (lhs.y < rhs.y) && (lhs.z < rhs.z) && (lhs.w < rhs.w);
+  return result;
+}
+
+DN_API bool operator>(DN_V4F32 lhs, DN_V4F32 rhs)
+{
+  bool result = (lhs.x > rhs.x) && (lhs.y > rhs.y) && (lhs.z > rhs.z) && (lhs.w > rhs.w);
+  return result;
+}
+
+DN_API DN_V4F32 operator-(DN_V4F32 lhs, DN_V4F32 rhs)
+{
+  DN_V4F32 result = DN_V4F32From4N(lhs.x - rhs.x, lhs.y - rhs.y, lhs.z - rhs.z, lhs.w - rhs.w);
+  return result;
+}
+
+DN_API DN_V4F32 operator-(DN_V4F32 lhs)
+{
+  DN_V4F32 result = DN_V4F32From4N(-lhs.x, -lhs.y, -lhs.z, -lhs.w);
+  return result;
+}
+
+DN_API DN_V4F32 operator+(DN_V4F32 lhs, DN_V4F32 rhs)
+{
+  DN_V4F32 result = DN_V4F32From4N(lhs.x + rhs.x, lhs.y + rhs.y, lhs.z + rhs.z, lhs.w + rhs.w);
+  return result;
+}
+
+DN_API DN_V4F32 operator*(DN_V4F32 lhs, DN_V4F32 rhs)
+{
+  DN_V4F32 result = DN_V4F32From4N(lhs.x * rhs.x, lhs.y * rhs.y, lhs.z * rhs.z, lhs.w * rhs.w);
+  return result;
+}
+
+DN_API DN_V4F32 operator*(DN_V4F32 lhs, DN_F32 rhs)
+{
+  DN_V4F32 result = DN_V4F32From4N(lhs.x * rhs, lhs.y * rhs, lhs.z * rhs, lhs.w * rhs);
+  return result;
+}
+
+DN_API DN_V4F32 operator*(DN_V4F32 lhs, DN_I32 rhs)
+{
+  DN_V4F32 result = DN_V4F32From4N(lhs.x * rhs, lhs.y * rhs, lhs.z * rhs, lhs.w * rhs);
+  return result;
+}
+
+DN_API DN_V4F32 operator/(DN_V4F32 lhs, DN_F32 rhs)
+{
+  DN_V4F32 result = DN_V4F32From4N(lhs.x / rhs, lhs.y / rhs, lhs.z / rhs, lhs.w / rhs);
+  return result;
+}
+
+DN_API DN_V4F32 &operator*=(DN_V4F32 &lhs, DN_V4F32 rhs)
+{
+  lhs = lhs * rhs;
+  return lhs;
+}
+
+DN_API DN_V4F32 &operator*=(DN_V4F32 &lhs, DN_F32 rhs)
+{
+  lhs = lhs * rhs;
+  return lhs;
+}
+
+DN_API DN_V4F32 &operator*=(DN_V4F32 &lhs, DN_I32 rhs)
+{
+  lhs = lhs * rhs;
+  return lhs;
+}
+
+DN_API DN_V4F32 &operator-=(DN_V4F32 &lhs, DN_V4F32 rhs)
+{
+  lhs = lhs - rhs;
+  return lhs;
+}
+
+DN_API DN_V4F32 &operator+=(DN_V4F32 &lhs, DN_V4F32 rhs)
+{
+  lhs = lhs + rhs;
+  return lhs;
+}
+
+DN_API DN_F32 DN_V4F32Dot(DN_V4F32 a, DN_V4F32 b)
+{
+  DN_F32 result = (a.x * b.x) + (a.y * b.y) + (a.z * b.z) + (a.w * b.w);
+  return result;
+}
+
+DN_API DN_M4 DN_M4Identity()
+{
+  DN_M4 result =
+      {
+          {
+           {1, 0, 0, 0},
+           {0, 1, 0, 0},
+           {0, 0, 1, 0},
+           {0, 0, 0, 1},
+           }
+  };
+
+  return result;
+}
+
+DN_API DN_M4 DN_M4ScaleF(DN_F32 x, DN_F32 y, DN_F32 z)
+{
+  DN_M4 result =
+      {
+          {
+           {x, 0, 0, 0},
+           {0, y, 0, 0},
+           {0, 0, z, 0},
+           {0, 0, 0, 1},
+           }
+  };
+
+  return result;
+}
+
+DN_API DN_M4 DN_M4Scale(DN_V3F32 xyz)
+{
+  DN_M4 result =
+      {
+          {
+           {xyz.x, 0, 0, 0},
+           {0, xyz.y, 0, 0},
+           {0, 0, xyz.z, 0},
+           {0, 0, 0, 1},
+           }
+  };
+
+  return result;
+}
+
+DN_API DN_M4 DN_M4TranslateF(DN_F32 x, DN_F32 y, DN_F32 z)
+{
+  DN_M4 result =
+      {
+          {
+           {1, 0, 0, 0},
+           {0, 1, 0, 0},
+           {0, 0, 1, 0},
+           {x, y, z, 1},
+           }
+  };
+
+  return result;
+}
+
+DN_API DN_M4 DN_M4Translate(DN_V3F32 xyz)
+{
+  DN_M4 result =
+      {
+          {
+           {1, 0, 0, 0},
+           {0, 1, 0, 0},
+           {0, 0, 1, 0},
+           {xyz.x, xyz.y, xyz.z, 1},
+           }
+  };
+
+  return result;
+}
+
+DN_API DN_M4 DN_M4Transpose(DN_M4 mat)
+{
+  DN_M4 result = {};
+  for (int col = 0; col < 4; col++)
+    for (int row = 0; row < 4; row++)
+      result.columns[col][row] = mat.columns[row][col];
+  return result;
+}
+
+DN_API DN_M4 DN_M4Rotate(DN_V3F32 axis01, DN_F32 radians)
+{
+  DN_AssertF(DN_Abs(DN_V3_Length(axis01) - 1.f) <= 0.01f,
+             "Rotation axis must be normalised, length = %f",
+             DN_V3_Length(axis01));
+
+  DN_F32 sin           = DN_SinF32(radians);
+  DN_F32 cos           = DN_CosF32(radians);
+  DN_F32 one_minus_cos = 1.f - cos;
+
+  DN_F32 x  = axis01.x;
+  DN_F32 y  = axis01.y;
+  DN_F32 z  = axis01.z;
+  DN_F32 x2 = DN_Squared(x);
+  DN_F32 y2 = DN_Squared(y);
+  DN_F32 z2 = DN_Squared(z);
+
+  DN_M4 result =
+      {
+          {
+           {cos + x2 * one_minus_cos, y * x * one_minus_cos + z * sin, z * x * one_minus_cos - y * sin, 0}, // Col 1
+              {x * y * one_minus_cos - z * sin, cos + y2 * one_minus_cos, z * y * one_minus_cos + x * sin, 0}, // Col 2
+              {x * z * one_minus_cos + y * sin, y * z * one_minus_cos - x * sin, cos + z2 * one_minus_cos, 0}, // Col 3
+              {0, 0, 0, 1},                                                                                    // Col 4
+          }
+  };
+
+  return result;
+}
+
+DN_API DN_M4 DN_M4Orthographic(DN_F32 left, DN_F32 right, DN_F32 bottom, DN_F32 top, DN_F32 z_near, DN_F32 z_far)
+{
+  // NOTE: Here is the matrix in column major for readability. Below it's
+  // transposed due to how you have to declare column major matrices in C/C++.
+  //
+  // m = [2/r-l, 0,      0,     -1*(r+l)/(r-l)]
+  //     [0,     2/t-b,  0,      1*(t+b)/(t-b)]
+  //     [0,     0,     -2/f-n, -1*(f+n)/(f-n)]
+  //     [0,     0,      0,      1            ]
+
+  DN_M4 result =
+      {
+          {
+           {2.f / (right - left), 0.f, 0.f, 0.f},
+           {0.f, 2.f / (top - bottom), 0.f, 0.f},
+           {0.f, 0.f, -2.f / (z_far - z_near), 0.f},
+           {(-1.f * (right + left)) / (right - left), (-1.f * (top + bottom)) / (top - bottom), (-1.f * (z_far + z_near)) / (z_far - z_near), 1.f},
+           }
+  };
+
+  return result;
+}
+
+DN_API DN_M4 DN_M4Perspective(DN_F32 fov /*radians*/, DN_F32 aspect, DN_F32 z_near, DN_F32 z_far)
+{
+  DN_F32 tan_fov = DN_TanF32(fov / 2.f);
+  DN_M4  result =
+      {
+          {
+           {1.f / (aspect * tan_fov), 0.f, 0.f, 0.f},
+           {0, 1.f / tan_fov, 0.f, 0.f},
+           {0.f, 0.f, (z_near + z_far) / (z_near - z_far), -1.f},
+           {0.f, 0.f, (2.f * z_near * z_far) / (z_near - z_far), 0.f},
+           }
+  };
+
+  return result;
+}
+
+DN_API DN_M4 DN_M4Add(DN_M4 lhs, DN_M4 rhs)
+{
+  DN_M4 result;
+  for (int col = 0; col < 4; col++)
+    for (int it = 0; it < 4; it++)
+      result.columns[col][it] = lhs.columns[col][it] + rhs.columns[col][it];
+  return result;
+}
+
+DN_API DN_M4 DN_M4Sub(DN_M4 lhs, DN_M4 rhs)
+{
+  DN_M4 result;
+  for (int col = 0; col < 4; col++)
+    for (int it = 0; it < 4; it++)
+      result.columns[col][it] = lhs.columns[col][it] - rhs.columns[col][it];
+  return result;
+}
+
+DN_API DN_M4 DN_M4Mul(DN_M4 lhs, DN_M4 rhs)
+{
+  DN_M4 result;
+  for (int col = 0; col < 4; col++) {
+    for (int row = 0; row < 4; row++) {
+      DN_F32 sum = 0;
+      for (int f32_it = 0; f32_it < 4; f32_it++)
+        sum += lhs.columns[f32_it][row] * rhs.columns[col][f32_it];
+
+      result.columns[col][row] = sum;
+    }
+  }
+  return result;
+}
+
+DN_API DN_M4 DN_M4Div(DN_M4 lhs, DN_M4 rhs)
+{
+  DN_M4 result;
+  for (int col = 0; col < 4; col++)
+    for (int it = 0; it < 4; it++)
+      result.columns[col][it] = lhs.columns[col][it] / rhs.columns[col][it];
+  return result;
+}
+
+DN_API DN_M4 DN_M4AddF(DN_M4 lhs, DN_F32 rhs)
+{
+  DN_M4 result;
+  for (int col = 0; col < 4; col++)
+    for (int it = 0; it < 4; it++)
+      result.columns[col][it] = lhs.columns[col][it] + rhs;
+  return result;
+}
+
+DN_API DN_M4 DN_M4SubF(DN_M4 lhs, DN_F32 rhs)
+{
+  DN_M4 result;
+  for (int col = 0; col < 4; col++)
+    for (int it = 0; it < 4; it++)
+      result.columns[col][it] = lhs.columns[col][it] - rhs;
+  return result;
+}
+
+DN_API DN_M4 DN_M4MulF(DN_M4 lhs, DN_F32 rhs)
+{
+  DN_M4 result;
+  for (int col = 0; col < 4; col++)
+    for (int it = 0; it < 4; it++)
+      result.columns[col][it] = lhs.columns[col][it] * rhs;
+  return result;
+}
+
+DN_API DN_M4 DN_M4DivF(DN_M4 lhs, DN_F32 rhs)
+{
+  DN_M4 result;
+  for (int col = 0; col < 4; col++)
+    for (int it = 0; it < 4; it++)
+      result.columns[col][it] = lhs.columns[col][it] / rhs;
+  return result;
+}
+
+DN_API DN_Str8x256 DN_M4ColumnMajorString(DN_M4 mat)
+{
+  DN_Str8x256 result = {};
+  for (int row = 0; row < 4; row++) {
+    for (int it = 0; it < 4; it++) {
+      if (it == 0)
+        DN_FmtAppend(result.data, &result.size, sizeof(result.data), "|");
+      DN_FmtAppend(result.data, &result.size, sizeof(result.data), "%.5f", mat.columns[it][row]);
+      if (it != 3)
+        DN_FmtAppend(result.data, &result.size, sizeof(result.data), ", ");
+      else
+        DN_FmtAppend(result.data, &result.size, sizeof(result.data), "|\n");
+    }
+  }
+  return result;
+}
+
+DN_API bool operator==(DN_M2x3 const &lhs, DN_M2x3 const &rhs)
+{
+  bool result = DN_Memcmp(lhs.e, rhs.e, sizeof(lhs.e[0]) * DN_ArrayCountU(lhs.e)) == 0;
+  return result;
+}
+
+DN_API bool operator!=(DN_M2x3 const &lhs, DN_M2x3 const &rhs)
+{
+  bool result = !(lhs == rhs);
+  return result;
+}
+
+DN_API DN_M2x3 DN_M2x3Identity()
+{
+  DN_M2x3 result = {
+      {
+       1,
+       0,
+       0,
+       0,
+       1,
+       0,
+       }
+  };
+  return result;
+}
+
+DN_API DN_M2x3 DN_M2x3Translate(DN_V2F32 offset)
+{
+  DN_M2x3 result = {
+      {
+       1,
+       0,
+       offset.x,
+       0,
+       1,
+       offset.y,
+       }
+  };
+  return result;
+}
+
+DN_API DN_V2F32 DN_M2x3ScaleGet(DN_M2x3 m2x3)
+{
+  DN_V2F32 result = DN_V2F32From2N(m2x3.row[0][0], m2x3.row[1][1]);
+  return result;
+}
+
+DN_API DN_M2x3 DN_M2x3Scale(DN_V2F32 scale)
+{
+  DN_M2x3 result = {{
+    scale.x, 0,       0,
+    0,       scale.y, 0,
+  }};
+  return result;
+}
+
+DN_API DN_M2x3 DN_M2x3Rotate(DN_F32 radians)
+{
+  DN_M2x3 result = {
+      {
+       DN_CosF32(radians),
+       DN_SinF32(radians),
+       0,
+       -DN_SinF32(radians),
+       DN_CosF32(radians),
+       0,
+       }
+  };
+  return result;
+}
+
+DN_API DN_M2x3 DN_M2x3Mul(DN_M2x3 m1, DN_M2x3 m2)
+{
+  // NOTE: Ordinarily you can't multiply M2x3 with M2x3 because column count
+  // (3) != row count (2). We pretend we have two 3x3 matrices with the last
+  // row set to [0 0 1] and perform a 3x3 matrix multiply.
+  //
+  // | (0)a (1)b (2)c |   | (0)g (1)h (2)i |
+  // | (3)d (4)e (5)f | x | (3)j (4)k (5)l |
+  // | (6)0 (7)0 (8)1 |   | (6)0 (7)0 (8)1 |
+
+  DN_M2x3 result = {
+      {
+          m1.e[0] * m2.e[0] + m1.e[1] * m2.e[3],           // a*g + b*j + c*0[omitted],
+          m1.e[0] * m2.e[1] + m1.e[1] * m2.e[4],           // a*h + b*k + c*0[omitted],
+          m1.e[0] * m2.e[2] + m1.e[1] * m2.e[5] + m1.e[2], // a*i + b*l + c*1,
+
+          m1.e[3] * m2.e[0] + m1.e[4] * m2.e[3],           // d*g + e*j + f*0[omitted],
+          m1.e[3] * m2.e[1] + m1.e[4] * m2.e[4],           // d*h + e*k + f*0[omitted],
+          m1.e[3] * m2.e[2] + m1.e[4] * m2.e[5] + m1.e[5], // d*i + e*l + f*1,
+      }
+  };
+
+  return result;
+}
+
+DN_API DN_V2F32 DN_M2x3Mul2F32(DN_M2x3 m1, DN_F32 x, DN_F32 y)
+{
+  // NOTE: Ordinarily you can't multiply M2x3 with V2 because column count (3)
+  // != row count (2). We pretend we have a V3 with `z` set to `1`.
+  //
+  // | (0)a (1)b (2)c |   | x |
+  // | (3)d (4)e (5)f | x | y |
+  //                      | 1 |
+
+  DN_V2F32 result = {
+      {
+       m1.e[0] * x + m1.e[1] * y + m1.e[2], // a*x + b*y + c*1
+          m1.e[3] * x + m1.e[4] * y + m1.e[5], // d*x + e*y + f*1
+      }
+  };
+  return result;
+}
+
+DN_API DN_V2F32 DN_M2x3MulV2F32(DN_M2x3 m1, DN_V2F32 v2)
+{
+  DN_V2F32 result = DN_M2x3Mul2F32(m1, v2.x, v2.y);
+  return result;
+}
+
+DN_API bool operator==(const DN_Rect &lhs, const DN_Rect &rhs)
+{
+  bool result = (lhs.pos == rhs.pos) && (lhs.size == rhs.size);
+  return result;
+}
+
+DN_API DN_V2F32 DN_RectCenter(DN_Rect rect)
+{
+  DN_V2F32 result = rect.pos + (rect.size * .5f);
+  return result;
+}
+
+DN_API bool DN_RectContainsPoint(DN_Rect rect, DN_V2F32 p)
+{
+  DN_V2F32 min    = rect.pos;
+  DN_V2F32 max    = rect.pos + rect.size;
+  bool     result = (p.x >= min.x && p.x <= max.x && p.y >= min.y && p.y <= max.y);
+  return result;
+}
+
+DN_API bool DN_RectContainsRect(DN_Rect a, DN_Rect b)
+{
+  DN_V2F32 a_min  = a.pos;
+  DN_V2F32 a_max  = a.pos + a.size;
+  DN_V2F32 b_min  = b.pos;
+  DN_V2F32 b_max  = b.pos + b.size;
+  bool     result = (b_min >= a_min && b_max <= a_max);
+  return result;
+}
+
+DN_API DN_Rect DN_RectExpand(DN_Rect a, DN_F32 amount)
+{
+  DN_Rect result = a;
+  result.pos -= amount;
+  result.size += (amount * 2.f);
+  return result;
+}
+
+DN_API DN_Rect DN_RectExpandV2(DN_Rect a, DN_V2F32 amount)
+{
+  DN_Rect result = a;
+  result.pos -= amount;
+  result.size += (amount * 2.f);
+  return result;
+}
+
+DN_API bool DN_RectIntersects(DN_Rect a, DN_Rect b)
+{
+  DN_V2F32 a_min    = a.pos;
+  DN_V2F32 a_max    = a.pos + a.size;
+  DN_V2F32 b_min    = b.pos;
+  DN_V2F32 b_max    = b.pos + b.size;
+  bool     has_size = a.size.x && a.size.y && b.size.x && b.size.y;
+  bool     result   = false;
+  if (has_size)
+    result = (a_min.x <= b_max.x && a_max.x >= b_min.x) &&
+             (a_min.y <= b_max.y && a_max.y >= b_min.y);
+  return result;
+}
+
+DN_API DN_Rect DN_RectIntersection(DN_Rect a, DN_Rect b)
+{
+  DN_Rect result = DN_RectFrom2V2(a.pos, DN_V2F32From1N(0));
+  if (DN_RectIntersects(a, b)) {
+    DN_V2F32 a_min = a.pos;
+    DN_V2F32 a_max = a.pos + a.size;
+    DN_V2F32 b_min = b.pos;
+    DN_V2F32 b_max = b.pos + b.size;
+
+    DN_V2F32 min = {};
+    DN_V2F32 max = {};
+    min.x        = DN_Max(a_min.x, b_min.x);
+    min.y        = DN_Max(a_min.y, b_min.y);
+    max.x        = DN_Min(a_max.x, b_max.x);
+    max.y        = DN_Min(a_max.y, b_max.y);
+    result       = DN_RectFrom2V2(min, max - min);
+  }
+  return result;
+}
+
+DN_API DN_Rect DN_RectUnion(DN_Rect a, DN_Rect b)
+{
+  DN_V2F32 a_min = a.pos;
+  DN_V2F32 a_max = a.pos + a.size;
+  DN_V2F32 b_min = b.pos;
+  DN_V2F32 b_max = b.pos + b.size;
+
+  DN_V2F32 min, max;
+  min.x          = DN_Min(a_min.x, b_min.x);
+  min.y          = DN_Min(a_min.y, b_min.y);
+  max.x          = DN_Max(a_max.x, b_max.x);
+  max.y          = DN_Max(a_max.y, b_max.y);
+  DN_Rect result = DN_RectFrom2V2(min, max - min);
+  return result;
+}
+
+DN_API DN_RectMinMax DN_RectGetMinMax(DN_Rect a)
+{
+  DN_RectMinMax result = {};
+  result.min           = a.pos;
+  result.max           = a.pos + a.size;
+  return result;
+}
+
+DN_API DN_F32 DN_RectArea(DN_Rect a)
+{
+  DN_F32 result = a.size.w * a.size.h;
+  return result;
+}
+
+DN_API DN_Rect DN_RectCutLeftClip(DN_Rect *rect, DN_F32 amount, DN_RectCutClip clip)
+{
+  DN_F32 min_x        = rect->pos.x;
+  DN_F32 max_x        = rect->pos.x + rect->size.w;
+  DN_F32 result_max_x = min_x + amount;
+  if (clip)
+    result_max_x = DN_Min(result_max_x, max_x);
+  DN_Rect result = DN_RectFrom4N(min_x, rect->pos.y, result_max_x - min_x, rect->size.h);
+  rect->pos.x    = result_max_x;
+  rect->size.w   = max_x - result_max_x;
+  return result;
+}
+
+DN_API DN_Rect DN_RectCutRightClip(DN_Rect *rect, DN_F32 amount, DN_RectCutClip clip)
+{
+  DN_F32 min_x        = rect->pos.x;
+  DN_F32 max_x        = rect->pos.x + rect->size.w;
+  DN_F32 result_min_x = max_x - amount;
+  if (clip)
+    result_min_x = DN_Max(result_min_x, 0);
+  DN_Rect result = DN_RectFrom4N(result_min_x, rect->pos.y, max_x - result_min_x, rect->size.h);
+  rect->size.w   = result_min_x - min_x;
+  return result;
+}
+
+DN_API DN_Rect DN_RectCutTopClip(DN_Rect *rect, DN_F32 amount, DN_RectCutClip clip)
+{
+  DN_F32 min_y        = rect->pos.y;
+  DN_F32 max_y        = rect->pos.y + rect->size.h;
+  DN_F32 result_max_y = min_y + amount;
+  if (clip)
+    result_max_y = DN_Min(result_max_y, max_y);
+  DN_Rect result = DN_RectFrom4N(rect->pos.x, min_y, rect->size.w, result_max_y - min_y);
+  rect->pos.y    = result_max_y;
+  rect->size.h   = max_y - result_max_y;
+  return result;
+}
+
+DN_API DN_Rect DN_RectCutBottomClip(DN_Rect *rect, DN_F32 amount, DN_RectCutClip clip)
+{
+  DN_F32 min_y        = rect->pos.y;
+  DN_F32 max_y        = rect->pos.y + rect->size.h;
+  DN_F32 result_min_y = max_y - amount;
+  if (clip)
+    result_min_y = DN_Max(result_min_y, 0);
+  DN_Rect result = DN_RectFrom4N(rect->pos.x, result_min_y, rect->size.w, max_y - result_min_y);
+  rect->size.h   = result_min_y - min_y;
+  return result;
+}
+
+DN_API DN_Rect DN_RectCutCut(DN_RectCut rect_cut, DN_V2F32 size, DN_RectCutClip clip)
+{
+  DN_Rect result = {};
+  if (rect_cut.rect) {
+    switch (rect_cut.side) {
+      case DN_RectCutSide_Left: result = DN_RectCutLeftClip(rect_cut.rect, size.w, clip); break;
+      case DN_RectCutSide_Right: result = DN_RectCutRightClip(rect_cut.rect, size.w, clip); break;
+      case DN_RectCutSide_Top: result = DN_RectCutTopClip(rect_cut.rect, size.h, clip); break;
+      case DN_RectCutSide_Bottom: result = DN_RectCutBottomClip(rect_cut.rect, size.h, clip); break;
+    }
+  }
+  return result;
+}
+
+DN_API DN_V2F32 DN_RectInterpV2F32(DN_Rect rect, DN_V2F32 t01)
+{
+  DN_V2F32 result = DN_V2F32From2N(rect.pos.w + (rect.size.w * t01.x),
+                                    rect.pos.h + (rect.size.h * t01.y));
+  return result;
+}
+
+DN_API DN_V2F32 DN_RectTopLeft(DN_Rect rect)
+{
+  DN_V2F32 result = DN_RectInterpV2F32(rect, DN_V2F32From2N(0, 0));
+  return result;
+}
+
+DN_API DN_V2F32 DN_RectTopRight(DN_Rect rect)
+{
+  DN_V2F32 result = DN_RectInterpV2F32(rect, DN_V2F32From2N(1, 0));
+  return result;
+}
+
+DN_API DN_V2F32 DN_RectBottomLeft(DN_Rect rect)
+{
+  DN_V2F32 result = DN_RectInterpV2F32(rect, DN_V2F32From2N(0, 1));
+  return result;
+}
+
+DN_API DN_V2F32 DN_RectBottomRight(DN_Rect rect)
+{
+  DN_V2F32 result = DN_RectInterpV2F32(rect, DN_V2F32From2N(1, 1));
+  return result;
+}
+
+DN_API DN_RaycastV2 DN_RaycastLineIntersectV2(DN_V2F32 origin_a, DN_V2F32 dir_a, DN_V2F32 origin_b, DN_V2F32 dir_b)
+{
+  // NOTE: Parametric equation of a line
+  //
+  // p = o + (t*d)
+  //
+  // - o is the starting 2d point
+  // - d is the direction of the line
+  // - t is a scalar that scales along the direction of the point
+  //
+  // To determine if a ray intersections a ray, we want to solve
+  //
+  // (o_a + (t_a * d_a)) = (o_b + (t_b * d_b))
+  //
+  // Where '_a' and '_b' represent the 1st and 2nd point's origin, direction
+  // and 't' components respectively. This is 2 equations with 2 unknowns
+  // (`t_a` and `t_b`) which we can solve for by expressing the equation in
+  // terms of `t_a` and `t_b`.
+  //
+  // Working that math out produces the formula below for 't'.
+
+  DN_RaycastV2 result      = {};
+  DN_F32       denominator = ((dir_b.y * dir_a.x) - (dir_b.x * dir_a.y));
+  if (denominator != 0.0f) {
+    result.t_a = (((origin_a.y - origin_b.y) * dir_b.x) + ((origin_b.x - origin_a.x) * dir_b.y)) / denominator;
+    result.t_b = (((origin_a.y - origin_b.y) * dir_a.x) + ((origin_b.x - origin_a.x) * dir_a.y)) / denominator;
+    result.hit = true;
+  }
+  return result;
+}
+
+DN_API DN_V2F32 DN_LerpV2F32(DN_V2F32 a, DN_F32 t, DN_V2F32 b)
+{
+  DN_V2F32 result = {};
+  result.x        = a.x + ((b.x - a.x) * t);
+  result.y        = a.y + ((b.y - a.y) * t);
+  return result;
+}
+
+DN_API DN_F32 DN_LerpF32(DN_F32 a, DN_F32 t, DN_F32 b)
+{
+  DN_F32 result = a + ((b - a) * t);
   return result;
 }

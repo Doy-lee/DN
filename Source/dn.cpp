@@ -29,7 +29,7 @@ DN_API void DN_Init(DN_Core *dn, DN_InitFlags flags, DN_InitArgs *args)
     #if DN_H_WITH_OS
     DN_OSCore *os = &dn->os;
     dn->os_init   = true;
-    DN_OS_SetLogPrintFuncToOS(os);
+    DN_OS_SetLogPrintFuncToOS();
 
     // NOTE: Query OS information
     {
@@ -222,10 +222,6 @@ DN_API void DN_BeginFrame()
   DN_AtomicSetValue64(&g_dn_->os.mem_allocs_frame, 0);
   #endif
 }
-
-#if DN_H_WITH_MATH
-#include "Extra/dn_math.cpp"
-#endif
 
 #if DN_H_WITH_HELPERS
 #include "Extra/dn_helpers.cpp"
