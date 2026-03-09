@@ -291,16 +291,6 @@
   #endif
 #endif
 
-// NOTE: Byte swaps
-#define DN_ByteSwap64(u64) (((((u64) >> 56) & 0xFF) <<  0) | \
-                              ((((u64) >> 48) & 0xFF) <<  8) | \
-                              ((((u64) >> 40) & 0xFF) << 16) | \
-                              ((((u64) >> 32) & 0xFF) << 24) | \
-                              ((((u64) >> 24) & 0xFF) << 32) | \
-                              ((((u64) >> 16) & 0xFF) << 40) | \
-                              ((((u64) >> 8)  & 0xFF) << 48) | \
-                              ((((u64) >> 0)  & 0xFF) << 56))
-
 // NOTE: Helper macros to declare an array data structure for a given `Type`
 #define DN_DArrayStructDecl(Type) \
   struct Type##Array             \
@@ -581,6 +571,15 @@ union DN_V2USize
   struct { DN_USize min,   max; };
   struct { DN_USize begin, end; };
   DN_USize data[2];
+};
+
+union DN_V2U64
+{
+  struct { DN_U64 x,     y; };
+  struct { DN_U64 w,     h; };
+  struct { DN_U64 min,   max; };
+  struct { DN_U64 begin, end; };
+  DN_U64 data[2];
 };
 DN_MSVC_WARNING_POP
 
@@ -1308,6 +1307,19 @@ DN_API DN_U32                   DN_AtomicSetValue32                             
 DN_API DN_USize                 DN_AlignUpPowerOfTwoUSize                              (DN_USize val);
 DN_API DN_U64                   DN_AlignUpPowerOfTwoU64                                (DN_U64 val);
 DN_API DN_U32                   DN_AlignUpPowerOfTwoU32                                (DN_U32 val);
+
+DN_API void                     DN_ByteSwapU64Ptr                                      (DN_U8* dest, DN_U64 src);
+#define                         DN_ByteSwap64(u64) ( \
+                                                    (((((DN_U64)(u64)) >> 56) & 0xFF) <<  0) | \
+                                                    (((((DN_U64)(u64)) >> 48) & 0xFF) <<  8) | \
+                                                    (((((DN_U64)(u64)) >> 40) & 0xFF) << 16) | \
+                                                    (((((DN_U64)(u64)) >> 32) & 0xFF) << 24) | \
+                                                    (((((DN_U64)(u64)) >> 24) & 0xFF) << 32) | \
+                                                    (((((DN_U64)(u64)) >> 16) & 0xFF) << 40) | \
+                                                    (((((DN_U64)(u64)) >> 8)  & 0xFF) << 48) | \
+                                                    (((((DN_U64)(u64)) >> 0)  & 0xFF) << 56)   \
+                                                   )
+
 
 DN_API DN_CPUIDResult           DN_CPUID                                               (DN_CPUIDArgs args);
 DN_API DN_USize                 DN_CPUHasFeatureArray                                  (DN_CPUReport const *report, DN_CPUFeatureQuery *features, DN_USize features_size);

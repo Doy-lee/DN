@@ -140,6 +140,27 @@ DN_API void *DN_CArrayAddArray(void *data, DN_USize *size, DN_USize max, DN_USiz
   return result;
 }
 
+DN_API bool DN_CArrayResizeFromArena(void **data, DN_USize *size, DN_USize *max, DN_USize data_size, DN_Pool *pool, DN_USize new_max)
+{
+  bool result = true;
+  if (new_max != *max) {
+    DN_USize bytes_to_alloc = data_size * new_max;
+    void    *buffer         = DN_PoolNewArray(pool, DN_U8, bytes_to_alloc);
+    if (buffer) {
+      DN_USize bytes_to_copy = data_size * DN_Min(*size, new_max);
+      DN_Memcpy(buffer, *data, bytes_to_copy);
+      DN_PoolDealloc(pool, *data);
+      *data = buffer;
+      *max  = new_max;
+      *size = DN_Min(*size, new_max);
+    } else {
+      result = false;
+    }
+  }
+
+  return result;
+}
+
 DN_API bool DN_CArrayResizeFromPool(void **data, DN_USize *size, DN_USize *max, DN_USize data_size, DN_Pool *pool, DN_USize new_max)
 {
   bool result = true;
@@ -161,6 +182,26 @@ DN_API bool DN_CArrayResizeFromPool(void **data, DN_USize *size, DN_USize *max, 
   return result;
 }
 
+DN_API bool DN_CArrayResizeFromArena(void **data, DN_USize *size, DN_USize *max, DN_USize data_size, DN_Arena *arena, DN_USize new_max)
+{
+  bool result = true;
+  if (new_max != *max) {
+    DN_USize bytes_to_alloc = data_size * new_max;
+    void    *buffer         = DN_ArenaNewArray(arena, DN_U8, bytes_to_alloc, DN_ZMem_No);
+    if (buffer) {
+      DN_USize bytes_to_copy = data_size * DN_Min(*size, new_max);
+      DN_Memcpy(buffer, *data, bytes_to_copy);
+      *data = buffer;
+      *max  = new_max;
+      *size = DN_Min(*size, new_max);
+    } else {
+      result = false;
+    }
+  }
+
+  return result;
+}
+
 DN_API bool DN_CArrayGrowFromPool(void **data, DN_USize size, DN_USize *max, DN_USize data_size, DN_Pool *pool, DN_USize new_max)
 {
   bool result = true;
@@ -169,6 +210,15 @@ DN_API bool DN_CArrayGrowFromPool(void **data, DN_USize size, DN_USize *max, DN_
   return result;
 }
 
+DN_API bool DN_CArrayGrowFromArena(void **data, DN_USize size, DN_USize *max, DN_USize data_size, DN_Arena *arena, DN_USize new_max)
+{
+  bool result = true;
+  if (new_max > *max)
+    result = DN_CArrayResizeFromArena(data, &size, max, data_size, arena, new_max);
+  return result;
+}
+
+
 DN_API bool DN_CArrayGrowIfNeededFromPool(void **data, DN_USize size, DN_USize *max, DN_USize data_size, DN_Pool *pool, DN_USize add_count)
 {
   bool     result   = true;
@@ -176,6 +226,17 @@ DN_API bool DN_CArrayGrowIfNeededFromPool(void **data, DN_USize size, DN_USize *
   if (new_size > *max) {
     DN_USize new_max = DN_Max(DN_Max(*max * 2, new_size), 8);
     result           = DN_CArrayResizeFromPool(data, &size, max, data_size, pool, new_max);
+  }
+  return result;
+}
+
+DN_API bool DN_CArrayGrowIfNeededFromArena(void **data, DN_USize size, DN_USize *max, DN_USize data_size, DN_Arena *arena, DN_USize add_count)
+{
+  bool     result   = true;
+  DN_USize new_size = size + add_count;
+  if (new_size > *max) {
+    DN_USize new_max = DN_Max(DN_Max(*max * 2, new_size), 8);
+    result           = DN_CArrayResizeFromArena(data, &size, max, data_size, arena, new_max);
   }
   return result;
 }

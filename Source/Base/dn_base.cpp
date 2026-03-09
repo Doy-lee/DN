@@ -1847,6 +1847,18 @@ DN_API DN_U64 DN_U64FromHexStr8Unsafe(DN_Str8 hex)
   return result;
 }
 
+DN_API void DN_ByteSwapU64Ptr(DN_U8 *dest, DN_U64 src)
+{
+  dest[0] = DN_Cast(DN_U8)((src >> 56) & 0xFF);
+  dest[1] = DN_Cast(DN_U8)((src >> 48) & 0xFF);
+  dest[2] = DN_Cast(DN_U8)((src >> 40) & 0xFF);
+  dest[3] = DN_Cast(DN_U8)((src >> 32) & 0xFF);
+  dest[4] = DN_Cast(DN_U8)((src >> 24) & 0xFF);
+  dest[5] = DN_Cast(DN_U8)((src >> 16) & 0xFF);
+  dest[6] = DN_Cast(DN_U8)((src >> 8) & 0xFF);
+  dest[7] = DN_Cast(DN_U8)(src & 0xFF);
+}
+
 DN_API DN_I64FromResult DN_I64FromStr8(DN_Str8 string, char separator)
 {
   // NOTE: Argument check

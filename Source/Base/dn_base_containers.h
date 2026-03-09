@@ -286,88 +286,100 @@ template <typename T> struct DN_DSMapResult
   #define DN_CppDeclType
 #endif
 
-#define                     DN_PArrayResizeFromPool(ptr, size, max, pool, new_max)         DN_CArrayResizeFromPool((void **)&(ptr), size, max, sizeof((ptr)[0]), pool, new_max)
-#define                     DN_PArrayGrowFromPool(ptr, size, max, pool, new_max)           DN_CArrayGrowFromPool((void **)&(ptr), size, max, sizeof((ptr)[0]), pool, new_max)
-#define                     DN_PArrayGrowIfNeededFromPool(ptr, size, max, pool, add_count) DN_CArrayGrowIfNeededFromPool((void **)(ptr), size, max, sizeof((ptr)[0]), pool, add_count)
-#define                     DN_PArrayMakeArray(ptr, size, max, count, z_mem)               (DN_CppDeclType(&(ptr)[0]))DN_CArrayMakeArray(ptr, size, max, sizeof((ptr)[0]), count, z_mem)
-#define                     DN_PArrayMakeArrayZ(ptr, size, max, count)                     (DN_CppDeclType(&(ptr)[0]))DN_CArrayMakeArray(ptr, size, max, sizeof((ptr)[0]), count, DN_ZMem_Yes)
-#define                     DN_PArrayMake(ptr, size, max, z_mem)                           (DN_CppDeclType(&(ptr)[0]))DN_CArrayMakeArray(ptr, size, max, sizeof((ptr)[0]), 1, z_mem)
-#define                     DN_PArrayMakeZ(ptr, size, max)                                 (DN_CppDeclType(&(ptr)[0]))DN_CArrayMakeArray(ptr, size, max, sizeof((ptr)[0]), 1, DN_ZMem_Yes)
-#define                     DN_PArrayAddArray(ptr, size, max, items, count, add)           (DN_CppDeclType(&(ptr)[0]))DN_CArrayAddArray(ptr, size, max, sizeof((ptr)[0]), items, count, add)
-#define                     DN_PArrayAdd(ptr, size, max, item, add)                        (DN_CppDeclType(&(ptr)[0]))DN_CArrayAddArray(ptr, size, max, sizeof((ptr)[0]), &item, 1, add)
-#define                     DN_PArrayAppendArray(ptr, size, max, items, count)             (DN_CppDeclType(&(ptr)[0]))DN_CArrayAddArray(ptr, size, max, sizeof((ptr)[0]), items, count, DN_ArrayAdd_Append)
-#define                     DN_PArrayAppend(ptr, size, max, item)                          (DN_CppDeclType(&(ptr)[0]))DN_CArrayAddArray(ptr, size, max, sizeof((ptr)[0]), &item, 1, DN_ArrayAdd_Append)
-#define                     DN_PArrayPrependArray(ptr, size, max, items, count)            (DN_CppDeclType(&(ptr)[0]))DN_CArrayAddArray(ptr, size, max, sizeof((ptr)[0]), items, count, DN_ArrayAdd_Prepend)
-#define                     DN_PArrayPrepend(ptr, size, max, item)                         (DN_CppDeclType(&(ptr)[0]))DN_CArrayAddArray(ptr, size, max, sizeof((ptr)[0]), &item, 1, DN_ArrayAdd_Prepend)
-#define                     DN_PArrayEraseRange(ptr, size, begin_index, count, erase)      DN_CArrayEraseRange(ptr, size, sizeof((ptr)[0]), begin_index, count, erase)
-#define                     DN_PArrayErase(ptr, size, index, erase)                        DN_CArrayEraseRange(ptr, size, sizeof((ptr)[0]), index, 1, erase)
-#define                     DN_PArrayInsertArray(ptr, size, max, index, items, count)      (DN_CppDeclType(&(ptr)[0]))DN_CArrayInsertArray(ptr, size, max, sizeof((ptr)[0]), index, items, count)
-#define                     DN_PArrayInsert(ptr, size, max, index, item)                   (DN_CppDeclType(&(ptr)[0]))DN_CArrayInsertArray(ptr, size, max, sizeof((ptr)[0]), index, &item, 1)
-#define                     DN_PArrayPopFront(ptr, size, max, count)                       (DN_CppDeclType(&(ptr)[0]))DN_CArrayPopFront(ptr, size, sizeof((ptr)[0]), count)
-#define                     DN_PArrayPopBack(ptr, size, max, count)                        (DN_CppDeclType(&(ptr)[0]))DN_CArrayPopBack(ptr, size, sizeof((ptr)[0]), count)
+#define                     DN_PArrayResizeFromPool(ptr, size, max, pool, new_max)           DN_CArrayResizeFromPool((void **)&(ptr), size, max, sizeof((ptr)[0]), pool, new_max)
+#define                     DN_PArrayResizeFromArena(ptr, size, max, arena, new_max)         DN_CArrayResizeFromArena((void **)&(ptr), size, max, sizeof((ptr)[0]), arena, new_max)
+#define                     DN_PArrayGrowFromPool(ptr, size, max, pool, new_max)             DN_CArrayGrowFromPool((void **)&(ptr), size, max, sizeof((ptr)[0]), pool, new_max)
+#define                     DN_PArrayGrowFromArena(ptr, size, max, arena, new_max)           DN_CArrayGrowFromArena((void **)&(ptr), size, max, sizeof((ptr)[0]), arena, new_max)
+#define                     DN_PArrayGrowIfNeededFromPool(ptr, size, max, pool, add_count)   DN_CArrayGrowIfNeededFromPool((void **)(ptr), size, max, sizeof((ptr)[0]), pool, add_count)
+#define                     DN_PArrayGrowIfNeededFromArena(ptr, size, max, arena, add_count) DN_CArrayGrowIfNeededFromArena((void **)(ptr), size, max, sizeof((ptr)[0]), arena, add_count)
+#define                     DN_PArrayMakeArray(ptr, size, max, count, z_mem)                 (DN_CppDeclType(&(ptr)[0]))DN_CArrayMakeArray(ptr, size, max, sizeof((ptr)[0]), count, z_mem)
+#define                     DN_PArrayMakeArrayZ(ptr, size, max, count)                       (DN_CppDeclType(&(ptr)[0]))DN_CArrayMakeArray(ptr, size, max, sizeof((ptr)[0]), count, DN_ZMem_Yes)
+#define                     DN_PArrayMake(ptr, size, max, z_mem)                             (DN_CppDeclType(&(ptr)[0]))DN_CArrayMakeArray(ptr, size, max, sizeof((ptr)[0]), 1, z_mem)
+#define                     DN_PArrayMakeZ(ptr, size, max)                                   (DN_CppDeclType(&(ptr)[0]))DN_CArrayMakeArray(ptr, size, max, sizeof((ptr)[0]), 1, DN_ZMem_Yes)
+#define                     DN_PArrayAddArray(ptr, size, max, items, count, add)             (DN_CppDeclType(&(ptr)[0]))DN_CArrayAddArray(ptr, size, max, sizeof((ptr)[0]), items, count, add)
+#define                     DN_PArrayAdd(ptr, size, max, item, add)                          (DN_CppDeclType(&(ptr)[0]))DN_CArrayAddArray(ptr, size, max, sizeof((ptr)[0]), &item, 1, add)
+#define                     DN_PArrayAppendArray(ptr, size, max, items, count)               (DN_CppDeclType(&(ptr)[0]))DN_CArrayAddArray(ptr, size, max, sizeof((ptr)[0]), items, count, DN_ArrayAdd_Append)
+#define                     DN_PArrayAppend(ptr, size, max, item)                            (DN_CppDeclType(&(ptr)[0]))DN_CArrayAddArray(ptr, size, max, sizeof((ptr)[0]), &item, 1, DN_ArrayAdd_Append)
+#define                     DN_PArrayPrependArray(ptr, size, max, items, count)              (DN_CppDeclType(&(ptr)[0]))DN_CArrayAddArray(ptr, size, max, sizeof((ptr)[0]), items, count, DN_ArrayAdd_Prepend)
+#define                     DN_PArrayPrepend(ptr, size, max, item)                           (DN_CppDeclType(&(ptr)[0]))DN_CArrayAddArray(ptr, size, max, sizeof((ptr)[0]), &item, 1, DN_ArrayAdd_Prepend)
+#define                     DN_PArrayEraseRange(ptr, size, begin_index, count, erase)        DN_CArrayEraseRange(ptr, size, sizeof((ptr)[0]), begin_index, count, erase)
+#define                     DN_PArrayErase(ptr, size, index, erase)                          DN_CArrayEraseRange(ptr, size, sizeof((ptr)[0]), index, 1, erase)
+#define                     DN_PArrayInsertArray(ptr, size, max, index, items, count)        (DN_CppDeclType(&(ptr)[0]))DN_CArrayInsertArray(ptr, size, max, sizeof((ptr)[0]), index, items, count)
+#define                     DN_PArrayInsert(ptr, size, max, index, item)                     (DN_CppDeclType(&(ptr)[0]))DN_CArrayInsertArray(ptr, size, max, sizeof((ptr)[0]), index, &item, 1)
+#define                     DN_PArrayPopFront(ptr, size, max, count)                         (DN_CppDeclType(&(ptr)[0]))DN_CArrayPopFront(ptr, size, sizeof((ptr)[0]), count)
+#define                     DN_PArrayPopBack(ptr, size, max, count)                          (DN_CppDeclType(&(ptr)[0]))DN_CArrayPopBack(ptr, size, sizeof((ptr)[0]), count)
 
-#define                     DN_LArrayResizeFromPool(c_array, size, pool, new_max)          DN_PArrayResizeFromPool(c_array, size, DN_ArrayCountU(c_array), pool, new_max)
-#define                     DN_LArrayGrowFromPool(c_array, size, pool, new_max)            DN_PArrayGrowFromPool(c_array, size, DN_ArrayCountU(c_array), pool, new_max)
-#define                     DN_LArrayGrowIfNeededFromPool(c_array, size, pool, add_count)  DN_PArrayGrowIfNeededFromPool(c_array, size, DN_ArrayCountU(c_array), pool, add_count)
-#define                     DN_LArrayMakeArray(c_array, size, count, z_mem)                DN_PArrayMakeArray(c_array, size, DN_ArrayCountU(c_array), count, z_mem)
-#define                     DN_LArrayMakeArrayZ(c_array, size, count)                      DN_PArrayMakeArrayZ(c_array, size, DN_ArrayCountU(c_array), count)
-#define                     DN_LArrayMake(c_array, size, z_mem)                            DN_PArrayMake(c_array, size, DN_ArrayCountU(c_array), z_mem)
-#define                     DN_LArrayMakeZ(c_array, size, max)                             DN_PArrayMakeZ(c_array, size, DN_ArrayCountU(c_array), max)
-#define                     DN_LArrayAddArray(c_array, size, items, count, add)            DN_PArrayAddArray(c_array, size, DN_ArrayCountU(c_array), items, count, add)
-#define                     DN_LArrayAdd(c_array, size, item, add)                         DN_PArrayAdd(c_array, size, DN_ArrayCountU(c_array), item, add)
-#define                     DN_LArrayAppendArray(c_array, size, items, count)              DN_PArrayAppendArray(c_array, size, DN_ArrayCountU(c_array), items, count)
-#define                     DN_LArrayAppend(c_array, size, item)                           DN_PArrayAppend(c_array, size, DN_ArrayCountU(c_array), item)
-#define                     DN_LArrayPrependArray(c_array, size, items, count)             DN_PArrayPrependArray(c_array, size, DN_ArrayCountU(c_array), items, count)
-#define                     DN_LArrayPrepend(c_array, size, item)                          DN_PArrayPrepend(c_array, size, DN_ArrayCountU(c_array), item)
-#define                     DN_LArrayEraseRange(c_array, size, begin_index, count, erase)  DN_PArrayEraseRange(c_array, size, DN_ArrayCountU(c_array), begin_index, count, erase)
-#define                     DN_LArrayErase(c_array, size, index, erase)                    DN_PArrayErase(c_array, size, DN_ArrayCountU(c_array), index, erase)
-#define                     DN_LArrayInsertArray(c_array, size, index, items, count)       DN_PArrayInsertArray(c_array, size, DN_ArrayCountU(c_array), index, items, count)
-#define                     DN_LArrayInsert(c_array, size, index, item)                    DN_PArrayInsert(c_array, size, DN_ArrayCountU(c_array), index, item)
-#define                     DN_LArrayPopFront(c_array, size, count)                        DN_PArrayPopFront(c_array, size, DN_ArrayCountU(c_array), count)
-#define                     DN_LArrayPopBack(c_array, size, count)                         DN_PArrayPopBack(c_array, size, DN_ArrayCountU(c_array), count)
+#define                     DN_LArrayResizeFromPool(c_array, size, pool, new_max)            DN_PArrayResizeFromPool(c_array, size, DN_ArrayCountU(c_array), pool, new_max)
+#define                     DN_LArrayResizeFromArena(c_array, size, arena, new_max)          DN_PArrayResizeFromArena(c_array, size, DN_ArrayCountU(c_array), arena, new_max)
+#define                     DN_LArrayGrowFromPool(c_array, size, pool, new_max)              DN_PArrayGrowFromPool(c_array, size, DN_ArrayCountU(c_array), pool, new_max)
+#define                     DN_LArrayGrowFromArena(c_array, size, arena, new_max)            DN_PArrayGrowFromArena(c_array, size, DN_ArrayCountU(c_array), arena, new_max)
+#define                     DN_LArrayGrowIfNeededFromPool(c_array, size, pool, add_count)    DN_PArrayGrowIfNeededFromPool(c_array, size, DN_ArrayCountU(c_array), pool, add_count)
+#define                     DN_LArrayGrowIfNeededFromArena(c_array, size, arena, add_count)  DN_PArrayGrowIfNeededFromArena(c_array, size, DN_ArrayCountU(c_array), arena, add_count)
+#define                     DN_LArrayMakeArray(c_array, size, count, z_mem)                  DN_PArrayMakeArray(c_array, size, DN_ArrayCountU(c_array), count, z_mem)
+#define                     DN_LArrayMakeArrayZ(c_array, size, count)                        DN_PArrayMakeArrayZ(c_array, size, DN_ArrayCountU(c_array), count)
+#define                     DN_LArrayMake(c_array, size, z_mem)                              DN_PArrayMake(c_array, size, DN_ArrayCountU(c_array), z_mem)
+#define                     DN_LArrayMakeZ(c_array, size, max)                               DN_PArrayMakeZ(c_array, size, DN_ArrayCountU(c_array), max)
+#define                     DN_LArrayAddArray(c_array, size, items, count, add)              DN_PArrayAddArray(c_array, size, DN_ArrayCountU(c_array), items, count, add)
+#define                     DN_LArrayAdd(c_array, size, item, add)                           DN_PArrayAdd(c_array, size, DN_ArrayCountU(c_array), item, add)
+#define                     DN_LArrayAppendArray(c_array, size, items, count)                DN_PArrayAppendArray(c_array, size, DN_ArrayCountU(c_array), items, count)
+#define                     DN_LArrayAppend(c_array, size, item)                             DN_PArrayAppend(c_array, size, DN_ArrayCountU(c_array), item)
+#define                     DN_LArrayPrependArray(c_array, size, items, count)               DN_PArrayPrependArray(c_array, size, DN_ArrayCountU(c_array), items, count)
+#define                     DN_LArrayPrepend(c_array, size, item)                            DN_PArrayPrepend(c_array, size, DN_ArrayCountU(c_array), item)
+#define                     DN_LArrayEraseRange(c_array, size, begin_index, count, erase)    DN_PArrayEraseRange(c_array, size, DN_ArrayCountU(c_array), begin_index, count, erase)
+#define                     DN_LArrayErase(c_array, size, index, erase)                      DN_PArrayErase(c_array, size, DN_ArrayCountU(c_array), index, erase)
+#define                     DN_LArrayInsertArray(c_array, size, index, items, count)         DN_PArrayInsertArray(c_array, size, DN_ArrayCountU(c_array), index, items, count)
+#define                     DN_LArrayInsert(c_array, size, index, item)                      DN_PArrayInsert(c_array, size, DN_ArrayCountU(c_array), index, item)
+#define                     DN_LArrayPopFront(c_array, size, count)                          DN_PArrayPopFront(c_array, size, DN_ArrayCountU(c_array), count)
+#define                     DN_LArrayPopBack(c_array, size, count)                           DN_PArrayPopBack(c_array, size, DN_ArrayCountU(c_array), count)
 
-#define                     DN_IArrayResizeFromPool(array, pool, new_max)                  DN_CArrayResizeFromPool((void **)(&(array)->data), &(array)->size, &(array)->max, sizeof((array)->data[0]), pool, new_max)
-#define                     DN_IArrayGrowFromPool(array, pool, new_max)                    DN_CArrayGrowFromPool((void **)(&(array)->data), (array)->size, &(array)->max, sizeof((array)->data[0]), pool, new_max)
-#define                     DN_IArrayGrowIfNeededFromPool(array, pool, add_count)          DN_CArrayGrowIfNeededFromPool((void **)(&(array)->data), (array)->size, &(array)->max, sizeof((array)->data[0]), pool, add_count)
-#define                     DN_IArrayMakeArray(array, count, z_mem)                        (DN_CppDeclType(&((array)->data)[0]))DN_CArrayMakeArray((array)->data, &(array)->size, (array)->max, sizeof(((array)->data)[0]), count, z_mem)
-#define                     DN_IArrayMakeArrayZ(array, count)                              (DN_CppDeclType(&((array)->data)[0]))DN_CArrayMakeArray((array)->data, &(array)->size, (array)->max, sizeof(((array)->data)[0]), count, DN_ZMem_Yes)
-#define                     DN_IArrayMake(array, z_mem)                                    (DN_CppDeclType(&((array)->data)[0]))DN_CArrayMakeArray((array)->data, &(array)->size, (array)->max, sizeof(((array)->data)[0]), 1, z_mem)
-#define                     DN_IArrayMakeZ(array)                                          (DN_CppDeclType(&((array)->data)[0]))DN_CArrayMakeArray((array)->data, &(array)->size, (array)->max, sizeof(((array)->data)[0]), 1, DN_ZMem_Yes)
-#define                     DN_IArrayAddArray(array, items, count, add)                    (DN_CppDeclType(&((array)->data)[0]))DN_CArrayAddArray((array)->data, &(array)->size, (array)->max, sizeof(((array)->data)[0]), items, count, add)
-#define                     DN_IArrayAdd(array, item, add)                                 (DN_CppDeclType(&((array)->data)[0]))DN_CArrayAddArray((array)->data, &(array)->size, (array)->max, sizeof(((array)->data)[0]), &item, 1, add)
-#define                     DN_IArrayAppendArray(array, items, count)                      (DN_CppDeclType(&((array)->data)[0]))DN_CArrayAddArray((array)->data, &(array)->size, (array)->max, sizeof(((array)->data)[0]), items, count, DN_ArrayAdd_Append)
-#define                     DN_IArrayAppend(array, item)                                   (DN_CppDeclType(&((array)->data)[0]))DN_CArrayAddArray((array)->data, &(array)->size, (array)->max, sizeof(((array)->data)[0]), &item, 1, DN_ArrayAdd_Append)
-#define                     DN_IArrayPrependArray(array, items, count)                     (DN_CppDeclType(&((array)->data)[0]))DN_CArrayAddArray((array)->data, &(array)->size, (array)->max, sizeof(((array)->data)[0]), items, count, DN_ArrayAdd_Prepend)
-#define                     DN_IArrayPrepend(array, item)                                  (DN_CppDeclType(&((array)->data)[0]))DN_CArrayAddArray((array)->data, &(array)->size, (array)->max, sizeof(((array)->data)[0]), &item, 1, DN_ArrayAdd_Prepend)
-#define                     DN_IArrayEraseRange(array, begin_index, count, erase)          DN_CArrayEraseRange((array)->data, &(array)->size, sizeof(((array)->data)[0]), begin_index, count, erase)
-#define                     DN_IArrayErase(array, index, erase)                            DN_CArrayEraseRange((array)->data, &(array)->size, sizeof(((array)->data)[0]), index, 1, erase)
-#define                     DN_IArrayInsertArray(array, index, items, count)               (DN_CppDeclType(&((array)->data)[0]))DN_CArrayInsertArray((array)->data, &(array)->size, (array)->max, sizeof(((array)->data)[0]), index, items, count)
-#define                     DN_IArrayInsert(array, index, item, count)                     (DN_CppDeclType(&((array)->data)[0]))DN_CArrayInsertArray((array)->data, &(array)->size, (array)->max, sizeof(((array)->data)[0]), index, &item, 1)
-#define                     DN_IArrayPopFront(array, count)                                (DN_CppDeclType(&((array)->data)[0]))DN_CArrayPopFront((array)->data, &(array)->size, sizeof(((array)->data)[0]), count)
-#define                     DN_IArrayPopBack(array, count)                                 (DN_CppDeclType(&((array)->data)[0]))DN_CArrayPopBack((array)->data, &(array)->size, sizeof(((array)->data)[0]), count)
+#define                     DN_IArrayResizeFromPool(array, pool, new_max)                    DN_CArrayResizeFromPool((void **)(&(array)->data), &(array)->size, &(array)->max, sizeof((array)->data[0]), pool, new_max)
+#define                     DN_IArrayResizeFromArena(array, arena, new_max)                  DN_CArrayResizeFromArena((void **)(&(array)->data), &(array)->size, &(array)->max, sizeof((array)->data[0]), arena, new_max)
+#define                     DN_IArrayGrowFromPool(array, pool, new_max)                      DN_CArrayGrowFromPool((void **)(&(array)->data), (array)->size, &(array)->max, sizeof((array)->data[0]), pool, new_max)
+#define                     DN_IArrayGrowFromArena(array, arena, new_max)                    DN_CArrayGrowFromArena((void **)(&(array)->data), (array)->size, &(array)->max, sizeof((array)->data[0]), arena, new_max)
+#define                     DN_IArrayGrowIfNeededFromPool(array, pool, add_count)            DN_CArrayGrowIfNeededFromPool((void **)(&(array)->data), (array)->size, &(array)->max, sizeof((array)->data[0]), pool, add_count)
+#define                     DN_IArrayGrowIfNeededFromArena(array, arena, add_count)          DN_CArrayGrowIfNeededFromArena((void **)(&(array)->data), (array)->size, &(array)->max, sizeof((array)->data[0]), arena, add_count)
+#define                     DN_IArrayMakeArray(array, count, z_mem)                          (DN_CppDeclType(&((array)->data)[0]))DN_CArrayMakeArray((array)->data, &(array)->size, (array)->max, sizeof(((array)->data)[0]), count, z_mem)
+#define                     DN_IArrayMakeArrayZ(array, count)                                (DN_CppDeclType(&((array)->data)[0]))DN_CArrayMakeArray((array)->data, &(array)->size, (array)->max, sizeof(((array)->data)[0]), count, DN_ZMem_Yes)
+#define                     DN_IArrayMake(array, z_mem)                                      (DN_CppDeclType(&((array)->data)[0]))DN_CArrayMakeArray((array)->data, &(array)->size, (array)->max, sizeof(((array)->data)[0]), 1, z_mem)
+#define                     DN_IArrayMakeZ(array)                                            (DN_CppDeclType(&((array)->data)[0]))DN_CArrayMakeArray((array)->data, &(array)->size, (array)->max, sizeof(((array)->data)[0]), 1, DN_ZMem_Yes)
+#define                     DN_IArrayAddArray(array, items, count, add)                      (DN_CppDeclType(&((array)->data)[0]))DN_CArrayAddArray((array)->data, &(array)->size, (array)->max, sizeof(((array)->data)[0]), items, count, add)
+#define                     DN_IArrayAdd(array, item, add)                                   (DN_CppDeclType(&((array)->data)[0]))DN_CArrayAddArray((array)->data, &(array)->size, (array)->max, sizeof(((array)->data)[0]), &item, 1, add)
+#define                     DN_IArrayAppendArray(array, items, count)                        (DN_CppDeclType(&((array)->data)[0]))DN_CArrayAddArray((array)->data, &(array)->size, (array)->max, sizeof(((array)->data)[0]), items, count, DN_ArrayAdd_Append)
+#define                     DN_IArrayAppend(array, item)                                     (DN_CppDeclType(&((array)->data)[0]))DN_CArrayAddArray((array)->data, &(array)->size, (array)->max, sizeof(((array)->data)[0]), &item, 1, DN_ArrayAdd_Append)
+#define                     DN_IArrayPrependArray(array, items, count)                       (DN_CppDeclType(&((array)->data)[0]))DN_CArrayAddArray((array)->data, &(array)->size, (array)->max, sizeof(((array)->data)[0]), items, count, DN_ArrayAdd_Prepend)
+#define                     DN_IArrayPrepend(array, item)                                    (DN_CppDeclType(&((array)->data)[0]))DN_CArrayAddArray((array)->data, &(array)->size, (array)->max, sizeof(((array)->data)[0]), &item, 1, DN_ArrayAdd_Prepend)
+#define                     DN_IArrayEraseRange(array, begin_index, count, erase)            DN_CArrayEraseRange((array)->data, &(array)->size, sizeof(((array)->data)[0]), begin_index, count, erase)
+#define                     DN_IArrayErase(array, index, erase)                              DN_CArrayEraseRange((array)->data, &(array)->size, sizeof(((array)->data)[0]), index, 1, erase)
+#define                     DN_IArrayInsertArray(array, index, items, count)                 (DN_CppDeclType(&((array)->data)[0]))DN_CArrayInsertArray((array)->data, &(array)->size, (array)->max, sizeof(((array)->data)[0]), index, items, count)
+#define                     DN_IArrayInsert(array, index, item, count)                       (DN_CppDeclType(&((array)->data)[0]))DN_CArrayInsertArray((array)->data, &(array)->size, (array)->max, sizeof(((array)->data)[0]), index, &item, 1)
+#define                     DN_IArrayPopFront(array, count)                                  (DN_CppDeclType(&((array)->data)[0]))DN_CArrayPopFront((array)->data, &(array)->size, sizeof(((array)->data)[0]), count)
+#define                     DN_IArrayPopBack(array, count)                                   (DN_CppDeclType(&((array)->data)[0]))DN_CArrayPopBack((array)->data, &(array)->size, sizeof(((array)->data)[0]), count)
 
-#define                     DN_ISliceAllocArena(T, slice_ptr, count_, zmem, arena)         (T *)DN_SliceAllocArena((void **)&((slice_ptr)->data), &((slice_ptr)->count), count_, sizeof(T), alignof(T), zmem, arena)
+#define                     DN_ISliceAllocArena(T, slice_ptr, count_, zmem, arena)           (T *)DN_SliceAllocArena((void **)&((slice_ptr)->data), &((slice_ptr)->count), count_, sizeof(T), alignof(T), zmem, arena)
 
-DN_API void*                DN_SliceAllocArena                                             (void **data, DN_USize *slice_size_field, DN_USize size, DN_USize elem_size, DN_U8 align, DN_ZMem zmem, DN_Arena *arena);
+DN_API void*                DN_SliceAllocArena                                               (void **data, DN_USize *slice_size_field, DN_USize size, DN_USize elem_size, DN_U8 align, DN_ZMem zmem, DN_Arena *arena);
 
-DN_API void*                DN_CArrayInsertArray                                           (void *data, DN_USize *size, DN_USize max, DN_USize elem_size, DN_USize index, void const *items, DN_USize count);
-DN_API void*                DN_CArrayPopFront                                              (void *data, DN_USize *size, DN_USize elem_size, DN_USize count);
-DN_API void*                DN_CArrayPopBack                                               (void *data, DN_USize *size, DN_USize elem_size, DN_USize count);
-DN_API DN_ArrayEraseResult  DN_CArrayEraseRange                                            (void *data, DN_USize *size, DN_USize elem_size, DN_USize begin_index, DN_ISize count, DN_ArrayErase erase);
-DN_API void*                DN_CArrayMakeArray                                             (void *data, DN_USize *size, DN_USize max, DN_USize data_size, DN_USize make_size, DN_ZMem z_mem);
-DN_API void*                DN_CArrayAddArray                                              (void *data, DN_USize *size, DN_USize max, DN_USize data_size, void const *elems, DN_USize elems_count, DN_ArrayAdd add);
-DN_API bool                 DN_CArrayResizeFromPool                                        (void **data, DN_USize *size, DN_USize *max, DN_USize data_size, DN_Pool *pool, DN_USize new_max);
-DN_API bool                 DN_CArrayGrowFromPool                                          (void **data, DN_USize size, DN_USize *max, DN_USize data_size, DN_Pool *pool, DN_USize new_max);
-DN_API bool                 DN_CArrayGrowIfNeededFromPool                                  (void **data, DN_USize size, DN_USize *max, DN_USize data_size, DN_Pool *pool);
+DN_API void*                DN_CArrayInsertArray                                             (void *data, DN_USize *size, DN_USize max, DN_USize elem_size, DN_USize index, void const *items, DN_USize count);
+DN_API void*                DN_CArrayPopFront                                                (void *data, DN_USize *size, DN_USize elem_size, DN_USize count);
+DN_API void*                DN_CArrayPopBack                                                 (void *data, DN_USize *size, DN_USize elem_size, DN_USize count);
+DN_API DN_ArrayEraseResult  DN_CArrayEraseRange                                              (void *data, DN_USize *size, DN_USize elem_size, DN_USize begin_index, DN_ISize count, DN_ArrayErase erase);
+DN_API void*                DN_CArrayMakeArray                                               (void *data, DN_USize *size, DN_USize max, DN_USize data_size, DN_USize make_size, DN_ZMem z_mem);
+DN_API void*                DN_CArrayAddArray                                                (void *data, DN_USize *size, DN_USize max, DN_USize data_size, void const *elems, DN_USize elems_count, DN_ArrayAdd add);
+DN_API bool                 DN_CArrayResizeFromPool                                          (void **data, DN_USize *size, DN_USize *max, DN_USize data_size, DN_Pool *pool, DN_USize new_max);
+DN_API bool                 DN_CArrayResizeFromArena                                         (void **data, DN_USize *size, DN_USize *max, DN_USize data_size, DN_Arena *arena, DN_USize new_max);
+DN_API bool                 DN_CArrayGrowFromPool                                            (void **data, DN_USize size, DN_USize *max, DN_USize data_size, DN_Pool *pool, DN_USize new_max);
+DN_API bool                 DN_CArrayGrowFromArena                                           (void **data, DN_USize size, DN_USize *max, DN_USize data_size, DN_Pool *pool, DN_USize new_max);
+DN_API bool                 DN_CArrayGrowIfNeededFromPool                                    (void **data, DN_USize size, DN_USize *max, DN_USize data_size, DN_Pool *pool);
+DN_API bool                 DN_CArrayGrowIfNeededFromArena                                   (void **data, DN_USize size, DN_USize *max, DN_USize data_size, DN_Arena *pool);
 
-DN_API void*                DN_SinglyLLDetach                                              (void **link, void **next);
+DN_API void*                DN_SinglyLLDetach                                                (void **link, void **next);
 
-DN_API bool                 DN_RingHasSpace                                                (DN_Ring const *ring, DN_U64 size);
-DN_API bool                 DN_RingHasData                                                 (DN_Ring const *ring, DN_U64 size);
-DN_API void                 DN_RingWrite                                                   (DN_Ring *ring, void const *src, DN_U64 src_size);
-#define                     DN_RingWriteStruct(ring, item)                                 DN_RingWrite((ring), (item), sizeof(*(item)))
-DN_API void                 DN_RingRead                                                    (DN_Ring *ring, void *dest, DN_U64 dest_size);
-#define                     DN_RingReadStruct(ring, dest)                                  DN_RingRead((ring), (dest), sizeof(*(dest)))
+DN_API bool                 DN_RingHasSpace                                                  (DN_Ring const *ring, DN_U64 size);
+DN_API bool                 DN_RingHasData                                                   (DN_Ring const *ring, DN_U64 size);
+DN_API void                 DN_RingWrite                                                     (DN_Ring *ring, void const *src, DN_U64 src_size);
+#define                     DN_RingWriteStruct(ring, item)                                   DN_RingWrite((ring), (item), sizeof(*(item)))
+DN_API void                 DN_RingRead                                                      (DN_Ring *ring, void *dest, DN_U64 dest_size);
+#define                     DN_RingReadStruct(ring, dest)                                    DN_RingRead((ring), (dest), sizeof(*(dest)))
 
 template <typename T> DN_DSMap<T>        DN_DSMapInit                  (DN_Arena *arena, DN_U32 size, DN_DSMapFlags flags);
 template <typename T> void               DN_DSMapDeinit                (DN_DSMap<T> *map, DN_ZMem z_mem);
