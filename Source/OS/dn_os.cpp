@@ -27,7 +27,7 @@ DN_API DN_ArenaMemFuncs DN_ArenaMemFuncsGet(DN_ArenaMemFuncType type)
       result.type          = DN_ArenaMemFuncType_Basic;
       result.basic_alloc   = DN_ArenaBasicAllocFromOSHeap;
       result.basic_dealloc = DN_OS_MemDealloc;
-    };
+    } break;
 
     case DN_ArenaMemFuncType_VMem: {
       DN_Core *dn = DN_Get();

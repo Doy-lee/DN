@@ -286,12 +286,12 @@ template <typename T> struct DN_DSMapResult
   #define DN_CppDeclType
 #endif
 
-#define                     DN_PArrayResizeFromPool(ptr, size, max, pool, new_max)           DN_CArrayResizeFromPool((void **)&(ptr), size, max, sizeof((ptr)[0]), pool, new_max)
-#define                     DN_PArrayResizeFromArena(ptr, size, max, arena, new_max)         DN_CArrayResizeFromArena((void **)&(ptr), size, max, sizeof((ptr)[0]), arena, new_max)
-#define                     DN_PArrayGrowFromPool(ptr, size, max, pool, new_max)             DN_CArrayGrowFromPool((void **)&(ptr), size, max, sizeof((ptr)[0]), pool, new_max)
-#define                     DN_PArrayGrowFromArena(ptr, size, max, arena, new_max)           DN_CArrayGrowFromArena((void **)&(ptr), size, max, sizeof((ptr)[0]), arena, new_max)
-#define                     DN_PArrayGrowIfNeededFromPool(ptr, size, max, pool, add_count)   DN_CArrayGrowIfNeededFromPool((void **)(ptr), size, max, sizeof((ptr)[0]), pool, add_count)
-#define                     DN_PArrayGrowIfNeededFromArena(ptr, size, max, arena, add_count) DN_CArrayGrowIfNeededFromArena((void **)(ptr), size, max, sizeof((ptr)[0]), arena, add_count)
+#define                     DN_PArrayResizeFromPool(ptr, size, max, pool, new_max)           DN_CArrayResizeFromPool((void **)&(ptr), size, max, sizeof((*ptr)[0]), pool, new_max)
+#define                     DN_PArrayResizeFromArena(ptr, size, max, arena, new_max)         DN_CArrayResizeFromArena((void **)&(ptr), size, max, sizeof((*ptr)[0]), arena, new_max)
+#define                     DN_PArrayGrowFromPool(ptr, size, max, pool, new_max)             DN_CArrayGrowFromPool((void **)&(ptr), size, max, sizeof((*ptr)[0]), pool, new_max)
+#define                     DN_PArrayGrowFromArena(ptr, size, max, arena, new_max)           DN_CArrayGrowFromArena((void **)&(ptr), size, max, sizeof((*ptr)[0]), arena, new_max)
+#define                     DN_PArrayGrowIfNeededFromPool(ptr, size, max, pool, add_count)   DN_CArrayGrowIfNeededFromPool((void **)(ptr), size, max, sizeof((*ptr)[0]), pool, add_count)
+#define                     DN_PArrayGrowIfNeededFromArena(ptr, size, max, arena, add_count) DN_CArrayGrowIfNeededFromArena((void **)(ptr), size, max, sizeof((*ptr)[0]), arena, add_count)
 #define                     DN_PArrayMakeArray(ptr, size, max, count, z_mem)                 (DN_CppDeclType(&(ptr)[0]))DN_CArrayMakeArray(ptr, size, max, sizeof((ptr)[0]), count, z_mem)
 #define                     DN_PArrayMakeArrayZ(ptr, size, max, count)                       (DN_CppDeclType(&(ptr)[0]))DN_CArrayMakeArray(ptr, size, max, sizeof((ptr)[0]), count, DN_ZMem_Yes)
 #define                     DN_PArrayMake(ptr, size, max, z_mem)                             (DN_CppDeclType(&(ptr)[0]))DN_CArrayMakeArray(ptr, size, max, sizeof((ptr)[0]), 1, z_mem)
@@ -318,7 +318,7 @@ template <typename T> struct DN_DSMapResult
 #define                     DN_LArrayMakeArray(c_array, size, count, z_mem)                  DN_PArrayMakeArray(c_array, size, DN_ArrayCountU(c_array), count, z_mem)
 #define                     DN_LArrayMakeArrayZ(c_array, size, count)                        DN_PArrayMakeArrayZ(c_array, size, DN_ArrayCountU(c_array), count)
 #define                     DN_LArrayMake(c_array, size, z_mem)                              DN_PArrayMake(c_array, size, DN_ArrayCountU(c_array), z_mem)
-#define                     DN_LArrayMakeZ(c_array, size, max)                               DN_PArrayMakeZ(c_array, size, DN_ArrayCountU(c_array), max)
+#define                     DN_LArrayMakeZ(c_array, size)                                    DN_PArrayMakeZ(c_array, size, DN_ArrayCountU(c_array))
 #define                     DN_LArrayAddArray(c_array, size, items, count, add)              DN_PArrayAddArray(c_array, size, DN_ArrayCountU(c_array), items, count, add)
 #define                     DN_LArrayAdd(c_array, size, item, add)                           DN_PArrayAdd(c_array, size, DN_ArrayCountU(c_array), item, add)
 #define                     DN_LArrayAppendArray(c_array, size, items, count)                DN_PArrayAppendArray(c_array, size, DN_ArrayCountU(c_array), items, count)
@@ -369,8 +369,8 @@ DN_API bool                 DN_CArrayResizeFromPool                             
 DN_API bool                 DN_CArrayResizeFromArena                                         (void **data, DN_USize *size, DN_USize *max, DN_USize data_size, DN_Arena *arena, DN_USize new_max);
 DN_API bool                 DN_CArrayGrowFromPool                                            (void **data, DN_USize size, DN_USize *max, DN_USize data_size, DN_Pool *pool, DN_USize new_max);
 DN_API bool                 DN_CArrayGrowFromArena                                           (void **data, DN_USize size, DN_USize *max, DN_USize data_size, DN_Pool *pool, DN_USize new_max);
-DN_API bool                 DN_CArrayGrowIfNeededFromPool                                    (void **data, DN_USize size, DN_USize *max, DN_USize data_size, DN_Pool *pool);
-DN_API bool                 DN_CArrayGrowIfNeededFromArena                                   (void **data, DN_USize size, DN_USize *max, DN_USize data_size, DN_Arena *pool);
+DN_API bool                 DN_CArrayGrowIfNeededFromPool                                    (void **data, DN_USize size, DN_USize *max, DN_USize data_size, DN_Pool *pool, DN_USize add_count);
+DN_API bool                 DN_CArrayGrowIfNeededFromArena                                   (void **data, DN_USize size, DN_USize *max, DN_USize data_size, DN_Arena *pool, DN_USize add_count);
 
 DN_API void*                DN_SinglyLLDetach                                                (void **link, void **next);
 

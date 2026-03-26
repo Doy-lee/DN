@@ -97,7 +97,6 @@
 #else
   #error Please define a platform e.g. 'DN_PLATFORM_WIN32' to enable the correct implementation for platform APIs
 #endif
-
 #include "OS/dn_os.h"
 #endif
 

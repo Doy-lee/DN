@@ -7,6 +7,8 @@
 #include "Base/dn_base_containers.cpp"
 #include "Base/dn_base_leak.cpp"
 
+DN_Core *g_dn_;
+
 #if DN_H_WITH_OS
 #include "OS/dn_os.cpp"
 #if defined(DN_PLATFORM_POSIX) || defined(DN_PLATFORM_EMSCRIPTEN)
@@ -17,8 +19,6 @@
   #error Please define a platform e.g. 'DN_PLATFORM_WIN32' to enable the correct implementation for platform APIs
 #endif
 #endif
-
-DN_Core *g_dn_;
 
 DN_API void DN_Init(DN_Core *dn, DN_InitFlags flags, DN_InitArgs *args)
 {
@@ -52,16 +52,12 @@ DN_API void DN_Init(DN_Core *dn, DN_InitFlags flags, DN_InitArgs *args)
 
 
     {
-      #if defined(DN_PLATFORM_EMSCRIPTEN)
-      os->arena = DN_ArenaFromHeap(DN_Megabytes(1), DN_ArenaFlags_NoAllocTrack);
-      #else
-      os->arena = DN_ArenaFromVMem(DN_Megabytes(1), DN_Kilobytes(4), DN_ArenaFlags_NoAllocTrack);
-      #endif
+      os->arena = DN_ArenaFromMemFuncs(DN_Megabytes(1), DN_Kilobytes(4), DN_ArenaFlags_NoAllocTrack, DN_ArenaMemFuncsGetDefaults());
 
       #if defined(DN_PLATFORM_WIN32)
       os->platform_context = DN_ArenaNew(&os->arena, DN_OSW32Core, DN_ZMem_Yes);
       #elif defined(DN_PLATFORM_POSIX) || defined(DN_PLATFORM_EMSCRIPTEN)
-      os->platform_context = DN_ArenaNew(&os->arena, DN_OSPOSIXCore, DN_ZMem_Yes);
+      os->platform_context = DN_ArenaNew(&os->arena, DN_OSPosixCore, DN_ZMem_Yes);
       #endif
 
       #if defined(DN_PLATFORM_WIN32)
@@ -101,7 +97,7 @@ DN_API void DN_Init(DN_Core *dn, DN_InitFlags flags, DN_InitArgs *args)
     #if DN_H_WITH_OS
     // NOTE: Setup the allocation table with allocation tracking turned off on
     // the arena we're using to initialise the table.
-    dn->leak.alloc_table_arena = DN_ArenaFromVMem(DN_Megabytes(1), DN_Kilobytes(512), DN_ArenaFlags_NoAllocTrack | DN_ArenaFlags_AllocCanLeak);
+    dn->leak.alloc_table_arena = DN_ArenaFromMemFuncs(DN_Megabytes(1), DN_Kilobytes(512), DN_ArenaFlags_NoAllocTrack | DN_ArenaFlags_AllocCanLeak, DN_ArenaMemFuncsGetDefaults());
     dn->leak.alloc_table       = DN_DSMapInit<DN_LeakAlloc>(&dn->leak.alloc_table_arena, 4096, DN_DSMapFlags_Nil);
     #endif
   }

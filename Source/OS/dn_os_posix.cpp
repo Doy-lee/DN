@@ -339,17 +339,17 @@ DN_API bool DN_OS_FileCopy(DN_Str8 src, DN_Str8 dest, bool overwrite, DN_ErrSink
 {
   bool result = false;
   #if defined(DN_PLATFORM_EMSCRIPTEN)
-  DN_OS_ErrSinkAppendF(error, 1, "Unsupported on Emscripten because of their VFS model");
+  DN_ErrSinkAppendF(error, 1, "Unsupported on Emscripten because of their VFS model");
   #else
   int src_fd = open(src.data, O_RDONLY);
   if (src_fd == -1) {
     int error_code = errno;
-    DN_OS_ErrSinkAppendF(error,
-                       error_code,
-                       "Failed to open file '%.*s' for copying: (%d) %s",
-                       DN_Str8PrintFmt(src),
-                       error_code,
-                       strerror(error_code));
+    DN_ErrSinkAppendF(error,
+                      error_code,
+                      "Failed to open file '%.*s' for copying: (%d) %s",
+                      DN_Str8PrintFmt(src),
+                      error_code,
+                      strerror(error_code));
     return result;
   }
   DN_DEFER
@@ -361,12 +361,12 @@ DN_API bool DN_OS_FileCopy(DN_Str8 src, DN_Str8 dest, bool overwrite, DN_ErrSink
   int dest_fd = open(dest.data, O_WRONLY | O_CREAT | (overwrite ? O_TRUNC : 0), 0644);
   if (dest_fd == -1) {
     int error_code = errno;
-    DN_OS_ErrSinkAppendF(error,
-                       error_code,
-                       "Failed to open file destination '%.*s' for copying to: (%d) %s",
-                       DN_Str8PrintFmt(src),
-                       error_code,
-                       strerror(error_code));
+    DN_ErrSinkAppendF(error,
+                      error_code,
+                      "Failed to open file destination '%.*s' for copying to: (%d) %s",
+                      DN_Str8PrintFmt(src),
+                      error_code,
+                      strerror(error_code));
     return result;
   }
   DN_DEFER
@@ -378,12 +378,12 @@ DN_API bool DN_OS_FileCopy(DN_Str8 src, DN_Str8 dest, bool overwrite, DN_ErrSink
   int         fstat_result = fstat(src_fd, &stat_existing);
   if (fstat_result == -1) {
     int error_code = errno;
-    DN_OS_ErrSinkAppendF(error,
-                       error_code,
-                       "Failed to query file size of '%.*s' for copying: (%d) %s",
-                       DN_Str8PrintFmt(src),
-                       error_code,
-                       strerror(error_code));
+    DN_ErrSinkAppendF(error,
+                      error_code,
+                      "Failed to query file size of '%.*s' for copying: (%d) %s",
+                      DN_Str8PrintFmt(src),
+                      error_code,
+                      strerror(error_code));
     return result;
   }
 
@@ -394,16 +394,16 @@ DN_API bool DN_OS_FileCopy(DN_Str8 src, DN_Str8 dest, bool overwrite, DN_ErrSink
     DN_TCScratch scratch               = DN_TCScratchBegin(nullptr, 0);
     DN_Str8      file_size_str8     = DN_Str8FromByteCount(scratch.arena, stat_existing.st_size, DN_ByteCountType_Auto);
     DN_Str8      bytes_written_str8 = DN_Str8FromByteCount(scratch.arena, bytes_written, DN_ByteCountType_Auto);
-    DN_OS_ErrSinkAppendF(error,
-                       error_code,
-                       "Failed to copy file '%.*s' to '%.*s', we copied %.*s but the file "
-                       "size is %.*s: (%d) %s",
-                       DN_Str8PrintFmt(src),
-                       DN_Str8PrintFmt(dest),
-                       DN_Str8PrintFmt(bytes_written_str8),
-                       DN_Str8PrintFmt(file_size_str8),
-                       error_code,
-                       strerror(error_code));
+    DN_rrSinkAppendF(error,
+                     error_code,
+                     "Failed to copy file '%.*s' to '%.*s', we copied %.*s but the file "
+                     "size is %.*s: (%d) %s",
+                     DN_Str8PrintFmt(src),
+                     DN_Str8PrintFmt(dest),
+                     DN_Str8PrintFmt(bytes_written_str8),
+                     DN_Str8PrintFmt(file_size_str8),
+                     error_code,
+                     strerror(error_code));
     DN_TCScratchEnd(&scratch);
   }
 
@@ -427,7 +427,7 @@ DN_API bool DN_OS_FileMove(DN_Str8 src, DN_Str8 dest, bool overwrite, DN_ErrSink
     int unlink_result = unlink(src.data);
     if (unlink_result == -1) {
       int error_code = errno;
-      DN_OS_ErrSinkAppendF(
+      DN_ErrSinkAppendF(
           error,
           error_code,
           "File '%.*s' was moved but failed to be unlinked from old location: (%d) %s",
@@ -455,7 +455,7 @@ DN_API DN_OSFile DN_OS_FileOpen(DN_Str8         path,
 
   if (access & DN_OSFileAccess_Execute) {
     result.error = true;
-    DN_OS_ErrSinkAppendF(
+    DN_ErrSinkAppendF(
         error,
         1,
         "Failed to open file '%.*s': File access flag 'execute' is not supported",
@@ -479,12 +479,12 @@ DN_API DN_OSFile DN_OS_FileOpen(DN_Str8         path,
 
     if (!handle) { // TODO(doyle): FileOpen flag to string
       result.error = true;
-      DN_OS_ErrSinkAppendF(error,
-                         1,
-                         "Failed to open file '%.*s': File could not be opened in requested "
-                         "mode 'DN_OSFileOpen' flag %d",
-                         DN_Str8PrintFmt(path),
-                         open_mode);
+      DN_ErrSinkAppendF(error,
+                        1,
+                        "Failed to open file '%.*s': File could not be opened in requested "
+                        "mode 'DN_OSFileOpen' flag %d",
+                        DN_Str8PrintFmt(path),
+                        open_mode);
       return result;
     }
     fclose(handle);
@@ -501,12 +501,12 @@ DN_API DN_OSFile DN_OS_FileOpen(DN_Str8         path,
   FILE *handle = fopen(path.data, fopen_mode);
   if (!handle) {
     result.error = true;
-    DN_OS_ErrSinkAppendF(error,
-                         1,
-                         "Failed to open file '%S': File could not be opened with requested "
-                         "access mode 'DN_OSFileAccess' %d",
-                         path,
-                         fopen_mode);
+    DN_ErrSinkAppendF(error,
+                      1,
+                      "Failed to open file '%S': File could not be opened with requested "
+                      "access mode 'DN_OSFileAccess' %d",
+                      path,
+                      fopen_mode);
     return result;
   }
   result.handle = handle;
@@ -523,7 +523,7 @@ DN_API DN_OSFileRead DN_OS_FileRead(DN_OSFile *file, void *buffer, DN_USize size
   if (feof(DN_Cast(FILE*)file->handle)) {
     DN_TCScratch scratch             = DN_TCScratchBegin(nullptr, 0);
     DN_Str8x32   buffer_size_str8 = DN_ByteCountStr8x32(size);
-    DN_OS_ErrSinkAppendF(err, 1, "Failed to read %S from file", buffer_size_str8);
+    DN_ErrSinkAppendF(err, 1, "Failed to read %S from file", buffer_size_str8);
     DN_TCScratchEnd(&scratch);
     return result;
   }
@@ -542,7 +542,7 @@ DN_API bool DN_OS_FileWritePtr(DN_OSFile *file, void const *buffer, DN_USize siz
   if (!result) {
     DN_TCScratch scratch             = DN_TCScratchBegin(nullptr, 0);
     DN_Str8x32   buffer_size_str8 = DN_ByteCountStr8x32(size);
-    DN_OS_ErrSinkAppendF(err, 1, "Failed to write buffer (%s) to file handle", DN_Str8PrintFmt(buffer_size_str8));
+    DN_ErrSinkAppendF(err, 1, "Failed to write buffer (%s) to file handle", DN_Str8PrintFmt(buffer_size_str8));
     DN_TCScratchEnd(&scratch);
   }
   return result;
@@ -553,13 +553,13 @@ DN_API bool DN_OS_FileFlush(DN_OSFile *file, DN_ErrSink *err)
   // TODO: errno is not thread safe
   int fd = fileno(DN_Cast(FILE *) file->handle);
   if (fd == -1) {
-    DN_OS_ErrSinkAppendF(err, errno, "Failed to flush file buffer to disk, file handle could not be converted to descriptor (%d): %s", fd, strerror(errno));
+    DN_ErrSinkAppendF(err, errno, "Failed to flush file buffer to disk, file handle could not be converted to descriptor (%d): %s", fd, strerror(errno));
     return false;
   }
 
   int fsync_result = fsync(fd);
   if (fsync_result == -1) {
-    DN_OS_ErrSinkAppendF(err, errno, "Failed to flush file buffer to disk (%d): %s", fsync_result, strerror(errno));
+    DN_ErrSinkAppendF(err, errno, "Failed to flush file buffer to disk (%d): %s", fsync_result, strerror(errno));
     return false;
   }
   return true;
@@ -833,22 +833,22 @@ DN_API DN_OSExecResult DN_OS_ExecWait(DN_OSExecAsyncHandle handle,
   return result;
 }
 
-DN_API DN_OSExecAsyncHandle DN_OS_ExecAsync(DN_Slice<DN_Str8> cmd_line,
-                                            DN_OSExecArgs    *args,
-                                            DN_ErrSink       *error)
+DN_API DN_OSExecAsyncHandle DN_OS_ExecAsync(DN_Str8Slice   cmd_line,
+                                            DN_OSExecArgs *args,
+                                            DN_ErrSink    *error)
 {
 #if defined(DN_PLATFORM_EMSCRIPTEN)
   DN_InvalidCodePathF("Unsupported operation");
 #endif
-  DN_AssertFOnce(args->environment.size == 0, "Unimplemented in POSIX");
+  DN_AssertFOnce(args->environment.count == 0, "Unimplemented in POSIX");
 
   DN_OSExecAsyncHandle result = {};
-  if (cmd_line.size == 0)
+  if (cmd_line.count == 0)
     return result;
 
-  DN_TCScratch scratch                              = DN_TCScratchBegin(nullptr, 0);
+  DN_TCScratch scratch = DN_TCScratchBegin(nullptr, 0);
   DN_DEFER { DN_TCScratchEnd(&scratch); };
-  DN_Str8    cmd_rendered                      = DN_Slice_Str8Render(scratch.arena, cmd_line, DN_Str8Lit(" "));
+  DN_Str8    cmd_rendered                      = DN_Str8SliceRender(cmd_line, DN_Str8Lit(" "), scratch.arena);
   int        stdout_pipe[DN_OSPipeType__Count] = {};
   int        stderr_pipe[DN_OSPipeType__Count] = {};
 
@@ -856,7 +856,7 @@ DN_API DN_OSExecAsyncHandle DN_OS_ExecAsync(DN_Slice<DN_Str8> cmd_line,
   if (DN_BitIsSet(args->flags, DN_OSExecFlags_SaveStdout)) {
     if (pipe(stdout_pipe) == -1) {
       result.os_error_code = errno;
-      DN_OS_ErrSinkAppendF(
+      DN_ErrSinkAppendF(
           error,
           result.os_error_code,
           "Failed to create stdout pipe to redirect the output of the command '%.*s': %s",
@@ -883,7 +883,7 @@ DN_API DN_OSExecAsyncHandle DN_OS_ExecAsync(DN_Slice<DN_Str8> cmd_line,
       stderr_pipe[DN_OSPipeType__Write] = stdout_pipe[DN_OSPipeType__Write];
     } else if (pipe(stderr_pipe) == -1) {
       result.os_error_code = errno;
-      DN_OS_ErrSinkAppendF(
+      DN_ErrSinkAppendF(
           error,
           result.os_error_code,
           "Failed to create stderr pipe to redirect the output of the command '%.*s': %s",
@@ -906,7 +906,7 @@ DN_API DN_OSExecAsyncHandle DN_OS_ExecAsync(DN_Slice<DN_Str8> cmd_line,
   pid_t child_pid = fork();
   if (child_pid < 0) {
     result.os_error_code = errno;
-    DN_OS_ErrSinkAppendF(
+    DN_ErrSinkAppendF(
         error,
         result.os_error_code,
         "Failed to fork process to execute the command '%.*s': %s",
@@ -919,7 +919,7 @@ DN_API DN_OSExecAsyncHandle DN_OS_ExecAsync(DN_Slice<DN_Str8> cmd_line,
     if (DN_BitIsSet(args->flags, DN_OSExecFlags_SaveStdout) &&
         (dup2(stdout_pipe[DN_OSPipeType__Write], STDOUT_FILENO) == -1)) {
       result.os_error_code = errno;
-      DN_OS_ErrSinkAppendF(
+      DN_ErrSinkAppendF(
           error,
           result.os_error_code,
           "Failed to redirect stdout 'write' pipe for output of command '%.*s': %s",
@@ -931,7 +931,7 @@ DN_API DN_OSExecAsyncHandle DN_OS_ExecAsync(DN_Slice<DN_Str8> cmd_line,
     if (DN_BitIsSet(args->flags, DN_OSExecFlags_SaveStderr) &&
         (dup2(stderr_pipe[DN_OSPipeType__Write], STDERR_FILENO) == -1)) {
       result.os_error_code = errno;
-      DN_OS_ErrSinkAppendF(
+      DN_ErrSinkAppendF(
           error,
           result.os_error_code,
           "Failed to redirect stderr 'read' pipe for output of command '%.*s': %s",
@@ -942,10 +942,10 @@ DN_API DN_OSExecAsyncHandle DN_OS_ExecAsync(DN_Slice<DN_Str8> cmd_line,
 
     // NOTE: Convert the command into something suitable for execvp
     char **argv =
-        DN_ArenaNewArray(scratch.arena, char *, cmd_line.size + 1 /*null*/, DN_ZMem_Yes);
+        DN_ArenaNewArray(scratch.arena, char *, cmd_line.count + 1 /*null*/, DN_ZMem_Yes);
     if (!argv) {
       result.exit_code = -1;
-      DN_OS_ErrSinkAppendF(
+      DN_ErrSinkAppendF(
           error,
           result.os_error_code,
           "Failed to create argument values from command line '%.*s': Out of memory",
@@ -953,7 +953,7 @@ DN_API DN_OSExecAsyncHandle DN_OS_ExecAsync(DN_Slice<DN_Str8> cmd_line,
       return result;
     }
 
-    for (DN_ForIndexU(arg_index, cmd_line.size)) {
+    for (DN_ForIndexU(arg_index, cmd_line.count)) {
       DN_Str8 arg     = cmd_line.data[arg_index];
       argv[arg_index] = DN_Str8FromStr8Arena(scratch.arena, arg).data; // NOTE: Copy string to guarantee it is null-terminated
     }
@@ -976,7 +976,7 @@ DN_API DN_OSExecAsyncHandle DN_OS_ExecAsync(DN_Slice<DN_Str8> cmd_line,
       DN_Str8 working_dir = DN_Str8FromStr8Arena(scratch.arena, args->working_dir);
       if (chdir(working_dir.data) == -1) {
         result.os_error_code = errno;
-        DN_OS_ErrSinkAppendF(
+        DN_ErrSinkAppendF(
             error,
             result.os_error_code,
             "Failed to create argument values from command line '%.*s': %s",
@@ -990,7 +990,7 @@ DN_API DN_OSExecAsyncHandle DN_OS_ExecAsync(DN_Slice<DN_Str8> cmd_line,
     // binary to execute is guaranteed to be null-terminated.
     if (execvp(argv[0], argv) < 0) {
       result.os_error_code = errno;
-      DN_OS_ErrSinkAppendF(
+      DN_ErrSinkAppendF(
           error,
           result.os_error_code,
           "Failed to execute command'%.*s': %s",
@@ -1290,7 +1290,7 @@ static void *DN_OS_ThreadFunc_(void *user_context)
   return nullptr;
 }
 
-DN_API bool DN_OS_ThreadInit(DN_OSThread *thread, DN_OSThreadFunc *func, DN_TCLane *lane, void *user_context)
+DN_API bool DN_OS_ThreadInit(DN_OSThread *thread, DN_OSThreadFunc *func, DN_OSThreadLane *lane, void *user_context)
 {
   bool result = false;
   if (!thread)
@@ -1299,7 +1299,7 @@ DN_API bool DN_OS_ThreadInit(DN_OSThread *thread, DN_OSThreadFunc *func, DN_TCLa
   thread->func           = func;
   thread->user_context   = user_context;
   thread->init_semaphore = DN_OS_SemaphoreInit(0 /*initial_count*/);
-  thread->lane           = lane;
+  thread->lane           = *lane;
 
   // TODO(doyle): Check if semaphore is valid
   // NOTE: pthread_t is essentially the thread ID. In Windows, the handle and
@@ -1412,28 +1412,28 @@ DN_API DN_OSPosixProcSelfStatus DN_OS_PosixProcSelfStatus()
     DN_Str8 const      VM_PEAK    = DN_Str8Lit("VmPeak:");
     DN_Str8 const      VM_SIZE    = DN_Str8Lit("VmSize:");
     DN_Str8            status_buf = DN_Str8BuilderBuild(&builder, tmem.arena);
-    DN_Str8SplitResult lines      = DN_Str8Split(tmem.arena, status_buf, DN_Str8Lit("\n"), DN_Str8SplitIncludeEmptyStrings_No);
+    DN_Str8SplitResult lines      = DN_Str8SplitArena(tmem.arena, status_buf, DN_Str8Lit("\n"), DN_Str8SplitIncludeEmptyStrings_No);
 
     for (DN_ForItSize(line_it, DN_Str8, lines.data, lines.count)) {
-      DN_Str8       line    = DN_Str8TrimWhitespaceAround(*line_it.data);
+      DN_Str8 line = DN_Str8TrimWhitespaceAround(*line_it.data);
       if (DN_Str8StartsWith(line, NAME, DN_Str8EqCase_Insensitive)) {
-        DN_Str8 str8     = DN_Str8TrimWhitespaceAround(DN_Str8Slice(line, NAME.size, line.size));
+        DN_Str8 str8     = DN_Str8TrimWhitespaceAround(DN_Str8Subset(line, NAME.size, line.size));
         result.name_size = DN_Min(str8.size, sizeof(result.name));
         DN_Memcpy(result.name, str8.data, result.name_size);
       } else if (DN_Str8StartsWith(line, PID, DN_Str8EqCase_Insensitive)) {
-        DN_Str8          str8   = DN_Str8TrimWhitespaceAround(DN_Str8Slice(line, PID.size, line.size));
+        DN_Str8          str8   = DN_Str8TrimWhitespaceAround(DN_Str8Subset(line, PID.size, line.size));
         DN_U64FromResult to_u64 = DN_U64FromStr8(str8, 0);
         result.pid              = to_u64.value;
         DN_Assert(to_u64.success);
       } else if (DN_Str8StartsWith(line, VM_SIZE, DN_Str8EqCase_Insensitive)) {
-        DN_Str8 size_with_kb = DN_Str8TrimWhitespaceAround(DN_Str8Slice(line, VM_SIZE.size, line.size));
+        DN_Str8 size_with_kb = DN_Str8TrimWhitespaceAround(DN_Str8Subset(line, VM_SIZE.size, line.size));
         DN_Assert(DN_Str8EndsWith(size_with_kb, DN_Str8Lit("kB")));
         DN_Str8          vm_size = DN_Str8BSplit(size_with_kb, DN_Str8Lit(" ")).lhs;
         DN_U64FromResult to_u64  = DN_U64FromStr8(vm_size, 0);
         result.vm_size           = DN_Kilobytes(to_u64.value);
         DN_Assert(to_u64.success);
       } else if (DN_Str8StartsWith(line, VM_PEAK, DN_Str8EqCase_Insensitive)) {
-        DN_Str8 size_with_kb = DN_Str8TrimWhitespaceAround(DN_Str8Slice(line, VM_PEAK.size, line.size));
+        DN_Str8 size_with_kb = DN_Str8TrimWhitespaceAround(DN_Str8Subset(line, VM_PEAK.size, line.size));
         DN_Assert(DN_Str8EndsWith(size_with_kb, DN_Str8Lit("kB")));
         DN_Str8          vm_size = DN_Str8BSplit(size_with_kb, DN_Str8Lit(" ")).lhs;
         DN_U64FromResult to_u64  = DN_U64FromStr8(vm_size, 0);
@@ -1498,7 +1498,7 @@ static void DN_OS_HttpRequestEMFetchOnSuccessCallback(emscripten_fetch_t *fetch)
     return;
 
   response->http_status = DN_Cast(DN_U32) fetch->status;
-  response->body        = DN_Str8FromArena(response->arena, fetch->numBytes, DN_ZMem_No);
+  response->body        = DN_Str8AllocArena(response->arena, fetch->numBytes, DN_ZMem_No);
   if (response->body.data)
     DN_Memcpy(response->body.data, fetch->data, fetch->numBytes);
 
@@ -1513,7 +1513,7 @@ static void DN_OS_HttpRequestEMFetchOnErrorCallback(emscripten_fetch_t *fetch)
     return;
 
   response->http_status = DN_Cast(DN_U32) fetch->status;
-  response->body        = DN_Str8FromArena(response->arena, fetch->numBytes, DN_ZMem_No);
+  response->body        = DN_Str8AllocArena(response->arena, fetch->numBytes, DN_ZMem_No);
   if (response->body.size)
     DN_Memcpy(response->body.data, fetch->data, fetch->numBytes);
 

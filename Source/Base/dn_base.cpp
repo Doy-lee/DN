@@ -1154,7 +1154,8 @@ DN_API DN_Str8x64 DN_ArenaInfoStr8x64(DN_ArenaInfo info)
   DN_Str8x32 used    = DN_ByteCountStr8x32(info.used);
   DN_Str8x32 commit  = DN_ByteCountStr8x32(info.commit);
   DN_Str8x32 reserve = DN_ByteCountStr8x32(info.reserve);
-  result             = DN_Str8x64FromFmt("Blks/Used/Comm/Resv (%u/%.*s/%.*s/%.*s)", DN_Cast(DN_U32)info.blocks, DN_Str8PrintFmt(used), DN_Str8PrintFmt(commit), DN_Str8PrintFmt(reserve));
+  // NOTE: Blocks, Used, Commit, Reserve
+  result             = DN_Str8x64FromFmt("B=%u U=%.*s C=%.*s R=%.*s", DN_Cast(DN_U32)info.blocks, DN_Str8PrintFmt(used), DN_Str8PrintFmt(commit), DN_Str8PrintFmt(reserve));
   return result;
 }
 
@@ -1533,7 +1534,10 @@ DN_API void DN_ErrSinkEndExitIfErrorF_(DN_ErrSink *err, DN_CallSite call_site, D
 
 DN_API void DN_ErrSinkAppendFV_(DN_ErrSink *err, DN_U32 error_code, DN_CallSite call_site, DN_FMT_ATTRIB char const *fmt, va_list args)
 {
-  DN_Assert(err && err->stack_size);
+  if (!err)
+    return;
+
+  DN_Assert(err->stack_size);
   DN_ErrSinkNode *node = err->stack + (err->stack_size - 1);
   DN_AssertF(node, "Error sink must be begun by calling 'Begin' before using this function.");
 
@@ -1613,7 +1617,7 @@ DN_API DN_Arena *DN_TCMainArena()
   return result;
 }
 
-DN_API DN_Arena *DN_TCTempArena(DN_Arena **conflicts, DN_U64 count)
+DN_API DN_Arena *DN_TCTempArena(DN_Arena **conflicts, DN_USize count)
 {
   DN_TCCore *tc           = DN_TCGet();
   DN_Arena  *candidates[] = {tc->temp_a_arena, tc->temp_b_arena};
@@ -1647,7 +1651,7 @@ DN_TCScratchCpp::~DN_TCScratchCpp()
 }
 #endif
 
-DN_API DN_TCScratch DN_TCScratchBegin(DN_Arena **conflicts, DN_U64 count)
+DN_API DN_TCScratch DN_TCScratchBegin(DN_Arena **conflicts, DN_USize count)
 {
   DN_TCScratch result = {};
   result.arena        = DN_TCTempArena(conflicts, count);
@@ -3228,7 +3232,7 @@ DN_API DN_Str8Slice DN_Str8BuilderBuildSlice(DN_Str8Builder const *builder, DN_A
 }
 
 // NOTE: DN_UTF
-DN_API int DN_UTF8EncodeCodepoint(DN_U8 utf8[4], DN_U32 codepoint)
+DN_API int DN_UTF8Encode(DN_U8 utf8[4], DN_U32 codepoint)
 {
   // NOTE: Table from https://www.reedbeta.com/blog/programmers-intro-to-unicode/
   // ----------------------------------------+----------------------------+--------------------+
@@ -3269,7 +3273,96 @@ DN_API int DN_UTF8EncodeCodepoint(DN_U8 utf8[4], DN_U32 codepoint)
   return 0;
 }
 
-DN_API int DN_UTF16EncodeCodepoint(DN_U16 utf16[2], DN_U32 codepoint)
+DN_API DN_UTF8DecodeResult DN_UTF8Decode(DN_Str8 stream)
+{
+  DN_UTF8DecodeResult result = {};
+  result.remaining           = stream;
+  if (stream.size <= 0)
+    return result;
+
+  DN_U8 b0 = DN_Cast(DN_U8)stream.data[0];
+  DN_U8 b1 = DN_Cast(DN_U8)(stream.size >= 2 ? stream.data[1] : 0);
+  DN_U8 b2 = DN_Cast(DN_U8)(stream.size >= 3 ? stream.data[2] : 0);
+  DN_U8 b3 = DN_Cast(DN_U8)(stream.size >= 4 ? stream.data[3] : 0);
+
+  if ((b0 & 0b1000'0000) == 0) {
+    result.codepoint = b0;
+    result.success   = true;
+    result.remaining = DN_Str8FromPtr(stream.data + 1, stream.size - 1);
+    return result;
+  }
+
+  if ((b0 & 0b1110'0000) == 0b1100'0000) {
+    if (stream.size < 2)
+      return result;
+    if ((b1 & 0b1100'0000) != 0b1000'0000)
+      return result;
+    DN_U32 cp = ((b0 & 0b0001'1111) << 6) | ((b1 & 0b0011'1111) << 0);
+    if (cp < 0x80)
+      return result;
+    result.codepoint  = cp;
+    result.success   = true;
+    result.remaining = DN_Str8FromPtr(stream.data + 2, stream.size - 2);
+    return result;
+  }
+
+  if ((b0 & 0b1111'0000) == 0b1110'0000) {
+    if (stream.size < 3)
+      return result;
+    if ((b1 & 0b1100'0000) != 0b1000'0000)
+      return result;
+    if ((b2 & 0b1100'0000) != 0b1000'0000)
+      return result;
+    DN_U32 cp = ((b0 & 0b0000'1111) << 12) | ((b1 & 0b0011'1111) << 6) | ((b2 & 0b0011'1111) << 0);
+    if (cp < 0x800)
+      return result;
+    result.codepoint  = cp;
+    result.success   = true;
+    result.remaining = DN_Str8FromPtr(stream.data + 3, stream.size - 3);
+    return result;
+  }
+
+  if ((b0 & 0b1111'1000) == 0b1111'0000) {
+    if (stream.size < 4)
+      return result;
+    if ((b1 & 0b1100'0000) != 0b1000'0000)
+      return result;
+    if ((b2 & 0b1100'0000) != 0b1000'0000)
+      return result;
+    if ((b3 & 0b1100'0000) != 0b1000'0000)
+      return result;
+    DN_U32 cp = ((b0 & 0b0000'0111) << 18)  |
+                 ((b1 & 0b0011'1111) << 12) |
+                 ((b2 & 0b0011'1111) << 6)  |
+                 ((b3 & 0b0011'1111) << 0);
+    if (cp < 0x10000 || cp > 0x10FFFF)
+      return result;
+    result.codepoint = cp;
+    result.success   = true;
+    result.remaining = DN_Str8FromPtr(stream.data + 4, stream.size - 4);
+    return result;
+  }
+
+  return result;
+}
+
+DN_API bool DN_UTF8DecodeIterate(DN_UTF8DecodeIterator *it, DN_Str8 utf8)
+{
+  if (it->init) {
+    it->codepoint_index++;
+  } else {
+    it->remaining = utf8;
+    it->init      = true;
+  }
+  DN_UTF8DecodeResult decode = DN_UTF8Decode(it->remaining);
+  it->success                = decode.success;
+  it->remaining              = decode.remaining;
+  it->codepoint              = decode.codepoint;
+  bool result                = it->success;
+  return result;
+}
+
+DN_API int DN_UTF16Encode(DN_U16 utf16[2], DN_U32 codepoint)
 {
   // NOTE: Table from https://www.reedbeta.com/blog/programmers-intro-to-unicode/
   // ----------------------------------------+------------------------------------+------------------+
@@ -4286,6 +4379,36 @@ DN_API DN_LogTypeParam DN_LogTypeParamFromType(DN_LogType type)
   return result;
 }
 
+DN_API DN_F32 DN_F32Lerp(DN_F32 a, DN_F32 t, DN_F32 b)
+{
+  DN_F32 result = a + ((b - a) * t);
+  return result;
+}
+
+DN_API DN_F32 DN_F32Floor(DN_F32 val)
+{
+  DN_I32 val_i32 = DN_Cast(DN_I32) val;
+  if (val < 0 && val != DN_Cast(DN_F32) val_i32)
+    val_i32 -= 1;
+  DN_F32 result = DN_Cast(DN_F32)val_i32;
+  return result;
+}
+
+DN_API DN_F32 DN_F32Ceil(DN_F32 val)
+{
+  DN_I32 val_i32 = DN_Cast(DN_I32)(val);
+  if (val > 0 && val != DN_Cast(DN_F32) val_i32)
+    val_i32 += 1;
+  DN_F32 result = DN_Cast(DN_F32) val_i32;
+  return result;
+}
+
+DN_API DN_F32 DN_F32RoundHalfUp(DN_F32 val)
+{
+  DN_F32 result = val >= 0 ? DN_F32Floor(val + 0.5f) : DN_F32Ceil(val - 0.5f);
+  return result;
+}
+
 DN_API bool operator==(DN_V2I32 lhs, DN_V2I32 rhs)
 {
   bool result = (lhs.x == rhs.x) && (lhs.y == rhs.y);
@@ -4572,6 +4695,14 @@ DN_API DN_V2U16 &operator+=(DN_V2U16 &lhs, DN_V2U16 rhs)
 {
   lhs = lhs + rhs;
   return lhs;
+}
+
+DN_API DN_V2F32 DN_V2F32Lerp(DN_V2F32 a, DN_F32 t, DN_V2F32 b)
+{
+  DN_V2F32 result = {};
+  result.x        = a.x + ((b.x - a.x) * t);
+  result.y        = a.y + ((b.y - a.y) * t);
+  return result;
 }
 
 DN_API bool operator!=(DN_V2F32 lhs, DN_V2F32 rhs)
@@ -5094,6 +5225,15 @@ DN_API DN_V3F32 &operator+=(DN_V3F32 &lhs, DN_V3F32 rhs)
   return lhs;
 }
 
+DN_API DN_V3F32 DN_V3F32Lerp(DN_V3F32 lhs, DN_F32 t01, DN_V3F32 rhs)
+{
+  DN_V3F32 result = {};
+  result.x        = lhs.x + ((rhs.x - lhs.x) * t01);
+  result.y        = lhs.y + ((rhs.y - lhs.y) * t01);
+  result.z        = lhs.z + ((rhs.z - lhs.z) * t01);
+  return result;
+}
+
 DN_API DN_F32 DN_V3_LengthSq(DN_V3F32 a)
 {
   DN_F32 result = DN_Squared(a.x) + DN_Squared(a.y) + DN_Squared(a.z);
@@ -5114,22 +5254,78 @@ DN_API DN_V3F32 DN_V3_Normalise(DN_V3F32 a)
   return result;
 }
 
-DN_API DN_V4F32 DN_V4F32FromRGBU32(DN_U32 u32)
+DN_API DN_V4F32 DN_V4F32Lerp(DN_V4F32 lhs, DN_F32 t01, DN_V4F32 rhs)
+{
+  DN_V4F32 result = {};
+  result.x        = lhs.x + (rhs.x - lhs.x) * t01;
+  result.y        = lhs.y + (rhs.y - lhs.y) * t01;
+  result.z        = lhs.z + (rhs.z - lhs.z) * t01;
+  result.w        = lhs.w + (rhs.w - lhs.w) * t01;
+  return result;
+}
+
+DN_API bool DN_V4F32RGBA01IsValid(DN_V4F32 rgba01)
+{
+  bool result = rgba01.r >= 0 && rgba01.r <= 1.f &&
+                rgba01.g >= 0 && rgba01.g <= 1.f &&
+                rgba01.b >= 0 && rgba01.b <= 1.f &&
+                rgba01.a >= 0 && rgba01.a <= 1.f;
+  return result;
+}
+
+DN_API DN_V4F32 DN_V4F32RGBA01FromRGBU32(DN_U32 u32)
 {
   DN_U8    r      = (DN_U8)((u32 & 0x00FF0000) >> 16);
   DN_U8    g      = (DN_U8)((u32 & 0x0000FF00) >> 8);
   DN_U8    b      = (DN_U8)((u32 & 0x000000FF) >> 0);
-  DN_V4F32 result = DN_V4F32FromRGBU8(r, g, b);
+  DN_V4F32 result = DN_V4F32RGBA01FromRGBU8(r, g, b);
   return result;
 }
 
-DN_API DN_V4F32 DN_V4F32FromRGBAU32(DN_U32 u32)
+DN_API DN_V4F32 DN_V4F32RGBA01FromRGBAU32(DN_U32 u32)
 {
   DN_U8    r      = (DN_U8)((u32 & 0xFF000000) >> 24);
   DN_U8    g      = (DN_U8)((u32 & 0x00FF0000) >> 16);
   DN_U8    b      = (DN_U8)((u32 & 0x0000FF00) >> 8);
   DN_U8    a      = (DN_U8)((u32 & 0x000000FF) >> 0);
-  DN_V4F32 result = DN_V4F32FromRGBAU8(r, g, b, a);
+  DN_V4F32 result = DN_V4F32RGBA01FromRGBAU8(r, g, b, a);
+  return result;
+}
+
+#define DN_SRGB_COEFFICIENT_F32 2.2f
+DN_API DN_V4F32 DN_V4F32Linear01FromSRGB01(DN_V4F32 srgb01)
+{
+  DN_Assert(srgb01.x >= 0.f && srgb01.x <= 1.f);
+  DN_Assert(srgb01.y >= 0.f && srgb01.y <= 1.f);
+  DN_Assert(srgb01.z >= 0.f && srgb01.z <= 1.f);
+  DN_Assert(srgb01.a >= 0.f && srgb01.a <= 1.f);
+  DN_V4F32 result = {};
+  result.r        = DN_PowF32(srgb01.r, DN_SRGB_COEFFICIENT_F32);
+  result.g        = DN_PowF32(srgb01.g, DN_SRGB_COEFFICIENT_F32);
+  result.b        = DN_PowF32(srgb01.b, DN_SRGB_COEFFICIENT_F32);
+  result.a        = srgb01.a;
+  return result;
+}
+
+DN_API DN_V4F32 DN_V4F32Linear01Desaturate(DN_V4F32 linear01, DN_F32 t01)
+{
+  DN_F32   luminance = (linear01.r * DN_V3F32_RGB_LUMINANCE.r) + (linear01.g * DN_V3F32_RGB_LUMINANCE.g) + (linear01.b * DN_V3F32_RGB_LUMINANCE.b);
+  DN_V4F32 result    = linear01;
+  result.rgb         = DN_V3F32Lerp(result.rgb, t01, DN_V3F32From1N(luminance));
+  return result;
+}
+
+DN_API DN_V4F32 DN_V4F32SRGB01FromLinear01(DN_V4F32 linear01)
+{
+  DN_Assert(linear01.x >= 0.f && linear01.x <= 1.f);
+  DN_Assert(linear01.y >= 0.f && linear01.y <= 1.f);
+  DN_Assert(linear01.z >= 0.f && linear01.z <= 1.f);
+  DN_Assert(linear01.a >= 0.f && linear01.a <= 1.f);
+  DN_V4F32 result = {};
+  result.r        = DN_PowF32(linear01.r, 1.f / DN_SRGB_COEFFICIENT_F32);
+  result.g        = DN_PowF32(linear01.g, 1.f / DN_SRGB_COEFFICIENT_F32);
+  result.b        = DN_PowF32(linear01.b, 1.f / DN_SRGB_COEFFICIENT_F32);
+  result.a        = linear01.a;
   return result;
 }
 
@@ -5554,16 +5750,80 @@ DN_API DN_M2x3 DN_M2x3Scale(DN_V2F32 scale)
 
 DN_API DN_M2x3 DN_M2x3Rotate(DN_F32 radians)
 {
-  DN_M2x3 result = {
-      {
-       DN_CosF32(radians),
-       DN_SinF32(radians),
-       0,
-       -DN_SinF32(radians),
-       DN_CosF32(radians),
-       0,
-       }
-  };
+  DN_M2x3 result = {{
+     DN_CosF32(radians), DN_SinF32(radians), 0,
+    -DN_SinF32(radians), DN_CosF32(radians), 0,
+  }};
+  return result;
+}
+
+DN_API DN_M2x3 DN_M2x3ProjFromV2F32(DN_V2F32 size, DN_M2x3ProjOrigin origin)
+{
+  DN_M2x3 result = {};
+
+  // NOTE: Maps coordinates within a rectangle of `size` into NDC where (-1, +1) is top left, (+1, -1) is bot right
+  if (origin == DN_M2x3ProjOrigin_TopLeft) {
+    result = {{
+       2.f/size.w, 0,           -1.f,
+       0,          -2.f/size.h, +1.f,
+    }};
+  } else {
+    DN_Assert(origin == DN_M2x3ProjOrigin_Center);
+    result = {{
+       2.f/size.w, 0,           0.f,
+       0,          -2.f/size.h, 0.f,
+    }};
+  }
+  return result;
+}
+
+DN_API DN_M2x3XForm DN_M2x3XFormFromM2x3(DN_M2x3 forward, DN_M2x3 inverse)
+{
+  DN_M2x3XForm result = {};
+  result.forward      = forward;
+  result.inverse      = inverse;
+  return result;
+}
+
+DN_API DN_M2x3XForm DN_M2x3XFormFromTRS(DN_V2F32 pos, DN_V2F32 scale, DN_F32 rotate_rads, DN_V2F32 pivot_pos)
+{
+  DN_M2x3XForm result = {};
+  result.forward      = DN_M2x3Identity();
+  result.inverse      = DN_M2x3Identity();
+
+  if (scale.x == 0)
+    scale.x = 1;
+  if (scale.y == 0)
+    scale.y = 1;
+
+  result.forward      = DN_M2x3Mul(result.forward, DN_M2x3Translate(pivot_pos));
+  result.forward      = DN_M2x3Mul(result.forward, DN_M2x3Rotate(rotate_rads));
+  result.forward      = DN_M2x3Mul(result.forward, DN_M2x3Scale(scale));
+  result.forward      = DN_M2x3Mul(result.forward, DN_M2x3Translate(-pivot_pos));
+  result.forward      = DN_M2x3Mul(result.forward, DN_M2x3Translate(pos));
+
+  DN_V2F32 inverse_scale = DN_V2F32From1N(1) / scale;
+  result.inverse      = DN_M2x3Mul(result.inverse, DN_M2x3Translate(-pos));
+  result.inverse      = DN_M2x3Mul(result.inverse, DN_M2x3Translate(pivot_pos));
+  result.inverse      = DN_M2x3Mul(result.inverse, DN_M2x3Scale(inverse_scale));
+  result.inverse      = DN_M2x3Mul(result.inverse, DN_M2x3Rotate(-rotate_rads));
+  result.inverse      = DN_M2x3Mul(result.inverse, DN_M2x3Translate(-pivot_pos));
+  return result;
+}
+
+DN_API DN_M2x3XForm DN_M2x3XFormIdentity()
+{
+  DN_M2x3XForm result = {};
+  result.forward      = DN_M2x3Identity();
+  result.inverse      = DN_M2x3Identity();
+  return result;
+}
+
+DN_API DN_M2x3XForm DN_M2x3XFormMul(DN_M2x3XForm m1, DN_M2x3XForm m2)
+{
+  DN_M2x3XForm result = {};
+  result.forward = DN_M2x3Mul(m1.forward, m2.forward);
+  result.inverse = DN_M2x3Mul(m2.inverse, m1.inverse);
   return result;
 }
 
@@ -5613,6 +5873,16 @@ DN_API DN_V2F32 DN_M2x3Mul2F32(DN_M2x3 m1, DN_F32 x, DN_F32 y)
 DN_API DN_V2F32 DN_M2x3MulV2F32(DN_M2x3 m1, DN_V2F32 v2)
 {
   DN_V2F32 result = DN_M2x3Mul2F32(m1, v2.x, v2.y);
+  return result;
+}
+
+DN_API DN_Rect DN_M2x3MulRect(DN_M2x3 m1, DN_Rect rect)
+{
+  DN_2V2F32    rect_range   = DN_RectRange(rect);
+  DN_2V2F32    result_range = {};
+  result_range.min          = DN_M2x3MulV2F32(m1, rect_range.min);
+  result_range.max          = DN_M2x3MulV2F32(m1, rect_range.max);
+  DN_Rect      result       = DN_RectFrom2V2(result_range.min, result_range.max - result_range.min);
   return result;
 }
 
@@ -5712,11 +5982,17 @@ DN_API DN_Rect DN_RectUnion(DN_Rect a, DN_Rect b)
   return result;
 }
 
-DN_API DN_RectMinMax DN_RectGetMinMax(DN_Rect a)
+DN_API DN_2V2F32 DN_RectRange(DN_Rect a)
 {
-  DN_RectMinMax result = {};
-  result.min           = a.pos;
-  result.max           = a.pos + a.size;
+  DN_2V2F32 result = {};
+  result.min       = a.pos;
+  result.max       = a.pos + a.size;
+  return result;
+}
+
+DN_API bool DN_RectEq(DN_Rect lhs, DN_Rect rhs)
+{
+  bool result = lhs.pos == rhs.pos && lhs.size == rhs.size;
   return result;
 }
 
@@ -5849,19 +6125,5 @@ DN_API DN_RaycastV2 DN_RaycastLineIntersectV2(DN_V2F32 origin_a, DN_V2F32 dir_a,
     result.t_b = (((origin_a.y - origin_b.y) * dir_a.x) + ((origin_b.x - origin_a.x) * dir_a.y)) / denominator;
     result.hit = true;
   }
-  return result;
-}
-
-DN_API DN_V2F32 DN_LerpV2F32(DN_V2F32 a, DN_F32 t, DN_V2F32 b)
-{
-  DN_V2F32 result = {};
-  result.x        = a.x + ((b.x - a.x) * t);
-  result.y        = a.y + ((b.y - a.y) * t);
-  return result;
-}
-
-DN_API DN_F32 DN_LerpF32(DN_F32 a, DN_F32 t, DN_F32 b)
-{
-  DN_F32 result = a + ((b - a) * t);
   return result;
 }
