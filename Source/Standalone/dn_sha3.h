@@ -124,7 +124,7 @@ bool            DN_SHA3U8x48Eq         (DN_SHA3U8x48 const *a, DN_SHA3U8x48 cons
 bool            DN_SHA3U8x64Eq         (DN_SHA3U8x64 const *a, DN_SHA3U8x64 const *b);
 #endif // DN_SHA3_H
 
-#if defined(DN_SHA3_IMPLEMENTATION) || 1
+#if defined(DN_SHA3_IMPLEMENTATION)
 uint64_t const DN_SHA3_ROUNDS[] = {
   0x0000000000000001, 0x0000000000008082, 0x800000000000808A, 0x8000000080008000, 0x000000000000808B,
   0x0000000080000001, 0x8000000080008081, 0x8000000000008009, 0x000000000000008A, 0x0000000000000088,
@@ -209,6 +209,7 @@ static void DN_SHA3FamilyPermute_(void *state)
 DN_SHA3State DN_SHA3FamilyInit(DN_SHA3Family type, size_t hash_size_bits)
 {
   DN_SHA3Assert(hash_size_bits == 224 ||
+                hash_size_bits == 256 ||
                 hash_size_bits == 384 ||
                 hash_size_bits == 512);
 
@@ -365,7 +366,7 @@ DN_SHA3U8x64 DN_SHA3Hash512b(void const *src, size_t src_size)
 
 void DN_KeccakHash224bPtr(void const *src, size_t src_size, void *dest, size_t dest_size)
 {
-  DN_SHA3FamilyHash(DN_SHA3Family_SHA3, /*hash_size_bits=*/ 224, src, src_size, dest, dest_size);
+  DN_SHA3FamilyHash(DN_SHA3Family_Keccak, /*hash_size_bits=*/ 224, src, src_size, dest, dest_size);
 }
 
 DN_SHA3U8x28 DN_KeccakHash224b(void const *src, size_t src_size)
@@ -377,7 +378,7 @@ DN_SHA3U8x28 DN_KeccakHash224b(void const *src, size_t src_size)
 
 void DN_KeccakHash256bPtr(void const *src, size_t src_size, void *dest, size_t dest_size)
 {
-  DN_SHA3FamilyHash(DN_SHA3Family_SHA3, /*hash_size_bits=*/ 256, src, src_size, dest, dest_size);
+  DN_SHA3FamilyHash(DN_SHA3Family_Keccak, /*hash_size_bits=*/ 256, src, src_size, dest, dest_size);
 }
 
 DN_SHA3U8x32 DN_KeccakHash256b(void const *src, size_t src_size)
@@ -389,7 +390,7 @@ DN_SHA3U8x32 DN_KeccakHash256b(void const *src, size_t src_size)
 
 void DN_KeccakHash384bPtr(void const *src, size_t src_size, void *dest, size_t dest_size)
 {
-  DN_SHA3FamilyHash(DN_SHA3Family_SHA3, /*hash_size_bits=*/ 384, src, src_size, dest, dest_size);
+  DN_SHA3FamilyHash(DN_SHA3Family_Keccak, /*hash_size_bits=*/ 384, src, src_size, dest, dest_size);
 }
 
 DN_SHA3U8x48 DN_KeccakHash384b(void const *src, size_t src_size)
@@ -401,7 +402,7 @@ DN_SHA3U8x48 DN_KeccakHash384b(void const *src, size_t src_size)
 
 void DN_KeccakHash512bPtr(void const *src, size_t src_size, void *dest, size_t dest_size)
 {
-  DN_SHA3FamilyHash(DN_SHA3Family_SHA3, /*hash_size_bits=*/ 512, src, src_size, dest, dest_size);
+  DN_SHA3FamilyHash(DN_SHA3Family_Keccak, /*hash_size_bits=*/ 512, src, src_size, dest, dest_size);
 }
 
 DN_SHA3U8x64 DN_KeccakHash512b(void const *src, size_t src_size)
