@@ -420,11 +420,13 @@ struct DN_Str8Slice
   DN_USize count;
 };
 
-struct DN_Str8x16  { char data[16];  DN_USize size; };
-struct DN_Str8x32  { char data[32];  DN_USize size; };
-struct DN_Str8x64  { char data[64];  DN_USize size; };
-struct DN_Str8x128 { char data[128]; DN_USize size; };
-struct DN_Str8x256 { char data[256]; DN_USize size; };
+struct DN_Str8x16   { char data[16];  DN_USize size; };
+struct DN_Str8x32   { char data[32];  DN_USize size; };
+struct DN_Str8x64   { char data[64];  DN_USize size; };
+struct DN_Str8x128  { char data[128]; DN_USize size; };
+struct DN_Str8x256  { char data[256]; DN_USize size; };
+struct DN_Str8x512  { char data[512]; DN_USize size; };
+struct DN_Str8x1024 { char data[1024]; DN_USize size; };
 
 struct DN_Str16 // A pointer and length style string that holds slices to UTF16 bytes.
 {
@@ -1353,16 +1355,27 @@ DN_API DN_U64                   DN_AlignUpPowerOfTwoU64                         
 DN_API DN_U32                   DN_AlignUpPowerOfTwoU32                                (DN_U32 val);
 
 DN_API void                     DN_ByteSwapU64Ptr                                      (DN_U8* dest, DN_U64 src);
-#define                         DN_ByteSwap64(u64) ( \
-                                                    (((((DN_U64)(u64)) >> 56) & 0xFF) <<  0) | \
-                                                    (((((DN_U64)(u64)) >> 48) & 0xFF) <<  8) | \
-                                                    (((((DN_U64)(u64)) >> 40) & 0xFF) << 16) | \
-                                                    (((((DN_U64)(u64)) >> 32) & 0xFF) << 24) | \
-                                                    (((((DN_U64)(u64)) >> 24) & 0xFF) << 32) | \
-                                                    (((((DN_U64)(u64)) >> 16) & 0xFF) << 40) | \
-                                                    (((((DN_U64)(u64)) >> 8)  & 0xFF) << 48) | \
-                                                    (((((DN_U64)(u64)) >> 0)  & 0xFF) << 56)   \
+#define                         DN_ByteSwap64(val) ( \
+                                                    (((((DN_U64)(val)) >> 56) & 0xFF) <<  0) | \
+                                                    (((((DN_U64)(val)) >> 48) & 0xFF) <<  8) | \
+                                                    (((((DN_U64)(val)) >> 40) & 0xFF) << 16) | \
+                                                    (((((DN_U64)(val)) >> 32) & 0xFF) << 24) | \
+                                                    (((((DN_U64)(val)) >> 24) & 0xFF) << 32) | \
+                                                    (((((DN_U64)(val)) >> 16) & 0xFF) << 40) | \
+                                                    (((((DN_U64)(val)) >> 8)  & 0xFF) << 48) | \
+                                                    (((((DN_U64)(val)) >> 0)  & 0xFF) << 56)   \
                                                    )
+#define                         DN_ByteSwap32(val) ( \
+                                                    (((((DN_U32)(val)) >> 24) & 0xFF) << 0)  | \
+                                                    (((((DN_U32)(val)) >> 16) & 0xFF) << 8)  | \
+                                                    (((((DN_U32)(val)) >> 8)  & 0xFF) << 16) | \
+                                                    (((((DN_U32)(val)) >> 0)  & 0xFF) << 24)   \
+                                                   )
+#if defined(DN_64_BIT)
+  #define                       DN_ByteSwapUSize(val) DN_ByteSwap64(val)
+#else
+  #define                       DN_ByteSwapUSize(val) DN_ByteSwap32(val)
+#endif
 
 
 DN_API DN_CPUIDResult           DN_CPUID                                               (DN_CPUIDArgs args);
@@ -1544,6 +1557,10 @@ DN_API DN_U64FromResult         DN_U64FromHexPtr                                
 DN_API DN_U64                   DN_U64FromHexPtrUnsafe                                 (void const *hex, DN_USize hex_count);
 DN_API DN_U64FromResult         DN_U64FromHexStr8                                      (DN_Str8 hex);
 DN_API DN_U64                   DN_U64FromHexStr8Unsafe                                (DN_Str8 hex);
+DN_API DN_U64                   DN_U64FromU8x32HiBEUnsafe                              (DN_U8x32 const *val); // Get U64 stored in big-endian at the high bytes [24:32)
+DN_API DN_U64                   DN_U64FromU8x32HiBE                                    (DN_U8x32 const *val); // Checks [0:24) bytes aren't set before getting the U64
+DN_API DN_USize                 DN_USizeFromU8x32HiBEUnsafe                            (DN_U8x32 const *val); // Get USize stored in big-endian at the high bytes [32 - sizeof USize:32)
+DN_API DN_USize                 DN_USizeFromU8x32HiBE                                  (DN_U8x32 const *val); // Checks [0:sizeof USize) bytes aren't set before getting the U64
 DN_API DN_I64FromResult         DN_I64FromStr8                                         (DN_Str8 string, char separator);
 DN_API DN_I64FromResult         DN_I64FromPtr                                          (void const *data, DN_USize size, char separator);
 DN_API DN_I64                   DN_I64FromPtrUnsafe                                    (void const *data, DN_USize size, char separator);
@@ -1563,6 +1580,7 @@ DN_API DN_USize                 DN_CStr16Size                                   
 #define                         DN_Str8PrintFmt(string)                                (int)((string).size), (string).data
 #define                         DN_Str8FromPtr(data, size)                             DN_Literal(DN_Str8){(char *)(data), (DN_USize)(size)}
 #define                         DN_Str8FromStruct(ptr)                                 DN_Str8FromPtr((ptr)->data, (ptr)->size)
+#define                         DN_Str8FromLitArray(c_array)                           DN_Str8FromPtr(c_array, DN_ArrayCountU(c_array))
 DN_API DN_Str8                  DN_Str8AllocArena                                      (DN_Arena *arena, DN_USize size, DN_ZMem z_mem);
 DN_API DN_Str8                  DN_Str8AllocPool                                        (DN_Pool *pool, DN_USize size);
 DN_API DN_Str8                  DN_Str8FromCStr8                                       (char const *src);
@@ -1584,6 +1602,10 @@ DN_API DN_Str8x128              DN_Str8x128FromFmt                              
 DN_API DN_Str8x256              DN_Str8x256FromFmtV                                    (DN_FMT_ATTRIB char const *fmt, va_list args);
 DN_API DN_Str8x256              DN_Str8x256FromFmt                                     (DN_FMT_ATTRIB char const *fmt, ...);
 DN_API DN_Str8x256              DN_Str8x256FromFmtV                                    (DN_FMT_ATTRIB char const *fmt, va_list args);
+DN_API DN_Str8x512              DN_Str8x512FromFmt                                     (DN_FMT_ATTRIB char const *fmt, ...);
+DN_API DN_Str8x512              DN_Str8x512FromFmtV                                    (DN_FMT_ATTRIB char const *fmt, va_list args);
+DN_API DN_Str8x1024             DN_Str8x1024FromFmt                                    (DN_FMT_ATTRIB char const *fmt, ...);
+DN_API DN_Str8x1024             DN_Str8x1024FromFmtV                                   (DN_FMT_ATTRIB char const *fmt, va_list args);
 DN_API void                     DN_Str8x16AppendFmt                                    (DN_Str8x16 *str, DN_FMT_ATTRIB char const *fmt, ...);
 DN_API void                     DN_Str8x16AppendFmtV                                   (DN_Str8x16 *str, DN_FMT_ATTRIB char const *fmt, va_list args);
 DN_API void                     DN_Str8x32AppendFmt                                    (DN_Str8x32 *str, DN_FMT_ATTRIB char const *fmt, ...);
@@ -1594,6 +1616,10 @@ DN_API void                     DN_Str8x128AppendFmt                            
 DN_API void                     DN_Str8x128AppendFmtV                                  (DN_Str8x128 *str, DN_FMT_ATTRIB char const *fmt, va_list args);
 DN_API void                     DN_Str8x256AppendFmt                                   (DN_Str8x256 *str, DN_FMT_ATTRIB char const *fmt, ...);
 DN_API void                     DN_Str8x256AppendFmtV                                  (DN_Str8x256 *str, DN_FMT_ATTRIB char const *fmt, va_list args);
+DN_API void                     DN_Str8x512AppendFmt                                   (DN_Str8x512 *str, DN_FMT_ATTRIB char const *fmt, ...);
+DN_API void                     DN_Str8x512AppendFmtV                                  (DN_Str8x512 *str, DN_FMT_ATTRIB char const *fmt, va_list args);
+DN_API void                     DN_Str8x1024AppendFmt                                  (DN_Str8x1024 *str, DN_FMT_ATTRIB char const *fmt, ...);
+DN_API void                     DN_Str8x1024AppendFmtV                                 (DN_Str8x1024 *str, DN_FMT_ATTRIB char const *fmt, va_list args);
 DN_API DN_Str8x32               DN_Str8x32FromU64                                      (DN_U64 val, char separator);
 DN_API bool                     DN_Str8IsAll                                           (DN_Str8 string, DN_Str8IsAllType is_all);
 DN_API char *                   DN_Str8End                                             (DN_Str8 string);
@@ -1690,12 +1716,12 @@ DN_API bool                     DN_UTF8DecodeIterate                            
 DN_API DN_U8                    DN_U8FromHexNibble                                     (char hex);
 DN_API DN_NibbleFromU8Result    DN_NibbleFromU8                                        (DN_U8 u8);
 
-DN_API DN_USize                 DN_BytesFromHexPtr                                     (void const *hex, DN_USize hex_count, void *dest, DN_USize dest_count);
-DN_API DN_Str8                  DN_BytesFromHexPtrArena                                (void const *hex, DN_USize hex_count, DN_Arena *arena);
-DN_API DN_USize                 DN_BytesFromHexStr8                                    (DN_Str8 hex, void *dest, DN_USize dest_count);
-DN_API DN_Str8                  DN_BytesFromHexStr8Arena                               (DN_Str8 hex, DN_Arena *arena);
-DN_API DN_U8x16                 DN_BytesFromHex32Ptr                                   (void const *hex, DN_USize hex_count);
-DN_API DN_U8x32                 DN_BytesFromHex64Ptr                                   (void const *hex, DN_USize hex_count);
+DN_API DN_USize                 DN_BytesFromHex                                        (DN_Str8 hex, void *dest, DN_USize dest_count);
+DN_API DN_Str8                  DN_BytesFromHexArena                                   (DN_Str8 hex, DN_Arena *arena);
+DN_API DN_USize                 DN_BytesFromHexPtr                                     (char const *hex, DN_USize hex_count, void *dest, DN_USize dest_count);
+DN_API DN_Str8                  DN_BytesFromHexPtrArena                                (char const *hex, DN_USize hex_count, DN_Arena *arena);
+DN_API DN_U8x16                 DN_BytesFromHex32Ptr                                   (char const *hex, DN_USize hex_count);
+DN_API DN_U8x32                 DN_BytesFromHex64Ptr                                   (char const *hex, DN_USize hex_count);
 
 DN_API DN_HexU64Str8            DN_HexFromU64                                          (DN_U64 value, DN_HexFromU64Type type);
 DN_API DN_USize                 DN_HexFromBytesPtr                                     (void const *bytes, DN_USize bytes_count, void *hex, DN_USize hex_count);

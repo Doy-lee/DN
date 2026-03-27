@@ -514,7 +514,7 @@ static DN_UTCore DN_Tests_Bin()
 
     DN_Str8 hex = DN_Str8Lit("0xf6ed00");
     for (DN_UT_Test(&test, "Convert %.*s to bytes", DN_Str8PrintFmt(hex))) {
-      DN_Str8 bytes = DN_BytesFromHexStr8Arena(hex, scratch.arena);
+      DN_Str8 bytes = DN_BytesFromHexArena(hex, scratch.arena);
       DN_UT_AssertF(&test,
                     DN_Str8Eq(bytes, DN_Str8Lit("\xf6\xed\x00")),
                     "number_hex=%.*s",
@@ -1567,8 +1567,8 @@ void DN_RefImpl_Keccak_(int r, int c, const uint8_t *in, uint64_t inLen, uint8_t
 DN_MSVC_WARNING_POP
 DN_GCC_WARNING_POP
 
-  #define DN_KC_IMPLEMENTATION
-  #include "../Standalone/dn_keccak.h"
+  #define DN_SHA3_IMPLEMENTATION
+  #include "../Standalone/dn_sha3.h"
 
   #define DN_UT_HASH_X_MACRO                     \
     DN_UT_HASH_X_ENTRY(SHA3_224, "SHA3-224")     \
@@ -1598,120 +1598,144 @@ DN_Str8 const DN_UT_HASH_STRING_[] =
 
 void DN_Tests_KeccakDispatch_(DN_UTCore *test, int hash_type, DN_Str8 input)
 {
-  DN_TCScratch scratch      = DN_TCScratchBegin(nullptr, 0);
+  DN_TCScratch scratch   = DN_TCScratchBegin(nullptr, 0);
   DN_Str8      input_hex = DN_HexFromBytesPtrArena(input.data, input.size, scratch.arena);
 
   switch (hash_type) {
     case Hash_SHA3_224: {
-      DN_KCBytes28 hash = DN_KC_SHA3_224Str8(input);
-      DN_KCBytes28 expect;
+      DN_SHA3U8x28 hash = DN_SHA3Hash224b(input.data, input.size);
+      DN_SHA3U8x28 expect;
       DN_RefImpl_FIPS202_SHA3_224_(DN_Cast(uint8_t *) input.data, input.size, (uint8_t *)expect.data);
+
+      DN_Str8 hash_hex   = DN_HexFromBytesPtrArena(hash.data, DN_ArrayCountU(hash.data), scratch.arena);
+      DN_Str8 expect_hex = DN_HexFromBytesPtrArena(expect.data, DN_ArrayCountU(expect.data), scratch.arena);
       DN_UT_AssertF(test,
-                    DN_KC_Bytes28Equals(&hash, &expect),
+                    DN_MemEq(hash.data, sizeof(hash.data), expect.data, sizeof(expect.data)),
                     "\ninput:  %.*s"
                     "\nhash:   %.*s"
                     "\nexpect: %.*s",
                     DN_Str8PrintFmt(input_hex),
-                    DN_KC_STRING56_FMT(DN_KC_Bytes28ToHex(&hash).data),
-                    DN_KC_STRING56_FMT(DN_KC_Bytes28ToHex(&expect).data));
+                    DN_Str8PrintFmt(hash_hex),
+                    DN_Str8PrintFmt(expect_hex));
     } break;
 
     case Hash_SHA3_256: {
-      DN_KCBytes32 hash = DN_KC_SHA3_256Str8(input);
-      DN_KCBytes32 expect;
+      DN_SHA3U8x32 hash = DN_SHA3Hash256b(input.data, input.size);
+      DN_SHA3U8x32 expect;
       DN_RefImpl_FIPS202_SHA3_256_(DN_Cast(uint8_t *) input.data, input.size, (uint8_t *)expect.data);
+
+      DN_Str8 hash_hex   = DN_HexFromBytesPtrArena(hash.data, DN_ArrayCountU(hash.data), scratch.arena);
+      DN_Str8 expect_hex = DN_HexFromBytesPtrArena(expect.data, DN_ArrayCountU(expect.data), scratch.arena);
       DN_UT_AssertF(test,
-                    DN_KC_Bytes32Equals(&hash, &expect),
+                    DN_MemEq(hash.data, sizeof(hash.data), expect.data, sizeof(expect.data)),
                     "\ninput:  %.*s"
                     "\nhash:   %.*s"
                     "\nexpect: %.*s",
                     DN_Str8PrintFmt(input_hex),
-                    DN_KC_STRING64_FMT(DN_KC_Bytes32ToHex(&hash).data),
-                    DN_KC_STRING64_FMT(DN_KC_Bytes32ToHex(&expect).data));
+                    DN_Str8PrintFmt(hash_hex),
+                    DN_Str8PrintFmt(expect_hex));
     } break;
 
     case Hash_SHA3_384: {
-      DN_KCBytes48 hash = DN_KC_SHA3_384Str8(input);
-      DN_KCBytes48 expect;
+      DN_SHA3U8x48 hash = DN_SHA3Hash384b(input.data, input.size);
+      DN_SHA3U8x48 expect;
       DN_RefImpl_FIPS202_SHA3_384_(DN_Cast(uint8_t *) input.data, input.size, (uint8_t *)expect.data);
+
+      DN_Str8 hash_hex   = DN_HexFromBytesPtrArena(hash.data, DN_ArrayCountU(hash.data), scratch.arena);
+      DN_Str8 expect_hex = DN_HexFromBytesPtrArena(expect.data, DN_ArrayCountU(expect.data), scratch.arena);
       DN_UT_AssertF(test,
-                    DN_KC_Bytes48Equals(&hash, &expect),
+                    DN_MemEq(hash.data, sizeof(hash.data), expect.data, sizeof(expect.data)),
                     "\ninput:  %.*s"
                     "\nhash:   %.*s"
                     "\nexpect: %.*s",
                     DN_Str8PrintFmt(input_hex),
-                    DN_KC_STRING96_FMT(DN_KC_Bytes48ToHex(&hash).data),
-                    DN_KC_STRING96_FMT(DN_KC_Bytes48ToHex(&expect).data));
+                    DN_Str8PrintFmt(hash_hex),
+                    DN_Str8PrintFmt(expect_hex));
     } break;
 
     case Hash_SHA3_512: {
-      DN_KCBytes64 hash = DN_KC_SHA3_512Str8(input);
-      DN_KCBytes64 expect;
+      DN_SHA3U8x64 hash = DN_SHA3Hash512b(input.data, input.size);
+      DN_SHA3U8x64 expect;
       DN_RefImpl_FIPS202_SHA3_512_(DN_Cast(uint8_t *) input.data, input.size, (uint8_t *)expect.data);
+
+      DN_Str8 hash_hex   = DN_HexFromBytesPtrArena(hash.data, DN_ArrayCountU(hash.data), scratch.arena);
+      DN_Str8 expect_hex = DN_HexFromBytesPtrArena(expect.data, DN_ArrayCountU(expect.data), scratch.arena);
       DN_UT_AssertF(test,
-                    DN_KC_Bytes64Equals(&hash, &expect),
+                    DN_MemEq(hash.data, sizeof(hash.data), expect.data, sizeof(expect.data)),
                     "\ninput:  %.*s"
                     "\nhash:   %.*s"
                     "\nexpect: %.*s",
                     DN_Str8PrintFmt(input_hex),
-                    DN_KC_STRING128_FMT(DN_KC_Bytes64ToHex(&hash).data),
-                    DN_KC_STRING128_FMT(DN_KC_Bytes64ToHex(&expect).data));
+                    DN_Str8PrintFmt(hash_hex),
+                    DN_Str8PrintFmt(expect_hex));
     } break;
 
     case Hash_Keccak_224: {
-      DN_KCBytes28 hash = DN_KC_Keccak224Str8(input);
-      DN_KCBytes28 expect;
+      DN_SHA3U8x28 hash = DN_KeccakHash224b(input.data, input.size);
+      DN_SHA3U8x28 expect;
       DN_RefImpl_Keccak_(1152, 448, DN_Cast(uint8_t *) input.data, input.size, 0x01, (uint8_t *)expect.data, sizeof(expect));
+
+      DN_Str8 hash_hex   = DN_HexFromBytesPtrArena(hash.data, DN_ArrayCountU(hash.data), scratch.arena);
+      DN_Str8 expect_hex = DN_HexFromBytesPtrArena(expect.data, DN_ArrayCountU(expect.data), scratch.arena);
       DN_UT_AssertF(test,
-                    DN_KC_Bytes28Equals(&hash, &expect),
+                    DN_MemEq(hash.data, sizeof(hash.data), expect.data, sizeof(expect.data)),
                     "\ninput:  %.*s"
                     "\nhash:   %.*s"
                     "\nexpect: %.*s",
                     DN_Str8PrintFmt(input_hex),
-                    DN_KC_STRING56_FMT(DN_KC_Bytes28ToHex(&hash).data),
-                    DN_KC_STRING56_FMT(DN_KC_Bytes28ToHex(&expect).data));
+                    DN_Str8PrintFmt(hash_hex),
+                    DN_Str8PrintFmt(expect_hex));
     } break;
 
     case Hash_Keccak_256: {
-      DN_KCBytes32 hash = DN_KC_Keccak256Str8(input);
-      DN_KCBytes32 expect;
+      DN_SHA3U8x32 hash = DN_KeccakHash256b(input.data, input.size);
+      DN_SHA3U8x32 expect;
       DN_RefImpl_Keccak_(1088, 512, DN_Cast(uint8_t *) input.data, input.size, 0x01, (uint8_t *)expect.data, sizeof(expect));
+
+      DN_Str8 hash_hex   = DN_HexFromBytesPtrArena(hash.data, DN_ArrayCountU(hash.data), scratch.arena);
+      DN_Str8 expect_hex = DN_HexFromBytesPtrArena(expect.data, DN_ArrayCountU(expect.data), scratch.arena);
       DN_UT_AssertF(test,
-                    DN_KC_Bytes32Equals(&hash, &expect),
+                    DN_MemEq(hash.data, sizeof(hash.data), expect.data, sizeof(expect.data)),
                     "\ninput:  %.*s"
                     "\nhash:   %.*s"
                     "\nexpect: %.*s",
                     DN_Str8PrintFmt(input_hex),
-                    DN_KC_STRING64_FMT(DN_KC_Bytes32ToHex(&hash).data),
-                    DN_KC_STRING64_FMT(DN_KC_Bytes32ToHex(&expect).data));
+                    DN_Str8PrintFmt(hash_hex),
+                    DN_Str8PrintFmt(expect_hex));
     } break;
 
     case Hash_Keccak_384: {
-      DN_KCBytes48 hash = DN_KC_Keccak384Str8(input);
-      DN_KCBytes48 expect;
+      DN_SHA3U8x48 hash = DN_KeccakHash384b(input.data, input.size);
+      DN_SHA3U8x48 expect;
       DN_RefImpl_Keccak_(832, 768, DN_Cast(uint8_t *) input.data, input.size, 0x01, (uint8_t *)expect.data, sizeof(expect));
+
+      DN_Str8 hash_hex   = DN_HexFromBytesPtrArena(hash.data, DN_ArrayCountU(hash.data), scratch.arena);
+      DN_Str8 expect_hex = DN_HexFromBytesPtrArena(expect.data, DN_ArrayCountU(expect.data), scratch.arena);
       DN_UT_AssertF(test,
-                    DN_KC_Bytes48Equals(&hash, &expect),
+                    DN_MemEq(hash.data, sizeof(hash.data), expect.data, sizeof(expect.data)),
                     "\ninput:  %.*s"
                     "\nhash:   %.*s"
                     "\nexpect: %.*s",
                     DN_Str8PrintFmt(input_hex),
-                    DN_KC_STRING96_FMT(DN_KC_Bytes48ToHex(&hash).data),
-                    DN_KC_STRING96_FMT(DN_KC_Bytes48ToHex(&expect).data));
+                    DN_Str8PrintFmt(hash_hex),
+                    DN_Str8PrintFmt(expect_hex));
     } break;
 
     case Hash_Keccak_512: {
-      DN_KCBytes64 hash = DN_KC_Keccak512Str8(input);
-      DN_KCBytes64 expect;
+      DN_SHA3U8x64 hash = DN_KeccakHash512b(input.data, input.size);
+      DN_SHA3U8x64 expect;
       DN_RefImpl_Keccak_(576, 1024, DN_Cast(uint8_t *) input.data, input.size, 0x01, (uint8_t *)expect.data, sizeof(expect));
+
+      DN_Str8 hash_hex   = DN_HexFromBytesPtrArena(hash.data, DN_ArrayCountU(hash.data), scratch.arena);
+      DN_Str8 expect_hex = DN_HexFromBytesPtrArena(expect.data, DN_ArrayCountU(expect.data), scratch.arena);
       DN_UT_AssertF(test,
-                    DN_KC_Bytes64Equals(&hash, &expect),
+                    DN_MemEq(hash.data, sizeof(hash.data), expect.data, sizeof(expect.data)),
                     "\ninput:  %.*s"
                     "\nhash:   %.*s"
                     "\nexpect: %.*s",
                     DN_Str8PrintFmt(input_hex),
-                     DN_KC_STRING128_FMT(DN_KC_Bytes64ToHex(&hash).data),
-                     DN_KC_STRING128_FMT(DN_KC_Bytes64ToHex(&expect).data));
+                    DN_Str8PrintFmt(hash_hex),
+                    DN_Str8PrintFmt(expect_hex));
     } break;
   }
   DN_TCScratchEnd(&scratch);

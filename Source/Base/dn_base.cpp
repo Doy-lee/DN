@@ -1851,6 +1851,49 @@ DN_API DN_U64 DN_U64FromHexStr8Unsafe(DN_Str8 hex)
   return result;
 }
 
+DN_API DN_U64 DN_U64FromU8x32HiBEUnsafe(DN_U8x32 const *val)
+{
+  DN_U64 result_be = 0; // Last 8 bytes of 32-byte slot (big-endian)
+  DN_Memcpy(&result_be, val->data + sizeof(val->data) - sizeof(result_be), sizeof(result_be));
+  DN_U64 result = DN_ByteSwap64(result_be);
+  return result;
+}
+
+DN_API DN_U64 DN_U64FromU8x32HiBE(DN_U8x32 const *val)
+{
+  DN_U64 result = {};
+  if (val) {
+    // NOTE: Check that the high bits are not set
+    DN_U8x32 zero_mask     = {};
+    bool     high_bits_set = DN_Memcmp(val->data, zero_mask.data, sizeof(zero_mask.data) - sizeof(result)) != 0;
+    DN_Assert(!high_bits_set);
+    result = DN_U64FromU8x32HiBEUnsafe(val);
+  }
+  return result;
+}
+
+DN_API DN_USize DN_USizeFromU8x32HiBEUnsafe(DN_U8x32 const *val)
+{
+  DN_USize result_be = 0;
+  DN_Memcpy(&result_be, val->data + sizeof(val->data) - sizeof(result_be), sizeof(result_be));
+  DN_USize result = DN_ByteSwapUSize(result_be);
+  return result;
+}
+
+DN_API DN_USize DN_USizeFromU8x32HiBE(DN_U8x32 const *val)
+{
+  DN_USize result = {};
+  if (val) {
+    // NOTE: Check that the high bits are not set
+    DN_U8x32 mask = {};
+    DN_Memset(mask.data, 1, sizeof(mask.data) - sizeof(result));
+    bool high_bits_set = DN_Memcmp(val->data, mask.data, 24) != 0;
+    DN_Assert(!high_bits_set);
+    result = DN_USizeFromU8x32HiBEUnsafe(val);
+  }
+  return result;
+}
+
 DN_API void DN_ByteSwapU64Ptr(DN_U8 *dest, DN_U64 src)
 {
   dest[0] = DN_Cast(DN_U8)((src >> 56) & 0xFF);
@@ -2190,6 +2233,40 @@ DN_API DN_Str8x256 DN_Str8x256FromFmtV(DN_FMT_ATTRIB char const *fmt, va_list ar
   return result;
 }
 
+DN_API DN_Str8x512 DN_Str8x512FromFmt(DN_FMT_ATTRIB char const *fmt, ...)
+{
+  va_list args;
+  va_start(args, fmt);
+  DN_Str8x512 result = {};
+  DN_FmtVAppend(result.data, &result.size, sizeof(result.data), fmt, args);
+  va_end(args);
+  return result;
+}
+
+DN_API DN_Str8x512 DN_Str8x512FromFmtV(DN_FMT_ATTRIB char const *fmt, va_list args)
+{
+  DN_Str8x512 result = {};
+  DN_FmtVAppend(result.data, &result.size, sizeof(result.data), fmt, args);
+  return result;
+}
+
+DN_API DN_Str8x1024 DN_Str8x1024FromFmt(DN_FMT_ATTRIB char const *fmt, ...)
+{
+  va_list args;
+  va_start(args, fmt);
+  DN_Str8x1024 result = {};
+  DN_FmtVAppend(result.data, &result.size, sizeof(result.data), fmt, args);
+  va_end(args);
+  return result;
+}
+
+DN_API DN_Str8x1024 DN_Str8x1024FromFmtV(DN_FMT_ATTRIB char const *fmt, va_list args)
+{
+  DN_Str8x1024 result = {};
+  DN_FmtVAppend(result.data, &result.size, sizeof(result.data), fmt, args);
+  return result;
+}
+
 DN_API void DN_Str8x16AppendFmt(DN_Str8x16 *str, DN_FMT_ATTRIB char const *fmt, ...)
 {
   va_list args;
@@ -2251,6 +2328,32 @@ DN_API void DN_Str8x256AppendFmt(DN_Str8x256 *str, DN_FMT_ATTRIB char const *fmt
 }
 
 DN_API void DN_Str8x256AppendFmtV(DN_Str8x256 *str, DN_FMT_ATTRIB char const *fmt, va_list args)
+{
+  DN_FmtVAppend(str->data, &str->size, sizeof(str->data), fmt, args);
+}
+
+DN_API void DN_Str8x512AppendFmt(DN_Str8x512 *str, DN_FMT_ATTRIB char const *fmt, ...)
+{
+  va_list args;
+  va_start(args, fmt);
+  DN_Str8x512AppendFmtV(str, fmt, args);
+  va_end(args);
+}
+
+DN_API void DN_Str8x512AppendFmtV(DN_Str8x512 *str, DN_FMT_ATTRIB char const *fmt, va_list args)
+{
+  DN_FmtVAppend(str->data, &str->size, sizeof(str->data), fmt, args);
+}
+
+DN_API void DN_Str8x1024AppendFmt(DN_Str8x1024 *str, DN_FMT_ATTRIB char const *fmt, ...)
+{
+  va_list args;
+  va_start(args, fmt);
+  DN_Str8x1024AppendFmtV(str, fmt, args);
+  va_end(args);
+}
+
+DN_API void DN_Str8x1024AppendFmtV(DN_Str8x1024 *str, DN_FMT_ATTRIB char const *fmt, va_list args)
 {
   DN_FmtVAppend(str->data, &str->size, sizeof(str->data), fmt, args);
 }
@@ -3414,22 +3517,17 @@ DN_API DN_NibbleFromU8Result DN_NibbleFromU8(DN_U8 u8)
   return result;
 }
 
-DN_API DN_USize DN_BytesFromHexPtr(void const *hex, DN_USize hex_count, void *bytes, DN_USize bytes_count)
+DN_API DN_USize DN_BytesFromHex(DN_Str8 hex, void *dest, DN_USize dest_count)
 {
-  DN_USize     result = 0;
-  DN_U8 const *hex_u8 = DN_Cast(DN_U8 const *) hex;
-  if (hex_count >= 2 && hex_u8[0] == '0' && (hex_u8[1] == 'x' || hex_u8[1] == 'X')) {
-    hex_u8    += 2;
-    hex_count -= 2;
-  }
-
-  if (hex_count > (bytes_count * 2))
+  DN_Str8 hex_trimmed = DN_Str8TrimHexPrefix(hex);
+  DN_USize result = 0;
+  if (hex_trimmed.size > (dest_count * 2))
     return result;
 
-  DN_U8       *ptr    = DN_Cast(DN_U8 *)bytes;
-  for (DN_USize index = 0; index < hex_count; index += 2) {
-    DN_U8 nibble0 = DN_U8FromHexNibble(hex_u8[index + 0]);
-    DN_U8 nibble1 = DN_U8FromHexNibble(hex_u8[index + 1]);
+  DN_U8 *ptr = DN_Cast(DN_U8 *) dest;
+  for (DN_USize index = 0; index < hex_trimmed.size; index += 2) {
+    DN_U8 nibble0 = DN_U8FromHexNibble(hex_trimmed.data[index + 0]);
+    DN_U8 nibble1 = DN_U8FromHexNibble(hex_trimmed.data[index + 1]);
     if (nibble0 == 0xFF || nibble1 == 0xFF)
       return result;
     *ptr++ = nibble0 << 4 | nibble1 << 0;
@@ -3438,42 +3536,45 @@ DN_API DN_USize DN_BytesFromHexPtr(void const *hex, DN_USize hex_count, void *by
   return result;
 }
 
-DN_API DN_Str8 DN_BytesFromHexPtrArena(void const *hex, DN_USize hex_size, DN_Arena *arena)
-{
-  DN_Assert(hex_size % 2 == 0);
-  DN_Str8 result = {};
-  result.data    = DN_ArenaNewArray(arena, char, hex_size / 2, DN_ZMem_No);
-  if (result.data)
-    result.size = DN_BytesFromHexPtr(hex, hex_size, result.data, hex_size / 2);
-  return result;
-}
-
-DN_API DN_USize DN_BytesFromHexStr8(DN_Str8 hex, void *dest, DN_USize dest_count)
-{
-  DN_USize result = DN_BytesFromHexPtr(hex.data, hex.size, dest, dest_count);
-  return result;
-}
-
-DN_API DN_Str8 DN_BytesFromHexStr8Arena(DN_Str8 hex, DN_Arena *arena)
+DN_API DN_Str8 DN_BytesFromHexArena(DN_Str8 hex, DN_Arena *arena)
 {
   DN_Str8 result = DN_BytesFromHexPtrArena(hex.data, hex.size, arena);
   return result;
 }
 
-DN_API DN_U8x16 DN_BytesFromHex32Ptr(void const *hex, DN_USize hex_count)
+DN_API DN_USize DN_BytesFromHexPtr(char const *hex, DN_USize hex_count, void *dest, DN_USize dest_count)
 {
-  DN_U8x16 result = {};
-  DN_Assert(hex_count / 2 == sizeof result.data);
-  DN_USize bytes_written = DN_BytesFromHexPtr(hex, hex_count, result.data, sizeof result);
+  DN_USize result = DN_BytesFromHex(DN_Str8FromPtr(hex, hex_count), dest, dest_count);
+  return result;
+}
+
+DN_API DN_Str8 DN_BytesFromHexPtrArena(char const *hex, DN_USize hex_count, DN_Arena *arena)
+{
+  DN_Str8 hex_trimmed = DN_Str8TrimHexPrefix(DN_Str8FromPtr(hex, hex_count));
+  DN_Assert(hex_trimmed.size % 2 == 0);
+  DN_Str8 result = {};
+  result.data    = DN_ArenaNewArray(arena, char, hex_trimmed.size / 2, DN_ZMem_No);
+  if (result.data)
+    result.size = DN_BytesFromHex(hex_trimmed, result.data, hex_trimmed.size / 2);
+  return result;
+}
+
+DN_API DN_U8x16 DN_BytesFromHex32Ptr(char const *hex, DN_USize hex_count)
+{
+  DN_U8x16 result      = {};
+  DN_Str8  hex_trimmed = DN_Str8TrimHexPrefix(DN_Str8FromPtr(hex, hex_count));
+  DN_Assert(hex_trimmed.size / 2 == sizeof result.data);
+  DN_USize bytes_written = DN_BytesFromHex(hex_trimmed, result.data, sizeof result.data);
   DN_Assert(bytes_written == sizeof result.data);
   return result;
 }
 
-DN_API DN_U8x32 DN_BytesFromHex64Ptr(void const *hex, DN_USize hex_count)
+DN_API DN_U8x32 DN_BytesFromHex64Ptr(char const *hex, DN_USize hex_count)
 {
-  DN_U8x32 result = {};
-  DN_Assert(hex_count / 2 == sizeof result.data);
-  DN_USize bytes_written = DN_BytesFromHexPtr(hex, hex_count, result.data, sizeof result);
+  DN_U8x32 result      = {};
+  DN_Str8  hex_trimmed = DN_Str8TrimHexPrefix(DN_Str8FromPtr(hex, hex_count));
+  DN_Assert(hex_trimmed.size / 2 == sizeof result.data);
+  DN_USize bytes_written = DN_BytesFromHex(hex_trimmed, result.data, sizeof result.data);
   DN_Assert(bytes_written == sizeof result.data);
   return result;
 }
