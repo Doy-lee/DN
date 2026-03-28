@@ -3903,7 +3903,7 @@ DN_API DN_Profiler DN_ProfilerInit(DN_ProfilerAnchor *anchors, DN_USize count, D
 
 DN_API DN_USize DN_ProfilerFrameCount(DN_Profiler const *profiler)
 {
-  DN_USize result = profiler->anchors_count / profiler->anchors_per_frame;
+  DN_USize result = profiler ? profiler->anchors_count / profiler->anchors_per_frame : 0;
   return result;
 }
 
@@ -3925,7 +3925,7 @@ DN_API DN_ProfilerAnchorArray DN_ProfilerFrameAnchors(DN_Profiler *profiler)
 DN_API DN_ProfilerZone DN_ProfilerBeginZone(DN_Profiler *profiler, DN_Str8 name, DN_U16 anchor_index)
 {
   DN_ProfilerZone result = {};
-  if (profiler->paused)
+  if (!profiler || profiler->paused)
     return result;
 
   DN_Assert(anchor_index < profiler->anchors_per_frame);
@@ -3949,7 +3949,7 @@ DN_API DN_ProfilerZone DN_ProfilerBeginZone(DN_Profiler *profiler, DN_Str8 name,
 
 DN_API void DN_ProfilerEndZone(DN_Profiler *profiler, DN_ProfilerZone zone)
 {
-  if (profiler->paused)
+  if (!profiler || profiler->paused)
     return;
 
   DN_Assert(zone.anchor_index < profiler->anchors_per_frame);
@@ -3973,7 +3973,7 @@ DN_API void DN_ProfilerEndZone(DN_Profiler *profiler, DN_ProfilerZone zone)
 
 DN_API void DN_ProfilerNewFrame(DN_Profiler *profiler)
 {
-  if (profiler->paused)
+  if (!profiler || profiler->paused)
     return;
 
   // NOTE: End the frame's zone
@@ -3996,7 +3996,7 @@ DN_API void DN_ProfilerNewFrame(DN_Profiler *profiler)
 
 DN_API void DN_ProfilerDump(DN_Profiler *profiler)
 {
-  if (profiler->frame_index == 0)
+  if (!profiler || profiler->frame_index == 0)
     return;
 
   DN_USize frame_index = profiler->frame_index - 1;
@@ -5979,11 +5979,17 @@ DN_API DN_V2F32 DN_M2x3MulV2F32(DN_M2x3 m1, DN_V2F32 v2)
 
 DN_API DN_Rect DN_M2x3MulRect(DN_M2x3 m1, DN_Rect rect)
 {
-  DN_2V2F32    rect_range   = DN_RectRange(rect);
-  DN_2V2F32    result_range = {};
-  result_range.min          = DN_M2x3MulV2F32(m1, rect_range.min);
-  result_range.max          = DN_M2x3MulV2F32(m1, rect_range.max);
-  DN_Rect      result       = DN_RectFrom2V2(result_range.min, result_range.max - result_range.min);
+  DN_2V2F32 rect_range   = DN_RectRange(rect);
+  DN_V2F32  m1_min       = DN_M2x3MulV2F32(m1, rect_range.min);
+  DN_V2F32  m1_max       = DN_M2x3MulV2F32(m1, rect_range.max);
+
+  // NOTE: Re-establish AABB of the rectangle because it has gone through an arbitrary
+  // vertex transformation.
+  DN_2V2F32 result_range = {};
+  result_range.min       = DN_V2F32Min(m1_min, m1_max);
+  result_range.max       = DN_V2F32Max(m1_min, m1_max);
+
+  DN_Rect   result       = DN_RectFrom2V2(result_range.min, DN_V2F32Abs(result_range.max - result_range.min));
   return result;
 }
 

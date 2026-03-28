@@ -40,7 +40,7 @@ void DN_Demo()
   // NOTE: DN_BytesFromHex
   {
     unsigned char bytes[2];
-    DN_USize      bytes_written = DN_BytesFromHexStr8(DN_Str8Lit("0xFACE"), bytes, sizeof(bytes));
+    DN_USize      bytes_written = DN_BytesFromHex(DN_Str8Lit("0xFACE"), bytes, sizeof(bytes));
     DN_Assert(bytes_written == 2);
     DN_Assert(bytes[0] == 0xFA);
     DN_Assert(bytes[1] == 0xCE);
