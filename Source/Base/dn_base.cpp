@@ -1153,12 +1153,15 @@ DN_API void DN_MemListPopTo(DN_MemList *mem, DN_U64 init_used)
   curr->used           = used - curr->reserve_sum;
 
   // NOTE: Scrub memory that we used previously in the block but no longer after reverting
+  DN_MSVC_WARNING_PUSH
+  DN_MSVC_WARNING_DISABLE(4127) // conditional expression is constant
   if (DN_SCRUB_UNINIT_MEM_BYTE) {
     if (old_used > curr->used) {
       char *discarded = (char *)curr + curr->used;
       DN_Memset(discarded, DN_SCRUB_UNINIT_MEM_BYTE, old_used - curr->used);
     }
   }
+  DN_MSVC_WARNING_POP
 
   // NOTE: ASAN Poison
   if (DN_ArenaHasPoison_(mem->flags)) {
@@ -1526,11 +1529,14 @@ DN_API void DN_PoolDealloc(DN_Pool *pool, void *ptr)
   DN_Assert(slot_index < DN_PoolSlotSize_Count);
 
   // NOTE: Scrub memory before returning to the pool
+  DN_MSVC_WARNING_PUSH
+  DN_MSVC_WARNING_DISABLE(4127) // conditional expression is constant
   if (DN_SCRUB_UNINIT_MEM_BYTE) {
     DN_USize slot_size_in_bytes = 1ULL << (slot_index + 5);
     DN_USize data_offset        = (char *)slot->data - (char *)slot;
     DN_Memset(slot->data, DN_SCRUB_UNINIT_MEM_BYTE, slot_size_in_bytes - data_offset);
   }
+  DN_MSVC_WARNING_POP
 
   slot->next              = pool->slots[slot_index];
   pool->slots[slot_index] = slot;
