@@ -1,15 +1,13 @@
-#define DN_BASE_CONTAINERS_CPP
 #if defined(_CLANGD)
-#include "../dn.h"
+  #include "../dn.h"
 #endif
 
 DN_API void *DN_SliceAllocArena(void **data, DN_USize *slice_size_field, DN_USize size, DN_USize elem_size, DN_U8 align, DN_ZMem zmem, DN_Arena *arena)
 {
   void *result = *data;
   *data        = DN_ArenaAlloc(arena, size * elem_size, align, zmem);
-  if (*data) {
+  if (*data)
     *slice_size_field = size;
-  }
   return result;
 }
 
@@ -292,9 +290,6 @@ DN_API void DN_RingRead(DN_Ring *ring, void *dest, DN_U64 dest_size)
   ring->read_pos += dest_size;
 }
 
-DN_U32 const DN_DS_MAP_DEFAULT_HASH_SEED = 0x8a1ced49;
-DN_U32 const DN_DS_MAP_SENTINEL_SLOT     = 0;
-
 template <typename T>
 DN_DSMap<T> DN_DSMapInit(DN_Arena *arena, DN_U32 size, DN_DSMapFlags flags)
 {
@@ -324,7 +319,7 @@ void DN_DSMapDeinit(DN_DSMap<T> *map, DN_ZMem z_mem)
     return;
   // TODO(doyle): Use z_mem
   (void)z_mem;
-  DN_ArenaDeinit(map->arena);
+  DN_MemListDeinit(map->arena->mem);
   *map = {};
 }
 
@@ -564,12 +559,16 @@ bool DN_DSMapResize(DN_DSMap<T> *map, DN_U32 size)
     return false;
 
   DN_Arena *prev_arena = map->arena;
+  DN_MemList *new_mem  = prev_arena->mem;
+  DN_MemList prev_mem  = *prev_arena->mem;
+  prev_arena->mem      = &prev_mem;
+
+  *new_mem             = {};
+  new_mem->funcs       = prev_mem.funcs;
+  new_mem->flags       = prev_mem.flags;
+
   DN_Arena  new_arena  = {};
-  new_arena.mem_funcs  = prev_arena->mem_funcs;
-  new_arena.flags      = prev_arena->flags;
-  new_arena.label      = prev_arena->label;
-  new_arena.prev       = prev_arena->prev;
-  new_arena.next       = prev_arena->next;
+  new_arena.mem        = new_mem;
 
   DN_DSMap<T> new_map = DN_DSMapInit<T>(&new_arena, size, map->flags);
   if (!DN_DSMapIsValid(&new_map))
@@ -695,7 +694,7 @@ DN_DSMapKey DN_DSMapKeyBuffer(DN_DSMap<T> const *map, void const *data, DN_USize
 }
 
 template <typename T>
-DN_DSMapKey DN_DSMapKeyBufferAsU64NoHash(DN_DSMap<T> const *map, void const *data, DN_U32 size)
+DN_DSMapKey DN_DSMapKeyBufferAsU64NoHash(DN_DSMap<T> const *map, void const *data, DN_USize size)
 {
   DN_DSMapKey result = {};
   result.type        = DN_DSMapKeyType_BufferAsU64NoHash;

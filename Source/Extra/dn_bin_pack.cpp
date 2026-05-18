@@ -128,8 +128,8 @@ DN_API void DN_BinPackStr8FromArena(DN_BinPack *pack, DN_Arena *arena, DN_BinPac
   if (mode == DN_BinPackMode_Serialise) {
     DN_Str8BuilderAppendBytesCopy(&pack->writer, string->data, string->size);
   } else {
-    DN_Str8 src = DN_Str8Slice(pack->read, pack->read_index, string->size);
-    *string     = DN_Str8FromStr8Arena(arena, src);
+    DN_Str8 src = DN_Str8Subset(pack->read, pack->read_index, string->size);
+    *string     = DN_Str8FromStr8Arena(src, arena);
     pack->read_index += src.size;
   }
 }
@@ -140,8 +140,8 @@ DN_API void DN_BinPackStr8FromPool(DN_BinPack *pack, DN_Pool *pool, DN_BinPackMo
   if (mode == DN_BinPackMode_Serialise) {
     DN_Str8BuilderAppendBytesCopy(&pack->writer, string->data, string->size);
   } else {
-    DN_Str8 src = DN_Str8Slice(pack->read, pack->read_index, string->size);
-    *string     = DN_Str8FromStr8Pool(pool, src);
+    DN_Str8 src = DN_Str8Subset(pack->read, pack->read_index, string->size);
+    *string     = DN_Str8FromStr8Pool(src, pool);
     pack->read_index += src.size;
   }
 }
@@ -175,7 +175,7 @@ DN_API void DN_BinPackCArray(DN_BinPack *pack, DN_BinPackMode mode, void *ptr, D
   if (mode == DN_BinPackMode_Serialise) {
     DN_Str8BuilderAppendBytesCopy(&pack->writer, ptr, size);
   } else {
-    DN_Str8 src = DN_Str8Slice(pack->read, pack->read_index, size);
+    DN_Str8 src = DN_Str8Subset(pack->read, pack->read_index, size);
     DN_Assert(src.size == size);
     DN_Memcpy(ptr, src.data, DN_Min(src.size, size));
     pack->read_index += src.size;

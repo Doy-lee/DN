@@ -2,8 +2,8 @@
 #define DN_NET_H
 
 #if defined(_CLANGD)
-  #include "../dn_base_inc.h"
-  #include "../dn_os_inc.h"
+  #define DN_H_WITH_OS 1
+  #include "../dn.h"
 #endif
 
 enum DN_NETRequestType
@@ -74,8 +74,9 @@ struct DN_NETResponse
 
 struct DN_NETRequest
 {
+  DN_MemList        mem;
   DN_Arena          arena;
-  DN_USize          start_response_arena_pos;
+  DN_Arena          start_response_arena;
   DN_NETRequestType type;
   DN_U64            gen;
   DN_Str8           url;
@@ -88,22 +89,13 @@ struct DN_NETRequest
   DN_U64            context[2];
 };
 
-struct DN_NETCore
-{
-  char          *base;
-  DN_U64         base_size;
-  DN_Arena       arena;
-  DN_OSSemaphore completion_sem;
-  void          *context;
-};
-
-typedef void               (DN_NETInitFunc)              (DN_NETCore *net, char *base, DN_U64 base_size);
-typedef void               (DN_NETDeinitFunc)            (DN_NETCore *net);
-typedef DN_NETRequestHandle(DN_NETDoHTTPFunc)            (DN_NETCore *net, DN_Str8 url, DN_Str8 method, DN_NETDoHTTPArgs const *args);
-typedef DN_NETRequestHandle(DN_NETDoWSFunc)              (DN_NETCore *net, DN_Str8 url);
+typedef void               (DN_NETInitFunc)              (struct DN_NETCore *net, char *base, DN_U64 base_size);
+typedef void               (DN_NETDeinitFunc)            (struct DN_NETCore *net);
+typedef DN_NETRequestHandle(DN_NETDoHTTPFunc)            (struct DN_NETCore *net, DN_Str8 url, DN_Str8 method, DN_NETDoHTTPArgs const *args);
+typedef DN_NETRequestHandle(DN_NETDoWSFunc)              (struct DN_NETCore *net, DN_Str8 url);
 typedef void               (DN_NETDoWSSendFunc)          (DN_NETRequestHandle handle, DN_Str8 data, DN_NETWSSend send);
 typedef DN_NETResponse     (DN_NETWaitForResponseFunc)   (DN_NETRequestHandle handle, DN_Arena *arena, DN_U32 timeout_ms);
-typedef DN_NETResponse     (DN_NETWaitForAnyResponseFunc)(DN_NETCore *net, DN_Arena *arena, DN_U32 timeout_ms);
+typedef DN_NETResponse     (DN_NETWaitForAnyResponseFunc)(struct DN_NETCore *net, DN_Arena *arena, DN_U32 timeout_ms);
 
 struct DN_NETInterface
 {
@@ -114,6 +106,17 @@ struct DN_NETInterface
   DN_NETDoWSSendFunc*           do_ws_send;
   DN_NETWaitForResponseFunc*    wait_for_response;
   DN_NETWaitForAnyResponseFunc* wait_for_any_response;
+};
+
+struct DN_NETCore
+{
+  char           *base;
+  DN_U64          base_size;
+  DN_MemList      mem;
+  DN_Arena        arena;
+  DN_OSSemaphore  completion_sem;
+  void           *context;
+  DN_NETInterface api;
 };
 
 DN_Str8             DN_NET_Str8FromResponseState(DN_NETResponseState state);

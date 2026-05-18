@@ -243,7 +243,7 @@ struct DN_OSHttpResponse
   // Synchronous HTTP response uses the TLS scratch arena whereas async
   // calls use their own dedicated arena.
   DN_Arena       tmp_arena;
-  DN_Arena      *scratch_arena;
+  DN_Arena       scratch_arena;
   DN_Str8Builder builder;
   DN_OSSemaphore on_complete_semaphore;
 
@@ -265,6 +265,7 @@ struct DN_OSCore
   DN_OSFile              log_file;                 // TODO(dn): Hmmm, how should we do this... ?
   DN_TicketMutex         log_file_mutex;           // Is locked when instantiating the log_file for the first time
   bool                   log_no_colour;            // Disable colours in the logging output
+  DN_TicketMutex         log_mutex;
 
   // NOTE: OS
   DN_U32                 logical_processor_count;
@@ -280,6 +281,7 @@ struct DN_OSCore
   DN_U64                 mem_allocs_total;
   DN_U64                 mem_allocs_frame;         // Total OS heap allocs since the last 'DN_Core_FrameBegin' was invoked
 
+  DN_MemList             mem;
   DN_Arena               arena;
   void                  *platform_context;
 };
@@ -291,10 +293,10 @@ struct DN_OSDiskSpace
   DN_U64 size;
 };
 
-DN_API DN_ArenaMemFuncs          DN_ArenaMemFuncsGet                          (DN_ArenaMemFuncType type);
-DN_API DN_ArenaMemFuncs          DN_ArenaMemFuncsGetDefaults                  ();
-DN_API DN_Arena                  DN_ArenaFromHeap                             (DN_U64 size, DN_ArenaFlags flags);
-DN_API DN_Arena                  DN_ArenaFromVMem                             (DN_U64 reserve, DN_U64 commit, DN_ArenaFlags flags);
+DN_API DN_MemFuncs               DN_MemFuncsFromType                          (DN_MemFuncsType type);
+DN_API DN_MemFuncs               DN_MemFuncsDefault                           ();
+DN_API DN_MemList                DN_MemListFromHeap                           (DN_U64 size, DN_MemFlags flags);
+DN_API DN_MemList                DN_MemListFromVMem                           (DN_U64 reserve, DN_U64 commit, DN_MemFlags flags);
 
 
 DN_API DN_Str8                   DN_Str8FromHeapF                             (DN_FMT_ATTRIB char const *fmt, ...);
@@ -367,6 +369,7 @@ DN_API bool                      DN_OS_FileWriteAllSafe                       (D
 DN_API bool                      DN_OS_FileWriteAllSafeFV                     (DN_Str8 path, DN_ErrSink *err, DN_FMT_ATTRIB char const *fmt, va_list args);
 DN_API bool                      DN_OS_FileWriteAllSafeF                      (DN_Str8 path, DN_ErrSink *err, DN_FMT_ATTRIB char const *fmt, ...);
 
+DN_API DN_Str8                   DN_OS_Str8FromPathInfoType                   (DN_OSPathInfoType type);
 DN_API DN_OSPathInfo             DN_OS_PathInfo                               (DN_Str8 path);
 DN_API bool                      DN_OS_PathIsOlderThan                        (DN_Str8 file, DN_Str8 check_against);
 DN_API bool                      DN_OS_PathDelete                             (DN_Str8 path);
@@ -419,7 +422,7 @@ DN_API void                      DN_OS_ConditionVariableSignal                (D
 DN_API void                      DN_OS_ConditionVariableBroadcast             (DN_OSConditionVariable *cv);
 
 DN_API bool                      DN_OS_ThreadInit                             (DN_OSThread *thread, DN_OSThreadFunc *func, DN_OSThreadLane *lane, void *user_context);
-DN_API bool                      DN_OS_ThreadJoin                             (DN_OSThread *thread);
+DN_API bool                      DN_OS_ThreadJoin                             (DN_OSThread *thread, DN_TCDeinitArenas deinit_arenas);
 DN_API DN_U32                    DN_OS_ThreadID                               ();
 DN_API void                      DN_OS_ThreadSetNameFmt                       (char const *fmt, ...);
 

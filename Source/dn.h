@@ -82,6 +82,65 @@
 //
 //      This means functionality that relies on the OS like printing, memory allocation, stack traces
 //      and so forth are disabled.
+//
+//    ASAN Arena Poisoning
+//      When compiled with address sanitizer (.e.g -fsanitize=address) you can optionally enable
+//      memory region poisoning on the inbuilt arena's to catch in certain scenarios, use-after-free
+//
+//        #define DN_ASAN_POISON 1
+//
+//      Since arenas manage their own block of memory it does not automatically benefit from ASAN's
+//      memory markup that ASAN does and so it is implemented manually by using the ASAN user-level
+//      poisoning APIs. Similarly, since the arena recycles its own memory rather than release back
+//      to the OS, poisoning is not as effective for arenas but every little bit helps.
+//
+//    Scrub Uninitialised Memory
+//      If this macro is defined, temp memory that is returned to an arena, or allocations freed by
+//      a pool are scrubbed to this specified byte, in absence of this bytes returned to the
+//      allocators are left as-is or memset to 0. For example to scrub bytes to 0xCD (MSVC's
+//      pattern) define as follows:
+//
+//        #define DN_SCRUB_UNINIT_MEM_BYTE 0xCD
+//
+//      Due to the recycling of memory in arenas and pool, similarly to ASAN poisoning this reduces
+//      the window in which a use-after-free can be detected using this guard, however every little
+//      bit helps.
+//
+//    Arena temp memory use-after-free (UAF) tooling
+//      UAF Guard
+//        Set the following preprocessor value to 1 to enable UAF protection when using
+//        scratch/temporary memory functionality. Defaults to off, or 0 if not specified
+//
+//          #define DN_ARENA_TEMP_MEM_UAF_GUARD 1
+//
+//        This enables arenas to markup itself with the active memory region and subsequent
+//        allocations check if the allocation belongs to the same or different region. Different
+//        regions cause a UAF violation.
+//
+//        More detailed diagnostics can be enabled by setting the flag DN_ArenaFlags_TempMemUAFGuard
+//        on the affected arenas. Note that this incurs a performance penalty as each memory region
+//        will store a stacktrace of its creation. It's recommended in development builds to always
+//        run with temp-memory guarding, if a violation occurs, then enable tracing on the arena to
+//        pinpoint the issue.
+//
+//        Enabling memory guard incurs additional memory requirements from the arena's backing
+//        memory block and additional book-keeping fields on each arena and their temp memory
+//        instances.
+//
+//      UAF Tracing
+//        Set the following preprocessor value to 1 to enable tracing when the UAF guard triggers.
+//        Defaults to off, or 0 if not specified.
+//
+//          #define DN_ARENA_TEMP_MEM_UAF_TRACE_ON_BY_DEFAULT 1
+//
+//        This opts in all arenas to tracing functionality by default globally. Arenas can opt out
+//        by setting the flag DN_ArenaFlags_TempMemUAFTraceDisable on the arena. The disable flag
+//        takes precedence over all other settings including the global preprocessor macro and the
+//        enablement flag (DN_ArenaFlags_TempMemUAFTrace).
+//
+//        Tracing incurs an additional much heavier performance penalty than the UAF guard due to
+//        the stacktrace that is stored per region to report to the user when a UAF guard violation
+//        occurs.
 
 #include "Base/dn_base.h"
 #include "Base/dn_base_assert.h"
@@ -110,10 +169,10 @@ enum DN_InitFlags_
 {
   DN_InitFlags_Nil            = 0,
   DN_InitFlags_OS             = (1 << 0),
-  DN_InitFlags_LeakTracker    = (1 << 1) | DN_InitFlags_OS,
-  DN_InitFlags_LogLibFeatures = (1 << 2),
-  DN_InitFlags_LogCPUFeatures = (1 << 3) | DN_InitFlags_OS,
-  DN_InitFlags_ThreadContext  = (1 << 4) | DN_InitFlags_OS,
+  DN_InitFlags_ThreadContext  = (1 << 1) | DN_InitFlags_OS,
+  DN_InitFlags_LeakTracker    = (1 << 2) | DN_InitFlags_OS,
+  DN_InitFlags_LogLibFeatures = (1 << 3),
+  DN_InitFlags_LogCPUFeatures = (1 << 4) | DN_InitFlags_OS,
   DN_InitFlags_LogAllFeatures = DN_InitFlags_LogLibFeatures | DN_InitFlags_LogCPUFeatures,
 };
 
@@ -124,6 +183,7 @@ struct DN_Core
   DN_USize         mem_allocs_frame;
   DN_LeakTracker   leak;
 
+  DN_U32           log_level_to_show_from;
   DN_LogPrintFunc* print_func;
   void*            print_func_context;
 

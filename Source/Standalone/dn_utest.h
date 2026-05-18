@@ -160,6 +160,9 @@ typedef struct DN_UTCore
   DN_UTStr8Link *output;
 } DN_UTCore;
 
+DN_UTCore DN_UT_Init();
+void DN_UT_Deinit(DN_UTCore *ut);
+
 void DN_UT_BeginFV(DN_UTCore *test, char const *fmt, va_list args);
 void DN_UT_BeginF(DN_UTCore *test, char const *fmt, ...);
 void DN_UT_End(DN_UTCore *test);

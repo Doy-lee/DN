@@ -1,6 +1,8 @@
 #define DN_NET_CURL_CPP
 
 #if defined(_CLANGD)
+  #define DN_H_WITH_OS 1
+  #include "../dn.h"
   #include "dn_net.h"
 #endif
 
@@ -43,7 +45,7 @@ DN_NETRequestHandle DN_NET_HandleFromRequest(DN_NETRequest *request)
 void DN_NET_EndFinishedRequest_(DN_NETRequest *request)
 {
   // NOTE: Deallocate the memory used in the request and reset the string builder
-  DN_ArenaPopTo(&request->arena, request->start_response_arena_pos);
+  DN_ArenaTempEnd(&request->start_response_arena, DN_ArenaReset_Yes);
   // NOTE: Check that the request is completely detached
   DN_Assert(request->next == nullptr);
 }
@@ -52,7 +54,8 @@ void DN_NET_BaseInit_(DN_NETCore *net, char *base, DN_U64 base_size)
 {
   net->base           = base;
   net->base_size      = base_size;
-  net->arena          = DN_ArenaFromBuffer(net->base, net->base_size, DN_ArenaFlags_Nil);
+  net->mem            = DN_MemListFromBuffer(net->base, net->base_size, DN_MemFlags_Nil);
+  net->arena          = DN_ArenaFromMemList(&net->mem);
   net->completion_sem = DN_OS_SemaphoreInit(0);
 }
 
@@ -61,31 +64,32 @@ DN_NETRequestHandle DN_NET_SetupRequest_(DN_NETRequest *request, DN_Str8 url, DN
   // NOTE: Setup request
   DN_Assert(request);
   if (request) {
-    if (!request->arena.curr)
-      request->arena = DN_ArenaFromVMem(DN_Megabytes(1), DN_Kilobytes(1), DN_ArenaFlags_Nil);
+    if (!request->mem.curr)
+      request->mem = DN_MemListFromVMem(DN_Megabytes(1), DN_Kilobytes(1), DN_MemFlags_Nil);
+    request->arena  = DN_ArenaTempBeginFromMemList(&request->mem);
     request->type   = type;
     request->gen    = DN_Max(request->gen + 1, 1);
-    request->url    = DN_Str8FromStr8Arena(&request->arena, url);
-    request->method = DN_Str8FromStr8Arena(&request->arena, DN_Str8TrimWhitespaceAround(method));
+    request->url    = DN_Str8FromStr8Arena(url, &request->arena);
+    request->method = DN_Str8FromStr8Arena(DN_Str8TrimWhitespaceAround(method), &request->arena);
 
     if (args) {
       request->args.flags    = args->flags;
-      request->args.username = DN_Str8FromStr8Arena(&request->arena, args->username);
-      request->args.password = DN_Str8FromStr8Arena(&request->arena, args->password);
+      request->args.username = DN_Str8FromStr8Arena(args->username, &request->arena);
+      request->args.password = DN_Str8FromStr8Arena(args->password, &request->arena);
       if (type == DN_NETRequestType_HTTP)
-        request->args.payload = DN_Str8FromStr8Arena(&request->arena, args->payload);
+        request->args.payload = DN_Str8FromStr8Arena(args->payload, &request->arena);
 
       request->args.headers = DN_ArenaNewArray(&request->arena, DN_Str8, args->headers_size, DN_ZMem_No);
       DN_Assert(request->args.headers);
       if (request->args.headers) {
         for (DN_ForItSize(it, DN_Str8, args->headers, args->headers_size))
-          request->args.headers[it.index] = DN_Str8FromStr8Arena(&request->arena, *it.data);
+          request->args.headers[it.index] = DN_Str8FromStr8Arena(*it.data, &request->arena);
         request->args.headers_size = args->headers_size;
       }
     }
 
-    request->completion_sem           = DN_OS_SemaphoreInit(0);
-    request->start_response_arena_pos = DN_ArenaPos(&request->arena);
+    request->completion_sem       = DN_OS_SemaphoreInit(0);
+    request->start_response_arena = DN_ArenaTempBeginFromArena(&request->arena);
   }
 
   DN_NETRequestHandle result = DN_NET_HandleFromRequest(request);

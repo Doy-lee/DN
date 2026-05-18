@@ -1,12 +1,28 @@
 #define DN_BASE_CPP
 
 #if defined(_CLANGD)
+  #define DN_ARENA_TEMP_MEM_UAF_GUARD 1
+  #define DN_H_WITH_OS 1
   #include "../dn.h"
 #endif
+
+DN_API bool DN_MemStartsWith(void const *lhs, DN_USize lhs_size, void const *rhs, DN_USize rhs_size)
+{
+  bool result = false;
+  if (lhs_size >= rhs_size)
+    result = DN_MemEqUnsafe(lhs, rhs, rhs_size);
+  return result;
+}
 
 DN_API bool DN_MemEq(void const *lhs, DN_USize lhs_size, void const *rhs, DN_USize rhs_size)
 {
   bool result = lhs_size == rhs_size && DN_Memcmp(lhs, rhs, rhs_size) == 0;
+  return result;
+}
+
+DN_API bool DN_MemEqUnsafe(void const *lhs, void const *rhs, DN_USize size)
+{
+  bool result = DN_Memcmp(lhs, rhs, size) == 0;
   return result;
 }
 
@@ -800,16 +816,16 @@ DN_API DN_F32 DN_EpsilonClampF32(DN_F32 value, DN_F32 target, DN_F32 epsilon)
   return result;
 }
 
-static DN_ArenaBlock *DN_ArenaBlockFromMemFuncs_(DN_U64 reserve, DN_U64 commit, bool track_alloc, bool alloc_can_leak, DN_ArenaMemFuncs mem_funcs)
+static DN_MemBlock *DN_ArenaBlockFromMemFuncs_(DN_U64 reserve, DN_U64 commit, bool track_alloc, bool alloc_can_leak, DN_MemFuncs mem_funcs)
 {
-  DN_ArenaBlock *result = nullptr;
+  DN_MemBlock *result = nullptr;
   switch (mem_funcs.type) {
-    case DN_ArenaMemFuncType_Nil:
+    case DN_MemFuncsType_Nil:
       break;
 
-    case DN_ArenaMemFuncType_Basic: {
+    case DN_MemFuncsType_Heap: {
       DN_AssertF(reserve > DN_ARENA_HEADER_SIZE, "%I64u > %I64u", reserve, DN_ARENA_HEADER_SIZE);
-      result = DN_Cast(DN_ArenaBlock *) mem_funcs.basic_alloc(reserve);
+      result = DN_Cast(DN_MemBlock *) mem_funcs.heap_alloc(reserve);
       if (!result)
         return result;
 
@@ -818,11 +834,11 @@ static DN_ArenaBlock *DN_ArenaBlockFromMemFuncs_(DN_U64 reserve, DN_U64 commit, 
       result->reserve = reserve;
     } break;
 
-    case DN_ArenaMemFuncType_VMem: {
-      DN_AssertF(mem_funcs.vmem_page_size, "Page size must be set to a non-zero, power of two value");
-      DN_Assert(DN_IsPowerOfTwo(mem_funcs.vmem_page_size));
+    case DN_MemFuncsType_Virtual: {
+      DN_AssertF(mem_funcs.virtual_page_size, "Page size must be set to a non-zero, power of two value");
+      DN_Assert(DN_IsPowerOfTwo(mem_funcs.virtual_page_size));
 
-      DN_USize const page_size    = mem_funcs.vmem_page_size;
+      DN_USize const page_size    = mem_funcs.virtual_page_size;
       DN_U64         real_reserve = reserve ? reserve : DN_ARENA_RESERVE_SIZE;
       DN_U64         real_commit  = commit ? commit   : DN_ARENA_COMMIT_SIZE;
       real_reserve                = DN_AlignUpPowerOfTwo(real_reserve, page_size);
@@ -830,12 +846,12 @@ static DN_ArenaBlock *DN_ArenaBlockFromMemFuncs_(DN_U64 reserve, DN_U64 commit, 
       DN_AssertF(DN_ARENA_HEADER_SIZE < real_commit && real_commit <= real_reserve, "%I64u < %I64u <= %I64u", DN_ARENA_HEADER_SIZE, real_commit, real_reserve);
 
       DN_MemCommit mem_commit = real_reserve == real_commit ? DN_MemCommit_Yes : DN_MemCommit_No;
-      result                    = DN_Cast(DN_ArenaBlock *) mem_funcs.vmem_reserve(real_reserve, mem_commit, DN_MemPage_ReadWrite);
+      result                    = DN_Cast(DN_MemBlock *) mem_funcs.virtual_reserve(real_reserve, mem_commit, DN_MemPage_ReadWrite);
       if (!result)
         return result;
 
-      if (mem_commit == DN_MemCommit_No && !mem_funcs.vmem_commit(result, real_commit, DN_MemPage_ReadWrite)) {
-        mem_funcs.vmem_release(result, real_reserve);
+      if (mem_commit == DN_MemCommit_No && !mem_funcs.virtual_commit(result, real_commit, DN_MemPage_ReadWrite)) {
+        mem_funcs.virtual_release(result, real_reserve);
         return result;
       }
 
@@ -851,107 +867,131 @@ static DN_ArenaBlock *DN_ArenaBlockFromMemFuncs_(DN_U64 reserve, DN_U64 commit, 
   return result;
 }
 
-static bool DN_ArenaHasPoison_(DN_ArenaFlags flags)
+static bool DN_ArenaHasPoison_(DN_MemFlags flags)
 {
   DN_MSVC_WARNING_PUSH
   DN_MSVC_WARNING_DISABLE(6237) // warning C6237: (<zero> && <expression>) is always zero.  <expression> is never evaluated and might have side effects.
-  bool result = DN_ASAN_POISON && DN_BitIsNotSet(flags, DN_ArenaFlags_NoPoison);
+  bool result = DN_ASAN_POISON && DN_BitIsNotSet(flags, DN_MemFlags_NoPoison);
   DN_MSVC_WARNING_POP
   return result;
 }
 
-static DN_ArenaBlock *DN_ArenaBlockFlagsFromMemFuncs_(DN_U64 reserve, DN_U64 commit, DN_ArenaFlags flags, DN_ArenaMemFuncs mem_funcs)
+static DN_MemBlock *DN_MemBlockFromMemFuncsFlags_(DN_U64 reserve, DN_U64 commit, DN_MemFlags flags, DN_MemFuncs mem_funcs)
 {
-  bool           track_alloc    = (flags & DN_ArenaFlags_NoAllocTrack) == 0;
-  bool           alloc_can_leak = flags & DN_ArenaFlags_AllocCanLeak;
-  DN_ArenaBlock *result         = DN_ArenaBlockFromMemFuncs_(reserve, commit, track_alloc, alloc_can_leak, mem_funcs);
+  bool           track_alloc    = (flags & DN_MemFlags_NoAllocTrack) == 0;
+  bool           alloc_can_leak = flags & DN_MemFlags_AllocCanLeak;
+  DN_MemBlock *result         = DN_ArenaBlockFromMemFuncs_(reserve, commit, track_alloc, alloc_can_leak, mem_funcs);
   if (result && DN_ArenaHasPoison_(flags))
     DN_ASanPoisonMemoryRegion(DN_Cast(char *) result + DN_ARENA_HEADER_SIZE, result->commit - DN_ARENA_HEADER_SIZE);
   return result;
 }
 
-static void DN_ArenaUpdateStatsOnNewBlock_(DN_Arena *arena, DN_ArenaBlock const *block)
+static void DN_MemListOnNewBlock_(DN_MemList *mem, DN_MemBlock const *block)
 {
-  DN_Assert(arena);
+  DN_Assert(mem);
   if (block) {
-    arena->stats.info.used    += block->used;
-    arena->stats.info.commit  += block->commit;
-    arena->stats.info.reserve += block->reserve;
-    arena->stats.info.blocks  += 1;
+    mem->stats.info.used    += block->used;
+    mem->stats.info.commit  += block->commit;
+    mem->stats.info.reserve += block->reserve;
+    mem->stats.info.blocks  += 1;
 
-    arena->stats.hwm.used    = DN_Max(arena->stats.hwm.used,    arena->stats.info.used);
-    arena->stats.hwm.commit  = DN_Max(arena->stats.hwm.commit,  arena->stats.info.commit);
-    arena->stats.hwm.reserve = DN_Max(arena->stats.hwm.reserve, arena->stats.info.reserve);
-    arena->stats.hwm.blocks  = DN_Max(arena->stats.hwm.blocks,  arena->stats.info.blocks);
+    mem->stats.hwm.used    = DN_Max(mem->stats.hwm.used,    mem->stats.info.used);
+    mem->stats.hwm.commit  = DN_Max(mem->stats.hwm.commit,  mem->stats.info.commit);
+    mem->stats.hwm.reserve = DN_Max(mem->stats.hwm.reserve, mem->stats.info.reserve);
+    mem->stats.hwm.blocks  = DN_Max(mem->stats.hwm.blocks,  mem->stats.info.blocks);
   }
 }
 
-DN_API DN_Arena DN_ArenaFromBuffer(void *buffer, DN_USize size, DN_ArenaFlags flags)
+DN_API DN_MemStats DN_MemStatsSum(DN_MemStats lhs, DN_MemStats rhs)
+{
+  DN_MemStats array[] = {lhs, rhs};
+  DN_MemStats result  = DN_MemStatsSumArray(array, DN_ArrayCountU(array));
+  return result;
+}
+
+DN_API DN_MemStats DN_MemStatsSumArray(DN_MemStats const *array, DN_USize size)
+{
+  DN_MemStats result = {};
+  for (DN_ForItSize(it, DN_MemStats const, array, size)) {
+    DN_MemStats stats    = *it.data;
+    result.info.used    += stats.info.used;
+    result.info.commit  += stats.info.commit;
+    result.info.reserve += stats.info.reserve;
+    result.info.blocks  += stats.info.blocks;
+
+    result.hwm.used      = DN_Max(result.hwm.used, result.info.used);
+    result.hwm.commit    = DN_Max(result.hwm.commit, result.info.commit);
+    result.hwm.reserve   = DN_Max(result.hwm.reserve, result.info.reserve);
+    result.hwm.blocks    = DN_Max(result.hwm.blocks, result.info.blocks);
+  }
+  return result;
+}
+
+DN_API DN_MemList DN_MemListFromBuffer(void *buffer, DN_USize size, DN_MemFlags flags)
 {
   DN_Assert(buffer);
   DN_AssertF(DN_ARENA_HEADER_SIZE < size, "Buffer (%zu bytes) too small, need atleast %zu bytes to store arena metadata", size, DN_ARENA_HEADER_SIZE);
   DN_AssertF(DN_IsPowerOfTwo(size), "Buffer (%zu bytes) must be a power-of-two", size);
 
   // NOTE: Init block
-  DN_ArenaBlock *block = DN_Cast(DN_ArenaBlock *) buffer;
+  DN_MemBlock *block = DN_Cast(DN_MemBlock *) buffer;
   block->commit        = size;
   block->reserve       = size;
   block->used          = DN_ARENA_HEADER_SIZE;
   if (block && DN_ArenaHasPoison_(flags))
     DN_ASanPoisonMemoryRegion(DN_Cast(char *) block + DN_ARENA_HEADER_SIZE, block->commit - DN_ARENA_HEADER_SIZE);
 
-  DN_Arena result = {};
-  result.flags    = flags | DN_ArenaFlags_NoGrow | DN_ArenaFlags_NoAllocTrack | DN_ArenaFlags_AllocCanLeak | DN_ArenaFlags_UserBuffer;
-  result.curr     = block;
-  DN_ArenaUpdateStatsOnNewBlock_(&result, result.curr);
+  DN_MemList result = {};
+  result.flags      = flags | DN_MemFlags_NoGrow | DN_MemFlags_NoAllocTrack | DN_MemFlags_AllocCanLeak | DN_MemFlags_UserBuffer;
+  result.curr       = block;
+  DN_MemListOnNewBlock_(&result, result.curr);
   return result;
 }
 
-DN_API DN_Arena DN_ArenaFromMemFuncs(DN_U64 reserve, DN_U64 commit, DN_ArenaFlags flags, DN_ArenaMemFuncs mem_funcs)
+DN_API DN_MemList DN_MemListFromMemFuncs(DN_U64 reserve, DN_U64 commit, DN_MemFlags flags, DN_MemFuncs mem_funcs)
 {
-  DN_Arena result   = {};
-  result.flags      = flags;
-  result.mem_funcs  = mem_funcs;
-  result.flags     |= DN_ArenaFlags_MemFuncs;
-  result.curr       = DN_ArenaBlockFlagsFromMemFuncs_(reserve, commit, flags, mem_funcs);
-  DN_ArenaUpdateStatsOnNewBlock_(&result, result.curr);
+  DN_MemList result  = {};
+  result.funcs       = mem_funcs;
+  result.flags      |= flags | DN_MemFlags_MemFuncs;
+  result.curr        = DN_MemBlockFromMemFuncsFlags_(reserve, commit, flags, mem_funcs);
+  DN_MemListOnNewBlock_(&result, result.curr);
   return result;
 }
 
-static void DN_ArenaBlockDeinit_(DN_Arena const *arena, DN_ArenaBlock *block)
+static void DN_MemBlockDeinit_(DN_MemList const *mem, DN_MemBlock *block)
 {
   DN_USize release_size = block->reserve;
-  if (DN_BitIsNotSet(arena->flags, DN_ArenaFlags_NoAllocTrack))
+  if (DN_BitIsNotSet(mem->flags, DN_MemFlags_NoAllocTrack))
     DN_LeakTrackDealloc(&g_dn_->leak, block);
 
-  if (DN_ArenaHasPoison_(arena->flags))
+  if (DN_ArenaHasPoison_(mem->flags))
     DN_ASanUnpoisonMemoryRegion(block, block->commit);
 
-  if (arena->flags & DN_ArenaFlags_MemFuncs) {
-    if (arena->mem_funcs.type == DN_ArenaMemFuncType_Basic)
-      arena->mem_funcs.basic_dealloc(block);
+  if (mem->flags & DN_MemFlags_MemFuncs) {
+    if (mem->funcs.type == DN_MemFuncsType_Heap)
+      mem->funcs.heap_dealloc(block);
     else
-      arena->mem_funcs.vmem_release(block, release_size);
+      mem->funcs.virtual_release(block, release_size);
   }
 }
 
-DN_API void DN_ArenaDeinit(DN_Arena *arena)
+DN_API void DN_MemListDeinit(DN_MemList *mem)
 {
-  for (DN_ArenaBlock *block = arena ? arena->curr : nullptr; block;) {
-    DN_ArenaBlock *block_to_free = block;
+  for (DN_MemBlock *block = mem ? mem->curr : nullptr; block;) {
+    DN_MemBlock *block_to_free = block;
     block                        = block->prev;
-    DN_ArenaBlockDeinit_(arena, block_to_free);
+    DN_MemBlockDeinit_(mem, block_to_free);
   }
-  if (arena)
-    *arena = {};
+  if (mem)
+    *mem = {};
 }
 
-DN_API bool DN_ArenaCommitTo(DN_Arena *arena, DN_U64 pos)
+DN_API bool DN_MemListCommitTo(DN_MemList *mem, DN_U64 pos)
 {
-  if (!arena || !arena->curr)
+  if (!mem || !mem->curr)
     return false;
 
-  DN_ArenaBlock *curr = arena->curr;
+  DN_MemBlock *curr = mem->curr;
   if (pos <= curr->commit)
     return true;
 
@@ -959,188 +999,202 @@ DN_API bool DN_ArenaCommitTo(DN_Arena *arena, DN_U64 pos)
   if (!DN_Check(pos <= curr->reserve))
     real_pos = curr->reserve;
 
-  DN_Assert(arena->mem_funcs.vmem_page_size);
-  DN_USize end_commit  = DN_AlignUpPowerOfTwo(real_pos, arena->mem_funcs.vmem_page_size);
+  DN_Assert(mem->funcs.virtual_page_size);
+  DN_USize end_commit  = DN_AlignUpPowerOfTwo(real_pos, mem->funcs.virtual_page_size);
   DN_USize commit_size = end_commit - curr->commit;
   char    *commit_ptr  = DN_Cast(char *) curr + curr->commit;
-  if (!arena->mem_funcs.vmem_commit(commit_ptr, commit_size, DN_MemPage_ReadWrite))
+  if (!mem->funcs.virtual_commit(commit_ptr, commit_size, DN_MemPage_ReadWrite))
     return false;
 
-  if (DN_ArenaHasPoison_(arena->flags))
+  if (DN_ArenaHasPoison_(mem->flags))
     DN_ASanPoisonMemoryRegion(commit_ptr, commit_size);
 
   curr->commit = end_commit;
   return true;
 }
 
-DN_API bool DN_ArenaCommit(DN_Arena *arena, DN_U64 size)
+DN_API bool DN_MemListCommit(DN_MemList *mem, DN_U64 size)
 {
-  if (!arena || !arena->curr)
+  if (!mem || !mem->curr)
     return false;
-  DN_U64 pos    = DN_Min(arena->curr->reserve, arena->curr->commit + size);
-  bool   result = DN_ArenaCommitTo(arena, pos);
+  DN_U64 pos    = DN_Min(mem->curr->reserve, mem->curr->commit + size);
+  bool   result = DN_MemListCommitTo(mem, pos);
   return result;
 }
 
-DN_API bool DN_ArenaGrow(DN_Arena *arena, DN_U64 reserve, DN_U64 commit)
+DN_API bool DN_MemListGrow(DN_MemList *mem, DN_U64 reserve, DN_U64 commit)
 {
-  if (arena->flags & (DN_ArenaFlags_NoGrow | DN_ArenaFlags_UserBuffer))
+  if (mem->flags & (DN_MemFlags_NoGrow | DN_MemFlags_UserBuffer))
     return false;
 
   bool result = false;
-  DN_ArenaBlock *new_block = DN_ArenaBlockFlagsFromMemFuncs_(reserve, commit, arena->flags, arena->mem_funcs);
+  DN_MemBlock *new_block = DN_MemBlockFromMemFuncsFlags_(reserve, commit, mem->flags, mem->funcs);
   if (new_block) {
-    result                      = true;
-    new_block->prev             = arena->curr;
-    arena->curr                 = new_block;
-    new_block->reserve_sum      = new_block->prev->reserve_sum + new_block->prev->reserve;
-    DN_ArenaUpdateStatsOnNewBlock_(arena, arena->curr);
+    result                 = true;
+    new_block->prev        = mem->curr;
+    mem->curr              = new_block;
+    new_block->reserve_sum = new_block->prev->reserve_sum + new_block->prev->reserve;
+    DN_MemListOnNewBlock_(mem, mem->curr);
   }
   return result;
 }
 
-DN_API void *DN_ArenaAlloc(DN_Arena *arena, DN_U64 size, uint8_t align, DN_ZMem z_mem)
+DN_API void *DN_MemListAlloc(DN_MemList *mem, DN_U64 size, uint8_t align, DN_ZMem z_mem)
 {
-  if (!arena)
+  if (!mem)
     return nullptr;
 
-  if (!arena->curr) {
-    arena->curr = DN_ArenaBlockFlagsFromMemFuncs_(DN_ARENA_RESERVE_SIZE, DN_ARENA_COMMIT_SIZE, arena->flags, arena->mem_funcs);
-    DN_ArenaUpdateStatsOnNewBlock_(arena, arena->curr);
+  if (!mem->curr) {
+    mem->curr = DN_MemBlockFromMemFuncsFlags_(DN_ARENA_RESERVE_SIZE, DN_ARENA_COMMIT_SIZE, mem->flags, mem->funcs);
+    DN_MemListOnNewBlock_(mem, mem->curr);
   }
 
-  if (!arena->curr)
+  if (!mem->curr)
     return nullptr;
 
   try_alloc_again:
-  DN_ArenaBlock *curr       = arena->curr;
-  bool           poison     = DN_ArenaHasPoison_(arena->flags);
-  uint8_t        real_align = poison ? DN_Max(align, DN_ASAN_POISON_ALIGNMENT) : align;
-  DN_U64         offset_pos = DN_AlignUpPowerOfTwo(curr->used, real_align) + (poison ? DN_ASAN_POISON_GUARD_SIZE : 0);
-  DN_U64         end_pos    = offset_pos + size;
-  DN_U64         alloc_size = end_pos - curr->used;
+    DN_MemBlock *curr       = mem->curr;
+    bool         poison     = DN_ArenaHasPoison_(mem->flags);
+    uint8_t      real_align = poison ? DN_Max(align, DN_ASAN_POISON_ALIGNMENT) : align;
+    DN_U64       offset_pos = DN_AlignUpPowerOfTwo(curr->used, real_align) + (poison ? DN_ASAN_POISON_GUARD_SIZE : 0);
+    DN_U64       end_pos    = offset_pos + size;
+    DN_U64       alloc_size = end_pos - curr->used;
 
-  if (end_pos > curr->reserve) {
-    if (arena->flags & (DN_ArenaFlags_NoGrow | DN_ArenaFlags_UserBuffer))
-      return nullptr;
-    DN_USize new_reserve = DN_Max(DN_ARENA_HEADER_SIZE + alloc_size, DN_ARENA_RESERVE_SIZE);
-    DN_USize new_commit  = DN_Max(DN_ARENA_HEADER_SIZE + alloc_size, DN_ARENA_COMMIT_SIZE);
-    if (!DN_ArenaGrow(arena, new_reserve, new_commit))
-      return nullptr;
-    goto try_alloc_again;
+    if (end_pos > curr->reserve) {
+      if (mem->flags & (DN_MemFlags_NoGrow | DN_MemFlags_UserBuffer))
+        return nullptr;
+      DN_USize new_reserve = DN_Max(DN_ARENA_HEADER_SIZE + alloc_size, DN_ARENA_RESERVE_SIZE);
+      DN_USize new_commit  = DN_Max(DN_ARENA_HEADER_SIZE + alloc_size, DN_ARENA_COMMIT_SIZE);
+      if (!DN_MemListGrow(mem, new_reserve, new_commit))
+        return nullptr;
+      goto try_alloc_again;
   }
 
   DN_USize prev_arena_commit = curr->commit;
   if (end_pos > curr->commit) {
-    DN_Assert(arena->mem_funcs.vmem_page_size);
-    DN_Assert(arena->mem_funcs.type == DN_ArenaMemFuncType_VMem);
-    DN_Assert((arena->flags & DN_ArenaFlags_UserBuffer) == 0);
-    DN_USize end_commit  = DN_AlignUpPowerOfTwo(end_pos, arena->mem_funcs.vmem_page_size);
+    DN_Assert(mem->funcs.virtual_page_size);
+    DN_Assert(mem->funcs.type == DN_MemFuncsType_Virtual);
+    DN_Assert((mem->flags & DN_MemFlags_UserBuffer) == 0);
+    DN_USize end_commit  = DN_AlignUpPowerOfTwo(end_pos, mem->funcs.virtual_page_size);
     DN_USize commit_size = end_commit - curr->commit;
     char    *commit_ptr  = DN_Cast(char *) curr + curr->commit;
-    if (!arena->mem_funcs.vmem_commit(commit_ptr, commit_size, DN_MemPage_ReadWrite))
+    if (!mem->funcs.virtual_commit(commit_ptr, commit_size, DN_MemPage_ReadWrite))
       return nullptr;
-    if (poison && DN_BitIsNotSet(arena->flags, DN_ArenaFlags_SimAlloc))
+    if (poison && DN_BitIsNotSet(mem->flags, DN_MemFlags_SimAlloc))
       DN_ASanPoisonMemoryRegion(commit_ptr, commit_size);
     curr->commit              = end_commit;
-    arena->stats.info.commit += commit_size;
-    arena->stats.hwm.commit   = DN_Max(arena->stats.hwm.commit, arena->stats.info.commit);
+    mem->stats.info.commit += commit_size;
+    mem->stats.hwm.commit   = DN_Max(mem->stats.hwm.commit, mem->stats.info.commit);
   }
 
-  void *result            = DN_Cast(char *) curr + offset_pos;
-  curr->used             += alloc_size;
-  arena->stats.info.used += alloc_size;
-  arena->stats.hwm.used   = DN_Max(arena->stats.hwm.used, arena->stats.info.used);
+  void *result                     = DN_Cast(char *) curr + offset_pos;
+  curr->used                      += alloc_size;
+  mem->stats.info.used += alloc_size;
+  mem->stats.hwm.used   = DN_Max(mem->stats.hwm.used, mem->stats.info.used);
 
-  if (poison && DN_BitIsNotSet(arena->flags, DN_ArenaFlags_SimAlloc))
+  if (poison && DN_BitIsNotSet(mem->flags, DN_MemFlags_SimAlloc))
     DN_ASanUnpoisonMemoryRegion(result, size);
 
-  if (z_mem == DN_ZMem_Yes && DN_BitIsNotSet(arena->flags, DN_ArenaFlags_SimAlloc)) {
+  if (z_mem == DN_ZMem_Yes && DN_BitIsNotSet(mem->flags, DN_MemFlags_SimAlloc)) {
     DN_USize reused_bytes = DN_Min(prev_arena_commit - offset_pos, size);
     DN_Memset(result, 0, reused_bytes);
   }
 
-  DN_Assert(arena->stats.hwm.used >= arena->stats.info.used);
-  DN_Assert(arena->stats.hwm.commit >= arena->stats.info.commit);
-  DN_Assert(arena->stats.hwm.reserve >= arena->stats.info.reserve);
-  DN_Assert(arena->stats.hwm.blocks >= arena->stats.info.blocks);
+  DN_Assert(mem->stats.hwm.used    >= mem->stats.info.used);
+  DN_Assert(mem->stats.hwm.commit  >= mem->stats.info.commit);
+  DN_Assert(mem->stats.hwm.reserve >= mem->stats.info.reserve);
+  DN_Assert(mem->stats.hwm.blocks  >= mem->stats.info.blocks);
   return result;
 }
 
-DN_API void *DN_ArenaAllocContiguous(DN_Arena *arena, DN_U64 size, uint8_t align, DN_ZMem z_mem)
+DN_API void *DN_MemListAllocContiguous(DN_MemList *mem, DN_U64 size, uint8_t align, DN_ZMem z_mem)
 {
-  DN_ArenaFlags prev_flags  = arena->flags;
-  arena->flags             |= (DN_ArenaFlags_NoGrow | DN_ArenaFlags_NoPoison);
-  void *memory              = DN_ArenaAlloc(arena, size, align, z_mem);
-  arena->flags              = prev_flags;
+  DN_MemFlags prev_flags = mem->flags;
+  mem->flags |= (DN_MemFlags_NoGrow | DN_MemFlags_NoPoison);
+  void *memory     = DN_MemListAlloc(mem, size, align, z_mem);
+  mem->flags = prev_flags;
   return memory;
 }
 
-DN_API void *DN_ArenaCopy(DN_Arena *arena, void const *data, DN_U64 size, uint8_t align)
+DN_API void *DN_MemListCopy(DN_MemList *mem, void const *data, DN_U64 size, uint8_t align)
 {
-  if (!arena || !data || size == 0)
+  if (!mem || !data || size == 0)
     return nullptr;
-  void *result = DN_ArenaAlloc(arena, size, align, DN_ZMem_No);
+  void *result = DN_MemListAlloc(mem, size, align, DN_ZMem_No);
   if (result)
     DN_Memcpy(result, data, size);
   return result;
 }
 
-DN_API void DN_ArenaPopTo(DN_Arena *arena, DN_U64 init_used)
+DN_API void DN_MemListPopTo(DN_MemList *mem, DN_U64 init_used)
 {
-  if (!arena || !arena->curr)
+  if (!mem || !mem->curr)
     return;
+
+  // NOTE: Free any memory blocks allocated additionally from the initial block to revert to
   DN_U64         used = DN_Max(DN_ARENA_HEADER_SIZE, init_used);
-  DN_ArenaBlock *curr = arena->curr;
+  DN_MemBlock *curr = mem->curr;
   while (curr->reserve_sum >= used) {
-    DN_ArenaBlock *block_to_free = curr;
-    arena->stats.info.used    -= block_to_free->used;
-    arena->stats.info.commit  -= block_to_free->commit;
-    arena->stats.info.reserve -= block_to_free->reserve;
-    arena->stats.info.blocks  -= 1;
-    if (arena->flags & DN_ArenaFlags_UserBuffer)
+    DN_MemBlock *block_to_free = curr;
+    mem->stats.info.used    -= block_to_free->used;
+    mem->stats.info.commit  -= block_to_free->commit;
+    mem->stats.info.reserve -= block_to_free->reserve;
+    mem->stats.info.blocks  -= 1;
+    if (mem->flags & DN_MemFlags_UserBuffer)
       break;
     curr = curr->prev;
-    DN_ArenaBlockDeinit_(arena, block_to_free);
+    DN_MemBlockDeinit_(mem, block_to_free);
   }
 
-  arena->stats.info.used -= curr->used;
-  arena->curr          = curr;
+  // NOTE: Revert the memory block we returned to
+  DN_U64 old_used      = curr->used;
+  mem->stats.info.used = old_used;
+  mem->curr            = curr;
   curr->used           = used - curr->reserve_sum;
-  if (DN_ArenaHasPoison_(arena->flags)) {
+
+  // NOTE: Scrub memory that we used previously in the block but no longer after reverting
+  if (DN_SCRUB_UNINIT_MEM_BYTE) {
+    if (old_used > curr->used) {
+      char *discarded = (char *)curr + curr->used;
+      DN_Memset(discarded, DN_SCRUB_UNINIT_MEM_BYTE, old_used - curr->used);
+    }
+  }
+
+  // NOTE: ASAN Poison
+  if (DN_ArenaHasPoison_(mem->flags)) {
     char    *poison_ptr  = (char *)curr + DN_AlignUpPowerOfTwo(curr->used, DN_ASAN_POISON_ALIGNMENT);
     DN_USize poison_size = ((char *)curr + curr->commit) - poison_ptr;
     DN_ASanPoisonMemoryRegion(poison_ptr, poison_size);
   }
-  arena->stats.info.used += curr->used;
+  mem->stats.info.used += curr->used;
 }
 
-DN_API void DN_ArenaPop(DN_Arena *arena, DN_U64 amount)
+DN_API void DN_MemListPop(DN_MemList *mem, DN_U64 amount)
 {
-  DN_ArenaBlock *curr     = arena->curr;
+  DN_MemBlock *curr     = mem->curr;
   DN_USize       used_sum = curr->reserve_sum + curr->used;
   if (!DN_Check(amount <= used_sum))
     amount = used_sum;
   DN_USize pop_to = used_sum - amount;
-  DN_ArenaPopTo(arena, pop_to);
+  DN_MemListPopTo(mem, pop_to);
 }
 
-DN_API DN_U64 DN_ArenaPos(DN_Arena const *arena)
+DN_API DN_U64 DN_MemListPos(DN_MemList const *mem)
 {
-  DN_U64 result = (arena && arena->curr) ? arena->curr->reserve_sum + arena->curr->used : 0;
+  DN_U64 result = (mem && mem->curr) ? mem->curr->reserve_sum + mem->curr->used : 0;
   return result;
 }
 
-DN_API void DN_ArenaClear(DN_Arena *arena)
+DN_API void DN_MemListClear(DN_MemList *mem)
 {
-  DN_ArenaPopTo(arena, 0);
+  DN_MemListPopTo(mem, 0);
 }
 
-DN_API bool DN_ArenaOwnsPtr(DN_Arena const *arena, void *ptr)
+DN_API bool DN_MemListOwnsPtr(DN_MemList const *mem, void *ptr)
 {
   bool      result   = false;
   uintptr_t uint_ptr = DN_Cast(uintptr_t) ptr;
-  for (DN_ArenaBlock const *block = arena ? arena->curr : nullptr; !result && block; block = block->prev) {
+  for (DN_MemBlock const *block = mem ? mem->curr : nullptr; !result && block; block = block->prev) {
     uintptr_t begin = DN_Cast(uintptr_t) block + DN_ARENA_HEADER_SIZE;
     uintptr_t end   = begin + block->reserve;
     result          = uint_ptr >= begin && uint_ptr <= end;
@@ -1148,7 +1202,7 @@ DN_API bool DN_ArenaOwnsPtr(DN_Arena const *arena, void *ptr)
   return result;
 }
 
-DN_API DN_Str8x64 DN_ArenaInfoStr8x64(DN_ArenaInfo info)
+DN_API DN_Str8x64 DN_MemListInfoStr8x64(DN_MemListInfo info)
 {
   DN_Str8x64 result  = {};
   DN_Str8x32 used    = DN_ByteCountStr8x32(info.used);
@@ -1159,67 +1213,219 @@ DN_API DN_Str8x64 DN_ArenaInfoStr8x64(DN_ArenaInfo info)
   return result;
 }
 
-DN_API DN_ArenaStats DN_ArenaSumStatsArray(DN_ArenaStats const *array, DN_USize size)
+DN_API DN_MemListTemp DN_MemListTempBegin(DN_MemList *mem)
 {
-  DN_ArenaStats result = {};
-  for (DN_ForItSize(it, DN_ArenaStats const, array, size)) {
-    DN_ArenaStats stats = *it.data;
-    result.info.used += stats.info.used;
-    result.info.commit += stats.info.commit;
-    result.info.reserve += stats.info.reserve;
-    result.info.blocks += stats.info.blocks;
-
-    result.hwm.used      = DN_Max(result.hwm.used, result.info.used);
-    result.hwm.commit    = DN_Max(result.hwm.commit, result.info.commit);
-    result.hwm.reserve   = DN_Max(result.hwm.reserve, result.info.reserve);
-    result.hwm.blocks    = DN_Max(result.hwm.blocks, result.info.blocks);
-  }
-  return result;
-}
-
-DN_API DN_ArenaStats DN_ArenaSumStats(DN_ArenaStats lhs, DN_ArenaStats rhs)
-{
-  DN_ArenaStats array[] = {lhs, rhs};
-  DN_ArenaStats result  = DN_ArenaSumStatsArray(array, DN_ArrayCountU(array));
-  return result;
-}
-
-DN_API DN_ArenaStats DN_ArenaSumArenaArrayToStats(DN_Arena const *array, DN_USize size)
-{
-  DN_ArenaStats result = {};
-  for (DN_USize index = 0; index < size; index++) {
-    DN_Arena const *arena = array + index;
-    result                = DN_ArenaSumStats(result, arena->stats);
-  }
-  return result;
-}
-
-DN_API DN_ArenaTempMem DN_ArenaTempMemBegin(DN_Arena *arena)
-{
-  DN_ArenaTempMem result = {};
-  if (arena) {
-    DN_ArenaBlock *curr = arena->curr;
-    result              = {arena, curr ? curr->reserve_sum + curr->used : 0};
+  DN_MemListTemp result = {};
+  if (mem) {
+    result.mem      = mem;
+    result.used_sum = mem->curr ? mem->curr->reserve_sum + mem->curr->used : 0;
   }
   return result;
 };
 
-DN_API void DN_ArenaTempMemEnd(DN_ArenaTempMem mem)
+DN_API void DN_MemListTempEnd(DN_MemListTemp temp)
 {
-  DN_ArenaPopTo(mem.arena, mem.used_sum);
+  DN_MemListPopTo(temp.mem, temp.used_sum);
 };
 
-DN_ArenaTempMemScope::DN_ArenaTempMemScope(DN_Arena *arena)
+DN_Str8 const DN_MEM_LIST_UAF_TRACING_DISABLED_MORE_INFO_STR8_ = DN_Str8Lit(
+  "\n\nSet `DN_MemFlags_TempMemUAFTrace` on the affected arenas or "
+  "`#define DN_ARENA_TEMP_MEM_UAF_TRACE_ON_BY_DEFAULT 1` for more information"
+);
+
+#if defined(DN_ARENA_TEMP_MEM_UAF_GUARD)
+static bool DN_MemListUAFTracingEnabled_(DN_MemList *mem)
 {
-  mem = DN_ArenaTempMemBegin(arena);
+  bool result = DN_ARENA_TEMP_MEM_UAF_TRACE_ON_BY_DEFAULT;
+  if (!result)
+    result = mem->flags & DN_MemFlags_TempMemUAFTrace;
+  if (mem->flags & DN_MemFlags_TempMemUAFTraceDisable)
+    result = false;
+  return result;
+}
+#endif
+
+DN_API void DN_ArenaUAFCheck(DN_Arena *arena)
+{
+  (void)arena;
+  #if DN_ARENA_TEMP_MEM_UAF_GUARD
+  DN_MemList *mem = arena->mem;
+  if (!mem)
+    return;
+
+  if (arena->uaf_guard_temp_mem && !arena->uaf_guard_is_being_checked) {
+    // NOTE: The following functions below allocate memory which might trigger an additional UAF
+    // check which would cause infinite recursion so we set a flag here to prevent that.
+    arena->uaf_guard_is_being_checked = true;
+    if (mem->uaf_guard_active_id != arena->uaf_guard_id) {
+      // NOTE: MSVC does not recognise %'u which is a STB extension which causes a lot of incorrect
+      // format arguments warnings that we mute here.
+      DN_MSVC_WARNING_PUSH
+      DN_MSVC_WARNING_DISABLE(6271) // Extra argument passed to 'DN_Str8FromFmtArena'
+      DN_MSVC_WARNING_DISABLE(6067) // _Param_(10) in call to 'DN_LogPrint' must be the address of a string. Actual type: 'int'.
+      DN_MSVC_WARNING_DISABLE(6273) // Non-integer passed as _Param_(11) when an integer is required in call to 'DN_LogPrint' Actual type: 'char *'.
+      DN_Str8    prefix = DN_Str8LineBreakStr8(DN_Str8FromFmtArena(arena,
+                                                                   "Arena use-after-free (UAF) detected in temporary memory usage! This allocation (trace "
+                                                                   "shown above) is attempting to allocate memory inside the active temporary region (id: %'u) "
+                                                                   "but belongs to a different region (id: %'u). This means when the active temporary region is "
+                                                                   "released, this allocation will be released and scrubbed causing a potential UAF.\n\nEnsure "
+                                                                   "that scratch memory is deconflicting correctly, scratch and or temporary memory regions have "
+                                                                   "matching begin and end pairs and only the arena view with the active temporary memory region "
+                                                                   "is being allocated from.",
+                                                                   mem->uaf_guard_active_id,
+                                                                   arena->uaf_guard_id),
+                                               100,
+                                               arena);
+
+      if (DN_MemListUAFTracingEnabled_(mem)) {
+        DN_Str8 curr_stack_trace   = DN_Str8PadNewLines(DN_StackTraceWalkResultToStr8(arena, &arena->uaf_guard_temp_mem->trace, 1), DN_Str8Lit("  "), arena);
+        DN_Str8 active_stack_trace = DN_Str8PadNewLines(DN_StackTraceWalkResultToStr8(arena, &mem->uaf_guard_active_temp_mem->trace, 1), DN_Str8Lit("  "), arena);
+        DN_AssertF(mem->uaf_guard_active_id == arena->uaf_guard_id,
+                   "%.*s\n\nThe originating temporary memory region (id: %'u) was created at:"
+                   "\n\n  %.*s\n\nThe active temporary memory region (id: %'u) was created at:\n\n  %.*s",
+                   DN_Str8PrintFmt(prefix),
+                   arena->uaf_guard_id,
+                   DN_Str8PrintFmt(curr_stack_trace),
+                   mem->uaf_guard_active_id,
+                   DN_Str8PrintFmt(active_stack_trace));
+      } else {
+        DN_Str8 suffix = DN_Str8LineBreakStr8(DN_MEM_LIST_UAF_TRACING_DISABLED_MORE_INFO_STR8_, 100, arena);
+        DN_AssertF(mem->uaf_guard_active_id == arena->uaf_guard_id, "%.*s%.*s", DN_Str8PrintFmt(prefix), DN_Str8PrintFmt(suffix));
+      }
+      DN_MSVC_WARNING_POP
+    }
+    arena->uaf_guard_is_being_checked = false;
+  }
+  #endif
 }
 
-DN_ArenaTempMemScope::~DN_ArenaTempMemScope()
+DN_API DN_Arena DN_ArenaFromMemList(DN_MemList *mem)
 {
-  DN_ArenaTempMemEnd(mem);
+  DN_Arena result = {};
+  result.mem      = mem;
+  return result;
 }
 
-// NOTE: DN_Pool ///////////////////////////////////////////////////////////////////////////////////
+DN_API DN_Arena DN_ArenaTempBeginFromMemList(DN_MemList* mem)
+{
+  DN_Arena       result   = DN_ArenaFromMemList(mem);
+  DN_MemListTemp temp_mem = DN_MemListTempBegin(mem);
+
+#if DN_ARENA_TEMP_MEM_UAF_GUARD
+  if (DN_MemListUAFTracingEnabled_(mem))
+    temp_mem.trace = DN_StackTraceWalk(&result, 256);
+
+  // NOTE: Create persistent temp mem and set it on the mem list
+  result.uaf_guard_temp_mem      = DN_ArenaNewCopy(&result, DN_MemListTemp, &temp_mem);
+  result.uaf_guard_prev_temp_mem = mem->uaf_guard_active_temp_mem;
+  mem->uaf_guard_active_temp_mem = result.uaf_guard_temp_mem;
+
+  // NOTE: Update IDs
+  result.uaf_guard_id            = ++mem->uaf_guard_next_id;
+  result.uaf_guard_prev_id       = mem->uaf_guard_active_id;
+  mem->uaf_guard_active_id       = result.uaf_guard_id;
+#else
+  result.temp_mem = temp_mem;
+#endif
+  return result;
+}
+
+
+DN_API DN_Arena DN_ArenaTempBeginFromArena(DN_Arena *arena)
+{
+  DN_Arena result = DN_ArenaTempBeginFromMemList(arena->mem);
+  return result;
+}
+
+DN_API void DN_ArenaTempEnd(DN_Arena *arena, DN_ArenaReset reset)
+{
+#if DN_ARENA_TEMP_MEM_UAF_GUARD
+  DN_AssertF(arena->uaf_guard_temp_mem, "Arena was not created with temp memory");
+#else
+  DN_AssertF(arena->temp_mem.mem, "Arena was not created with temp memory");
+#endif
+
+#if DN_ARENA_TEMP_MEM_UAF_GUARD
+  DN_MemList *mem = arena->mem;
+  if (mem->uaf_guard_active_id != arena->uaf_guard_id) {
+    // NOTE: MSVC does not recognise %'u which is a STB extension which causes a lot of incorrect
+    // format arguments warnings that we mute here.
+    DN_MSVC_WARNING_PUSH
+    DN_MSVC_WARNING_DISABLE(6271) // Extra argument passed to 'DN_Str8FromFmtArena'
+    DN_MSVC_WARNING_DISABLE(6067) // _Param_(10) in call to 'DN_LogPrint' must be the address of a string. Actual type: 'int'.
+    DN_MSVC_WARNING_DISABLE(6273) // Non-integer passed as _Param_(11) when an integer is required in call to 'DN_LogPrint' Actual type: 'char *'.
+
+    // TODO: If this triggers, using the arena to format the error message is going to trigger the UAF check which is already failing.
+    DN_Str8 prefix = DN_Str8LineBreakStr8(DN_Str8Lit("The active temporary memory region recorded on the arena is "
+                                                    "different from the current temporary memory region recorded on "
+                                                    "the memory list allocator. This means that a temporary region "
+                                                    "began but was not ended after the region was completed. Temporary "
+                                                    "memory regions are enforced in a first-in-last-out manner (FILO) "
+                                                    "to ensure the developer's intent of what the temporary region "
+                                                    "spans is logically consistent and always strictly ends and begins "
+                                                    "within a known lifetime."),
+                                          100,
+                                          arena);
+
+    if (DN_MemListUAFTracingEnabled_(mem)) {
+      DN_Str8 curr_stack_trace   = DN_Str8PadNewLines(DN_StackTraceWalkResultToStr8(arena, &arena->uaf_guard_temp_mem->trace, 1), DN_Str8Lit("  "), arena);
+      DN_Str8 active_stack_trace = DN_Str8PadNewLines(DN_StackTraceWalkResultToStr8(arena, &mem->uaf_guard_active_temp_mem->trace, 1), DN_Str8Lit("  "), arena);
+      DN_AssertF(mem->uaf_guard_active_id == arena->uaf_guard_id,
+                 "%.*s\n\nThe originating temporary memory region (id: %'u) was created at:"
+                 "\n\n  %.*s\n\nThe active temporary memory region (id: %'u) was created at:\n\n  %.*s",
+                 DN_Str8PrintFmt(prefix),
+                 arena->uaf_guard_id,
+                 DN_Str8PrintFmt(curr_stack_trace),
+                 mem->uaf_guard_active_id,
+                 DN_Str8PrintFmt(active_stack_trace));
+    } else {
+      DN_Str8 suffix = DN_Str8LineBreakStr8(DN_MEM_LIST_UAF_TRACING_DISABLED_MORE_INFO_STR8_, 100, arena);
+      DN_AssertF(mem->uaf_guard_active_id == arena->uaf_guard_id, "%.*s%.*s", DN_Str8PrintFmt(prefix), DN_Str8PrintFmt(suffix));
+    }
+    DN_MSVC_WARNING_POP
+    DN_Assert(arena->mem->uaf_guard_active_id == arena->uaf_guard_id);
+  }
+#endif
+
+  if (reset == DN_ArenaReset_Yes) {
+#if DN_ARENA_TEMP_MEM_UAF_GUARD
+    DN_MemListTempEnd(*arena->uaf_guard_temp_mem);
+#else
+    DN_MemListTempEnd(arena->temp_mem);
+#endif
+  }
+
+#if DN_ARENA_TEMP_MEM_UAF_GUARD
+  mem->uaf_guard_active_id       = arena->uaf_guard_prev_id;
+  mem->uaf_guard_active_temp_mem = arena->uaf_guard_prev_temp_mem;
+
+  arena->uaf_guard_prev_temp_mem = nullptr;
+  arena->uaf_guard_prev_id       = 0;
+  arena->uaf_guard_temp_mem      = nullptr;
+#endif
+}
+
+DN_API void *DN_ArenaAlloc(DN_Arena *arena, DN_U64 size, uint8_t align, DN_ZMem z_mem)
+{
+  DN_ArenaUAFCheck(arena);
+  void *result = DN_MemListAlloc(arena->mem, size, align, z_mem);
+  return result;
+}
+
+DN_API void *DN_ArenaAllocContiguous(DN_Arena *arena, DN_U64 size, uint8_t align, DN_ZMem z_mem)
+{
+  DN_ArenaUAFCheck(arena);
+  void *result = DN_MemListAllocContiguous(arena->mem, size, align, z_mem);
+  return result;
+}
+
+DN_API void *DN_ArenaCopy(DN_Arena *arena, void const *data, DN_U64 size, uint8_t align)
+{
+  DN_ArenaUAFCheck(arena);
+  void *result = DN_MemListCopy(arena->mem, data, size, align);
+  return result;
+}
+
 DN_API DN_Pool DN_PoolFromArena(DN_Arena *arena, uint8_t align)
 {
   DN_Pool result = {};
@@ -1303,7 +1509,7 @@ DN_API void DN_PoolDealloc(DN_Pool *pool, void *ptr)
   if (!DN_PoolIsValid(pool) || !ptr)
     return;
 
-  DN_Assert(DN_ArenaOwnsPtr(pool->arena, ptr));
+  DN_Assert(DN_MemListOwnsPtr(pool->arena->mem, ptr));
 
   char const *one_byte_behind_ptr    = DN_Cast(char *) ptr - 1;
   DN_USize    offset_to_original_ptr = 0;
@@ -1315,13 +1521,20 @@ DN_API void DN_PoolDealloc(DN_Pool *pool, void *ptr)
   DN_PoolSlotSize slot_index   = DN_Cast(DN_PoolSlotSize)(DN_Cast(uintptr_t) slot->next);
   DN_Assert(slot_index < DN_PoolSlotSize_Count);
 
+  // NOTE: Scrub memory before returning to the pool
+  if (DN_SCRUB_UNINIT_MEM_BYTE) {
+    DN_USize slot_size_in_bytes = 1ULL << (slot_index + 5);
+    DN_USize data_offset        = (char *)slot->data - (char *)slot;
+    DN_Memset(slot->data, DN_SCRUB_UNINIT_MEM_BYTE, slot_size_in_bytes - data_offset);
+  }
+
   slot->next              = pool->slots[slot_index];
   pool->slots[slot_index] = slot;
 }
 
 static void DN_ErrSinkCheck_(DN_ErrSink const *err)
 {
-  DN_Assert(err->arena);
+  DN_Assert(err->arena->mem);
   if (err->stack_size == 0)
     return;
 
@@ -1342,28 +1555,29 @@ static void DN_ErrSinkCheck_(DN_ErrSink const *err)
 
 DN_API DN_ErrSink* DN_ErrSinkBegin_(DN_ErrSink *err, DN_ErrSinkMode mode, DN_CallSite call_site)
 {
-  DN_USize arena_pos = DN_ArenaPos(err->arena);
+  // NOTE: OOM error
   if (err->stack_size == DN_ArrayCountU(err->stack)) {
     DN_Str8Builder builder = DN_Str8BuilderFromArena(err->arena);
     for (DN_ForItSize(it, DN_ErrSinkNode, err->stack, err->stack_size))
       DN_Str8BuilderAppendF(&builder, "  [%04zu] %.*s:%u %.*s\n", it.index, DN_Str8PrintFmt(it.data->call_site.file), it.data->call_site.line, DN_Str8PrintFmt(it.data->call_site.function));
     DN_Str8 msg = DN_Str8BuilderBuild(&builder, err->arena);
     DN_AssertF(err->stack_size < DN_ArrayCountU(err->stack), "Error sink has run out of error scopes, potential leak. Scopes were\n%.*s", DN_Str8PrintFmt(msg));
-    DN_ArenaPopTo(err->arena, arena_pos);
   }
 
+  // NOTE: Allocate the node
   DN_ErrSinkNode *node = err->stack + err->stack_size++;
-  node->arena_pos      = arena_pos;
+  node->arena_pos      = DN_MemListPos(err->arena->mem);
   node->mode           = mode;
   node->call_site      = call_site;
   DN_SentinelDoublyLLInitArena(node->msg_sentinel, DN_ErrSinkMsg, err->arena);
 
   // NOTE: Handle allocation error
   if (!DN_Check(node && node->msg_sentinel)) {
-    DN_ArenaPopTo(err->arena, arena_pos);
+    DN_MemListPopTo(err->arena->mem, node->arena_pos);
     node->msg_sentinel = nullptr;
     err->stack_size--;
   }
+
   DN_ErrSink *result = err;
   return result;
 }
@@ -1389,7 +1603,7 @@ DN_API DN_ErrSinkMsg *DN_ErrSinkEnd(DN_Arena *arena, DN_ErrSink *err)
   DN_ErrSinkMsg  *prev = nullptr;
   for (DN_ErrSinkMsg *it = node->msg_sentinel->next; it != node->msg_sentinel; it = it->next) {
     DN_ErrSinkMsg *entry = DN_ArenaNew(arena, DN_ErrSinkMsg, DN_ZMem_Yes);
-    entry->msg           = DN_Str8FromStr8Arena(arena, it->msg);
+    entry->msg           = DN_Str8FromStr8Arena(it->msg, arena);
     entry->call_site     = it->call_site;
     entry->error_code    = it->error_code;
     if (!result)
@@ -1401,7 +1615,7 @@ DN_API DN_ErrSinkMsg *DN_ErrSinkEnd(DN_Arena *arena, DN_ErrSink *err)
 
   // NOTE: Deallocate all the memory for this scope
   err->stack_size--;
-  DN_ArenaPopTo(err->arena, node->arena_pos);
+  DN_MemListPopTo(err->arena->mem, node->arena_pos);
   return result;
 }
 
@@ -1451,8 +1665,7 @@ DN_API DN_Str8 DN_ErrSinkEndStr8(DN_Arena *arena, DN_ErrSink *err)
 
   // NOTE: Deallocate all the memory for this scope
   err->stack_size--;
-  DN_U64 arena_pos = node->arena_pos;
-  DN_ArenaPopTo(err->arena, arena_pos);
+  DN_MemListPopTo(err->arena->mem, node->arena_pos);
 
   result = DN_Str8BuilderBuild(&builder, arena);
   return result;
@@ -1468,6 +1681,8 @@ DN_API bool DN_ErrSinkEndLogError_(DN_ErrSink *err, DN_CallSite call_site, DN_St
   DN_ErrSinkNode *node = err->stack + (err->stack_size - 1);
   DN_AssertF(err->stack_size, "Begin must be called before calling end");
   DN_AssertF(node->msg_sentinel, "Begin must be called before calling end");
+  err->stack_size--;
+
   bool result = false;
   if (node->msg_sentinel != node->msg_sentinel->next) {
     result = true;
@@ -1487,14 +1702,13 @@ DN_API bool DN_ErrSinkEndLogError_(DN_ErrSink *err, DN_CallSite call_site, DN_St
 
     // NOTE: Log the error
     DN_Str8 log = DN_Str8BuilderBuild(&builder, err->arena);
-    DN_LogPrint(DN_LogTypeParamFromType(DN_LogType_Error), call_site, "%.*s", DN_Str8PrintFmt(log));
+    DN_LogPrint(DN_LogTypeParamFromType(DN_LogType_Error), call_site, DN_LogFlags_Nil, "%.*s", DN_Str8PrintFmt(log));
 
     if (node->mode == DN_ErrSinkMode_DebugBreakOnErrorLog)
       DN_DebugBreak;
 
     // NOTE: Deallocate the error node's memory and pop it from the stack
-    DN_ArenaPopTo(err->arena, node->arena_pos);
-    err->stack_size--;
+    DN_MemListPopTo(err->arena->mem, node->arena_pos);
   }
   return result;
 }
@@ -1566,12 +1780,13 @@ DN_API void DN_TCInit(DN_TCCore *tc, DN_U64 thread_id, DN_Arena *main_arena, DN_
 {
   tc->thread_id      = thread_id;
   tc->main_arena     = main_arena;
+  tc->main_pool      = DN_PoolFromArena(tc->main_arena, 0);
   tc->temp_a_arena   = temp_a_arena;
   tc->temp_b_arena   = temp_b_arena;
   tc->err_sink.arena = err_sink_arena;
 }
 
-DN_API void DN_TCInitFromMemFuncs(DN_TCCore *tc, DN_U64 thread_id, DN_TCInitArgs *args, DN_ArenaMemFuncs mem_funcs)
+DN_API void DN_TCInitFromMemFuncs(DN_TCCore *tc, DN_U64 thread_id, DN_TCInitArgs *args, DN_MemFuncs mem_funcs)
 {
   DN_U64 main_reserve     = (args && args->main_reserve)     ? args->main_reserve     : DN_Kilobytes(64);
   DN_U64 main_commit      = (args && args->main_commit)      ? args->main_commit      : DN_Kilobytes(4);
@@ -1580,20 +1795,26 @@ DN_API void DN_TCInitFromMemFuncs(DN_TCCore *tc, DN_U64 thread_id, DN_TCInitArgs
   DN_U64 err_sink_reserve = (args && args->err_sink_reserve) ? args->err_sink_reserve : DN_Kilobytes(64);
   DN_U64 err_sink_commit  = (args && args->err_sink_commit)  ? args->err_sink_commit  : DN_Kilobytes(4);
 
-  tc->main_arena_         = DN_ArenaFromMemFuncs(main_reserve,     main_commit,     DN_ArenaFlags_AllocCanLeak | DN_ArenaFlags_NoAllocTrack, mem_funcs);
-  tc->temp_a_arena_       = DN_ArenaFromMemFuncs(temp_reserve,     temp_commit,     DN_ArenaFlags_AllocCanLeak | DN_ArenaFlags_NoAllocTrack, mem_funcs);
-  tc->temp_b_arena_       = DN_ArenaFromMemFuncs(temp_reserve,     temp_commit,     DN_ArenaFlags_AllocCanLeak | DN_ArenaFlags_NoAllocTrack, mem_funcs);
-  tc->err_sink_arena_     = DN_ArenaFromMemFuncs(err_sink_reserve, err_sink_commit, DN_ArenaFlags_AllocCanLeak | DN_ArenaFlags_NoAllocTrack, mem_funcs);
+  tc->main_arena_mem_     = DN_MemListFromMemFuncs(main_reserve, main_commit, DN_MemFlags_AllocCanLeak | DN_MemFlags_NoAllocTrack, mem_funcs);
+  tc->temp_a_arena_mem_   = DN_MemListFromMemFuncs(temp_reserve, temp_commit, DN_MemFlags_AllocCanLeak | DN_MemFlags_NoAllocTrack, mem_funcs);
+  tc->temp_b_arena_mem_   = DN_MemListFromMemFuncs(temp_reserve, temp_commit, DN_MemFlags_AllocCanLeak | DN_MemFlags_NoAllocTrack, mem_funcs);
+  tc->err_sink_arena_mem_ = DN_MemListFromMemFuncs(err_sink_reserve, err_sink_commit, DN_MemFlags_AllocCanLeak | DN_MemFlags_NoAllocTrack, mem_funcs);
+  tc->main_arena_         = DN_ArenaFromMemList(&tc->main_arena_mem_);
+  tc->temp_a_arena_       = DN_ArenaFromMemList(&tc->temp_a_arena_mem_);
+  tc->temp_b_arena_       = DN_ArenaFromMemList(&tc->temp_b_arena_mem_);
+  tc->err_sink_arena_     = DN_ArenaFromMemList(&tc->err_sink_arena_mem_);
 
   DN_TCInit(tc, thread_id, &tc->main_arena_, &tc->temp_a_arena_, &tc->temp_b_arena_, &tc->err_sink_arena_);
 }
 
-DN_API void DN_TCDeinit(DN_TCCore *tc)
+DN_API void DN_TCDeinit(DN_TCCore *tc, DN_TCDeinitArenas deinit_arenas)
 {
-  DN_ArenaDeinit(tc->main_arena);
-  DN_ArenaDeinit(tc->temp_a_arena);
-  DN_ArenaDeinit(tc->temp_b_arena);
-  DN_ArenaDeinit(tc->err_sink.arena);
+  if (deinit_arenas == DN_TCDeinitArenas_Yes) {
+    DN_MemListDeinit(tc->main_arena->mem);
+    DN_MemListDeinit(tc->temp_a_arena->mem);
+    DN_MemListDeinit(tc->temp_b_arena->mem);
+    DN_MemListDeinit(tc->err_sink.arena->mem);
+  }
 }
 
 DN_API void DN_TCEquip(DN_TCCore *tc)
@@ -1617,25 +1838,37 @@ DN_API DN_Arena *DN_TCMainArena()
   return result;
 }
 
-DN_API DN_Arena *DN_TCTempArena(DN_Arena **conflicts, DN_USize count)
+DN_API DN_Pool *DN_TCMainPool()
 {
-  DN_TCCore *tc           = DN_TCGet();
-  DN_Arena  *candidates[] = {tc->temp_a_arena, tc->temp_b_arena};
-  DN_Arena  *result       = nullptr;
-  for (DN_ForItCArray(it, DN_Arena *, candidates)) {
-    bool is_usable = false;
+  DN_TCCore *tc    = DN_TCGet();
+  DN_Pool  *result = &tc->main_pool;
+  return result;
+}
+
+DN_API DN_Arena DN_TCTempArena(DN_Arena **conflicts, DN_USize count)
+{
+  DN_TCCore  *tc           = DN_TCGet();
+  DN_MemList *candidates[] = {tc->temp_a_arena->mem, tc->temp_b_arena->mem};
+  DN_Arena    result       = {};
+  for (DN_ForItCArray(it, DN_MemList *, candidates)) {
+    bool        is_usable = true;
+    DN_MemList *rhs_mem   = *it.data;
     for (DN_ForItSize(conflict_it, DN_Arena *, conflicts, count)) {
-      if (*conflict_it.data == *it.data)
-        continue;
-      is_usable = true;
-      break;
+      DN_Arena   *lhs_arena = *conflict_it.data;
+      DN_MemList *lhs_mem   = lhs_arena->mem;
+      if (lhs_mem == rhs_mem) {
+        is_usable = false;
+        break;
+      }
     }
 
-    if (count == 0 || is_usable) {
-      result = *it.data;
+    if (is_usable) {
+      result = DN_ArenaTempBeginFromMemList(rhs_mem);
       break;
     }
   }
+
+  DN_AssertF(result.mem, "All temp arenas are being used, there are none left to return to the caller");
   return result;
 }
 
@@ -1655,17 +1888,15 @@ DN_API DN_TCScratch DN_TCScratchBegin(DN_Arena **conflicts, DN_USize count)
 {
   DN_TCScratch result = {};
   result.arena        = DN_TCTempArena(conflicts, count);
-  result.temp_mem     = DN_ArenaTempMemBegin(result.arena);
   return result;
 }
 
 DN_API void DN_TCScratchEnd(DN_TCScratch *scratch)
 {
   DN_Assert(scratch->destructed == false);
-  DN_ArenaTempMemEnd(scratch->temp_mem);
+  DN_ArenaTempEnd(&scratch->arena, DN_ArenaReset_Yes);
+  *scratch            = {};
   scratch->destructed = true;
-  scratch->arena      = nullptr;
-  scratch->temp_mem   = {};
 }
 
 DN_API void DN_TCSetFrameArena(DN_Arena *arena)
@@ -1859,15 +2090,15 @@ DN_API DN_U64 DN_U64FromU8x32HiBEUnsafe(DN_U8x32 const *val)
   return result;
 }
 
-DN_API DN_U64 DN_U64FromU8x32HiBE(DN_U8x32 const *val)
+DN_API DN_U64FromResult DN_U64FromU8x32HiBE(DN_U8x32 const *val)
 {
-  DN_U64 result = {};
+  DN_U64FromResult result = {};
   if (val) {
     // NOTE: Check that the high bits are not set
     DN_U8x32 zero_mask     = {};
     bool     high_bits_set = DN_Memcmp(val->data, zero_mask.data, sizeof(zero_mask.data) - sizeof(result)) != 0;
-    DN_Assert(!high_bits_set);
-    result = DN_U64FromU8x32HiBEUnsafe(val);
+    result.success         = !high_bits_set;
+    result.value           = DN_U64FromU8x32HiBEUnsafe(val);
   }
   return result;
 }
@@ -1880,16 +2111,16 @@ DN_API DN_USize DN_USizeFromU8x32HiBEUnsafe(DN_U8x32 const *val)
   return result;
 }
 
-DN_API DN_USize DN_USizeFromU8x32HiBE(DN_U8x32 const *val)
+DN_API DN_USizeFromResult DN_USizeFromU8x32HiBE(DN_U8x32 const *val)
 {
-  DN_USize result = {};
+  DN_USizeFromResult result = {};
   if (val) {
     // NOTE: Check that the high bits are not set
     DN_U8x32 mask = {};
     DN_Memset(mask.data, 1, sizeof(mask.data) - sizeof(result));
     bool high_bits_set = DN_Memcmp(val->data, mask.data, 24) != 0;
-    DN_Assert(!high_bits_set);
-    result = DN_USizeFromU8x32HiBEUnsafe(val);
+    result.success     = !high_bits_set;
+    result.value       = DN_USizeFromU8x32HiBEUnsafe(val);
   }
   return result;
 }
@@ -1969,6 +2200,72 @@ DN_API DN_I64 DN_I64FromPtrUnsafe(void const *data, DN_USize size, char separato
   return result;
 }
 
+DN_API bool DN_U8x32Eq(DN_U8x32 const *lhs, DN_U8x32 const *rhs)
+{
+  bool result = DN_MemEqUnsafe(lhs->data, rhs->data, sizeof(lhs->data));
+  return result;
+}
+
+DN_API DN_U8x32 DN_U8x32FromBytesLeftPadZ(DN_U8 const *ptr, DN_USize count)
+{
+  DN_U8x32 result = {};
+  DN_Assert(count <= sizeof(result.data));
+  DN_Memcpy(result.data + sizeof(result.data) - count, ptr, count);
+  return result;
+}
+
+DN_API DN_U8x32 DN_U8x32FromHexUnsafe(DN_Str8 hex_32b)
+{
+  DN_U8x32 result = {};
+  hex_32b         = DN_Str8TrimHexPrefix(hex_32b);
+  DN_Assert(hex_32b.size <= sizeof(result.data) * 2);
+  DN_BytesFromHexPtr(hex_32b.data, hex_32b.size, result.data, sizeof(result.data));
+  return result;
+}
+
+DN_API DN_U8x32FromResult DN_U8x32FromHex(DN_Str8 hex_32b)
+{
+  DN_U8x32FromResult result        = {};
+  DN_USize           bytes_written = DN_BytesFromHexPtr(hex_32b.data, hex_32b.size, result.value.data, sizeof(result.value.data));
+  if (bytes_written == sizeof(result.value.data))
+    result.success = true;
+  return result;
+}
+
+DN_API DN_U8x32FromResult DN_U8x32FromDecimalStr8(DN_Str8 decimal)
+{
+  DN_U8x32FromResult result = {};
+  result.success            = true;
+  for (DN_USize i = 0; i < decimal.size; i++) {
+    DN_U8 digit = decimal.data[i];
+    if (!DN_CharIsDigit(digit)) {
+      result.success = false;
+      break;
+    }
+
+    DN_U8 digit_val = digit - '0';
+
+    // NOTE: Goal is to do => (result = result * 10 + digit_val)
+    // Multiply current result by 10
+    DN_U16 carry = 0;
+    for (int j = 31; j >= 0; j--) {
+      DN_U16 prod          = DN_Cast(DN_U16)result.value.data[j] * 10 + carry;
+      result.value.data[j] = DN_Cast(DN_U8)(prod & 0xFF);
+      carry                = prod >> 8;
+    }
+
+    // Add the digit
+    carry = digit_val;
+    for (int j = 31; j >= 0 && carry > 0; j--) {
+      DN_U16 sum           = DN_Cast(DN_U16)result.value.data[j] + carry;
+      result.value.data[j] = DN_Cast(DN_U8)(sum & 0xFF);
+      carry                = sum >> 8;
+    }
+  }
+
+  return result;
+}
+
 DN_API DN_FmtAppendResult DN_FmtVAppend(char *buf, DN_USize *buf_size, DN_USize buf_max, char const *fmt, va_list args)
 {
   DN_FmtAppendResult result         = {};
@@ -2037,15 +2334,7 @@ DN_API DN_USize DN_CStr16Size(wchar_t const *src)
   return result;
 }
 
-DN_API bool DN_Str16Eq(DN_Str16 lhs, DN_Str16 rhs)
-{
-  if (lhs.size != rhs.size)
-      return false;
-  bool result = (DN_Memcmp(lhs.data, rhs.data, lhs.size) == 0);
-  return result;
-}
-
-DN_API DN_Str8 DN_Str8AllocArena(DN_Arena *arena, DN_USize size, DN_ZMem z_mem)
+DN_API DN_Str8 DN_Str8AllocArena(DN_USize size, DN_ZMem z_mem, DN_Arena *arena)
 {
   DN_Str8 result = {};
   result.data    = DN_ArenaNewArray(arena, char, size + 1, z_mem);
@@ -2055,7 +2344,7 @@ DN_API DN_Str8 DN_Str8AllocArena(DN_Arena *arena, DN_USize size, DN_ZMem z_mem)
   return result;
 }
 
-DN_API DN_Str8 DN_Str8AllocPool(DN_Pool *pool, DN_USize size)
+DN_API DN_Str8 DN_Str8AllocPool(DN_USize size, DN_Pool *pool)
 {
   DN_Str8 result = {};
   result.data    = DN_PoolNewArray(pool, char, size + 1);
@@ -2072,23 +2361,30 @@ DN_API DN_Str8 DN_Str8FromCStr8(char const *src)
   return result;
 }
 
-DN_API DN_Str8 DN_Str8FromPtrArena(DN_Arena *arena, void const *data, DN_USize size)
+DN_API DN_Str8 DN_Str8FromCStr8Arena(char const *src, DN_Arena *arena)
 {
-  DN_Str8 result = DN_Str8AllocArena(arena, size, DN_ZMem_No);
+  DN_Str8 shallow = DN_Str8FromCStr8(src);
+  DN_Str8 result  = DN_Str8FromStr8Arena(shallow, arena);
+  return result;
+}
+
+DN_API DN_Str8 DN_Str8FromPtrArena(void const *data, DN_USize size, DN_Arena *arena)
+{
+  DN_Str8 result = DN_Str8AllocArena(size, DN_ZMem_No, arena);
   if (result.size)
     DN_Memcpy(result.data, data, size);
   return result;
 }
 
-DN_API DN_Str8 DN_Str8FromPtrPool(DN_Pool *pool, void const *data, DN_USize size)
+DN_API DN_Str8 DN_Str8FromPtrPool(void const *data, DN_USize size, DN_Pool *pool)
 {
-  DN_Str8 result = DN_Str8AllocPool(pool, size);
+  DN_Str8 result = DN_Str8AllocPool(size, pool);
   if (result.size)
     DN_Memcpy(result.data, data, size);
   return result;
 }
 
-DN_API DN_Str8 DN_Str8FromStr8Arena(DN_Arena *arena, DN_Str8 string)
+DN_API DN_Str8 DN_Str8FromStr8Arena(DN_Str8 string, DN_Arena *arena)
 {
   DN_Str8 result = {};
   result.data    = DN_Cast(char *) DN_ArenaAlloc(arena, string.size + 1, alignof(char), DN_ZMem_No);
@@ -2100,7 +2396,7 @@ DN_API DN_Str8 DN_Str8FromStr8Arena(DN_Arena *arena, DN_Str8 string)
   return result;
 }
 
-DN_API DN_Str8 DN_Str8FromStr8Pool(DN_Pool *pool, DN_Str8 string)
+DN_API DN_Str8 DN_Str8FromStr8Pool(DN_Str8 string, DN_Pool *pool)
 {
   DN_Str8 result = {};
   result.data    = DN_Cast(char *) DN_PoolAlloc(pool, string.size + 1);
@@ -2108,6 +2404,18 @@ DN_API DN_Str8 DN_Str8FromStr8Pool(DN_Pool *pool, DN_Str8 string)
     DN_Memcpy(result.data, string.data, string.size);
     result.data[string.size] = 0;
     result.size              = string.size;
+  }
+  return result;
+}
+
+DN_API DN_Str8 DN_Str8FromFmtVArena(DN_Arena *arena, DN_FMT_ATTRIB char const *fmt, va_list args)
+{
+  DN_USize size   = DN_FmtVSize(fmt, args);
+  DN_Str8  result = DN_Str8AllocArena(size, DN_ZMem_No, arena);
+  if (result.data) {
+    DN_USize written = 0;
+    DN_FmtVAppend(result.data, &written, result.size + 1, fmt, args);
+    DN_Assert(written == result.size);
   }
   return result;
 }
@@ -2121,10 +2429,10 @@ DN_API DN_Str8 DN_Str8FromFmtArena(DN_Arena *arena, DN_FMT_ATTRIB char const *fm
   return result;
 }
 
-DN_API DN_Str8 DN_Str8FromFmtVArena(DN_Arena *arena, DN_FMT_ATTRIB char const *fmt, va_list args)
+DN_API DN_Str8 DN_Str8FromFmtVPool(DN_Pool *pool, DN_FMT_ATTRIB char const *fmt, va_list args)
 {
   DN_USize size   = DN_FmtVSize(fmt, args);
-  DN_Str8  result = DN_Str8AllocArena(arena, size, DN_ZMem_No);
+  DN_Str8  result = DN_Str8AllocPool(size, pool);
   if (result.data) {
     DN_USize written = 0;
     DN_FmtVAppend(result.data, &written, result.size + 1, fmt, args);
@@ -2137,13 +2445,7 @@ DN_API DN_Str8 DN_Str8FromFmtPool(DN_Pool *pool, DN_FMT_ATTRIB char const *fmt, 
 {
   va_list args;
   va_start(args, fmt);
-  DN_USize size   = DN_FmtVSize(fmt, args);
-  DN_Str8  result = DN_Str8AllocPool(pool, size);
-  if (result.data) {
-    DN_USize written = 0;
-    DN_FmtVAppend(result.data, &written, result.size + 1, fmt, args);
-    DN_Assert(written == result.size);
-  }
+  DN_Str8 result = DN_Str8FromFmtVPool(pool, fmt, args);
   va_end(args);
   return result;
 }
@@ -2158,7 +2460,7 @@ DN_API DN_Str8x16 DN_Str8x16FromFmt(DN_FMT_ATTRIB char const *fmt, ...)
   return result;
 }
 
-DN_API DN_Str8x16 DN_Str8x16FromFmtV(DN_FMT_ATTRIB char const *fmt, va_list args)
+DN_API DN_Str8x16 DN_Str8x16FromFmtVArena(DN_FMT_ATTRIB char const *fmt, va_list args)
 {
   DN_Str8x16 result = {};
   DN_FmtVAppend(result.data, &result.size, sizeof(result.data), fmt, args);
@@ -2175,7 +2477,7 @@ DN_API DN_Str8x32 DN_Str8x32FromFmt(DN_FMT_ATTRIB char const *fmt, ...)
   return result;
 }
 
-DN_API DN_Str8x32 DN_Str8x32FromFmtV(DN_FMT_ATTRIB char const *fmt, va_list args)
+DN_API DN_Str8x32 DN_Str8x32FromFmtVArena(DN_FMT_ATTRIB char const *fmt, va_list args)
 {
   DN_Str8x32 result = {};
   DN_FmtVAppend(result.data, &result.size, sizeof(result.data), fmt, args);
@@ -2209,7 +2511,7 @@ DN_API DN_Str8x128 DN_Str8x128FromFmt(DN_FMT_ATTRIB char const *fmt, ...)
   return result;
 }
 
-DN_API DN_Str8x128 DN_Str8x128FromFmtV(DN_FMT_ATTRIB char const *fmt, va_list args)
+DN_API DN_Str8x128 DN_Str8x128FromFmtVArena(DN_FMT_ATTRIB char const *fmt, va_list args)
 {
   DN_Str8x128 result = {};
   DN_FmtVAppend(result.data, &result.size, sizeof(result.data), fmt, args);
@@ -2226,7 +2528,7 @@ DN_API DN_Str8x256 DN_Str8x256FromFmt(DN_FMT_ATTRIB char const *fmt, ...)
   return result;
 }
 
-DN_API DN_Str8x256 DN_Str8x256FromFmtV(DN_FMT_ATTRIB char const *fmt, va_list args)
+DN_API DN_Str8x256 DN_Str8x256FromFmtVArena(DN_FMT_ATTRIB char const *fmt, va_list args)
 {
   DN_Str8x256 result = {};
   DN_FmtVAppend(result.data, &result.size, sizeof(result.data), fmt, args);
@@ -2243,7 +2545,7 @@ DN_API DN_Str8x512 DN_Str8x512FromFmt(DN_FMT_ATTRIB char const *fmt, ...)
   return result;
 }
 
-DN_API DN_Str8x512 DN_Str8x512FromFmtV(DN_FMT_ATTRIB char const *fmt, va_list args)
+DN_API DN_Str8x512 DN_Str8x512FromFmtVArena(DN_FMT_ATTRIB char const *fmt, va_list args)
 {
   DN_Str8x512 result = {};
   DN_FmtVAppend(result.data, &result.size, sizeof(result.data), fmt, args);
@@ -2260,7 +2562,7 @@ DN_API DN_Str8x1024 DN_Str8x1024FromFmt(DN_FMT_ATTRIB char const *fmt, ...)
   return result;
 }
 
-DN_API DN_Str8x1024 DN_Str8x1024FromFmtV(DN_FMT_ATTRIB char const *fmt, va_list args)
+DN_API DN_Str8x1024 DN_Str8x1024FromFmtVArena(DN_FMT_ATTRIB char const *fmt, va_list args)
 {
   DN_Str8x1024 result = {};
   DN_FmtVAppend(result.data, &result.size, sizeof(result.data), fmt, args);
@@ -2447,9 +2749,10 @@ DN_API DN_Str8BSplitResult DN_Str8BSplitArray(DN_Str8 string, DN_Str8 const *fin
       DN_Str8 find_item    = find[find_index];
       DN_Str8 string_slice = DN_Str8Subset(string, index, find_item.size);
       if (DN_Str8Eq(string_slice, find_item)) {
-        result.lhs.size = index;
-        result.rhs.data = string_slice.data + find_item.size;
-        result.rhs.size = string.size - (index + find_item.size);
+        result.input_index = find_index;
+        result.lhs.size    = index;
+        result.rhs.data    = string_slice.data + find_item.size;
+        result.rhs.size    = string.size - (index + find_item.size);
         break;
       }
     }
@@ -2493,28 +2796,39 @@ DN_API DN_Str8BSplitResult DN_Str8BSplitLast(DN_Str8 string, DN_Str8 find)
   return result;
 }
 
-DN_API DN_USize DN_Str8Split(DN_Str8 string, DN_Str8 delimiter, DN_Str8 *splits, DN_USize splits_count, DN_Str8SplitIncludeEmptyStrings mode)
+DN_API DN_USize DN_Str8Split(DN_Str8 string, DN_Str8 delimiter, DN_Str8 *splits, DN_USize splits_count, DN_Str8SplitFlags flags)
 {
   DN_USize result = 0; // The number of splits in the actual string.
   if (string.size == 0 || delimiter.size == 0 || delimiter.size <= 0)
     return result;
 
-  DN_Str8BSplitResult split = {};
-  DN_Str8                  first = string;
+  DN_Str8 it                  = string;
+  bool    allow_empty_strings = DN_BitIsNotSet(flags, DN_Str8SplitFlags_ExcludeEmptyStrings);
+  bool    handle_quotes       = DN_BitIsSet(flags, DN_Str8SplitFlags_HandleQuotedStrings);
   do {
-    split = DN_Str8BSplit(first, delimiter);
-    if (split.lhs.size || mode == DN_Str8SplitIncludeEmptyStrings_Yes) {
+    DN_Str8 item = {};
+    if (handle_quotes && DN_Str8StartsWith(it, DN_Str8Lit("\""))) {
+      DN_Str8FindResult find = DN_Str8FindStr8(DN_Str8Advance(it, 1), DN_Str8Lit("\""), DN_Str8EqCase_Sensitive);
+      DN_Assert(find.found);
+      item = find.start_to_before_match;
+      it   = DN_Str8BSplit(find.after_match_to_end_of_buffer, DN_Str8Lit(",")).rhs;
+    } else {
+      DN_Str8BSplitResult sub_split = DN_Str8BSplit(it, DN_Str8Lit(","));
+      item                          = sub_split.lhs;
+      it                            = sub_split.rhs;
+    }
+
+    if (item.size || allow_empty_strings) {
       if (splits && result < splits_count)
-        splits[result] = split.lhs;
+        splits[result] = item;
       result++;
     }
-    first = split.rhs;
-  } while (first.size);
+  } while (it.size);
 
   return result;
 }
 
-DN_API DN_Str8SplitResult DN_Str8SplitArena(DN_Arena *arena, DN_Str8 string, DN_Str8 delimiter, DN_Str8SplitIncludeEmptyStrings mode)
+DN_API DN_Str8SplitResult DN_Str8SplitArena(DN_Arena *arena, DN_Str8 string, DN_Str8 delimiter, DN_Str8SplitFlags mode)
 {
   DN_Str8SplitResult result = {};
   DN_USize           count  = DN_Str8Split(string, delimiter, /*splits*/ nullptr, /*count*/ 0, mode);
@@ -2575,7 +2889,7 @@ DN_API DN_Str8FindResult DN_Str8Find(DN_Str8 string, DN_Str8FindFlag flags)
 DN_API DN_Str8 DN_Str8Segment(DN_Arena *arena, DN_Str8 src, DN_USize segment_size, char segment_char)
 {
   if (!segment_size || src.size == 0) {
-    DN_Str8 result = DN_Str8FromStr8Arena(arena, src);
+    DN_Str8 result = DN_Str8FromStr8Arena(src, arena);
     return result;
   }
 
@@ -2584,7 +2898,7 @@ DN_API DN_Str8 DN_Str8Segment(DN_Arena *arena, DN_Str8 src, DN_USize segment_siz
     segments--;
 
   DN_USize segment_counter = 0;
-  DN_Str8  result          = DN_Str8AllocArena(arena, src.size + segments, DN_ZMem_Yes);
+  DN_Str8  result          = DN_Str8AllocArena(src.size + segments, DN_ZMem_Yes, arena);
   DN_USize write_index     = 0;
   for (DN_ForIndexU(src_index, src.size)) {
     result.data[write_index++] = src.data[src_index];
@@ -2602,7 +2916,7 @@ DN_API DN_Str8 DN_Str8Segment(DN_Arena *arena, DN_Str8 src, DN_USize segment_siz
 DN_API DN_Str8 DN_Str8ReverseSegment(DN_Arena *arena, DN_Str8 src, DN_USize segment_size, char segment_char)
 {
   if (!segment_size || src.size == 0) {
-    DN_Str8 result = DN_Str8FromStr8Arena(arena, src);
+    DN_Str8 result = DN_Str8FromStr8Arena(src, arena);
     return result;
   }
 
@@ -2612,7 +2926,7 @@ DN_API DN_Str8 DN_Str8ReverseSegment(DN_Arena *arena, DN_Str8 src, DN_USize segm
 
   DN_USize write_counter   = 0;
   DN_USize segment_counter = 0;
-  DN_Str8  result          = DN_Str8AllocArena(arena, src.size + segments, DN_ZMem_Yes);
+  DN_Str8  result          = DN_Str8AllocArena(src.size + segments, DN_ZMem_Yes, arena);
   DN_USize write_index     = result.size - 1;
 
   DN_MSVC_WARNING_PUSH
@@ -2827,7 +3141,7 @@ DN_API DN_Str8 DN_Str8AppendFV(DN_Arena *arena, DN_Str8 string, char const *fmt,
 {
   // TODO: Calculate size and write into one buffer instead of 2 appends
   DN_Str8 append = DN_Str8FromFmtVArena(arena, fmt, args);
-  DN_Str8 result = DN_Str8AllocArena(arena, string.size + append.size, DN_ZMem_No);
+  DN_Str8 result = DN_Str8AllocArena(string.size + append.size, DN_ZMem_No, arena);
   DN_Memcpy(result.data, string.data, string.size);
   DN_Memcpy(result.data + string.size, append.data, append.size);
   return result;
@@ -2845,7 +3159,7 @@ DN_API DN_Str8 DN_Str8FillF(DN_Arena *arena, DN_USize count, char const *fmt, ..
 DN_API DN_Str8 DN_Str8FillFV(DN_Arena *arena, DN_USize count, char const *fmt, va_list args)
 {
   DN_Str8 fill = DN_Str8FromFmtVArena(arena, fmt, args);
-  DN_Str8 result = DN_Str8AllocArena(arena, count * fill.size, DN_ZMem_No);
+  DN_Str8 result = DN_Str8AllocArena(count * fill.size, DN_ZMem_No, arena);
   for (DN_USize index = 0; index < count; index++) {
     void *dest = result.data + (index * fill.size);
     DN_Memcpy(dest, fill.data, fill.size);
@@ -2866,35 +3180,64 @@ DN_API void DN_Str8Remove(DN_Str8 *string, DN_USize offset, DN_USize size)
   string->size -= bytes_to_move;
 }
 
-DN_API DN_Str8TruncateResult DN_Str8TruncateMiddle(DN_Arena *arena, DN_Str8 str8, DN_U32 side_size, DN_Str8 truncator)
+DN_API DN_Str8TruncResult DN_Str8TruncMiddlePtr(DN_Str8 str8, DN_USize side_size, DN_Str8 truncator, char *dest, DN_USize dest_max)
 {
-  DN_Str8TruncateResult result = {};
+  DN_Assert(side_size <= DN_USIZE_MAX / 2);
+  if (dest) {
+    // NOTE: If the user passes the dest buffer, we expect it to be sized correctly.
+    if ((side_size * 2) >= str8.size) {
+      DN_Assert(dest_max >= str8.size + 1 /*null*/);
+    } else {
+      DN_Assert(dest_max >= (2 * side_size + truncator.size) + 1 /*null*/);
+    }
+  }
+
+  DN_Str8TruncResult result = {};
   if (str8.size <= (side_size * 2)) {
-    result.str8 = DN_Str8FromStr8Arena(arena, str8);
+    result.size_req = str8.size;
+    if (dest) {
+      DN_Memcpy(dest, str8.data, str8.size);
+      dest[str8.size] = 0;
+      result.str8     = DN_Str8FromPtr(dest, result.size_req);
+    }
     return result;
   }
 
-  DN_Str8 head     = DN_Str8Subset(str8, 0, side_size);
-  DN_Str8 tail     = DN_Str8Subset(str8, str8.size - side_size, side_size);
-  DN_MSVC_WARNING_PUSH
-  DN_MSVC_WARNING_DISABLE(6284) // Object passed as _Param_(3) when a string is required in call to 'DN_Str8FromFmtArena' Actual type: 'struct DN_Str8'
-  result.str8      = DN_Str8FromFmtArena(arena, "%S%S%S", head, truncator, tail);
-  DN_MSVC_WARNING_POP
-  result.truncated = true;
+  DN_Str8            head          = DN_Str8Subset(str8, 0, side_size);
+  DN_Str8            tail          = DN_Str8Subset(str8, str8.size - side_size, side_size);
+  DN_USize           dest_size     = 0;
+  if (dest) {
+    DN_FmtAppendResult append_result = DN_FmtAppend(dest, &dest_size, dest_max, "%.*s%.*s%.*s", DN_Str8PrintFmt(head), DN_Str8PrintFmt(truncator), DN_Str8PrintFmt(tail));
+    result.str8                      = append_result.str8;
+    result.truncated                 = true;
+    result.size_req                  = result.str8.size;
+  } else {
+    result.size_req  = DN_FmtSize("%.*s%.*s%.*s", DN_Str8PrintFmt(head), DN_Str8PrintFmt(truncator), DN_Str8PrintFmt(tail));
+    result.truncated = true;
+  }
+
   return result;
 }
 
-DN_API DN_Str8 DN_Str8Lower(DN_Arena *arena, DN_Str8 string)
+DN_API DN_Str8TruncResult DN_Str8TruncMiddle(DN_Str8 str8, DN_USize side_size, DN_Str8 truncator, DN_Arena *arena)
 {
-  DN_Str8 result = DN_Str8FromStr8Arena(arena, string);
+  DN_Str8TruncResult trunc  = DN_Str8TruncMiddlePtr(str8, side_size, truncator, nullptr, 0);
+  DN_Str8            dest   = DN_Str8AllocArena(trunc.size_req, DN_ZMem_No, arena);
+  DN_Str8TruncResult result = DN_Str8TruncMiddlePtr(str8, side_size, truncator, dest.data, dest.size + 1);
+  return result;
+}
+
+DN_API DN_Str8 DN_Str8Lower(DN_Str8 string, DN_Arena *arena)
+{
+  DN_Str8 result = DN_Str8FromStr8Arena(string, arena);
   for (DN_ForIndexU(index, result.size))
     result.data[index] = DN_CharToLower(result.data[index]);
   return result;
 }
 
-DN_API DN_Str8 DN_Str8Upper(DN_Arena *arena, DN_Str8 string)
+DN_API DN_Str8 DN_Str8Upper(DN_Str8 string, DN_Arena *arena)
 {
-  DN_Str8 result = DN_Str8FromStr8Arena(arena, string);
+  DN_Str8 result = DN_Str8FromStr8Arena(string, arena);
   for (DN_ForIndexU(index, result.size))
     result.data[index] = DN_CharToUpper(result.data[index]);
   return result;
@@ -2907,15 +3250,14 @@ DN_API DN_Str8 DN_Str8Replace(DN_Str8       string,
                               DN_Arena     *arena,
                               DN_Str8EqCase eq_case)
 {
-  // TODO: Implement this without requiring TLS so it can go into base strings
   DN_Str8 result = {};
   if (string.size == 0 || find.size == 0 || find.size > string.size || find.size == 0 || string.size == 0) {
-    result = DN_Str8FromStr8Arena(arena, string);
+    result = DN_Str8FromStr8Arena(string, arena);
     return result;
   }
 
   DN_TCScratch   scratch        = DN_TCScratchBegin(&arena, 1);
-  DN_Str8Builder string_builder = DN_Str8BuilderFromArena(scratch.arena);
+  DN_Str8Builder string_builder = DN_Str8BuilderFromArena(&scratch.arena);
   DN_USize       max            = string.size - find.size;
   DN_USize       head           = start_index;
 
@@ -2942,7 +3284,7 @@ DN_API DN_Str8 DN_Str8Replace(DN_Str8       string,
 
   if (string_builder.string_size == 0) {
     // NOTE: No replacement possible, so we just do a full-copy
-    result = DN_Str8FromStr8Arena(arena, string);
+    result = DN_Str8FromStr8Arena(string, arena);
   } else {
     DN_Str8 remainder = DN_Str8FromPtr(string.data + head, string.size - head);
     DN_Str8BuilderAppendRef(&string_builder, remainder);
@@ -2964,6 +3306,187 @@ DN_API DN_Str8 DN_Str8ReplaceInsensitive(DN_Str8 string, DN_Str8 find, DN_Str8 r
   return result;
 }
 
+DN_API DN_Str8 DN_Str8PadNewLines(DN_Str8 string, DN_Str8 pad_string, DN_Arena *arena)
+{
+  DN_TCScratch   scratch = DN_TCScratchBegin(&arena, 1);
+  DN_Str8Builder builder = DN_Str8BuilderFromArena(&scratch.arena);
+  DN_Str8        it      = string;
+  while (it.size) {
+    DN_Str8BSplitResult split = DN_Str8BSplit(it, DN_Str8Lit("\n"));
+    DN_Str8BuilderAppendRef(&builder, DN_Str8FromPtr(split.lhs.data, split.lhs.size + 1));
+    it = split.rhs;
+  }
+
+  DN_Str8 result = DN_Str8BuilderBuildDelimited(&builder, pad_string, arena);
+  DN_TCScratchEnd(&scratch);
+  return result;
+}
+
+DN_API DN_USize DN_USizeCodepointCountFromUTF8(DN_Str8 str, DN_CodepointCountFlags flags)
+{
+  DN_USize result = 0;
+
+  if (DN_BitIsNotSet(flags, DN_CodepointCountFlags_SkipANSICode)) {
+    DN_UTF8DecodeIterator it = {};
+    while (DN_UTF8DecodeIterate(&it, str))
+      ;
+    result = it.codepoint_index;
+  } else {
+    // NOTE: ANSI SGR (Select Graphic Rendition) sequence handling
+    // Format:             ESC [ parameter_bytes intermediate_bytes final_byte
+    // Common examples:    \x1b[31m (red), \x1b[1;31m (bold red), \x1b[0m (reset)
+    // Parameter bytes:    0x30-0x3F (digits and :;<=>?)
+    // Intermediate bytes: 0x20-0x2F (space and !"#$%&'()*+,-./)
+    // Final byte:         0x40-0x7E (@A-Z[\]^_`a-z{|}~)
+    char const *p   = str.data;
+    char const *end = DN_Str8End(str);
+    while (p < end) {
+      if (*p == '\x1b' && p + 1 < end && *(p + 1) == '[') { // Detect CSI sequence: ESC [
+        p += 2;
+        while (p < end && *p >= 0x30 && *p <= 0x3F)         // Skip parameter bytes (0x30-0x3F)
+          p++;
+        while (p < end && *p >= 0x20 && *p <= 0x2F)         // Skip intermediate bytes (0x20-0x2F)
+          p++;
+        if (p < end && *p >= 0x40 && *p <= 0x7E)            // Skip final byte (0x40-0x7E)
+          p++;
+        continue;
+      }
+
+      DN_UTF8DecodeResult decode = DN_UTF8Decode(DN_Str8FromPtr(p, end - p));
+      if (!decode.success)
+        break;
+      p = decode.remaining.data;
+      result++;
+    }
+  }
+
+  return result;
+}
+
+DN_API DN_Str8 DN_Str8LineBreakStr8(DN_Str8 src, DN_USize desired_width, DN_Arena *arena)
+{
+  DN_TCScratch   scratch = DN_TCScratchBegin(&arena, 1);
+  DN_Str8Builder builder = DN_Str8BuilderFromArena(&scratch.arena);
+
+  char*   start = src.data;
+  char*   end   = src.data;
+  DN_Str8 it    = src;
+  while (it.size) {
+    DN_Str8             splitters[]      = {DN_Str8Lit(" "), DN_Str8Lit("\n")};
+    DN_Str8BSplitResult split            = DN_Str8BSplitArray(it, splitters, DN_ArrayCountU(splitters));
+    DN_USize            curr_line_length = end - start;
+
+    // Handle explicit newlines in input
+    if (split.input_index == 1 /*the newline*/) {
+      if (curr_line_length == 0 && split.lhs.size)
+        start = split.lhs.data;
+      if (split.lhs.size)
+        end = DN_Str8End(split.lhs);
+      DN_Str8BuilderAppendRef(&builder, DN_Str8FromPtr(start, end - start));
+      start = split.rhs.data;
+      end   = split.rhs.data;
+      it    = split.rhs;
+      continue;
+    }
+
+    // Skip empty segments (multiple spaces, leading/trailing spaces)
+    if (split.lhs.size == 0) {
+      it = split.rhs;
+      continue;
+    }
+
+    // First word on this line
+    if (curr_line_length == 0) {
+      start = split.lhs.data;
+      end   = DN_Str8End(split.lhs);
+      it    = split.rhs;
+      continue;
+    }
+
+    // Check if adding this word (plus separator space) would overflow
+    DN_USize combined_length = curr_line_length + 1 + split.lhs.size;
+    if (combined_length > desired_width) {
+      // Commit current line, start new line with current word
+      DN_Str8BuilderAppendRef(&builder, DN_Str8FromPtr(start, end - start));
+      start = split.lhs.data;
+      end   = DN_Str8End(split.lhs);
+      it    = split.rhs;
+    } else {
+      // Add word to current line
+      end = DN_Str8End(split.lhs);
+      it  = split.rhs;
+    }
+  }
+
+  // Append final line
+  if (end > start)
+    DN_Str8BuilderAppendRef(&builder, DN_Str8FromPtr(start, end - start));
+
+  DN_Str8 result = DN_Str8BuilderBuildDelimited(&builder, DN_Str8Lit("\n"), arena);
+  DN_TCScratchEnd(&scratch);
+  return result;
+}
+
+DN_API DN_Str8 DN_Str8Table(DN_Str8 const *rows, DN_USize num_rows, DN_USize num_cols, DN_Str8TableFlags flags, DN_Arena *arena)
+{
+  DN_TCScratch scratch         = DN_TCScratchBegin(&arena, 1);
+  DN_U16       col_widths[128] = {};
+  for (DN_USize i = 0; i < num_cols; i++) {
+    for (DN_USize j = 0; j < num_rows; j++) {
+      DN_USize index = j * num_cols + i;
+      col_widths[i]  = DN_Max(col_widths[i], (DN_U16)DN_USizeCodepointCountFromUTF8(rows[index], DN_CodepointCountFlags_SkipANSICode));
+    }
+  }
+
+  DN_Str8Builder builder = DN_Str8BuilderFromArena(&scratch.arena);
+  DN_Str8BuilderAppendF(&builder, "+");
+  for (DN_USize i = 0; i < num_cols; i++) {
+    for (DN_USize j = 0; j < col_widths[i] + 2; j++)
+      DN_Str8BuilderAppendF(&builder, "-");
+    DN_Str8BuilderAppendF(&builder, "+");
+  }
+  DN_Str8BuilderAppendF(&builder, "\n");
+
+  for (DN_USize i = 0; i < num_rows; i++) {
+    DN_Str8BuilderAppendF(&builder, "|");
+    for (DN_USize j = 0; j < num_cols; j++) {
+      DN_USize index = (i * num_cols) + j;
+      DN_Str8  item  = rows[index];
+      DN_Str8BuilderAppendF(&builder, " %.*s", DN_Str8PrintFmt(item));
+      DN_USize item_width = DN_USizeCodepointCountFromUTF8(item, DN_CodepointCountFlags_SkipANSICode);
+      for (DN_USize k = 0; k < col_widths[j] - item_width; k++)
+        DN_Str8BuilderAppendF(&builder, " ");
+      DN_Str8BuilderAppendF(&builder, " |");
+    }
+    DN_Str8BuilderAppendF(&builder, "\n");
+
+    bool print_row_line = i == 0 && DN_BitIsSet(flags, DN_Str8TableFlags_HasHeader);
+    if (!print_row_line)
+      print_row_line = DN_BitIsSet(flags, DN_Str8TableFlags_RowLines);
+
+    if (print_row_line) {
+      DN_Str8BuilderAppendF(&builder, "+");
+      for (DN_USize sub_i = 0; sub_i < num_cols; sub_i++) {
+        for (DN_USize sub_j = 0; sub_j < col_widths[sub_i] + 2; sub_j++)
+          DN_Str8BuilderAppendF(&builder, "-");
+        DN_Str8BuilderAppendF(&builder, "+");
+      }
+      DN_Str8BuilderAppendF(&builder, "\n");
+    }
+  }
+
+  DN_Str8BuilderAppendF(&builder, "+");
+  for (DN_USize i = 0; i < num_cols; i++) {
+    for (DN_USize j = 0; j < col_widths[i] + 2; j++)
+      DN_Str8BuilderAppendF(&builder, "-");
+    DN_Str8BuilderAppendF(&builder, "+");
+  }
+
+  DN_Str8 result = DN_Str8BuilderBuild(&builder, arena);
+  DN_TCScratchEnd(&scratch);
+  return result;
+}
+
 DN_API DN_Str8 DN_Str8SliceRender(DN_Str8Slice slice, DN_Str8 separator, DN_Arena *arena)
 {
   DN_Str8 result = {};
@@ -2978,7 +3501,7 @@ DN_API DN_Str8 DN_Str8SliceRender(DN_Str8Slice slice, DN_Str8 separator, DN_Aren
     total_size += item.size;
   }
 
-  result = DN_Str8AllocArena(arena, total_size, DN_ZMem_No);
+  result = DN_Str8AllocArena(total_size, DN_ZMem_No, arena);
   if (result.data) {
     DN_USize write_index = 0;
     for (DN_USize index = 0; index < slice.count; index++) {
@@ -3000,6 +3523,15 @@ DN_API DN_Str8 DN_Str8RenderSpaceSep(DN_Str8Slice slice, DN_Arena *arena)
   DN_Str8 result = DN_Str8SliceRender(slice, DN_Str8Lit(" "), arena);
   return result;
 }
+
+DN_API bool DN_Str16Eq(DN_Str16 lhs, DN_Str16 rhs)
+{
+  if (lhs.size != rhs.size)
+      return false;
+  bool result = (DN_Memcmp(lhs.data, rhs.data, lhs.size) == 0);
+  return result;
+}
+
 
 DN_API DN_Str16 DN_Str16SliceRender(DN_Str16Slice slice, DN_Str16 separator, DN_Arena *arena)
 {
@@ -3075,7 +3607,8 @@ DN_API bool DN_Str8BuilderAddArrayRef(DN_Str8Builder *builder, DN_Str8 const *st
   if (!strings || size <= 0)
     return true;
 
-  DN_Str8Link *links = DN_ArenaNewArray(builder->arena, DN_Str8Link, size, DN_ZMem_No);
+  // NOTE: Allocate the links
+  DN_Str8Link *links = DN_ArenaNewArrayNoZ(builder->arena, DN_Str8Link, size);
   if (!links)
     return false;
 
@@ -3083,15 +3616,12 @@ DN_API bool DN_Str8BuilderAddArrayRef(DN_Str8Builder *builder, DN_Str8 const *st
     for (DN_ForIndexU(index, size)) {
       DN_Str8      string = strings[index];
       DN_Str8Link *link   = links + index;
-
       link->string = string;
       link->next   = NULL;
-
       if (builder->head)
         builder->tail->next = link;
       else
         builder->head = link;
-
       builder->tail = link;
       builder->count++;
       builder->string_size += string.size;
@@ -3124,11 +3654,11 @@ DN_API bool DN_Str8BuilderAddArrayCopy(DN_Str8Builder *builder, DN_Str8 const *s
   if (!strings || size <= 0)
     return true;
 
-  DN_ArenaTempMem tmp_mem      = DN_ArenaTempMemBegin(builder->arena);
-  bool            result       = true;
-  DN_Str8        *strings_copy = DN_ArenaNewArray(builder->arena, DN_Str8, size, DN_ZMem_No);
+  bool     result       = true;
+  DN_U64   arena_p      = DN_MemListPos(builder->arena->mem);
+  DN_Str8 *strings_copy = DN_ArenaNewArrayNoZ(builder->arena, DN_Str8, size);
   for (DN_ForIndexU(index, size)) {
-    strings_copy[index] = DN_Str8FromStr8Arena(builder->arena, strings[index]);
+    strings_copy[index] = DN_Str8FromStr8Arena(strings[index], builder->arena);
     if (strings_copy[index].size != strings[index].size) {
       result = false;
       break;
@@ -3137,20 +3667,18 @@ DN_API bool DN_Str8BuilderAddArrayCopy(DN_Str8Builder *builder, DN_Str8 const *s
 
   if (result)
     result = DN_Str8BuilderAddArrayRef(builder, strings_copy, size, add);
-
-  if (!result)
-    DN_ArenaTempMemEnd(tmp_mem);
-
+  else
+    DN_MemListPopTo(builder->arena->mem, arena_p);
   return result;
 }
 
 DN_API bool DN_Str8BuilderAddFV(DN_Str8Builder *builder, DN_Str8BuilderAdd add, DN_FMT_ATTRIB char const *fmt, va_list args)
 {
-  DN_Str8         string   = DN_Str8FromFmtVArena(builder->arena, fmt, args);
-  DN_ArenaTempMem temp_mem = DN_ArenaTempMemBegin(builder->arena);
-  bool            result   = DN_Str8BuilderAddArrayRef(builder, &string, 1, add);
+  DN_Str8 string  = DN_Str8FromFmtVArena(builder->arena, fmt, args);
+  DN_U64  arena_p = DN_MemListPos(builder->arena->mem);
+  bool    result  = DN_Str8BuilderAddArrayRef(builder, &string, 1, add);
   if (!result)
-    DN_ArenaTempMemEnd(temp_mem);
+    DN_MemListPopTo(builder->arena->mem, arena_p);
   return result;
 }
 
@@ -3193,48 +3721,48 @@ static bool DN_Str8BuilderAppendBuilder_(DN_Str8Builder *dest, DN_Str8Builder co
 {
   if (!dest)
     return false;
-  if (!src)
+  if (!src || src->string_size == 0)
     return true;
 
-  DN_ArenaTempMemBegin(dest->arena);
-  DN_Str8Link *links = DN_ArenaNewArray(dest->arena, DN_Str8Link, src->count, DN_ZMem_No);
-  if (!links)
-    return false;
+  DN_Arena     arena  = DN_ArenaTempBeginFromArena(dest->arena);
+  DN_Str8Link *links  = DN_ArenaNewArrayNoZ(&arena, DN_Str8Link, src->count);
+  bool         result = true;
+  if (links) {
+    DN_Str8Link *first      = nullptr;
+    DN_Str8Link *last       = nullptr;
+    DN_USize     link_index = 0;
+    for (DN_Str8Link const *it = src->head; it; it = it->next) {
+      DN_Str8Link *link = links + link_index++;
+      link->next        = nullptr;
+      link->string      = it->string;
 
-  DN_Str8Link *first      = nullptr;
-  DN_Str8Link *last       = nullptr;
-  DN_USize     link_index = 0;
-  bool         result     = true;
-  for (DN_Str8Link const *it = src->head; it; it = it->next) {
-    DN_Str8Link *link = links + link_index++;
-    link->next        = nullptr;
-    link->string      = it->string;
-
-    if (copy) {
-      link->string = DN_Str8FromStr8Arena(dest->arena, it->string);
-      if (link->string.size != it->string.size) {
-        result = false;
-        break;
+      if (copy) {
+        link->string = DN_Str8FromStr8Arena(it->string, &arena);
+        if (link->string.size != it->string.size) {
+          result = false;
+          break;
+        }
       }
+
+      if (last)
+        last->next = link;
+      else
+        first = link;
+      last = link;
     }
 
-    if (last)
-      last->next = link;
-    else
-      first = link;
-    last = link;
+    if (result) {
+      if (dest->head)
+        dest->tail->next = first;
+      else
+        dest->head = first;
+      dest->tail = last;
+      dest->count += src->count;
+      dest->string_size += src->string_size;
+    }
   }
-
-  if (result) {
-    if (dest->head)
-      dest->tail->next = first;
-    else
-      dest->head = first;
-    dest->tail = last;
-    dest->count += src->count;
-    dest->string_size += src->string_size;
-  }
-  return true;
+  DN_ArenaTempEnd(&arena, result ? DN_ArenaReset_No : DN_ArenaReset_Yes);
+  return result;
 }
 
 DN_API bool DN_Str8BuilderAppendBuilderRef(DN_Str8Builder *dest, DN_Str8Builder const *src)
@@ -3297,9 +3825,9 @@ DN_API DN_Str8 DN_Str8BuilderBuildDelimited(DN_Str8Builder const *builder, DN_St
 
   DN_USize size_for_delimiter = delimiter.size ? ((builder->count - 1) * delimiter.size) : 0;
   result.data                 = DN_ArenaNewArray(arena,
-                                  char,
-                                  builder->string_size + size_for_delimiter + 1 /*null terminator*/,
-                                  DN_ZMem_No);
+                                 char,
+                                 builder->string_size + size_for_delimiter + 1 /*null terminator*/,
+                                 DN_ZMem_No);
   if (!result.data)
     return result;
 
@@ -3314,23 +3842,6 @@ DN_API DN_Str8 DN_Str8BuilderBuildDelimited(DN_Str8Builder const *builder, DN_St
 
   result.data[result.size] = 0;
   DN_Assert(result.size == builder->string_size + size_for_delimiter);
-  return result;
-}
-
-DN_API DN_Str8Slice DN_Str8BuilderBuildSlice(DN_Str8Builder const *builder, DN_Arena *arena)
-{
-  DN_Str8Slice result = {};
-  if (!builder || builder->string_size <= 0 || builder->count <= 0)
-    return result;
-
-  if (!DN_ISliceAllocArena(DN_Str8, &result, builder->count, DN_ZMem_No, arena))
-    return result;
-
-  DN_USize slice_index = 0;
-  for (DN_Str8Link *link = builder->head; link; link = link->next)
-    result.data[slice_index++] = DN_Str8FromStr8Arena(arena, link->string);
-
-  DN_Assert(slice_index == builder->count);
   return result;
 }
 
@@ -3559,6 +4070,18 @@ DN_API DN_Str8 DN_BytesFromHexPtrArena(char const *hex, DN_USize hex_count, DN_A
   return result;
 }
 
+DN_API DN_Str8 DN_BytesFromHexPtrPool(char const *hex, DN_USize hex_count, DN_Pool *pool)
+{
+  DN_Str8 hex_trimmed = DN_Str8TrimHexPrefix(DN_Str8FromPtr(hex, hex_count));
+  DN_Assert(hex_trimmed.size % 2 == 0);
+  DN_Str8 result = {};
+  result.data    = DN_PoolNewArray(pool, char, hex_trimmed.size / 2);
+  if (result.data)
+    result.size = DN_BytesFromHex(hex_trimmed, result.data, hex_trimmed.size / 2);
+  return result;
+}
+
+
 DN_API DN_U8x16 DN_BytesFromHex32Ptr(char const *hex, DN_USize hex_count)
 {
   DN_U8x16 result      = {};
@@ -3582,7 +4105,7 @@ DN_API DN_U8x32 DN_BytesFromHex64Ptr(char const *hex, DN_USize hex_count)
 DN_API DN_HexU64Str8 DN_HexFromU64(DN_U64 value, DN_HexFromU64Type type)
 {
   DN_HexU64Str8 result = {};
-  DN_HexFromBytesPtr(&value, sizeof(value), result.data, sizeof(result.data));
+  DN_HexFromPtrBytes(&value, sizeof(value), result.data, sizeof(result.data), DN_TrimLeadingZero_No);
   if (type == DN_HexFromU64Type_Uppercase) {
     for (DN_USize index = 0; index < result.size; index++)
       result.data[index] = DN_CharToUpper(result.data[index]);
@@ -3590,55 +4113,78 @@ DN_API DN_HexU64Str8 DN_HexFromU64(DN_U64 value, DN_HexFromU64Type type)
   return result;
 }
 
-DN_API DN_USize DN_HexFromBytesPtr(void const *bytes, DN_USize bytes_count, void *hex, DN_USize hex_count)
+DN_API DN_USize DN_HexFromPtrBytes(void const *bytes, DN_USize bytes_count, void *hex, DN_USize hex_count, DN_TrimLeadingZero trim_leading_z)
 {
   DN_USize result = 0;
-  if ((bytes_count * 2) != hex_count)
+  if ((bytes_count * 2) > hex_count)
     return result;
-  DN_U8 const *src_u8 = DN_Cast(DN_U8 const *)bytes;
-  DN_U8       *ptr    = DN_Cast(DN_U8 *)hex;
+  DN_U8 const *src_u8        = DN_Cast(DN_U8 const *) bytes;
+  DN_U8       *ptr           = DN_Cast(DN_U8 *) hex;
+  bool         leading_zeros = true;
   for (DN_USize index = 0; index < bytes_count; index++) {
-    DN_NibbleFromU8Result to_nibbles  = DN_NibbleFromU8(src_u8[index]);
-    *ptr++                            = to_nibbles.nibble0;
-    *ptr++                            = to_nibbles.nibble1;
-    result                           += 2;
+    char ch = src_u8[index];
+    if (leading_zeros)
+      leading_zeros = ch == 0;
+
+    if (leading_zeros) {
+      if (trim_leading_z == DN_TrimLeadingZero_Yes && ch == 0)
+        continue;
+    }
+
+    DN_NibbleFromU8Result to_nibbles = DN_NibbleFromU8(ch);
+    *ptr++                           = to_nibbles.nibble0;
+    *ptr++                           = to_nibbles.nibble1;
+    result += 2;
+  }
+
+  if (result == 0) {
+    *ptr = '0';
+    result++;
   }
   return result;
 }
 
-DN_API DN_Str8 DN_HexFromBytesPtrArena(void const *bytes, DN_USize bytes_count, DN_Arena *arena)
+DN_API DN_Str8 DN_HexFromPtrBytesArena(void const *bytes, DN_USize bytes_count, DN_Arena *arena, DN_TrimLeadingZero trim_leading_z)
 {
   DN_Str8 result = {};
-  result.data    = DN_ArenaNewArray(arena, char, bytes_count * 2, DN_ZMem_No);
-  if (result.data)
-    result.size = DN_HexFromBytesPtr(bytes, bytes_count, result.data, bytes_count * 2);
+  if (bytes_count) {
+    result.data = DN_ArenaNewArray(arena, char, bytes_count * 2, DN_ZMem_No);
+    if (result.data)
+      result.size = DN_HexFromPtrBytes(bytes, bytes_count, result.data, bytes_count * 2, trim_leading_z);
+  }
   return result;
 }
 
-DN_API DN_Hex32 DN_HexFromBytes16Ptr(void const *bytes, DN_USize bytes_count)
+DN_API DN_USize DN_HexFromStr8Bytes(DN_Str8 bytes, void *hex, DN_USize hex_count, DN_TrimLeadingZero trim_leading_z)
+{
+  DN_USize result = DN_HexFromPtrBytes(bytes.data, bytes.size, hex, hex_count, trim_leading_z);
+  return result;
+}
+
+DN_API DN_Hex32 DN_Hex32FromPtr16b(void const *bytes, DN_USize bytes_count, DN_TrimLeadingZero trim_leading_z)
 {
   DN_Hex32 result = {};
-  DN_Assert(bytes_count * 2 == sizeof result.data);
-  DN_USize hex_written = DN_HexFromBytesPtr(bytes, bytes_count, result.data, sizeof result.data);
-  DN_Assert(hex_written == sizeof result.data);
+  DN_Assert(bytes_count * 2 == sizeof result.data - 1);
+  result.size = DN_HexFromPtrBytes(bytes, bytes_count, result.data, sizeof result.data, trim_leading_z);
+  DN_Assert(result.size <= sizeof result.data - 1);
   return result;
 }
 
-DN_API DN_Hex64 DN_HexFromBytes32Ptr(void const *bytes, DN_USize bytes_count)
+DN_API DN_Hex64 DN_Hex64FromPtr32b(void const *bytes, DN_USize bytes_count, DN_TrimLeadingZero trim_leading_z)
 {
   DN_Hex64 result = {};
-  DN_Assert(bytes_count * 2 == sizeof result.data);
-  DN_USize hex_written = DN_HexFromBytesPtr(bytes, bytes_count, result.data, sizeof result.data);
-  DN_Assert(hex_written == sizeof result.data);
+  DN_Assert(bytes_count * 2 == sizeof result.data - 1);
+  result.size = DN_HexFromPtrBytes(bytes, bytes_count, result.data, sizeof result.data, trim_leading_z);
+  DN_Assert(result.size <= sizeof result.data - 1);
   return result;
 }
 
-DN_API DN_Hex128 DN_HexFromBytes64Ptr(void const *bytes, DN_USize bytes_count)
+DN_API DN_Hex128 DN_Hex128FromPtr64b(void const *bytes, DN_USize bytes_count, DN_TrimLeadingZero trim_leading_z)
 {
   DN_Hex128 result = {};
-  DN_Assert(bytes_count * 2 == sizeof result.data);
-  DN_USize hex_written = DN_HexFromBytesPtr(bytes, bytes_count, result.data, sizeof result.data);
-  DN_Assert(hex_written == sizeof result.data);
+  DN_Assert(bytes_count * 2 == sizeof result.data - 1);
+  result.size = DN_HexFromPtrBytes(bytes, bytes_count, result.data, sizeof result.data, trim_leading_z);
+  DN_Assert(result.size <= sizeof result.data - 1);
   return result;
 }
 
@@ -4357,28 +4903,68 @@ DN_API DN_U32 DN_MurmurHash3HashU32FromBytesX64(void const *bytes, int len, DN_U
   return result;
 }
 
-DN_API DN_Str8 DN_LogColourEscapeCodeStr8FromRGB(DN_LogColourType colour, DN_U8 r, DN_U8 g, DN_U8 b)
+DN_API DN_Str8x32 DN_Str8x32FromANSIColourCodeU8RGB(DN_ANSIColourMode mode, DN_U8 r, DN_U8 g, DN_U8 b)
 {
-  DN_THREAD_LOCAL char buffer[32];
-  buffer[0]      = 0;
-  DN_Str8 result = {};
-  result.size    = DN_SNPrintF(buffer,
-                            DN_ArrayCountU(buffer),
-                            "\x1b[%d;2;%u;%u;%um",
-                            colour == DN_LogColourType_Fg ? 38 : 48,
-                            r,
-                            g,
-                            b);
-  result.data    = buffer;
+  DN_Str8x32 result = DN_Str8x32FromFmt("\x1b[%d;2;%u;%u;%um",
+                                        mode == DN_ANSIColourMode_Fg ? 38 : 48,
+                                        r,
+                                        g,
+                                        b);
   return result;
 }
 
-DN_API DN_Str8 DN_LogColourEscapeCodeStr8FromU32(DN_LogColourType colour, DN_U32 value)
+DN_API DN_Str8x32 DN_Str8x32FromANSIColourCodeV3F32RGB255(DN_ANSIColourMode mode, DN_V3F32 rgb_255)
 {
-  DN_U8   r      = DN_Cast(DN_U8)(value >> 24);
-  DN_U8   g      = DN_Cast(DN_U8)(value >> 16);
-  DN_U8   b      = DN_Cast(DN_U8)(value >> 8);
-  DN_Str8 result = DN_LogColourEscapeCodeStr8FromRGB(colour, r, g, b);
+  DN_Str8x32 result = DN_Str8x32FromANSIColourCodeU8RGB(mode, DN_Cast(DN_U8)rgb_255.r, DN_Cast(DN_U8)rgb_255.g, DN_Cast(DN_U8)rgb_255.b);
+  return result;
+}
+
+DN_API DN_Str8x32 DN_Str8x32FromANSIColourCodeU32RGB(DN_ANSIColourMode mode, DN_U32 value)
+{
+  DN_U8      r      = DN_Cast(DN_U8)(value >> 24);
+  DN_U8      g      = DN_Cast(DN_U8)(value >> 16);
+  DN_U8      b      = DN_Cast(DN_U8)(value >> 8);
+  DN_Str8x32 result = DN_Str8x32FromANSIColourCodeU8RGB(mode, r, g, b);
+  return result;
+}
+
+DN_API DN_Str8 DN_Str8FromStr8ANSIColourU8RGBArena(DN_ANSIColourMode mode, DN_Str8 str8, DN_U8 r, DN_U8 g, DN_U8 b, DN_Arena *arena)
+{
+  DN_Str8x32 ansi   = DN_Str8x32FromANSIColourCodeU8RGB(mode, r, g, b);
+  DN_Str8    result = DN_Str8FromFmtArena(arena, "%.*s%.*s%s", DN_Str8PrintFmt(ansi), DN_Str8PrintFmt(str8), DN_ANSICodeResetLit);
+  return result;
+}
+
+DN_API DN_Str8 DN_Str8FromStr8ANSIColourV3F32RGB255Arena(DN_ANSIColourMode mode, DN_Str8 str8, DN_V3F32 rgb_255, DN_Arena *arena)
+{
+  DN_Str8 result = DN_Str8FromStr8ANSIColourU8RGBArena(mode, str8, DN_Cast(DN_U8)rgb_255.r, DN_Cast(DN_U8)rgb_255.g, DN_Cast(DN_U8)rgb_255.b, arena);
+  return result;
+}
+
+DN_API DN_Str8 DN_Str8ANSIColourU8RGBFromFmtVArena(DN_ANSIColourMode mode, DN_U8 r, DN_U8 g, DN_U8 b, DN_Arena *arena, char const *fmt, va_list args)
+{
+  DN_TCScratch scratch = DN_TCScratchBegin(&arena, 1);
+  DN_Str8      string  = DN_Str8FromFmtVArena(&scratch.arena, fmt, args);
+  DN_Str8      result  = DN_Str8FromStr8ANSIColourU8RGBArena(mode, string, r, g, b, arena);
+  DN_TCScratchEnd(&scratch);
+  return result;
+}
+
+DN_API DN_Str8 DN_Str8FromFmtANSIColourU8RGBArena(DN_ANSIColourMode mode, DN_U8 r, DN_U8 g, DN_U8 b, DN_Arena *arena, char const *fmt, ...)
+{
+  va_list args;
+  va_start(args, fmt);
+  DN_Str8 result = DN_Str8ANSIColourU8RGBFromFmtVArena(mode, r, g, b, arena, fmt, args);
+  va_end(args);
+  return result;
+}
+
+DN_API DN_Str8 DN_Str8FromFmtANSIColourV3F32RGB255Arena(DN_ANSIColourMode mode, DN_V3F32 rgb_255, DN_Arena *arena, char const *fmt, ...)
+{
+  va_list args;
+  va_start(args, fmt);
+  DN_Str8 result = DN_Str8ANSIColourU8RGBFromFmtVArena(mode, DN_Cast(DN_U8)rgb_255.r, DN_Cast(DN_U8)rgb_255.g, DN_Cast(DN_U8)rgb_255.b, arena, fmt, args);
+  va_end(args);
   return result;
 }
 
@@ -4399,30 +4985,25 @@ DN_API DN_LogPrefixSize DN_LogMakePrefix(DN_LogStyle style, DN_LogTypeParam type
   max_type_length                 = DN_Max(max_type_length, type_str8.size);
   int type_padding                = DN_Cast(int)(max_type_length - type_str8.size);
 
-  DN_Str8 colour_esc = {};
-  DN_Str8 bold_esc   = {};
-  DN_Str8 reset_esc  = {};
+  DN_Str8x32 colour_esc = {};
+  DN_Str8    bold_esc   = {};
+  DN_Str8    reset_esc  = {};
   if (style.colour) {
-    bold_esc   = DN_Str8Lit(DN_LogBoldEscapeCode);
-    reset_esc  = DN_Str8Lit(DN_LogResetEscapeCode);
-    colour_esc = DN_LogColourEscapeCodeStr8FromRGB(DN_LogColourType_Fg, style.r, style.g, style.b);
+    bold_esc   = DN_Str8Lit(DN_ANSICodeBoldLit);
+    reset_esc  = DN_Str8Lit(DN_ANSICodeResetLit);
+    colour_esc = DN_Str8x32FromANSIColourCodeU8RGB(DN_ANSIColourMode_Fg, style.r, style.g, style.b);
   }
 
   DN_Str8 file_name = DN_Str8FileNameFromPath(call_site.file);
-  DN_GCC_WARNING_PUSH
-  DN_GCC_WARNING_DISABLE(-Wformat)
-  DN_GCC_WARNING_DISABLE(-Wformat-extra-args)
-  DN_MSVC_WARNING_PUSH
-  DN_MSVC_WARNING_DISABLE(4477)
   int     size      = DN_SNPrintF(dest,
                          DN_Cast(int)dest_size,
                          "%04u-%02u-%02uT%02u:%02u:%02u" // date
-                         "%S"                            // colour
-                         "%S"                            // bold
-                         " %S"                           // type
+                         "%.*s"                          // colour
+                         "%.*s"                          // bold
+                         " %.*s"                         // type
                          "%.*s"                          // type padding
-                         "%S"                            // reset
-                         " %S"                           // file name
+                         "%.*s"                          // reset
+                         " %.*s"                         // file name
                          ":%05I32u "                     // line number
                          ,
                          date.year,
@@ -4431,16 +5012,14 @@ DN_API DN_LogPrefixSize DN_LogMakePrefix(DN_LogStyle style, DN_LogTypeParam type
                          date.hour,
                          date.minute,
                          date.second,
-                         colour_esc,      // colour
-                         bold_esc,        // bold
-                         type_str8,       // type
+                         DN_Str8PrintFmt(colour_esc), // colour
+                         DN_Str8PrintFmt(bold_esc),   // bold
+                         DN_Str8PrintFmt(type_str8),  // type
                          DN_Cast(int) type_padding,
-                         "",              // type padding
-                         reset_esc,       // reset
-                         file_name,       // file name
+                         "",                          // type padding
+                         DN_Str8PrintFmt(reset_esc),  // reset
+                         DN_Str8PrintFmt(file_name),  // file name
                          call_site.line); // line number
-  DN_MSVC_WARNING_POP // '%S' requires an argument of type 'wchar_t *', but variadic argument 7 has type 'DN_Str8'
-  DN_GCC_WARNING_POP
 
   static DN_USize max_header_length  = 0;
   DN_USize        size_no_ansi_codes = size - colour_esc.size - reset_esc.size - bold_esc.size;
@@ -4460,14 +5039,19 @@ DN_API void DN_LogSetPrintFunc(DN_LogPrintFunc *print_func, void *user_data)
   dn->print_func_context = user_data;
 }
 
-DN_API void DN_LogPrint(DN_LogTypeParam type, DN_CallSite call_site, DN_FMT_ATTRIB char const *fmt, ...)
+DN_API void DN_LogPrint(DN_LogTypeParam type, DN_CallSite call_site, DN_LogFlags flags, DN_FMT_ATTRIB char const *fmt, ...)
 {
-  DN_Core         *dn   = DN_Get();
+  DN_Core *dn = DN_Get();
+  if (type.is_u32_enum) {
+    if (type.u32 < dn->log_level_to_show_from)
+      return;
+  }
+
   DN_LogPrintFunc *func = dn->print_func;
   if (func) {
     va_list args;
     va_start(args, fmt);
-    func(type, dn->print_func_context, call_site, fmt, args);
+    func(type, dn->print_func_context, call_site, flags, fmt, args);
     va_end(args);
   }
 }

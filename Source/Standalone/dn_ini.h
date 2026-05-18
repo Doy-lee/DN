@@ -1,34 +1,127 @@
 #if !defined(DN_INI_H)
 #define DN_INI_H
 
-#include <stdint.h> // size_t
+// NOTE: DN INI Configuration
+//  Getting Started
+//    This is a single header and implementation file library that implements .ini file handling.
+//    It supports the following .ini features:
+//
+//      - Plain sections: [sections]
+//      - Arbitrarily nested sections delimited by '.': [sections.a] [sections.a.b] [sections.a.b....]
+//      - Repeated section names (the last section takes precedence)
+//      - Comments marked by #: [section] # Comment
+//      - Multi-line values for keys:
+//          [my_section]
+//          the_key = the_value \
+//          another line for the key \
+//          and another one
+//          the_next_key = that's cool
+//
+//    Include both .h and .c in your translation unit or compile the .c separately and link against
+//    it to get started. The goals of the library are as follows:
+//
+//      - Zero allocations to parse, accepts a NULL buffer to determine the amount of bytes required
+//        to parse the .ini buffer
+//      - Compile in C99 and compatible with C++
+//
+//  Example
+/*
+   #include <stdio.h>
+   #include <stdlib.h>
+   #include <stdbool.h>
+   #include "dn_ini.h"
+   #include "dn_ini.c"
 
-#if !defined(DN_INI_Assert)
-  #include <assert.h>
-  #define DN_INI_Assert(expr) assert(expr)
-#endif
+   void main() {
+     DN_INIStr8 ini_buffer = DN_INIStr8Lit(
+       "[my_stuff]\n"
+       "app=the_stuff # Comment on the stuff value\n"
+       "\n"
+       "[section]\n"
+       "item=abc\n"
+       "\n"
+       "[section.foo.xyz]\n"
+       "another=one\n"
+       "multi_line_key=coolios \\\n"
+       "from another line?!\n"
+     );
 
-#include <stdarg.h>
+     // NOTE: Calculate the number of bytes required to parse the buffer and make one single
+     // allocation
+     DN_INICore ini               = DN_INI_ParseFromPtr(ini_buffer.data, ini_buffer.size, NULL, 0);
+     size_t     parse_buffer_size = ini.memory_required;
+     char*      parse_buffer      = calloc(1, parse_buffer_size);
 
-#if !defined(DN_INI_VSNPrintF)
-  #include <stdio.h>
-  #define DN_INI_VSNPrintF(buffer, size, fmt, args) vsnprintf(buffer, size, fmt, args)
-#endif
+     // NOTE: Parse the buffer into the `ini` object from the single allocation. No additional
+     // allocations are made
+     ini                          = DN_INI_ParseFromPtr(ini_buffer.data, ini_buffer.size, parse_buffer, parse_buffer_size);
 
-#if !defined(DN_INI_Memset) || !defined(DN_INI_Memcmp) || !defined(DN_INI_Memcpy)
-  #include <string.h>
-  #if !defined(DN_INI_Memset)
-  #define DN_INI_Memset(ptr, val, size) memset(ptr, val, size)
+     // NOTE: Process the ini file
+     // The .INI file parsed into a tree, resembling
+     //
+     //   [Root (Sentinel)] <-- This is ini.first_section, its children contains the .ini contents
+     //   |
+     //   +-- [my_stuff]
+     //   +-- [my_section]
+     //       |
+     //       +-- [foo]
+     //           |
+     //           +-- [xyz]
+     //
+     DN_INISection *my_stuff           = DN_INI_ChildSectionFromStr8(&ini.first_section, DN_INIStr8Lit("my_stuff"));
+     DN_INISection *my_section         = DN_INI_ChildSectionFromStr8(&ini.first_section, DN_INIStr8Lit("my_section"));
+     DN_INISection *my_section_foo     = DN_INI_ChildSectionFromStr8(my_section,        DN_INIStr8Lit("foo"));
+     DN_INISection *my_section_foo_xyz = DN_INI_ChildSectionFromStr8(my_section_foo,    DN_INIStr8Lit("xyz"));
+
+     printf("My Section Foo XYZ: %zu fields\n", my_section_foo_xyz->fields_count);
+     for (DN_INIField *field = my_section_foo->first_field; field; field = field->next)
+       printf("  %.*s: %.*s\n", (int)field->key.size, field->key.data, (int)field->value.size, field->value.data);
+
+     // Alternatively you can access the section directly by specifying the fully qualified path from
+     // the section, e.g.:
+     DN_INISection *my_section_foo_xyz_direct = DN_INI_ChildSectionFromStr8(&ini.first_section, DN_INIStr8Lit("my_section.foo.xyz"));
+     if (my_section_foo_xyz_direct) {
+       // ...
+     }
+
+     // You may also lookup the field directly by specifying the fully qualified path
+     DN_INIField *my_section_item = DN_INI_FieldFromSectionStr8(&ini.first_section, DN_INIStr8Lit("my_section.item"));
+     if (my_section_item)
+       printf("  %.*s: %.*s\n", (int)my_section_item->key.size, my_section_item->key.data, (int)my_section_item->value.size, my_section_item->value.data);
+
+     // NOTE: Release memory, `ini` and its contents are invalidated and should not be used
+     free(parse_buffer);
+   }
+ */
+
+  #include <stdint.h> // size_t
+
+  #if !defined(DN_INI_Assert)
+    #include <assert.h>
+    #define DN_INI_Assert(expr) assert(expr)
   #endif
 
-  #if !defined(DN_INI_Memcmp)
-  #define DN_INI_Memcmp(dest, src, size) memcmp(dest, src, size)
+  #include <stdarg.h>
+
+  #if !defined(DN_INI_VSNPrintF)
+    #include <stdio.h>
+    #define DN_INI_VSNPrintF(buffer, size, fmt, args) vsnprintf(buffer, size, fmt, args)
   #endif
 
-  #if !defined(DN_INI_Memcpy)
-  #define DN_INI_Memcpy(dest, src, size) memcpy(dest, src, size)
+  #if !defined(DN_INI_Memset) || !defined(DN_INI_Memcmp) || !defined(DN_INI_Memcpy)
+    #include <string.h>
+    #if !defined(DN_INI_Memset)
+      #define DN_INI_Memset(ptr, val, size) memset(ptr, val, size)
+    #endif
+
+    #if !defined(DN_INI_Memcmp)
+      #define DN_INI_Memcmp(dest, src, size) memcmp(dest, src, size)
+    #endif
+
+    #if !defined(DN_INI_Memcpy)
+      #define DN_INI_Memcpy(dest, src, size) memcpy(dest, src, size)
+    #endif
   #endif
-#endif
 
 typedef enum DN_INITokenType {
   DN_INITokenType_Nil,
@@ -175,7 +268,7 @@ DN_INIFieldStr8      DN_INI_FieldStr8FromSectionStr8 (DN_INISection *section, DN
 DN_INIFieldBool      DN_INI_FieldBoolFromSectionStr8 (DN_INISection *section, DN_INIStr8 str8);
 DN_INICore           DN_INI_ParseFromPtr             (char const *buf, size_t count, char *base, size_t base_count);
 
-// NOTE: Building    
+// NOTE: Building
 DN_INISection *      DN_INI_AppendSectionF           (DN_INICore *ini,        DN_INIArena *arena, DN_INISection *section, char const *fmt, ...);
 DN_INIField *        DN_INI_AppendKeyBool            (DN_INICore *ini,        DN_INIArena *arena, DN_INISection *section, DN_INIStr8 key,  bool value);
 DN_INIField *        DN_INI_AppendKeyPtrBool         (DN_INICore *ini,        DN_INIArena *arena, DN_INISection *section, char const *key, size_t key_size, bool value);

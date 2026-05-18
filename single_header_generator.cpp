@@ -29,10 +29,12 @@ struct File
 
 static void AppendCppFileLineByLine(DN_Str8Builder *dest, DN_Str8 cpp_path)
 {
-  DN_OSErrSink *err    = DN_OS_ErrSinkBeginDefault();
-  DN_Str8       buffer = DN_OS_FileReadAllTLS(cpp_path, err);
-  DN_OS_ErrSinkEndAndExitIfErrorF(err, -1, "Failed to load file from '%S' for appending", cpp_path);
+  DN_TCScratch scratch = DN_TCScratchBegin(&dest->arena, 1);
+  DN_ErrSink  *err     = DN_TCErrSinkBeginDefault();
+  DN_Str8      buffer  = DN_OS_FileReadAllArena(&scratch.arena, cpp_path, err);
+  DN_ErrSinkEndExitIfErrorF(err, -1, "Failed to load file from '%S' for appending", cpp_path);
 
+  bool inside_clangd_preprocessor_block = false;
   for (DN_Str8 inc_walker = buffer;;) {
     DN_Str8BSplitResult split = DN_Str8BSplit(inc_walker, DN_Str8Lit("\n"));
     if (split.lhs.size == 0)
@@ -42,42 +44,59 @@ static void AppendCppFileLineByLine(DN_Str8Builder *dest, DN_Str8 cpp_path)
     // NOTE: Trim the whitespace, mainly for windows, the file we read will have \r\n whereas we just want to emit \n
     DN_Str8 line = DN_Str8TrimTailWhitespace(split.lhs);
 
-    // NOTE: Comment out any #include "../dn_.*" matches if we encounter one
-    DN_Str8FindResult find = DN_Str8FindStr8(line, DN_Str8Lit("#include \"../dn_"), DN_Str8EqCase_Sensitive);
-    {
+    // NOTE: Detect if we're inside a clangd preprocessor block
+    // TODO: This breaks if there's any nested #if's in the block (we naiively match on #endif)
+    bool commented_out = false;
+    if (!inside_clangd_preprocessor_block) {
+      DN_Str8FindResult find = DN_Str8FindStr8(line, DN_Str8Lit("#if defined(_CLANGD)"), DN_Str8EqCase_Sensitive);
       if (find.found) {
-        line = DN_Str8FromTLSF("%S// DN: Single header generator commented out this header => %S", find.start_to_before_match, DN_Str8TrimWhitespaceAround(find.match_to_end_of_buffer));
-
-        // The only time we use '../dn_.*' is for LSP purposes, so we
-        // don't care about inlining it, hence we don't set 'include_file'
+        line                             = DN_Str8FromFmtArena(&scratch.arena, "%S// DN: Single header generator commented out => %S", find.start_to_before_match, DN_Str8TrimWhitespaceAround(find.match_to_end_of_buffer));
+        commented_out                    = true;
+        inside_clangd_preprocessor_block = true;
       }
     }
 
-    // NOTE: Inline any other relative includes if we encounter one
-    // (Right now DN only includes stb_sprintf with a relative path)
+    // NOTE: Inline relative includes as long as we're not inside a CLANDG block
     DN_Str8 extra_include_path = {};
-    if (!find.found) {
-      find = DN_Str8FindStr8(line, DN_Str8Lit("#include \""), DN_Str8EqCase_Sensitive);
-      if (find.found) {
-        line                     = DN_Str8FromTLSF("%S// DN: Single header generator commented out this header => %S", find.start_to_before_match, DN_Str8TrimWhitespaceAround(find.match_to_end_of_buffer));
-        DN_Str8 rel_include_path = DN_Str8TrimWhitespaceAround(find.after_match_to_end_of_buffer);
-        DN_Str8 root_dir         = DN_Str8FileDirectoryFromPath(cpp_path);
-        extra_include_path       = DN_OS_PathFFromTLS("%S/%S", root_dir, DN_Str8TrimSuffix(rel_include_path, DN_Str8Lit("\"")));
+    if (!inside_clangd_preprocessor_block) {
+      DN_Str8 ignore_patterns[] = {
+        DN_Str8Lit("#include \"dn.h\""),
+        DN_Str8Lit("#include \"dn.cpp\""),
+      };
+
+      DN_Str8FindResult ignore = DN_Str8FindStr8Array(line, ignore_patterns, DN_ArrayCountU(ignore_patterns), DN_Str8EqCase_Sensitive);
+      if (!ignore.found) {
+        DN_Str8FindResult find = DN_Str8FindStr8(line, DN_Str8Lit("#include \""), DN_Str8EqCase_Sensitive);
+        if (find.found) {
+          line                     = DN_Str8FromFmtArena(&scratch.arena, "%S// DN: Single header generator commented out => %S", find.start_to_before_match, DN_Str8TrimWhitespaceAround(find.match_to_end_of_buffer));
+          DN_Str8 rel_include_path = DN_Str8TrimWhitespaceAround(find.after_match_to_end_of_buffer);
+          DN_Str8 root_dir         = DN_Str8FileDirectoryFromPath(cpp_path);
+          extra_include_path       = DN_OS_PathF(&scratch.arena, "%S/%S", root_dir, DN_Str8TrimSuffix(rel_include_path, DN_Str8Lit("\"")));
+        }
       }
     }
 
-    DN_Str8BuilderAppendRef(dest, line);
+    // NOTE: Detect if we're at the end of the CLAND block
+    if (inside_clangd_preprocessor_block) {
+      if (!commented_out)
+        line = DN_Str8FromFmtArena(&scratch.arena, "// %S", line);
+      if (DN_Str8FindStr8(line, DN_Str8Lit("#endif"), DN_Str8EqCase_Sensitive).found)
+        inside_clangd_preprocessor_block = false;
+    }
+
+    DN_Str8BuilderAppendCopy(dest, line);
     DN_Str8BuilderAppendRef(dest, DN_Str8Lit("\n"));
 
     if (extra_include_path.size)
       AppendCppFileLineByLine(dest, extra_include_path);
   }
+  DN_TCScratchEnd(&scratch);
 }
 
 int main(int argc, char **argv)
 {
   DN_Core dn = {};
-  DN_Init(&dn, DN_InitFlags_OS, nullptr);
+  DN_Init(&dn, DN_InitFlags_OS | DN_InitFlags_ThreadContext, nullptr);
 
   if (argc != 3) {
     DN_OS_PrintErrF("USAGE: %s <path/to/dn/Source> <output_dir>", argv[0]);
@@ -91,81 +110,30 @@ int main(int argc, char **argv)
     return -1;
   }
 
-  File const FILES[] = {
-      {FileType_Header, DN_Str8Lit("dn.h")},
-      {FileType_Impl, DN_Str8Lit("dn.cpp")},
+  DN_Str8 const REL_FILE_PATHS[] = {
+      DN_Str8Lit("dn"),
+      DN_Str8Lit("Extra/dn_async"),
+      DN_Str8Lit("Extra/dn_bin_pack"),
+      DN_Str8Lit("Extra/dn_csv"),
+      DN_Str8Lit("Extra/dn_helpers"),
   };
 
   for (DN_ForIndexU(type, FileType_Count)) {
-    DN_OSTLSTMem   tmem    = DN_OS_TLSPushTMem(nullptr);
-    DN_Str8Builder builder = DN_Str8BuilderFromTLS();
-    for (DN_ForItCArray(it, File const, FILES)) {
-      if (it.data->type != type)
-        continue;
-
-      // NOTE: Parse the include files in the *_inc.[h|cpp] files
-      DN_Str8 path = DN_OS_PathFFromTLS("%S/%S", dn_root_dir, it.data->file_name);
-      {
-        DN_OSErrSink *err         = DN_OS_ErrSinkBeginDefault();
-        DN_Str8       file_buffer = DN_OS_FileReadAllTLS(path, err);
-        DN_OS_ErrSinkEndAndExitIfErrorF(err, -1, "Failed to load file");
-
-        // NOTE: Walk the top-level dn_*_inc.[h|cpp] files
-        for (DN_Str8 walker = file_buffer;;) {
-          DN_Str8BSplitResult split = DN_Str8BSplit(walker, DN_Str8Lit("\n"));
-          if (split.lhs.size == 0)
-            break;
-
-          // NOTE: Parse the line, if it was a #include, extract it into this string
-          DN_Str8 include_file = {};
-          {
-            walker       = split.rhs;
-            DN_Str8 line = DN_Str8TrimTailWhitespace(split.lhs);
-
-            // NOTE: Comment out any #include "dn_.*" matches if we encounter one
-            DN_Str8FindResult find = DN_Str8FindStr8(line, DN_Str8Lit("#include \""), DN_Str8EqCase_Sensitive);
-            {
-              if (find.found && DN_Str8FindStr8(line, DN_Str8Lit("dn_"), DN_Str8EqCase_Sensitive).found) {
-                line         = DN_Str8FromTLSF("%S// DN: Single header generator inlined this file => %S", find.start_to_before_match, DN_Str8TrimWhitespaceAround(find.match_to_end_of_buffer));
-                include_file = DN_Str8BSplit(find.after_match_to_end_of_buffer, DN_Str8Lit("\"")).lhs;
-                DN_Assert(include_file.size);
-              }
-            }
-
-            // NOTE: Record the line
-            DN_Str8BuilderAppendRef(&builder, line);
-            DN_Str8BuilderAppendRef(&builder, DN_Str8Lit("\n"));
-          }
-
-          if (include_file.size) { // NOTE: If the line was a include file, we will inline the included file
-            DN_Str8 include_path = DN_OS_PathFFromTLS("%S/%S", dn_root_dir, include_file);
-            AppendCppFileLineByLine(&builder, include_path);
-          }
-        }
-      }
-    }
-
-    DN_Str8 extra_files[] = {
-        DN_Str8Lit("Extra/dn_math"),
-        DN_Str8Lit("Extra/dn_async"),
-        DN_Str8Lit("Extra/dn_bin_pack"),
-        DN_Str8Lit("Extra/dn_csv"),
-        DN_Str8Lit("Extra/dn_hash"),
-        DN_Str8Lit("Extra/dn_helpers"),
-    };
-    DN_Str8 suffix = type == FileType_Header ? DN_Str8Lit("h") : DN_Str8Lit("cpp");
-    for (DN_ForItCArray(extra_it, DN_Str8, extra_files)) {
-      DN_Str8 extra_path = DN_OS_PathFFromTLS("%S/%S.%S", dn_root_dir, *extra_it.data, suffix);
+    DN_TCScratch   scratch = DN_TCScratchBegin(nullptr, 0);
+    DN_Str8Builder builder = DN_Str8BuilderFromArena(&scratch.arena);
+    DN_Str8        suffix  = type == FileType_Header ? DN_Str8Lit("h") : DN_Str8Lit("cpp");
+    for (DN_ForItCArray(extra_it, DN_Str8 const, REL_FILE_PATHS)) {
+      DN_Str8 extra_path = DN_OS_PathF(&scratch.arena, "%S/%S.%S", dn_root_dir, *extra_it.data, suffix);
       AppendCppFileLineByLine(&builder, extra_path);
     }
 
     DN_Date date = DN_OS_DateLocalTimeNow();
     DN_Str8BuilderPrependF(&builder, "// Generated by the DN single header generator %04u-%02u-%02u %02u:%02u:%02u\n\n", date.year, date.month, date.day, date.hour, date.minutes, date.seconds);
 
-    DN_Str8       buffer             = DN_Str8TrimWhitespaceAround(DN_Str8BuilderBuildFromTLS(&builder));
-    DN_Str8       single_header_path = DN_OS_PathFFromTLS("%S/dn_single_header.%S", output_dir, suffix);
-    DN_OSErrSink *err                = DN_OS_ErrSinkBeginDefault();
+    DN_Str8     buffer             = DN_Str8TrimWhitespaceAround(DN_Str8BuilderBuild(&builder, &scratch.arena));
+    DN_Str8     single_header_path = DN_OS_PathF(&scratch.arena, "%S/dn_single_header.%S", output_dir, suffix);
+    DN_ErrSink *err                = DN_TCErrSinkBeginDefault();
     DN_OS_FileWriteAllSafe(single_header_path, buffer, err);
-    DN_OS_ErrSinkEndAndExitIfErrorF(err, -1, "Failed to write Single header file '%S'", single_header_path);
+    DN_ErrSinkEndExitIfErrorF(err, -1, "Failed to write Single header file '%S'", single_header_path);
   }
 }

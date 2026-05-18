@@ -41,7 +41,6 @@ struct DN_JSONBuilder
 };
 #endif // !defined(DN_NO_JSON_BUIDLER)
 
-// NOTE: DN_BinarySearch ///////////////////////////////////////////////////////////////////////////
 template <typename T>
 using DN_BinarySearchLessThanProc = bool(T const &lhs, T const &rhs);
 

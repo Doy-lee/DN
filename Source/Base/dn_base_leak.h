@@ -29,6 +29,7 @@ struct DN_LeakTracker
 {
   DN_DSMap<DN_LeakAlloc> alloc_table;
   DN_TicketMutex         alloc_table_mutex;
+  DN_MemList             alloc_table_mem;
   DN_Arena               alloc_table_arena;
   DN_U64                 alloc_table_bytes_allocated_for_stack_traces;
 };

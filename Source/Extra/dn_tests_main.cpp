@@ -2,12 +2,14 @@
   #define DN_NO_WINDOWS_H_REPLACEMENT_HEADER
 #endif
 
-#define DN_H_WITH_OS      1
-#define DN_H_WITH_CORE    1
-#define DN_H_WITH_HASH    1
-#define DN_H_WITH_HELPERS 1
-#define DN_H_WITH_ASYNC   1
-#define DN_H_WITH_NET     1
+#define DN_ARENA_TEMP_MEM_UAF_GUARD               1
+#define DN_ARENA_TEMP_MEM_UAF_TRACE_ON_BY_DEFAULT 0
+#define DN_H_WITH_OS                              1
+#define DN_H_WITH_CORE                            1
+#define DN_H_WITH_HASH                            1
+#define DN_H_WITH_HELPERS                         1
+#define DN_H_WITH_ASYNC                           1
+#define DN_H_WITH_NET                             1
 #include "../dn.h"
 #include "../dn.cpp"
 
@@ -35,7 +37,7 @@ int main(int, char**)
 {
   DN_Core dn = {};
   DN_Init(&dn, DN_InitFlags_LogAllFeatures | DN_InitFlags_OS | DN_InitFlags_ThreadContext, nullptr);
-  DN_Tests_RunSuite(DN_TestsPrint_Yes);
+  DN_TST_RunSuite(DN_TSTPrint_Yes);
   return 0;
 }
 DN_MSVC_WARNING_POP

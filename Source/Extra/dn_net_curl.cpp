@@ -129,7 +129,7 @@ static int32_t DN_NET_CurlThreadEntryPoint_(DN_OSThread *thread)
           DN_Str8 payload = {};
           for (DN_OS_MutexScope(&curl->ring_mutex)) {
             DN_Assert(DN_RingHasData(&curl->ring, event.ws_send_size));
-            payload = DN_Str8AllocArena(tmem.arena, event.ws_send_size, DN_ZMem_No);
+            payload = DN_Str8AllocArena(event.ws_send_size, DN_ZMem_No, &tmem.arena);
             DN_RingRead(&curl->ring, payload.data, payload.size);
           }
 
@@ -168,7 +168,7 @@ static int32_t DN_NET_CurlThreadEntryPoint_(DN_OSThread *thread)
           DN_NETRequest *request = DN_Cast(DN_NETRequest *) event.request.handle;
 
           // NOTE: Release resources
-          DN_ArenaClear(&request->arena);
+          DN_ArenaTempEnd(&request->arena, DN_ArenaReset_Yes);
           DN_OS_SemaphoreDeinit(&request->completion_sem);
 
           curl_multi_remove_handle(curl->thread_curlm, curl_req->handle);
@@ -224,7 +224,7 @@ static int32_t DN_NET_CurlThreadEntryPoint_(DN_OSThread *thread)
             }
           } else {
             req->response.error_str8 = DN_Str8FromFmtArena(&req->arena, "Failed to get HTTP response status (CURL %d): %s", msg->data.result, curl_easy_strerror(get_result));
-            req->response.state     = DN_NETResponseState_Error;
+            req->response.state      = DN_NETResponseState_Error;
           }
         } else {
           DN_USize curl_extended_error_size = DN_CStr8Size(curl_req->error);
@@ -302,7 +302,7 @@ static int32_t DN_NET_CurlThreadEntryPoint_(DN_OSThread *thread)
 
         // NOTE: Allocate and read (we use meta->bytesleft as per comment from initial recv)
         if (meta->bytesleft) {
-          DN_Str8 buffer  = DN_Str8AllocArena(&req->arena, meta->bytesleft, DN_ZMem_No);
+          DN_Str8 buffer  = DN_Str8AllocArena(meta->bytesleft, DN_ZMem_No, &req->arena);
           DN_Assert(buffer.size == DN_Cast(DN_USize)meta->bytesleft);
           receive_result  = curl_ws_recv(curl_req->handle, buffer.data, buffer.size, &buffer.size, &meta);
           DN_Assert(buffer.size == DN_Cast(DN_USize)meta->len);
@@ -353,13 +353,13 @@ static int32_t DN_NET_CurlThreadEntryPoint_(DN_OSThread *thread)
           DN_USize curl_extended_error_size = DN_CStr8Size(curl_req->error);
           req->response.state           = DN_NETResponseState_Error;
           req->response.error_str8      = DN_Str8FromFmtArena(&req->arena,
-                                                             "Websocket receive '%.*s' failed (CURL %d): %s%s%s%s",
-                                                             DN_Str8PrintFmt(req->url),
-                                                             receive_result,
-                                                             curl_easy_strerror(receive_result),
-                                                             curl_extended_error_size ? " (" : "",
-                                                             curl_extended_error_size ? curl_req->error : "",
-                                                             curl_extended_error_size ? ")" : "");
+                                                                  "Websocket receive '%.*s' failed (CURL %d): %s%s%s%s",
+                                                                  DN_Str8PrintFmt(req->url),
+                                                                  receive_result,
+                                                                  curl_easy_strerror(receive_result),
+                                                                  curl_extended_error_size ? " (" : "",
+                                                                  curl_extended_error_size ? curl_req->error : "",
+                                                                  curl_extended_error_size ? ")" : "");
         }
       }
 
@@ -394,10 +394,11 @@ DN_NETInterface DN_NET_CurlInterface()
 void DN_NET_CurlInit(DN_NETCore *net, char *base, DN_U64 base_size)
 {
   DN_NET_BaseInit_(net, base, base_size);
-  DN_NETCurlCore *curl       = DN_ArenaNew(&net->arena, DN_NETCurlCore, DN_ZMem_Yes);
-  net->context               = curl;
+  DN_NETCurlCore *curl = DN_ArenaNew(&net->arena, DN_NETCurlCore, DN_ZMem_Yes);
+  net->context         = curl;
+  net->api             = DN_NET_CurlInterface();
 
-  DN_USize arena_bytes_avail = (net->arena.curr->reserve - net->arena.curr->used);
+  DN_USize arena_bytes_avail = (net->arena.mem->curr->reserve - net->arena.mem->curr->used);
   curl->ring.size            = arena_bytes_avail / 2;
   curl->ring.base            = DN_Cast(char *) DN_ArenaAlloc(&net->arena, curl->ring.size, /*align*/ 1, DN_ZMem_Yes);
   DN_Assert(curl->ring.base);
@@ -415,7 +416,7 @@ void DN_NET_CurlDeinit(DN_NETCore *net)
   DN_NETCurlCore *curl = DN_Cast(DN_NETCurlCore *) net->context;
   curl->kill_thread    = true;
   curl_multi_wakeup(curl->thread_curlm);
-  DN_OS_ThreadJoin(&curl->thread);
+  DN_OS_ThreadJoin(&curl->thread, DN_TCDeinitArenas_Yes);
 }
 
 static DN_NETRequestHandle DN_NET_CurlDoRequest_(DN_NETCore *net, DN_Str8 url, DN_Str8 method, DN_NETDoHTTPArgs const *args, DN_NETRequestType type)
@@ -434,11 +435,11 @@ static DN_NETRequestHandle DN_NET_CurlDoRequest_(DN_NETCore *net, DN_Str8 url, D
 
     // NOTE None in the free list so allocate one
     if (!req) {
-      DN_U64 arena_pos            = DN_ArenaPos(&net->arena);
+      DN_U64 arena_pos            = DN_MemListPos(net->arena.mem);
       req                         = DN_ArenaNew(&net->arena, DN_NETRequest, DN_ZMem_Yes);
       DN_NETCurlRequest *curl_req = DN_ArenaNew(&net->arena, DN_NETCurlRequest, DN_ZMem_Yes);
       if (!req || !curl_req) {
-        DN_ArenaPopTo(&net->arena, arena_pos);
+        DN_MemListPopTo(net->arena.mem, arena_pos);
         return result;
       }
 
@@ -453,7 +454,7 @@ static DN_NETRequestHandle DN_NET_CurlDoRequest_(DN_NETCore *net, DN_Str8 url, D
     result                 = DN_NET_SetupRequest_(req, url, method, args, type);
     req->response.request  = result;
     req->context[1]        = DN_Cast(DN_UPtr) net;
-    curl_req->str8_builder = DN_Str8BuilderFromArena(&req->arena);
+    curl_req->str8_builder = DN_Str8BuilderFromArena(&req->start_response_arena);
   }
 
   // NOTE: Setup the request for curl API
@@ -587,8 +588,8 @@ static DN_NETResponse DN_NET_CurlHandleFinishedRequest_(DN_NETCurlCore *curl, DN
     DN_NETCurlRequest *curl_req = DN_NET_CurlRequestFromRequest_(req);
     result.body                 = DN_Str8BuilderBuild(&curl_req->str8_builder, arena);
     if (result.error_str8.size)
-      result.error_str8 = DN_Str8FromStr8Arena(arena, result.error_str8);
-    curl_req->str8_builder = DN_Str8BuilderFromArena(&req->arena);
+      result.error_str8 = DN_Str8FromStr8Arena(result.error_str8, arena);
+    curl_req->str8_builder = {}; // Clear it out, reinitialised on subsequent do request call
   }
   DN_NET_EndFinishedRequest_(req);
 

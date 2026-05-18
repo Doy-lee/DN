@@ -39,7 +39,7 @@ pushd %build_dir%
 
   where /q emcc && (
     echo [BUILD] Emscripten emcc detected, compiling ...
-    call emcc -g -msimd128 -msse2 %flags% -o %build_dir%\dn_unit_tests_emcc.js -s FETCH=1 -pthread -s ASYNCIFY=1 -lwebsocket -Wall
+    call emcc -g -msimd128 -msse2 %flags% -o %build_dir%\dn_unit_tests_emcc.js -s FETCH=1 -pthread -s ASYNCIFY=1 -lwebsocket -Wall || echo Failed&& exit /b 1
   )
 
   where /q cl && (
@@ -50,15 +50,16 @@ pushd %build_dir%
     )
     set msvc_cmd=!msvc_cmd! -link
 
-    powershell -Command "$time = Measure-Command { !msvc_cmd! | Out-Default }; Write-Host '[BUILD] msvc:'$time.TotalSeconds's'; exit $LASTEXITCODE" || exit /b 1
-    call cl %script_dir%\single_header_generator.cpp -Z7 -nologo -link
-    call %build_dir%\single_header_generator.exe %script_dir%\Source %script_dir%\Single-Header
+    powershell -Command "$time = Measure-Command { !msvc_cmd! | Out-Default }; Write-Host '[BUILD] msvc:'$time.TotalSeconds's'; exit $LASTEXITCODE" || echo MSVC build failed&& exit /b 1
+    echo [BUILD] Single header generator ...
+    call cl %script_dir%\single_header_generator.cpp -Z7 -nologo -link || echo Single header generator build failed&& exit /b 1
+    call %build_dir%\single_header_generator.exe %script_dir%\Source %script_dir%\Single-Header || echo Single header generation failed&& exit /b 1
   )
 
   where /q clang-cl && (
     echo [BUILD] LLVM clang-cl detected, compiling ...
     set clang_cmd=clang-cl -MT %msvc_driver_flags% -fsanitize=undefined -Fe:dn_unit_tests_clang -link
-    powershell -Command "$time = Measure-Command { !clang_cmd! | Out-Default }; Write-Host '[BUILD] clang-cl:'$time.TotalSeconds's'; exit $LASTEXITCODE" || exit /b 1
+    powershell -Command "$time = Measure-Command { !clang_cmd! | Out-Default }; Write-Host '[BUILD] clang-cl:'$time.TotalSeconds's'; exit $LASTEXITCODE" || echo CLANG build failed&& exit /b 1
   )
 
   exit /b 1

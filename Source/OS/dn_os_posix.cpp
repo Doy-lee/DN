@@ -1333,7 +1333,7 @@ DN_API bool DN_OS_ThreadInit(DN_OSThread *thread, DN_OSThreadFunc *func, DN_OSTh
   return result;
 }
 
-DN_API bool DN_OS_ThreadJoin(DN_OSThread *thread)
+DN_API bool DN_OS_ThreadJoin(DN_OSThread *thread, DN_TCDeinitArenas deinit_arenas)
 {
   bool result = false;
   if (thread && thread->handle) {
@@ -1344,6 +1344,7 @@ DN_API bool DN_OS_ThreadJoin(DN_OSThread *thread)
     result            = pthread_join(thread_id, &return_val) == 0;
     thread->handle    = {};
     thread->thread_id = {};
+    DN_TCDeinit(&thread->context, deinit_arenas);
   }
   return result;
 }
@@ -1535,8 +1536,7 @@ DN_API void DN_OS_HttpRequestAsync(DN_OSHttpResponse     *response,
     return;
 
   response->arena = arena;
-  response->builder.arena =
-      response->scratch_arena ? response->scratch_arena : &response->tmp_arena;
+  response->builder.arena = response->scratch_arena ? response->scratch_arena : &response->tmp_arena;
 
   DN_Arena  *scratch  = response->scratch_arena;
   DN_TCScratch scratch_ = DN_TCScratchBegin(&arena, 1);

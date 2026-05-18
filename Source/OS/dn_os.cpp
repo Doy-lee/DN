@@ -11,61 +11,59 @@
 #include <unistd.h>      // getpagesize
 #endif
 
-static void *DN_ArenaBasicAllocFromOSHeap(DN_USize size)
+static void *DN_OS_MemFuncsHeapAllocShim_(DN_USize size)
 {
   void *result = DN_OS_MemAlloc(size, DN_ZMem_Yes);
   return result;
 }
 
-DN_API DN_ArenaMemFuncs DN_ArenaMemFuncsGet(DN_ArenaMemFuncType type)
+DN_API DN_MemFuncs DN_MemFuncsFromType(DN_MemFuncsType type)
 {
-  DN_ArenaMemFuncs result = {};
-  result.type = type;
+  DN_MemFuncs result = {};
+  result.type        = type;
   switch (type) {
-    case DN_ArenaMemFuncType_Nil: break;
-    case DN_ArenaMemFuncType_Basic: {
-      result.type          = DN_ArenaMemFuncType_Basic;
-      result.basic_alloc   = DN_ArenaBasicAllocFromOSHeap;
-      result.basic_dealloc = DN_OS_MemDealloc;
+    case DN_MemFuncsType_Nil: break;
+    case DN_MemFuncsType_Heap: {
+      result.heap_alloc   = DN_OS_MemFuncsHeapAllocShim_;
+      result.heap_dealloc = DN_OS_MemDealloc;
     } break;
 
-    case DN_ArenaMemFuncType_VMem: {
+    case DN_MemFuncsType_Virtual: {
       DN_Core *dn = DN_Get();
       DN_Assert(dn->init_flags & DN_InitFlags_OS);
-      result.type           = DN_ArenaMemFuncType_VMem;
-      result.vmem_page_size = dn->os.page_size;
-      result.vmem_reserve   = DN_OS_MemReserve;
-      result.vmem_commit    = DN_OS_MemCommit;
-      result.vmem_release   = DN_OS_MemRelease;
+      result.virtual_page_size = dn->os.page_size;
+      result.virtual_reserve   = DN_OS_MemReserve;
+      result.virtual_commit    = DN_OS_MemCommit;
+      result.virtual_release   = DN_OS_MemRelease;
     } break;
   }
   return result;
 }
 
-DN_API DN_ArenaMemFuncs DN_ArenaMemFuncsGetDefaults()
+DN_API DN_MemFuncs DN_MemFuncsDefault()
 {
-  DN_Core            *dn   = DN_Get();
-  DN_ArenaMemFuncType type = DN_ArenaMemFuncType_Basic;
+  DN_Core        *dn   = DN_Get();
+  DN_MemFuncsType type = DN_MemFuncsType_Heap;
   if (dn->os_init) {
-    #if !defined(DN_PLATFORM_EMSCRIPTEN)
-    type = DN_ArenaMemFuncType_VMem;
-    #endif
+#if !defined(DN_PLATFORM_EMSCRIPTEN)
+    type = DN_MemFuncsType_Virtual;
+#endif
   }
-  DN_ArenaMemFuncs result = DN_ArenaMemFuncsGet(type);
+  DN_MemFuncs result = DN_MemFuncsFromType(type);
   return result;
 }
 
-DN_API DN_Arena DN_ArenaFromHeap(DN_U64 size, DN_ArenaFlags flags)
+DN_API DN_MemList DN_MemListFromHeap(DN_U64 size, DN_MemFlags flags)
 {
-  DN_ArenaMemFuncs mem_funcs = DN_ArenaMemFuncsGet(DN_ArenaMemFuncType_Basic);
-  DN_Arena         result    = DN_ArenaFromMemFuncs(size, size, flags, mem_funcs);
+  DN_MemFuncs mem_funcs = DN_MemFuncsFromType(DN_MemFuncsType_Heap);
+  DN_MemList  result    = DN_MemListFromMemFuncs(size, size, flags, mem_funcs);
   return result;
 }
 
-DN_API DN_Arena DN_ArenaFromVMem(DN_U64 reserve, DN_U64 commit, DN_ArenaFlags flags)
+DN_API DN_MemList DN_MemListFromVMem(DN_U64 reserve, DN_U64 commit, DN_MemFlags flags)
 {
-  DN_ArenaMemFuncs mem_funcs = DN_ArenaMemFuncsGet(DN_ArenaMemFuncType_VMem);
-  DN_Arena         result    = DN_ArenaFromMemFuncs(reserve, commit, flags, mem_funcs);
+  DN_MemFuncs mem_funcs = DN_MemFuncsFromType(DN_MemFuncsType_Virtual);
+  DN_MemList  result    = DN_MemListFromMemFuncs(reserve, commit, flags, mem_funcs);
   return result;
 }
 
@@ -95,7 +93,7 @@ DN_API DN_Str8 DN_Str8PadNewLines(DN_Arena *arena, DN_Str8 src, DN_Str8 pad)
 {
   // TODO: Implement this without requiring TLS so it can go into base strings
   DN_TCScratch        scratch = DN_TCScratchBegin(&arena, 1);
-  DN_Str8Builder      builder = DN_Str8BuilderFromArena(scratch.arena);
+  DN_Str8Builder      builder = DN_Str8BuilderFromArena(&scratch.arena);
   DN_Str8BSplitResult split   = DN_Str8BSplit(src, DN_Str8Lit("\n"));
   while (split.lhs.size) {
     DN_Str8BuilderAppendRef(&builder, pad);
@@ -129,7 +127,7 @@ DN_API DN_Str8 DN_Str8BuilderBuildFromHeap(DN_Str8Builder const *builder)
   return result;
 }
 
-DN_API void DN_OS_LogPrint(DN_LogTypeParam type, void *user_data, DN_CallSite call_site, DN_FMT_ATTRIB char const *fmt, va_list args)
+DN_API void DN_OS_LogPrint(DN_LogTypeParam type, void *user_data, DN_CallSite call_site, DN_LogFlags flags, DN_FMT_ATTRIB char const *fmt, va_list args)
 {
   DN_Assert(user_data);
   DN_OSCore *os = DN_Cast(DN_OSCore *)user_data;
@@ -138,69 +136,82 @@ DN_API void DN_OS_LogPrint(DN_LogTypeParam type, void *user_data, DN_CallSite ca
   DN_TicketMutex_Begin(&os->log_file_mutex);
   if (os->log_to_file && !os->log_file.handle && !os->log_file.error) {
     DN_TCScratch scratch  = DN_TCScratchBegin(nullptr, 0);
-    DN_Str8      exe_dir  = DN_OS_EXEDir(scratch.arena);
-    DN_Str8      log_path = DN_OS_PathF(scratch.arena, "%.*s/dn.log", DN_Str8PrintFmt(exe_dir));
+    DN_Str8      exe_dir  = DN_OS_EXEDir(&scratch.arena);
+    DN_Str8      log_path = DN_OS_PathF(&scratch.arena, "%.*s/dn.log", DN_Str8PrintFmt(exe_dir));
     os->log_file          = DN_OS_FileOpen(log_path, DN_OSFileOpen_CreateAlways, DN_OSFileAccess_AppendOnly, nullptr);
     DN_TCScratchEnd(&scratch);
   }
   DN_TicketMutex_End(&os->log_file_mutex);
 
-  DN_LogStyle style = {};
-  if (!os->log_no_colour) {
-    style.colour = true;
-    style.bold   = DN_LogBold_Yes;
-    if (type.is_u32_enum) {
-      switch (type.u32) {
-        case DN_LogType_Debug: {
-          style.colour = false;
-          style.bold   = DN_LogBold_No;
-        } break;
+  bool             print_prefix       = DN_BitIsNotSet(flags, DN_LogFlags_NoPrefix);
+  char             prefix_buffer[128] = {};
+  DN_LogPrefixSize prefix_size        = {};
+  if (print_prefix) {
+    DN_LogStyle style = {};
+    if (!os->log_no_colour) {
+      style.colour = true;
+      style.bold   = DN_LogBold_Yes;
+      if (type.is_u32_enum) {
+        switch (type.u32) {
+          case DN_LogType_Debug: {
+            style.colour = false;
+            style.bold   = DN_LogBold_No;
+          } break;
 
-        case DN_LogType_Info: {
-          style.g = 0x87;
-          style.b = 0xff;
-        } break;
+          case DN_LogType_Info: {
+            style.g = 0x87;
+            style.b = 0xff;
+          } break;
 
-        case DN_LogType_Warning: {
-          style.r = 0xff;
-          style.g = 0xff;
-        } break;
+          case DN_LogType_Warning: {
+            style.r = 0xff;
+            style.g = 0xff;
+          } break;
 
-        case DN_LogType_Error: {
-          style.r = 0xff;
-        } break;
+          case DN_LogType_Error: {
+            style.r = 0xff;
+          } break;
+        }
       }
     }
+
+    DN_Date    os_date  = DN_OS_DateLocalTimeNow();
+    DN_LogDate log_date = {};
+    log_date.year       = os_date.year;
+    log_date.month      = os_date.month;
+    log_date.day        = os_date.day;
+    log_date.hour       = os_date.hour;
+    log_date.minute     = os_date.minutes;
+    log_date.second     = os_date.seconds;
+    prefix_size         = DN_LogMakePrefix(style, type, call_site, log_date, prefix_buffer, sizeof(prefix_buffer));
   }
-
-  DN_Date    os_date  = DN_OS_DateLocalTimeNow();
-  DN_LogDate log_date = {};
-  log_date.year       = os_date.year;
-  log_date.month      = os_date.month;
-  log_date.day        = os_date.day;
-  log_date.hour       = os_date.hour;
-  log_date.minute     = os_date.minutes;
-  log_date.second     = os_date.seconds;
-
-  char             prefix_buffer[128] = {};
-  DN_LogPrefixSize prefix_size        = DN_LogMakePrefix(style, type, call_site, log_date, prefix_buffer, sizeof(prefix_buffer));
 
   va_list args_copy;
   va_copy(args_copy, args);
   DN_TicketMutex_Begin(&os->log_file_mutex);
   {
-    DN_OS_FileWrite(&os->log_file, DN_Str8FromPtr(prefix_buffer, prefix_size.size), nullptr);
-    DN_OS_FileWriteF(&os->log_file, nullptr, "%*s ", DN_Cast(int)prefix_size.padding, "");
+    if (print_prefix) {
+      DN_OS_FileWrite(&os->log_file, DN_Str8FromPtr(prefix_buffer, prefix_size.size), nullptr);
+      DN_OS_FileWriteF(&os->log_file, nullptr, "%*s ", DN_Cast(int) prefix_size.padding, "");
+    }
     DN_OS_FileWriteFV(&os->log_file, nullptr, fmt, args_copy);
-    DN_OS_FileWrite(&os->log_file, DN_Str8Lit("\n"), nullptr);
+    if (!DN_BitIsSet(flags, DN_LogFlags_NoNewLine))
+      DN_OS_FileWrite(&os->log_file, DN_Str8Lit("\n"), nullptr);
   }
   DN_TicketMutex_End(&os->log_file_mutex);
   va_end(args_copy);
 
-  DN_OSPrintDest dest = (type.is_u32_enum && type.u32 == DN_LogType_Error) ? DN_OSPrintDest_Err : DN_OSPrintDest_Out;
-  DN_OS_Print(dest, DN_Str8FromPtr(prefix_buffer, prefix_size.size));
-  DN_OS_PrintF(dest, "%*s ", DN_Cast(int)prefix_size.padding, "");
-  DN_OS_PrintLnFV(dest, fmt, args);
+  DN_TicketMutex_Begin(&os->log_mutex);
+  {
+    if (print_prefix)
+      DN_OS_PrintF(DN_OSPrintDest_Err, "%.*s%*s ", DN_Cast(int) prefix_size.size, prefix_buffer, DN_Cast(int) prefix_size.padding, "");
+
+    if (DN_BitIsSet(flags, DN_LogFlags_NoNewLine))
+      DN_OS_PrintFV(DN_OSPrintDest_Err, fmt, args);
+    else
+      DN_OS_PrintLnFV(DN_OSPrintDest_Err, fmt, args);
+  }
+  DN_TicketMutex_End(&os->log_mutex);
 }
 
 DN_API void DN_OS_SetLogPrintFuncToOS()
@@ -239,11 +250,11 @@ DN_API DN_Str8 DN_OS_EXEDir(DN_Arena *arena)
   DN_Str8 result = {};
   if (!arena)
     return result;
-  DN_TCScratch        scratch              = DN_TCScratchBegin(&arena, 1);
-  DN_Str8             exe_path          = DN_OS_EXEPath(scratch.arena);
-  DN_Str8             separators[]      = {DN_Str8Lit("/"), DN_Str8Lit("\\")};
-  DN_Str8BSplitResult split             = DN_Str8BSplitLastArray(exe_path, separators, DN_ArrayCountU(separators));
-  result                                = DN_Str8FromStr8Arena(arena, split.lhs);
+  DN_TCScratch        scratch      = DN_TCScratchBegin(&arena, 1);
+  DN_Str8             exe_path     = DN_OS_EXEPath(&scratch.arena);
+  DN_Str8             separators[] = {DN_Str8Lit("/"), DN_Str8Lit("\\")};
+  DN_Str8BSplitResult split        = DN_Str8BSplitLastArray(exe_path, separators, DN_ArrayCountU(separators));
+  result                           = DN_Str8FromStr8Arena(split.lhs, arena);
   DN_TCScratchEnd(&scratch);
   return result;
 }
@@ -388,7 +399,7 @@ DN_API bool DN_OS_FileWriteF(DN_OSFile *file, DN_ErrSink *error, DN_FMT_ATTRIB c
   return result;
 }
 
-DN_API DN_Str8 DN_OS_FileReadAll(DN_Allocator alloc_type, void *allocator, DN_Str8 path, DN_ErrSink *err)
+DN_API DN_Str8 DN_OS_FileReadAll(DN_Allocator allocator, DN_Str8 path, DN_ErrSink *err)
 {
   // NOTE: Query file size
   DN_Str8       result    = {};
@@ -399,14 +410,14 @@ DN_API DN_Str8 DN_OS_FileReadAll(DN_Allocator alloc_type, void *allocator, DN_St
   }
 
   // NOTE: Allocate
-  DN_ArenaTempMem arena_tmp = {};
-  if (alloc_type == DN_Allocator_Arena) {
-    DN_Arena *arena = DN_Cast(DN_Arena *) allocator;
-    arena_tmp       = DN_ArenaTempMemBegin(arena);
-    result          = DN_Str8AllocArena(arena, path_info.size, DN_ZMem_No);
+  DN_Arena temp_arena = {};
+  if (allocator.type == DN_AllocatorType_Arena) {
+    DN_Arena *arena = DN_Cast(DN_Arena *) allocator.context;
+    temp_arena      = DN_ArenaTempBeginFromArena(arena);
+    result          = DN_Str8AllocArena(path_info.size, DN_ZMem_No, &temp_arena);
   } else {
-    DN_Pool *pool = DN_Cast(DN_Pool *) allocator;
-    result        = DN_Str8AllocPool(pool, path_info.size);
+    DN_Pool *pool = DN_Cast(DN_Pool *) allocator.context;
+    result        = DN_Str8AllocPool(path_info.size, pool);
   }
 
   if (!result.data) {
@@ -416,17 +427,21 @@ DN_API DN_Str8 DN_OS_FileReadAll(DN_Allocator alloc_type, void *allocator, DN_St
   }
 
   // NOTE: Read all
-  DN_OSFile     file = DN_OS_FileOpen(path, DN_OSFileOpen_OpenIfExist, DN_OSFileAccess_Read, err);
-  DN_OSFileRead read = DN_OS_FileRead(&file, result.data, result.size, err);
-  if (file.error || !read.success) {
-    if (alloc_type == DN_Allocator_Arena) {
-      DN_ArenaTempMemEnd(arena_tmp);
-    } else {
-      DN_Pool *pool = DN_Cast(DN_Pool *) allocator;
+  DN_OSFile     file   = DN_OS_FileOpen(path, DN_OSFileOpen_OpenIfExist, DN_OSFileAccess_Read, err);
+  DN_OSFileRead read   = DN_OS_FileRead(&file, result.data, result.size, err);
+  bool          failed = file.error || !read.success;
+
+  if (allocator.type == DN_AllocatorType_Arena) {
+    DN_ArenaTempEnd(&temp_arena, failed ? DN_ArenaReset_Yes : DN_ArenaReset_No);
+  } else {
+    if (failed) {
+      DN_Pool *pool = DN_Cast(DN_Pool *) allocator.context;
       DN_PoolDealloc(pool, result.data);
     }
-    result = {};
   }
+
+  if (failed)
+    result = {};
 
   DN_OS_FileClose(&file);
   return result;
@@ -434,13 +449,19 @@ DN_API DN_Str8 DN_OS_FileReadAll(DN_Allocator alloc_type, void *allocator, DN_St
 
 DN_API DN_Str8 DN_OS_FileReadAllArena(DN_Arena *arena, DN_Str8 path, DN_ErrSink *err)
 {
-  DN_Str8 result = DN_OS_FileReadAll(DN_Allocator_Arena, arena, path, err);
+  DN_Allocator allocator = {};
+  allocator.type         = DN_AllocatorType_Arena;
+  allocator.context      = arena;
+  DN_Str8 result = DN_OS_FileReadAll(allocator, path, err);
   return result;
 }
 
 DN_API DN_Str8 DN_OS_FileReadAllPool(DN_Pool *pool, DN_Str8 path, DN_ErrSink *err)
 {
-  DN_Str8 result = DN_OS_FileReadAll(DN_Allocator_Pool, pool, path, err);
+  DN_Allocator allocator = {};
+  allocator.type         = DN_AllocatorType_Pool;
+  allocator.context      = pool;
+  DN_Str8 result         = DN_OS_FileReadAll(allocator, path, err);
   return result;
 }
 
@@ -454,9 +475,9 @@ DN_API bool DN_OS_FileWriteAll(DN_Str8 path, DN_Str8 buffer, DN_ErrSink *error)
 
 DN_API bool DN_OS_FileWriteAllFV(DN_Str8 file_path, DN_ErrSink *error, DN_FMT_ATTRIB char const *fmt, va_list args)
 {
-  DN_TCScratch scratch   = DN_TCScratchBegin(nullptr, 0);
-  DN_Str8      buffer = DN_Str8FromFmtVArena(scratch.arena, fmt, args);
-  bool         result = DN_OS_FileWriteAll(file_path, buffer, error);
+  DN_TCScratch scratch = DN_TCScratchBegin(nullptr, 0);
+  DN_Str8      buffer  = DN_Str8FromFmtVArena(&scratch.arena, fmt, args);
+  bool         result  = DN_OS_FileWriteAll(file_path, buffer, error);
   DN_TCScratchEnd(&scratch);
   return result;
 }
@@ -472,8 +493,8 @@ DN_API bool DN_OS_FileWriteAllF(DN_Str8 file_path, DN_ErrSink *error, DN_FMT_ATT
 
 DN_API bool DN_OS_FileWriteAllSafe(DN_Str8 path, DN_Str8 buffer, DN_ErrSink *error)
 {
-  DN_TCScratch scratch     = DN_TCScratchBegin(nullptr, 0);
-  DN_Str8      tmp_path = DN_Str8FromFmtArena(scratch.arena, "%.*s.tmp", DN_Str8PrintFmt(path));
+  DN_TCScratch scratch  = DN_TCScratchBegin(nullptr, 0);
+  DN_Str8      tmp_path = DN_Str8FromFmtArena(&scratch.arena, "%.*s.tmp", DN_Str8PrintFmt(path));
   if (!DN_OS_FileWriteAll(tmp_path, buffer, error)) {
     DN_TCScratchEnd(&scratch);
     return false;
@@ -492,9 +513,9 @@ DN_API bool DN_OS_FileWriteAllSafe(DN_Str8 path, DN_Str8 buffer, DN_ErrSink *err
 
 DN_API bool DN_OS_FileWriteAllSafeFV(DN_Str8 path, DN_ErrSink *error, DN_FMT_ATTRIB char const *fmt, va_list args)
 {
-  DN_TCScratch scratch   = DN_TCScratchBegin(nullptr, 0);
-  DN_Str8    buffer = DN_Str8FromFmtVArena(scratch.arena, fmt, args);
-  bool       result = DN_OS_FileWriteAllSafe(path, buffer, error);
+  DN_TCScratch scratch = DN_TCScratchBegin(nullptr, 0);
+  DN_Str8      buffer  = DN_Str8FromFmtVArena(&scratch.arena, fmt, args);
+  bool         result  = DN_OS_FileWriteAllSafe(path, buffer, error);
   DN_TCScratchEnd(&scratch);
   return result;
 }
@@ -504,6 +525,17 @@ DN_API bool DN_OS_FileWriteAllSafeF(DN_Str8 path, DN_ErrSink *error, DN_FMT_ATTR
   va_list args;
   va_start(args, fmt);
   bool result = DN_OS_FileWriteAllSafeFV(path, error, fmt, args);
+  return result;
+}
+
+DN_API DN_Str8 DN_OS_Str8FromPathInfoType(DN_OSPathInfoType type)
+{
+  DN_Str8 result = DN_Str8Lit("BAD PATH INFO TYPE");
+  switch(type) {
+    case DN_OSPathInfoType_Unknown:   result = DN_Str8Lit("Unknown");   break;
+    case DN_OSPathInfoType_Directory: result = DN_Str8Lit("Directory"); break;
+    case DN_OSPathInfoType_File:      result = DN_Str8Lit("File");      break;
+  }
   return result;
 }
 
@@ -552,7 +584,7 @@ DN_API bool DN_OS_PathAddRef(DN_Arena *arena, DN_OSPath *fs_path, DN_Str8 path)
 
 DN_API bool DN_OS_PathAdd(DN_Arena *arena, DN_OSPath *fs_path, DN_Str8 path)
 {
-  DN_Str8 copy   = DN_Str8FromStr8Arena(arena, path);
+  DN_Str8 copy   = DN_Str8FromStr8Arena(path, arena);
   bool    result = copy.size ? true : DN_OS_PathAddRef(arena, fs_path, copy);
   return result;
 }
@@ -601,7 +633,7 @@ DN_API DN_Str8 DN_OS_PathToF(DN_Arena *arena, DN_Str8 path_separator, DN_FMT_ATT
   DN_TCScratch scratch = DN_TCScratchBegin(&arena, 1);
   va_list    args;
   va_start(args, fmt);
-  DN_Str8 path = DN_Str8FromFmtVArena(scratch.arena, fmt, args);
+  DN_Str8 path = DN_Str8FromFmtVArena(&scratch.arena, fmt, args);
   va_end(args);
   DN_Str8 result = DN_OS_PathTo(arena, path, path_separator);
   DN_TCScratchEnd(&scratch);
@@ -619,7 +651,7 @@ DN_API DN_Str8 DN_OS_PathF(DN_Arena *arena, DN_FMT_ATTRIB char const *fmt, ...)
   DN_TCScratch scratch = DN_TCScratchBegin(&arena, 1);
   va_list    args;
   va_start(args, fmt);
-  DN_Str8 path = DN_Str8FromFmtVArena(scratch.arena, fmt, args);
+  DN_Str8 path = DN_Str8FromFmtVArena(&scratch.arena, fmt, args);
   va_end(args);
   DN_Str8 result = DN_OS_Path(arena, path);
   DN_TCScratchEnd(&scratch);
@@ -634,7 +666,7 @@ DN_API DN_Str8 DN_OS_PathBuildWithSeparator(DN_Arena *arena, DN_OSPath const *fs
 
   // NOTE: Each link except the last one needs the path separator appended to it, '/' or '\\'
   DN_USize string_size = (fs_path->has_prefix_path_separator ? path_separator.size : 0) + fs_path->string_size + ((fs_path->links_size - 1) * path_separator.size);
-  result               = DN_Str8AllocArena(arena, string_size, DN_ZMem_No);
+  result               = DN_Str8AllocArena(string_size, DN_ZMem_No, arena);
   if (result.data) {
     char *dest = result.data;
     if (fs_path->has_prefix_path_separator) {
@@ -683,7 +715,7 @@ DN_API DN_OSExecResult DN_OS_ExecOrAbort(DN_Str8Slice cmd_line, DN_OSExecArgs *a
 static void DN_OS_ThreadExecute_(void *user_context)
 {
   DN_OSThread     *thread    = DN_Cast(DN_OSThread *) user_context;
-  DN_ArenaMemFuncs mem_funcs = DN_ArenaMemFuncsGetDefaults();
+  DN_MemFuncs mem_funcs = DN_MemFuncsDefault();
   DN_TCInitFromMemFuncs(&thread->context, thread->thread_id, /*args=*/nullptr, mem_funcs);
   DN_TCEquip(&thread->context);
   if (thread->is_lane_set) {
@@ -800,9 +832,9 @@ DN_API void DN_OS_HttpRequestWait(DN_OSHttpResponse *response)
 DN_API DN_OSHttpResponse DN_OS_HttpRequest(DN_Arena *arena, DN_Str8 host, DN_Str8 path, DN_OSHttpRequestSecure secure, DN_Str8 method, DN_Str8 body, DN_Str8 headers)
 {
   // TODO(doyle): Revise the memory allocation and its lifetime
-  DN_OSHttpResponse result = {};
-  DN_TCScratch        scratch   = DN_TCScratchBegin(&arena, 1);
-  result.scratch_arena        = scratch.arena;
+  DN_OSHttpResponse result  = {};
+  DN_TCScratch      scratch = DN_TCScratchBegin(&arena, 1);
+  result.scratch_arena      = scratch.arena;
 
   DN_OS_HttpRequestAsync(&result, arena, host, path, secure, method, body, headers);
   DN_OS_HttpRequestWait(&result);
@@ -899,13 +931,15 @@ DN_API void DN_OS_PrintFStyle(DN_OSPrintDest dest, DN_LogStyle style, DN_FMT_ATT
 DN_API void DN_OS_PrintStyle(DN_OSPrintDest dest, DN_LogStyle style, DN_Str8 string)
 {
   if (string.data && string.size) {
-    if (style.colour)
-      DN_OS_Print(dest, DN_LogColourEscapeCodeStr8FromRGB(DN_LogColourType_Fg, style.r, style.g, style.b));
+    if (style.colour) {
+      DN_Str8x32 colour = DN_Str8x32FromANSIColourCodeU8RGB(DN_ANSIColourMode_Fg, style.r, style.g, style.b);
+      DN_OS_Print(dest, DN_Str8FromStruct(&colour));
+    }
     if (style.bold == DN_LogBold_Yes)
-      DN_OS_Print(dest, DN_Str8Lit(DN_LogBoldEscapeCode));
+      DN_OS_Print(dest, DN_Str8Lit(DN_ANSICodeBoldLit));
     DN_OS_Print(dest, string);
     if (style.colour || style.bold == DN_LogBold_Yes)
-      DN_OS_Print(dest, DN_Str8Lit(DN_LogResetEscapeCode));
+      DN_OS_Print(dest, DN_Str8Lit(DN_ANSICodeResetLit));
   }
 }
 
@@ -930,13 +964,15 @@ DN_API void DN_OS_PrintFV(DN_OSPrintDest dest, DN_FMT_ATTRIB char const *fmt, va
 DN_API void DN_OS_PrintFVStyle(DN_OSPrintDest dest, DN_LogStyle style, DN_FMT_ATTRIB char const *fmt, va_list args)
 {
   if (fmt) {
-    if (style.colour)
-      DN_OS_Print(dest, DN_LogColourEscapeCodeStr8FromRGB(DN_LogColourType_Fg, style.r, style.g, style.b));
+    if (style.colour) {
+      DN_Str8x32 colour = DN_Str8x32FromANSIColourCodeU8RGB(DN_ANSIColourMode_Fg, style.r, style.g, style.b);
+      DN_OS_Print(dest, DN_Str8FromStruct(&colour));
+    }
     if (style.bold == DN_LogBold_Yes)
-      DN_OS_Print(dest, DN_Str8Lit(DN_LogBoldEscapeCode));
+      DN_OS_Print(dest, DN_Str8Lit(DN_ANSICodeBoldLit));
     DN_OS_PrintFV(dest, fmt, args);
     if (style.colour || style.bold == DN_LogBold_Yes)
-      DN_OS_Print(dest, DN_Str8Lit(DN_LogResetEscapeCode));
+      DN_OS_Print(dest, DN_Str8Lit(DN_ANSICodeResetLit));
   }
 }
 
@@ -1166,8 +1202,8 @@ DN_API DN_StackTraceWalkResult DN_StackTraceWalk(DN_Arena *arena, DN_U16 limit)
     w32->sym_initialised = true;
     SymSetOptions(SYMOPT_LOAD_LINES);
     if (!SymInitialize(result.process, nullptr /*UserSearchPath*/, true /*fInvadeProcess*/)) {
-      DN_TCScratch scratch  = DN_TCScratchBegin(&arena, 1);
-      DN_OSW32Error  error = DN_OS_W32LastError(scratch.arena);
+      DN_TCScratch  scratch = DN_TCScratchBegin(&arena, 1);
+      DN_OSW32Error error   = DN_OS_W32LastError(&scratch.arena);
       DN_LogErrorF("SymInitialize failed, stack trace can not be generated (%lu): %.*s\n", error.code, DN_Str8PrintFmt(error.msg));
       DN_TCScratchEnd(&scratch);
     }
@@ -1246,8 +1282,8 @@ DN_API DN_Str8 DN_StackTraceWalkResultToStr8(DN_Arena *arena, DN_StackTraceWalkR
   if (!walk || !arena)
     return result;
 
-  DN_TCScratch   scratch    = DN_TCScratchBegin(&arena, 1);
-  DN_Str8Builder builder = DN_Str8BuilderFromArena(scratch.arena);
+  DN_TCScratch   scratch = DN_TCScratchBegin(&arena, 1);
+  DN_Str8Builder builder = DN_Str8BuilderFromArena(&scratch.arena);
   DN_StackTraceAddWalkToStr8Builder(walk, &builder, skip);
   result = DN_Str8BuilderBuild(&builder, arena);
   DN_TCScratchEnd(&scratch);
@@ -1256,9 +1292,9 @@ DN_API DN_Str8 DN_StackTraceWalkResultToStr8(DN_Arena *arena, DN_StackTraceWalkR
 
 DN_API DN_Str8 DN_StackTraceWalkStr8(DN_Arena *arena, DN_U16 limit, DN_U16 skip)
 {
-  DN_TCScratch            scratch   = DN_TCScratchBegin(&arena, 1);
-  DN_StackTraceWalkResult walk   = DN_StackTraceWalk(scratch.arena, limit);
-  DN_Str8                 result = DN_StackTraceWalkResultToStr8(arena, &walk, skip);
+  DN_TCScratch            scratch = DN_TCScratchBegin(&arena, 1);
+  DN_StackTraceWalkResult walk    = DN_StackTraceWalk(&scratch.arena, limit);
+  DN_Str8                 result  = DN_StackTraceWalkResultToStr8(arena, &walk, skip);
   DN_TCScratchEnd(&scratch);
   return result;
 }
@@ -1267,12 +1303,13 @@ DN_API DN_Str8 DN_StackTraceWalkStr8FromHeap(DN_U16 limit, DN_U16 skip)
 {
   // NOTE: We don't use WalkResultToStr8 because that uses the TLS arenas which
   // does not use the OS heap.
-  DN_Arena                arena   = DN_ArenaFromHeap(DN_Kilobytes(64), DN_ArenaFlags_NoAllocTrack);
+  DN_MemList              mem     = DN_MemListFromHeap(DN_Kilobytes(64), DN_MemFlags_NoAllocTrack);
+  DN_Arena                arena   = DN_ArenaFromMemList(&mem);
   DN_Str8Builder          builder = DN_Str8BuilderFromArena(&arena);
   DN_StackTraceWalkResult walk    = DN_StackTraceWalk(&arena, limit);
   DN_StackTraceAddWalkToStr8Builder(&walk, &builder, skip);
   DN_Str8 result = DN_Str8BuilderBuildFromHeap(&builder);
-  DN_ArenaDeinit(&arena);
+  DN_MemListDeinit(&mem);
   return result;
 }
 
@@ -1283,9 +1320,9 @@ DN_API DN_StackTraceFrameSlice DN_StackTraceGetFrames(DN_Arena *arena, DN_U16 li
     return result;
 
   DN_TCScratch            scratch = DN_TCScratchBegin(&arena, 1);
-  DN_StackTraceWalkResult walk    = DN_StackTraceWalk(scratch.arena, limit);
+  DN_StackTraceWalkResult walk    = DN_StackTraceWalk(&scratch.arena, limit);
   if (walk.size) {
-    if (DN_ISliceAllocArena(DN_StackTraceFrameSlice, &result, walk.size, DN_ZMem_No, arena)) {
+    if (DN_ISliceAllocArena(&result, walk.size, DN_ZMem_No, arena)) {
       DN_USize slice_index = 0;
       for (DN_StackTraceWalkResultIterator it = {}; DN_StackTraceWalkResultIterate(&it, &walk);)
         result.data[slice_index++] = DN_StackTraceRawFrameToFrame(arena, it.raw_frame);
@@ -1345,7 +1382,7 @@ DN_API DN_StackTraceFrame DN_StackTraceRawFrameToFrame(DN_Arena *arena, DN_Stack
 DN_API void DN_StackTracePrint(DN_U16 limit)
 {
   DN_TCScratch            scratch     = DN_TCScratchBegin(nullptr, 0);
-  DN_StackTraceFrameSlice stack_trace = DN_StackTraceGetFrames(scratch.arena, limit);
+  DN_StackTraceFrameSlice stack_trace = DN_StackTraceGetFrames(&scratch.arena, limit);
   for (DN_ForItSize(it, DN_StackTraceFrame, stack_trace.data, stack_trace.count)) {
     DN_StackTraceFrame frame = *it.data;
     DN_OS_PrintErrLnF("%.*s(%I64u): %.*s", DN_Str8PrintFmt(frame.file_name), frame.line_number, DN_Str8PrintFmt(frame.function_name));

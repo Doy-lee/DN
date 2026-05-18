@@ -50,9 +50,9 @@ DN_API void DN_Init(DN_Core *dn, DN_InitFlags flags, DN_InitArgs *args)
       #endif
     }
 
-
     {
-      os->arena = DN_ArenaFromMemFuncs(DN_Megabytes(1), DN_Kilobytes(4), DN_ArenaFlags_NoAllocTrack, DN_ArenaMemFuncsGetDefaults());
+      os->mem   = DN_MemListFromMemFuncs(DN_Megabytes(1), DN_Kilobytes(4), DN_MemFlags_NoAllocTrack, DN_MemFuncsDefault());
+      os->arena = DN_ArenaFromMemList(&os->mem);
 
       #if defined(DN_PLATFORM_WIN32)
       os->platform_context = DN_ArenaNew(&os->arena, DN_OSW32Core, DN_ZMem_Yes);
@@ -97,7 +97,8 @@ DN_API void DN_Init(DN_Core *dn, DN_InitFlags flags, DN_InitArgs *args)
     #if DN_H_WITH_OS
     // NOTE: Setup the allocation table with allocation tracking turned off on
     // the arena we're using to initialise the table.
-    dn->leak.alloc_table_arena = DN_ArenaFromMemFuncs(DN_Megabytes(1), DN_Kilobytes(512), DN_ArenaFlags_NoAllocTrack | DN_ArenaFlags_AllocCanLeak, DN_ArenaMemFuncsGetDefaults());
+    dn->leak.alloc_table_mem   = DN_MemListFromMemFuncs(DN_Megabytes(1), DN_Kilobytes(512), DN_MemFlags_NoAllocTrack | DN_MemFlags_AllocCanLeak, DN_MemFuncsDefault());
+    dn->leak.alloc_table_arena = DN_ArenaFromMemList(&dn->leak.alloc_table_mem);
     dn->leak.alloc_table       = DN_DSMapInit<DN_LeakAlloc>(&dn->leak.alloc_table_arena, 4096, DN_DSMapFlags_Nil);
     #endif
   }
@@ -106,7 +107,7 @@ DN_API void DN_Init(DN_Core *dn, DN_InitFlags flags, DN_InitArgs *args)
     DN_Assert(dn->os_init);
     #if DN_H_WITH_OS
     DN_TCInitArgs *tc_init_args = args ? &args->thread_context_init_args : nullptr;
-    DN_TCInitFromMemFuncs(&dn->main_tc, DN_OS_ThreadID(), tc_init_args, DN_ArenaMemFuncsGetDefaults());
+    DN_TCInitFromMemFuncs(&dn->main_tc, DN_OS_ThreadID(), tc_init_args, DN_MemFuncsDefault());
     DN_TCEquip(&dn->main_tc);
     #endif
   }
@@ -133,17 +134,17 @@ DN_API void DN_Init(DN_Core *dn, DN_InitFlags flags, DN_InitArgs *args)
     if (DN_BitIsSet(flags, DN_InitFlags_ThreadContext)) {
       DN_Arena *arena     = dn->main_tc.main_arena;
       DN_Str8   mem_funcs = DN_Str8Lit("");
-      switch (arena->mem_funcs.type) {
-        case DN_ArenaMemFuncType_Nil:   break;
-        case DN_ArenaMemFuncType_Basic: mem_funcs = DN_Str8Lit("Basic"); break;
-        case DN_ArenaMemFuncType_VMem:  mem_funcs = DN_Str8Lit("VMem"); break;
+      switch (arena->mem->funcs.type) {
+        case DN_MemFuncsType_Nil:     break;
+        case DN_MemFuncsType_Heap:    mem_funcs = DN_Str8Lit("Heap"); break;
+        case DN_MemFuncsType_Virtual: mem_funcs = DN_Str8Lit("Virtual"); break;
       }
-      DN_Str8x32 main_commit  = DN_ByteCountStr8x32(dn->main_tc.main_arena->curr->commit);
-      DN_Str8x32 main_reserve = DN_ByteCountStr8x32(dn->main_tc.main_arena->curr->reserve);
-      DN_Str8x32 temp_commit  = DN_ByteCountStr8x32(dn->main_tc.temp_a_arena->curr->commit);
-      DN_Str8x32 temp_reserve = DN_ByteCountStr8x32(dn->main_tc.temp_a_arena->curr->reserve);
-      DN_Str8x32 err_commit   = DN_ByteCountStr8x32(dn->main_tc.err_sink.arena->curr->commit);
-      DN_Str8x32 err_reserve  = DN_ByteCountStr8x32(dn->main_tc.err_sink.arena->curr->reserve);
+      DN_Str8x32 main_commit  = DN_ByteCountStr8x32(dn->main_tc.main_arena->mem->curr->commit);
+      DN_Str8x32 main_reserve = DN_ByteCountStr8x32(dn->main_tc.main_arena->mem->curr->reserve);
+      DN_Str8x32 temp_commit  = DN_ByteCountStr8x32(dn->main_tc.temp_a_arena->mem->curr->commit);
+      DN_Str8x32 temp_reserve = DN_ByteCountStr8x32(dn->main_tc.temp_a_arena->mem->curr->reserve);
+      DN_Str8x32 err_commit   = DN_ByteCountStr8x32(dn->main_tc.err_sink.arena->mem->curr->commit);
+      DN_Str8x32 err_reserve  = DN_ByteCountStr8x32(dn->main_tc.err_sink.arena->mem->curr->reserve);
       DN_FmtAppendTruncate(buf,
                            &buf_size,
                            sizeof(buf),

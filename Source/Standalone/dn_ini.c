@@ -318,7 +318,7 @@ DN_INIToken DN_INI_NextToken(DN_INITokeniser const *tokeniser)
               if (DN_INI_Str8Eq(esc_str8, DN_INIStr8Lit("\n"))) {
                 result.next_p += 2;
               } else if (DN_INI_Str8Eq(esc_str8, DN_INIStr8Lit("\\"))) {
-                // NOTE: Backespace is escaping a backspace
+                // NOTE: Backspace is escaping a backspace
               } else {
                 result.next_p += 1;
               }
@@ -340,7 +340,19 @@ DN_INIToken DN_INI_NextToken(DN_INITokeniser const *tokeniser)
             if (tokeniser->prev_token.type == DN_INITokenType_FieldSeparator || multiline_value || value) {
               if (tokeniser->data[pos] == ' ') // Value can have spaces in it without quotes
                 continue;
-              result.type = tokeniser->prev_token.type == DN_INITokenType_FieldSeparator ? DN_INITokenType_Value : DN_INITokenType_MultilineValue;
+
+              if (tokeniser->prev_token.type == DN_INITokenType_FieldSeparator) {
+                if (result.line_start_new_line) {
+                  // NOTE: The user has terminated the value component of the key with a newline
+                  // (e.g. no value presented). For example: `their_key=\n` which means there's no
+                  // value and instead they started a new key-value pair.
+                  result.type = DN_INITokenType_Key;
+                } else {
+                  result.type = DN_INITokenType_Value;
+                }
+              } else {
+                result.type = DN_INITokenType_MultilineValue;
+              }
             } else if (tokeniser->prev_token.type == DN_INITokenType_Key) {
               result.type  = DN_INITokenType_Error;
               result.error = DN_INIStr8Lit("Invalid unquoted string, multiple consecutive keys encountered");
@@ -849,7 +861,7 @@ DN_INIField *DN_INI_AppendKeyF(DN_INICore *ini, DN_INIArena *arena, DN_INISectio
   return result;
 }
 
-#if defined(DN_INI_WITH_UNIT_TESTS) || 1
+#if defined(DN_INI_WITH_UNIT_TESTS)
 void DN_INI_UnitTests()
 {
   // NOTE: Section and comments
@@ -1105,6 +1117,28 @@ void DN_INI_UnitTests()
     parse = DN_INI_ParseFromPtr(EXAMPLE, sizeof(EXAMPLE) - 1, parse_memory, sizeof(parse_memory));
     DN_INI_Assert(parse.error_token.type == DN_INITokenType_Nil);
     DN_INI_Assert(DN_INI_Str8Eq(parse.first_section.child_first->first_field->key, DN_INIStr8Lit("foo")));
+  }
+
+  // NOTE: 2 empty key-values consecutively
+  {
+    char const EXAMPLE[] =
+        "[metadata]\n"
+        "foo=\n"
+        "bar=\n"
+        ;
+
+    DN_INICore parse = DN_INI_ParseFromPtr(EXAMPLE, sizeof(EXAMPLE) - 1, 0, 0);
+    DN_INI_Assert(parse.error_token.type == DN_INITokenType_Nil);
+    DN_INI_Assert(parse.total_sections_count == 1);
+    DN_INI_Assert(parse.total_fields_count == 2);
+
+    char parse_memory[400];
+    DN_INI_Assert(parse.memory_required <= sizeof(parse_memory));
+
+    parse = DN_INI_ParseFromPtr(EXAMPLE, sizeof(EXAMPLE) - 1, parse_memory, sizeof(parse_memory));
+    DN_INI_Assert(parse.error_token.type == DN_INITokenType_Nil);
+    DN_INI_Assert(DN_INI_Str8Eq(parse.first_section.child_first->first_field->key, DN_INIStr8Lit("foo")));
+    DN_INI_Assert(DN_INI_Str8Eq(parse.first_section.child_first->first_field->next->key, DN_INIStr8Lit("bar")));
   }
 }
 #endif

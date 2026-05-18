@@ -1,10 +1,8 @@
 #define DN_CSV_CPP
 
-#if defined(_CLANGD)
-  #include "dn_csv.h"
-#endif
+#include "dn_csv.h"
 
-static DN_CSVTokeniser DN_CSV_TokeniserInit(DN_Str8 string, char delimiter)
+DN_CSVTokeniser DN_CSV_TokeniserInit(DN_Str8 string, char delimiter)
 {
   DN_CSVTokeniser result = {};
   result.string          = string;
@@ -12,13 +10,21 @@ static DN_CSVTokeniser DN_CSV_TokeniserInit(DN_Str8 string, char delimiter)
   return result;
 }
 
-static bool DN_CSV_TokeniserValid(DN_CSVTokeniser *tokeniser)
+bool DN_CSV_TokeniserValid(DN_CSVTokeniser *tokeniser)
 {
   bool result = tokeniser && !tokeniser->bad;
   return result;
 }
 
-static bool DN_CSV_TokeniserNextRow(DN_CSVTokeniser *tokeniser)
+static void DN_CSV_TokeniserEatNewLines_(DN_CSVTokeniser *tokeniser)
+{
+  char const *end = tokeniser->string.data + tokeniser->string.size;
+  while (tokeniser->it[0] == '\n' || tokeniser->it[0] == '\r')
+    if (++tokeniser->it == end)
+      break;
+}
+
+bool DN_CSV_TokeniserNextRow(DN_CSVTokeniser *tokeniser)
 {
   bool result = false;
   if (DN_CSV_TokeniserValid(tokeniser) && tokeniser->string.size) {
@@ -37,7 +43,7 @@ static bool DN_CSV_TokeniserNextRow(DN_CSVTokeniser *tokeniser)
   return result;
 }
 
-static DN_Str8 DN_CSV_TokeniserNextField(DN_CSVTokeniser *tokeniser)
+DN_Str8 DN_CSV_TokeniserNextField(DN_CSVTokeniser *tokeniser)
 {
   DN_Str8 result = {};
   if (!DN_CSV_TokeniserValid(tokeniser))
@@ -52,10 +58,7 @@ static DN_Str8 DN_CSV_TokeniserNextField(DN_CSVTokeniser *tokeniser)
   char const *string_end = tokeniser->string.data + tokeniser->string.size;
   if (!tokeniser->it) {
     tokeniser->it = tokeniser->string.data;
-    // NOTE: Skip any leading new lines
-    while (tokeniser->it[0] == '\n' || tokeniser->it[0] == '\r')
-      if (++tokeniser->it == string_end)
-        break;
+    DN_CSV_TokeniserEatNewLines_(tokeniser); // NOTE: Skip any leading new lines
   }
 
   // NOTE: Tokeniser pointing at end, no more valid data to parse.
@@ -68,8 +71,8 @@ static DN_Str8 DN_CSV_TokeniserNextField(DN_CSVTokeniser *tokeniser)
   // 3. '\n'                  Last field in record, extract everything leading up the the new line.
   char const *begin = tokeniser->it;
   while (tokeniser->it != string_end && (tokeniser->it[0] != '"' &&
-                                                tokeniser->it[0] != tokeniser->delimiter &&
-                                                tokeniser->it[0] != '\n'))
+                                         tokeniser->it[0] != tokeniser->delimiter &&
+                                         tokeniser->it[0] != '\n'))
     tokeniser->it++;
 
   bool quoted_field = (tokeniser->it != string_end) && tokeniser->it[0] == '"';
@@ -106,8 +109,7 @@ static DN_Str8 DN_CSV_TokeniserNextField(DN_CSVTokeniser *tokeniser)
   // NOTE: Quoted fields may have whitespace after the closing quote, we skip
   // until we reach the field terminator.
   if (quoted_field)
-    while (tokeniser->it != string_end && (tokeniser->it[0] != tokeniser->delimiter &&
-                                                  tokeniser->it[0] != '\n'))
+    while (tokeniser->it != string_end && (tokeniser->it[0] != tokeniser->delimiter && tokeniser->it[0] != '\n'))
       tokeniser->it++;
 
   // NOTE: Advance the tokeniser past the field terminator.
@@ -120,7 +122,7 @@ static DN_Str8 DN_CSV_TokeniserNextField(DN_CSVTokeniser *tokeniser)
   return result;
 }
 
-static DN_Str8 DN_CSV_TokeniserNextColumn(DN_CSVTokeniser *tokeniser)
+DN_Str8 DN_CSV_TokeniserNextColumn(DN_CSVTokeniser *tokeniser)
 {
   DN_Str8 result = {};
   if (!DN_CSV_TokeniserValid(tokeniser))
@@ -135,14 +137,14 @@ static DN_Str8 DN_CSV_TokeniserNextColumn(DN_CSVTokeniser *tokeniser)
   return result;
 }
 
-static void DN_CSV_TokeniserSkipLine(DN_CSVTokeniser *tokeniser)
+void DN_CSV_TokeniserSkipLine(DN_CSVTokeniser *tokeniser)
 {
   while (DN_CSV_TokeniserValid(tokeniser) && !tokeniser->end_of_line)
     DN_CSV_TokeniserNextColumn(tokeniser);
   DN_CSV_TokeniserNextRow(tokeniser);
 }
 
-static int DN_CSV_TokeniserNextN(DN_CSVTokeniser *tokeniser, DN_Str8 *fields, int fields_size, bool column_iterator)
+int DN_CSV_TokeniserNextN(DN_CSVTokeniser *tokeniser, DN_Str8 *fields, int fields_size, bool column_iterator)
 {
   if (!DN_CSV_TokeniserValid(tokeniser) || !fields || fields_size <= 0)
     return 0;
@@ -150,34 +152,32 @@ static int DN_CSV_TokeniserNextN(DN_CSVTokeniser *tokeniser, DN_Str8 *fields, in
   int result = 0;
   for (; result < fields_size; result++) {
     fields[result] = column_iterator ? DN_CSV_TokeniserNextColumn(tokeniser) : DN_CSV_TokeniserNextField(tokeniser);
-    if (!DN_CSV_TokeniserValid(tokeniser) || fields[result].size == 0)
+    if (!DN_CSV_TokeniserValid(tokeniser) || !fields[result].data)
       break;
   }
 
   return result;
 }
 
-DN_MSVC_WARNING_PUSH
-DN_MSVC_WARNING_DISABLE(4505) // 'x': unreferenced function with internal linkage has been removed
-static int DN_CSV_TokeniserNextColumnN(DN_CSVTokeniser *tokeniser, DN_Str8 *fields, int fields_size)
+int DN_CSV_TokeniserNextColumnN(DN_CSVTokeniser *tokeniser, DN_Str8 *fields, int fields_size)
 {
   int result = DN_CSV_TokeniserNextN(tokeniser, fields, fields_size, true /*column_iterator*/);
   return result;
 }
 
-static int DN_CSV_TokeniserNextFieldN(DN_CSVTokeniser *tokeniser, DN_Str8 *fields, int fields_size)
+int DN_CSV_TokeniserNextFieldN(DN_CSVTokeniser *tokeniser, DN_Str8 *fields, int fields_size)
 {
   int result = DN_CSV_TokeniserNextN(tokeniser, fields, fields_size, false /*column_iterator*/);
   return result;
 }
 
-static void DN_CSV_TokeniserSkipLineN(DN_CSVTokeniser *tokeniser, int count)
+void DN_CSV_TokeniserSkipLineN(DN_CSVTokeniser *tokeniser, int count)
 {
   for (int i = 0; i < count && DN_CSV_TokeniserValid(tokeniser); i++)
     DN_CSV_TokeniserSkipLine(tokeniser);
 }
 
-static void DN_CSV_PackU64(DN_CSVPack *pack, DN_CSVSerialise serialise, DN_U64 *value)
+void DN_CSV_PackU64(DN_CSVPack *pack, DN_CSVSerialise serialise, DN_U64 *value)
 {
   if (serialise == DN_CSVSerialise_Read) {
     DN_Str8          csv_value = DN_CSV_TokeniserNextColumn(&pack->read_tokeniser);
@@ -189,7 +189,7 @@ static void DN_CSV_PackU64(DN_CSVPack *pack, DN_CSVSerialise serialise, DN_U64 *
   }
 }
 
-static void DN_CSV_PackI64(DN_CSVPack *pack, DN_CSVSerialise serialise, DN_I64 *value)
+void DN_CSV_PackI64(DN_CSVPack *pack, DN_CSVSerialise serialise, DN_I64 *value)
 {
   if (serialise == DN_CSVSerialise_Read) {
     DN_Str8          csv_value = DN_CSV_TokeniserNextColumn(&pack->read_tokeniser);
@@ -201,7 +201,7 @@ static void DN_CSV_PackI64(DN_CSVPack *pack, DN_CSVSerialise serialise, DN_I64 *
   }
 }
 
-static void DN_CSV_PackI32(DN_CSVPack *pack, DN_CSVSerialise serialise, DN_I32 *value)
+void DN_CSV_PackI32(DN_CSVPack *pack, DN_CSVSerialise serialise, DN_I32 *value)
 {
   DN_I64 u64 = *value;
   DN_CSV_PackI64(pack, serialise, &u64);
@@ -209,7 +209,7 @@ static void DN_CSV_PackI32(DN_CSVPack *pack, DN_CSVSerialise serialise, DN_I32 *
     *value = DN_SaturateCastI64ToI32(u64);
 }
 
-static void DN_CSV_PackI16(DN_CSVPack *pack, DN_CSVSerialise serialise, DN_I16 *value)
+void DN_CSV_PackI16(DN_CSVPack *pack, DN_CSVSerialise serialise, DN_I16 *value)
 {
   DN_I64 u64 = *value;
   DN_CSV_PackI64(pack, serialise, &u64);
@@ -217,7 +217,7 @@ static void DN_CSV_PackI16(DN_CSVPack *pack, DN_CSVSerialise serialise, DN_I16 *
     *value = DN_SaturateCastI64ToI16(u64);
 }
 
-static void DN_CSV_PackI8(DN_CSVPack *pack, DN_CSVSerialise serialise, DN_I8 *value)
+void DN_CSV_PackI8(DN_CSVPack *pack, DN_CSVSerialise serialise, DN_I8 *value)
 {
   DN_I64 u64 = *value;
   DN_CSV_PackI64(pack, serialise, &u64);
@@ -225,8 +225,7 @@ static void DN_CSV_PackI8(DN_CSVPack *pack, DN_CSVSerialise serialise, DN_I8 *va
     *value = DN_SaturateCastI64ToI8(u64);
 }
 
-
-static void DN_CSV_PackU32(DN_CSVPack *pack, DN_CSVSerialise serialise, DN_U32 *value)
+void DN_CSV_PackU32(DN_CSVPack *pack, DN_CSVSerialise serialise, DN_U32 *value)
 {
   DN_U64 u64 = *value;
   DN_CSV_PackU64(pack, serialise, &u64);
@@ -234,7 +233,7 @@ static void DN_CSV_PackU32(DN_CSVPack *pack, DN_CSVSerialise serialise, DN_U32 *
     *value = DN_SaturateCastU64ToU32(u64);
 }
 
-static void DN_CSV_PackU16(DN_CSVPack *pack, DN_CSVSerialise serialise, DN_U16 *value)
+void DN_CSV_PackU16(DN_CSVPack *pack, DN_CSVSerialise serialise, DN_U16 *value)
 {
   DN_U64 u64 = *value;
   DN_CSV_PackU64(pack, serialise, &u64);
@@ -242,7 +241,7 @@ static void DN_CSV_PackU16(DN_CSVPack *pack, DN_CSVSerialise serialise, DN_U16 *
     *value = DN_SaturateCastU64ToU16(u64);
 }
 
-static void DN_CSV_PackBoolAsU64(DN_CSVPack *pack, DN_CSVSerialise serialise, bool *value)
+void DN_CSV_PackBoolAsU64(DN_CSVPack *pack, DN_CSVSerialise serialise, bool *value)
 {
   DN_U64 u64 = *value;
   DN_CSV_PackU64(pack, serialise, &u64);
@@ -250,17 +249,17 @@ static void DN_CSV_PackBoolAsU64(DN_CSVPack *pack, DN_CSVSerialise serialise, bo
     *value = u64 ? 1 : 0;
 }
 
-static void DN_CSV_PackStr8(DN_CSVPack *pack, DN_CSVSerialise serialise, DN_Str8 *str8, DN_Arena *arena)
+void DN_CSV_PackStr8(DN_CSVPack *pack, DN_CSVSerialise serialise, DN_Str8 *str8, DN_Arena *arena)
 {
   if (serialise == DN_CSVSerialise_Read) {
     DN_Str8 csv_value = DN_CSV_TokeniserNextColumn(&pack->read_tokeniser);
-    *str8             = DN_Str8FromStr8Arena(arena, csv_value);
+    *str8             = DN_Str8FromStr8Arena(csv_value, arena);
   } else {
     DN_Str8BuilderAppendF(&pack->write_builder, "%s%.*s", pack->write_column++ ? "," : "", DN_Str8PrintFmt(*str8));
   }
 }
 
-static void DN_CSV_PackBuffer(DN_CSVPack *pack, DN_CSVSerialise serialise, void *dest, size_t *size)
+void DN_CSV_PackBuffer(DN_CSVPack *pack, DN_CSVSerialise serialise, void *dest, size_t *size)
 {
   if (serialise == DN_CSVSerialise_Read) {
     DN_Str8 csv_value = DN_CSV_TokeniserNextColumn(&pack->read_tokeniser);
@@ -271,14 +270,14 @@ static void DN_CSV_PackBuffer(DN_CSVPack *pack, DN_CSVSerialise serialise, void 
   }
 }
 
-static void DN_CSV_PackBufferWithMax(DN_CSVPack *pack, DN_CSVSerialise serialise, void *dest, size_t *size, size_t max)
+void DN_CSV_PackBufferWithMax(DN_CSVPack *pack, DN_CSVSerialise serialise, void *dest, size_t *size, size_t max)
 {
   if (serialise == DN_CSVSerialise_Read)
     *size = max;
   DN_CSV_PackBuffer(pack, serialise, dest, size);
 }
 
-static bool DN_CSV_PackNewLine(DN_CSVPack *pack, DN_CSVSerialise serialise)
+bool DN_CSV_PackNewLine(DN_CSVPack *pack, DN_CSVSerialise serialise)
 {
   bool result = true;
   if (serialise == DN_CSVSerialise_Read) {
@@ -289,4 +288,3 @@ static bool DN_CSV_PackNewLine(DN_CSVPack *pack, DN_CSVSerialise serialise)
   }
   return result;
 }
-DN_MSVC_WARNING_POP
