@@ -156,6 +156,13 @@ static int32_t DN_NET_CurlThreadEntryPoint_(DN_OSThread *thread)
           DN_Assert(req->response.state >= DN_NETResponseState_WSOpen && req->response.state <= DN_NETResponseState_WSPong);
           req->response.state = DN_NETResponseState_WSOpen;
 
+          // NOTE: End the temp memory storing the WS data we just read and the user returned to us
+          // (we got their receipt back). Then restart the temp memory scope for the next websocket
+          // payload
+          DN_NET_EndFinishedRequest_(req);
+          req->start_response_arena = DN_ArenaTempBeginFromArena(&req->arena);
+          curl_req->str8_builder    = DN_Str8BuilderFromArena(&req->start_response_arena);
+
           for (DN_OS_MutexScope(&curl->list_mutex)) {
             DN_Assert(DN_NET_CurlRequestIsInList(curl->request_list, req));
             DN_DoublyLLDetach(curl->request_list, req);
@@ -168,7 +175,7 @@ static int32_t DN_NET_CurlThreadEntryPoint_(DN_OSThread *thread)
           DN_NETRequest *request = DN_Cast(DN_NETRequest *) event.request.handle;
 
           // NOTE: Release resources
-          DN_ArenaTempEnd(&request->arena, DN_ArenaReset_Yes);
+          DN_NET_EndFinishedRequest_(request);
           DN_OS_SemaphoreDeinit(&request->completion_sem);
 
           curl_multi_remove_handle(curl->thread_curlm, curl_req->handle);
@@ -177,8 +184,8 @@ static int32_t DN_NET_CurlThreadEntryPoint_(DN_OSThread *thread)
 
           // NOTE: Zero the struct preserving just the data we need to retain
           DN_NETRequest resetter = {};
-          resetter.arena                 = request->arena;
-          resetter.gen                   = request->gen;
+          resetter.arena         = request->arena;
+          resetter.gen           = request->gen;
           DN_Memcpy(resetter.context, request->context, sizeof(resetter.context));
           *request = resetter;
 
@@ -302,7 +309,7 @@ static int32_t DN_NET_CurlThreadEntryPoint_(DN_OSThread *thread)
 
         // NOTE: Allocate and read (we use meta->bytesleft as per comment from initial recv)
         if (meta->bytesleft) {
-          DN_Str8 buffer  = DN_Str8AllocArena(meta->bytesleft, DN_ZMem_No, &req->arena);
+          DN_Str8 buffer  = DN_Str8AllocArena(meta->bytesleft, DN_ZMem_No, &req->start_response_arena);
           DN_Assert(buffer.size == DN_Cast(DN_USize)meta->bytesleft);
           receive_result  = curl_ws_recv(curl_req->handle, buffer.data, buffer.size, &buffer.size, &meta);
           DN_Assert(buffer.size == DN_Cast(DN_USize)meta->len);
@@ -352,7 +359,7 @@ static int32_t DN_NET_CurlThreadEntryPoint_(DN_OSThread *thread)
         } else if (receive_result != CURLE_OK) {
           DN_USize curl_extended_error_size = DN_CStr8Size(curl_req->error);
           req->response.state           = DN_NETResponseState_Error;
-          req->response.error_str8      = DN_Str8FromFmtArena(&req->arena,
+          req->response.error_str8      = DN_Str8FromFmtArena(&req->start_response_arena,
                                                                   "Websocket receive '%.*s' failed (CURL %d): %s%s%s%s",
                                                                   DN_Str8PrintFmt(req->url),
                                                                   receive_result,
@@ -583,15 +590,13 @@ void DN_NET_CurlDoWSSend(DN_NETRequestHandle handle, DN_Str8 payload, DN_NETWSSe
 static DN_NETResponse DN_NET_CurlHandleFinishedRequest_(DN_NETCurlCore *curl, DN_NETRequest *req, DN_Arena *arena)
 {
   // NOTE: Generate the response, copy out the strings into the user given memory
-  DN_NETResponse result = req->response;
+  DN_NETResponse     result   = req->response;
+  DN_NETCurlRequest *curl_req = DN_NET_CurlRequestFromRequest_(req);
   {
-    DN_NETCurlRequest *curl_req = DN_NET_CurlRequestFromRequest_(req);
     result.body                 = DN_Str8BuilderBuild(&curl_req->str8_builder, arena);
     if (result.error_str8.size)
       result.error_str8 = DN_Str8FromStr8Arena(result.error_str8, arena);
-    curl_req->str8_builder = {}; // Clear it out, reinitialised on subsequent do request call
   }
-  DN_NET_EndFinishedRequest_(req);
 
   bool continue_ws_request = false;
   if (req->type == DN_NETRequestType_WS &&
@@ -617,6 +622,7 @@ static DN_NETResponse DN_NET_CurlHandleFinishedRequest_(DN_NETCurlCore *curl, DN
     else
       DN_DoublyLLAppend(curl->deinit_list, req);
   }
+
 
   // NOTE: Submit the post-request event to the CURL thread
   DN_NETCurlRingEvent event = {};

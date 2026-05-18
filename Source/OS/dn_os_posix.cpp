@@ -228,20 +228,16 @@ DN_API bool DN_OS_SetEnvVar(DN_Str8 name, DN_Str8 value)
 
 DN_API DN_OSDiskSpace DN_OS_DiskSpace(DN_Str8 path)
 {
-  DN_TCScratch   tmem              = DN_TCScratchBegin(nullptr, 0);
+  DN_TCScratch   scratch           = DN_TCScratchBegin(nullptr, 0);
   DN_OSDiskSpace result            = {};
-  DN_Str8        path_z_terminated = DN_Str8FromStr8Arena(tmem.arena, path);
-
-  struct statvfs info = {};
-  if (statvfs(path_z_terminated.data, &info) != 0) {
-    DN_TCScratchEnd(&tmem);
-    return result;
+  DN_Str8        path_z_terminated = DN_Str8FromStr8Arena(path, &scratch.arena);
+  struct statvfs info              = {};
+  if (statvfs(path_z_terminated.data, &info) == 0) {
+    result.success = true;
+    result.avail   = info.f_bavail * info.f_frsize;
+    result.size    = info.f_blocks * info.f_frsize;
   }
-
-  result.success = true;
-  result.avail   = info.f_bavail * info.f_frsize;
-  result.size    = info.f_blocks * info.f_frsize;
-  DN_TCScratchEnd(&tmem);
+  DN_TCScratchEnd(&scratch);
   return result;
 }
 
@@ -251,11 +247,11 @@ DN_API DN_Str8 DN_OS_EXEPath(DN_Arena *arena)
   if (!arena)
     return result;
 
-  int required_size_wo_null_terminator = 0;
+  DN_U64 mem_p                            = DN_MemListPos(arena->mem);
+  int    required_size_wo_null_terminator = 0;
   for (int try_size = 128;; try_size *= 2) {
-    auto  scoped_arena  = DN_ArenaTempMemScope(arena);
-    char *try_buf       = DN_ArenaNewArray(arena, char, try_size, DN_ZMem_No);
-    int   bytes_written = readlink("/proc/self/exe", try_buf, try_size);
+    char    *try_buf       = DN_ArenaNewArray(arena, char, try_size, DN_ZMem_No);
+    int      bytes_written = readlink("/proc/self/exe", try_buf, try_size);
     if (bytes_written == -1) {
       // Failed, we're unable to determine the executable directory
       break;
@@ -280,11 +276,11 @@ DN_API DN_Str8 DN_OS_EXEPath(DN_Arena *arena)
       break;
     }
   }
+  DN_MemListPopTo(arena->mem, mem_p);
 
   if (required_size_wo_null_terminator) {
-    DN_ArenaTempMem temp_mem = DN_ArenaTempMemBegin(arena);
-    char           *exe_path =
-        DN_ArenaNewArray(arena, char, required_size_wo_null_terminator + 1, DN_ZMem_No);
+    mem_p                                      = DN_MemListPos(arena->mem);
+    char *exe_path                             = DN_ArenaNewArray(arena, char, required_size_wo_null_terminator + 1, DN_ZMem_No);
     exe_path[required_size_wo_null_terminator] = 0;
 
     int bytes_written = readlink("/proc/self/exe", exe_path, required_size_wo_null_terminator);
@@ -292,7 +288,7 @@ DN_API DN_Str8 DN_OS_EXEPath(DN_Arena *arena)
       // Note that if read-link fails again can be because there's
       // a potential race condition here, our exe or directory could have
       // been deleted since the last call, so we need to be careful.
-      DN_ArenaTempMemEnd(temp_mem);
+      DN_MemListPopTo(arena->mem, mem_p);
     } else {
       result = DN_Str8FromPtr(exe_path, required_size_wo_null_terminator);
     }
@@ -631,15 +627,15 @@ DN_API bool DN_OS_PathIsDir(DN_Str8 path)
 
 DN_API bool DN_OS_PathMakeDir(DN_Str8 path)
 {
-  DN_TCScratch scratch   = DN_TCScratchBegin(nullptr, 0);
-  bool       result = true;
+  DN_TCScratch scratch = DN_TCScratchBegin(nullptr, 0);
+  bool         result  = true;
 
   // TODO(doyle): Implement this without using the path indexes, it's not
   // necessary. See Windows implementation.
   DN_USize path_indexes_size = 0;
   uint16_t path_indexes[64]  = {};
 
-  DN_Str8 copy = DN_Str8FromStr8Arena(scratch.arena, path);
+  DN_Str8 copy = DN_Str8FromStr8Arena(path, &scratch.arena);
   for (DN_USize index = copy.size - 1; index < copy.size; index--) {
     bool first_char = index == (copy.size - 1);
     char ch         = copy.data[index];
@@ -674,8 +670,8 @@ DN_API bool DN_OS_PathMakeDir(DN_Str8 path)
   }
 
   for (DN_USize index = path_indexes_size - 1; result && index < path_indexes_size; index--) {
-    uint16_t path_index = path_indexes[index];
-    char     temp       = copy.data[path_index];
+    DN_U16 path_index = path_indexes[index];
+    char   temp       = copy.data[path_index];
 
     if (index != 0)
       copy.data[path_index] = 0;
@@ -800,7 +796,7 @@ DN_API DN_OSExecResult DN_OS_ExecWait(DN_OSExecAsyncHandle handle,
     DN_TCScratch scratch = DN_TCScratchBegin(&arena, 1);
     if (arena && handle.stdout_read) {
       char           buffer[4096];
-      DN_Str8Builder builder = DN_Str8BuilderFromArena(scratch.arena);
+      DN_Str8Builder builder = DN_Str8BuilderFromArena(&scratch.arena);
       for (;;) {
         ssize_t bytes_read =
             read(stdout_pipe[DN_OSPipeType__Read], buffer, sizeof(buffer));
@@ -814,7 +810,7 @@ DN_API DN_OSExecResult DN_OS_ExecWait(DN_OSExecAsyncHandle handle,
 
     if (arena && handle.stderr_read) {
       char           buffer[4096];
-      DN_Str8Builder builder = DN_Str8BuilderFromArena(scratch.arena);
+      DN_Str8Builder builder = DN_Str8BuilderFromArena(&scratch.arena);
       for (;;) {
         ssize_t bytes_read =
             read(stderr_pipe[DN_OSPipeType__Read], buffer, sizeof(buffer));
@@ -848,7 +844,7 @@ DN_API DN_OSExecAsyncHandle DN_OS_ExecAsync(DN_Str8Slice   cmd_line,
 
   DN_TCScratch scratch = DN_TCScratchBegin(nullptr, 0);
   DN_DEFER { DN_TCScratchEnd(&scratch); };
-  DN_Str8    cmd_rendered                      = DN_Str8SliceRender(cmd_line, DN_Str8Lit(" "), scratch.arena);
+  DN_Str8    cmd_rendered                      = DN_Str8SliceRender(cmd_line, DN_Str8Lit(" "), &scratch.arena);
   int        stdout_pipe[DN_OSPipeType__Count] = {};
   int        stderr_pipe[DN_OSPipeType__Count] = {};
 
@@ -942,7 +938,7 @@ DN_API DN_OSExecAsyncHandle DN_OS_ExecAsync(DN_Str8Slice   cmd_line,
 
     // NOTE: Convert the command into something suitable for execvp
     char **argv =
-        DN_ArenaNewArray(scratch.arena, char *, cmd_line.count + 1 /*null*/, DN_ZMem_Yes);
+        DN_ArenaNewArray(&scratch.arena, char *, cmd_line.count + 1 /*null*/, DN_ZMem_Yes);
     if (!argv) {
       result.exit_code = -1;
       DN_ErrSinkAppendF(
@@ -955,7 +951,7 @@ DN_API DN_OSExecAsyncHandle DN_OS_ExecAsync(DN_Str8Slice   cmd_line,
 
     for (DN_ForIndexU(arg_index, cmd_line.count)) {
       DN_Str8 arg     = cmd_line.data[arg_index];
-      argv[arg_index] = DN_Str8FromStr8Arena(scratch.arena, arg).data; // NOTE: Copy string to guarantee it is null-terminated
+      argv[arg_index] = DN_Str8FromStr8Arena(arg, &scratch.arena).data; // NOTE: Copy string to guarantee it is null-terminated
     }
 
     // NOTE: Change the working directory if there is one
@@ -973,7 +969,7 @@ DN_API DN_OSExecAsyncHandle DN_OS_ExecAsync(DN_Str8Slice   cmd_line,
 
     if (args->working_dir.size) {
       prev_working_dir    = get_current_dir_name();
-      DN_Str8 working_dir = DN_Str8FromStr8Arena(scratch.arena, args->working_dir);
+      DN_Str8 working_dir = DN_Str8FromStr8Arena(args->working_dir, &scratch.arena);
       if (chdir(working_dir.data) == -1) {
         result.os_error_code = errno;
         DN_ErrSinkAppendF(
@@ -1374,11 +1370,11 @@ DN_API void DN_OS_PosixThreadSetName(DN_Str8 name)
 #if defined(DN_PLATFORM_EMSCRIPTEN)
   (void)name;
 #else
-  DN_TCScratch tmem   = DN_TCScratchBegin(nullptr, 0);
-  DN_Str8      copy   = DN_Str8FromStr8Arena(tmem.arena, name);
-  pthread_t    thread = pthread_self();
+  DN_TCScratch scratch = DN_TCScratchBegin(nullptr, 0);
+  DN_Str8      copy    = DN_Str8FromStr8Arena(name, &scratch.arena);
+  pthread_t    thread  = pthread_self();
   pthread_setname_np(thread, (char *)copy.data);
-  DN_TCScratchEnd(&tmem);
+  DN_TCScratchEnd(&scratch);
 #endif
 }
 
@@ -1398,9 +1394,9 @@ DN_API DN_OSPosixProcSelfStatus DN_OS_PosixProcSelfStatus()
   DN_OSFile    file = DN_OS_FileOpen(DN_Str8Lit("/proc/self/status"), DN_OSFileOpen_OpenIfExist, DN_OSFileAccess_Read, nullptr);
 
   if (!file.error) {
-    DN_TCScratch tmem = DN_TCScratchBegin(nullptr, 0);
+    DN_TCScratch   scratch = DN_TCScratchBegin(nullptr, 0);
     char           buf[256];
-    DN_Str8Builder builder = DN_Str8BuilderFromArena(tmem.arena);
+    DN_Str8Builder builder = DN_Str8BuilderFromArena(&scratch.arena);
     for (;;) {
       DN_OSFileRead read = DN_OS_FileRead(&file, buf, sizeof(buf), nullptr);
       if (!read.success || read.bytes_read == 0)
@@ -1412,8 +1408,8 @@ DN_API DN_OSPosixProcSelfStatus DN_OS_PosixProcSelfStatus()
     DN_Str8 const      PID        = DN_Str8Lit("Pid:");
     DN_Str8 const      VM_PEAK    = DN_Str8Lit("VmPeak:");
     DN_Str8 const      VM_SIZE    = DN_Str8Lit("VmSize:");
-    DN_Str8            status_buf = DN_Str8BuilderBuild(&builder, tmem.arena);
-    DN_Str8SplitResult lines      = DN_Str8SplitArena(tmem.arena, status_buf, DN_Str8Lit("\n"), DN_Str8SplitIncludeEmptyStrings_No);
+    DN_Str8            status_buf = DN_Str8BuilderBuild(&builder, &scratch.arena);
+    DN_Str8SplitResult lines      = DN_Str8SplitArena(status_buf, DN_Str8Lit("\n"), DN_Str8SplitFlags_ExcludeEmptyStrings, &scratch.arena);
 
     for (DN_ForItSize(line_it, DN_Str8, lines.data, lines.count)) {
       DN_Str8 line = DN_Str8TrimWhitespaceAround(*line_it.data);
@@ -1442,7 +1438,7 @@ DN_API DN_OSPosixProcSelfStatus DN_OS_PosixProcSelfStatus()
         DN_Assert(to_u64.success);
       }
     }
-    DN_TCScratchEnd(&tmem);
+    DN_TCScratchEnd(&scratch);
   }
   DN_OS_FileClose(&file);
   return result;
@@ -1499,7 +1495,7 @@ static void DN_OS_HttpRequestEMFetchOnSuccessCallback(emscripten_fetch_t *fetch)
     return;
 
   response->http_status = DN_Cast(DN_U32) fetch->status;
-  response->body        = DN_Str8AllocArena(response->arena, fetch->numBytes, DN_ZMem_No);
+  response->body        = DN_Str8AllocArena(fetch->numBytes, DN_ZMem_No, response->arena);
   if (response->body.data)
     DN_Memcpy(response->body.data, fetch->data, fetch->numBytes);
 
@@ -1514,7 +1510,7 @@ static void DN_OS_HttpRequestEMFetchOnErrorCallback(emscripten_fetch_t *fetch)
     return;
 
   response->http_status = DN_Cast(DN_U32) fetch->status;
-  response->body        = DN_Str8AllocArena(response->arena, fetch->numBytes, DN_ZMem_No);
+  response->body        = DN_Str8AllocArena(fetch->numBytes, DN_ZMem_No, response->arena);
   if (response->body.size)
     DN_Memcpy(response->body.data, fetch->data, fetch->numBytes);
 
@@ -1536,13 +1532,13 @@ DN_API void DN_OS_HttpRequestAsync(DN_OSHttpResponse     *response,
     return;
 
   response->arena = arena;
-  response->builder.arena = response->scratch_arena ? response->scratch_arena : &response->tmp_arena;
+  response->builder.arena = response->scratch_arena.mem ? &response->scratch_arena : &response->tmp_arena;
 
-  DN_Arena  *scratch  = response->scratch_arena;
+  DN_Arena    *scratch  = &response->scratch_arena;
   DN_TCScratch scratch_ = DN_TCScratchBegin(&arena, 1);
   DN_DEFER { DN_TCScratchEnd(&scratch_); };
   if (!scratch)
-    scratch = scratch_.arena;
+    scratch = &scratch_.arena;
 
 #if defined(DN_PLATFORM_EMSCRIPTEN)
   emscripten_fetch_attr_t fetch_attribs = {};
@@ -1594,7 +1590,7 @@ DN_API void DN_OS_HttpRequestFree(DN_OSHttpResponse *response)
   }
 #endif // #elif defined(DN_OS_WIN32)
 
-  DN_ArenaDeinit(&response->tmp_arena);
+  DN_MemListDeinit(response->tmp_arena.mem);
   DN_OS_SemaphoreDeinit(&response->on_complete_semaphore);
   *response = {};
 }

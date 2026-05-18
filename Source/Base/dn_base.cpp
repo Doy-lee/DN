@@ -1250,10 +1250,10 @@ DN_API void DN_ArenaUAFCheck(DN_Arena *arena)
   (void)arena;
   #if DN_ARENA_TEMP_MEM_UAF_GUARD
   DN_MemList *mem = arena->mem;
-  if (!mem)
+  if (!arena || !mem)
     return;
 
-  if (arena->uaf_guard_temp_mem && !arena->uaf_guard_is_being_checked) {
+  if ((arena->uaf_guard_temp_mem || mem->uaf_guard_active_temp_mem) && !arena->uaf_guard_is_being_checked) {
     // NOTE: The following functions below allocate memory which might trigger an additional UAF
     // check which would cause infinite recursion so we set a flag here to prevent that.
     arena->uaf_guard_is_being_checked = true;
@@ -1278,7 +1278,11 @@ DN_API void DN_ArenaUAFCheck(DN_Arena *arena)
                                                arena);
 
       if (DN_MemListUAFTracingEnabled_(mem)) {
-        DN_Str8 curr_stack_trace   = DN_Str8PadNewLines(DN_StackTraceWalkResultToStr8(arena, &arena->uaf_guard_temp_mem->trace, 1), DN_Str8Lit("  "), arena);
+        DN_Str8 curr_stack_trace = DN_Str8Lit("<Unknown: Arena is not using temporary memory>");
+        if (arena->uaf_guard_temp_mem)
+          curr_stack_trace = DN_StackTraceWalkResultToStr8(arena, &arena->uaf_guard_temp_mem->trace, 1);
+        curr_stack_trace = DN_Str8PadNewLines(curr_stack_trace, DN_Str8Lit("  "), arena);
+
         DN_Str8 active_stack_trace = DN_Str8PadNewLines(DN_StackTraceWalkResultToStr8(arena, &mem->uaf_guard_active_temp_mem->trace, 1), DN_Str8Lit("  "), arena);
         DN_AssertF(mem->uaf_guard_active_id == arena->uaf_guard_id,
                    "%.*s\n\nThe originating temporary memory region (id: %'u) was created at:"
@@ -1316,7 +1320,7 @@ DN_API DN_Arena DN_ArenaTempBeginFromMemList(DN_MemList* mem)
     temp_mem.trace = DN_StackTraceWalk(&result, 256);
 
   // NOTE: Create persistent temp mem and set it on the mem list
-  result.uaf_guard_temp_mem      = DN_ArenaNewCopy(&result, DN_MemListTemp, &temp_mem);
+  result.uaf_guard_temp_mem      = DN_MemListNewCopy(mem, DN_MemListTemp, &temp_mem);
   result.uaf_guard_prev_temp_mem = mem->uaf_guard_active_temp_mem;
   mem->uaf_guard_active_temp_mem = result.uaf_guard_temp_mem;
 
@@ -5004,7 +5008,7 @@ DN_API DN_LogPrefixSize DN_LogMakePrefix(DN_LogStyle style, DN_LogTypeParam type
                          "%.*s"                          // type padding
                          "%.*s"                          // reset
                          " %.*s"                         // file name
-                         ":%05I32u "                     // line number
+                         ":%05u "                        // line number
                          ,
                          date.year,
                          date.month,

@@ -97,7 +97,7 @@ static bool DN_NET_EmcWSOnMessage(int eventType, const EmscriptenWebSocketMessag
   DN_NETEmcWSEvent *net_event = DN_NET_EmcAllocWSEvent_(req);
   net_event->state            = event->isText ? DN_NETResponseState_WSText : DN_NETResponseState_WSBinary;
   if (event->numBytes > 0)
-    net_event->payload = DN_Str8FromPtrArena(&req->arena, event->data, event->numBytes);
+    net_event->payload = DN_Str8FromPtrArena(event->data, event->numBytes, &req->arena);
   DN_NET_EmcOnRequestDone_(net, req);
   return true;
 }
@@ -129,7 +129,7 @@ static void DN_NET_EmcHTTPSuccessCallback(emscripten_fetch_t *fetch)
   DN_NETCore    *net        = DN_Cast(DN_NETCore *) req->context[0];
   req->response.http_status = fetch->status;
   req->response.state       = DN_NETResponseState_HTTP;
-  req->response.body        = DN_Str8FromStr8Arena(&req->arena, DN_Str8FromPtr(fetch->data, fetch->numBytes - 1));
+  req->response.body        = DN_Str8FromStr8Arena(DN_Str8FromPtr(fetch->data, fetch->numBytes - 1), &req->arena);
   DN_NET_EmcOnRequestDone_(net, req);
 }
 
@@ -176,8 +176,9 @@ static DN_NETRequest *DN_NET_EmcAllocRequest_(DN_NETCore *net)
     // NOTE: Setup the request's arena here. WASM doesn't have the concept of virtual memory
     // so we use malloc to initialise it.
     result = DN_ArenaNew(&net->arena, DN_NETRequest, DN_ZMem_Yes);
-    if (result)
-      result->arena = DN_ArenaFromHeap(DN_Megabytes(1), DN_ArenaFlags_Nil);
+    if (result) {
+      result->arena = DN_ArenaFromMemList(&result->mem);
+    }
   }
 
   // NOTE: Setup some emscripten specific data into our request context
@@ -210,7 +211,7 @@ DN_NETRequestHandle DN_NET_EmcDoHTTP(DN_NETCore *net, DN_Str8 url, DN_Str8 metho
 
     // NOTE: Assign HTTP headers
     if (req->args.headers_size) {
-      char **headers = DN_ArenaNewArray(&req->arena, char *, req->args.headers_size + 1, DN_ZMem_Yes);
+      char **headers = DN_ArenaNewArray(&req->start_response_arena, char *, req->args.headers_size + 1, DN_ZMem_Yes);
       for (DN_ForItSize(it, DN_Str8, req->args.headers, req->args.headers_size)) {
         DN_Assert(it.data->data[it.data->size] == 0);
         headers[it.index] = it.data->data;
@@ -244,9 +245,6 @@ DN_NETRequestHandle DN_NET_EmcDoHTTP(DN_NETCore *net, DN_Str8 url, DN_Str8 metho
     fetch_attribs.userData   = req;
   }
 
-  // NOTE: Update the pop to position for the request
-  req->start_response_arena_pos = DN_ArenaPos(&req->arena);
-
   // NOTE: Dispatch the asynchronous fetch
   emscripten_fetch(&fetch_attribs, req->url.data);
   return result;
@@ -261,8 +259,7 @@ DN_NETRequestHandle DN_NET_EmcDoWS(DN_NETCore *net, DN_Str8 url)
     return result;
 
   // NOTE: Setup some emscripten specific data into our request context
-  req->context[1]               = DN_Cast(DN_UPtr) DN_ArenaNew(&req->arena, DN_NETEmcRequest, DN_ZMem_Yes);
-  req->start_response_arena_pos = DN_ArenaPos(&req->arena);
+  req->context[1] = DN_Cast(DN_UPtr) DN_ArenaNew(&req->start_response_arena, DN_NETEmcRequest, DN_ZMem_Yes);
 
   // NOTE: Create the websocket request and dispatch it via emscripten
   EmscriptenWebSocketCreateAttributes attr;
@@ -293,10 +290,10 @@ void DN_NET_EmcDoWSSend(DN_NETRequestHandle handle, DN_Str8 data, DN_NETWSSend s
     switch (send) {
       default: DN_InvalidCodePath; break;
       case DN_NETWSSend_Text: {
-        DN_U64  pos                  = DN_ArenaPos(&request_ptr->arena);
-        DN_Str8 data_null_terminated = DN_Str8FromStr8Arena(&request_ptr->arena, data);
+        DN_U64  pos                  = DN_MemListPos(request_ptr->start_response_arena.mem);
+        DN_Str8 data_null_terminated = DN_Str8FromStr8Arena(data, &request_ptr->start_response_arena);
         result                       = emscripten_websocket_send_utf8_text(emc_request->socket, data_null_terminated.data);
-        DN_ArenaPopTo(&request_ptr->arena, pos);
+        DN_MemListPopTo(request_ptr->arena.mem, pos);
       } break;
 
       case DN_NETWSSend_Binary: {
@@ -320,7 +317,7 @@ static DN_NETResponse DN_NET_EmcHandleFinishedRequest_(DN_NETCore *net, DN_NETEm
   bool              end_request     = true;
   bool              dequeue_request = true;
   if (request->type == DN_NETRequestType_HTTP) {
-    result.body = DN_Str8FromStr8Arena(arena, result.body);
+    result.body = DN_Str8FromStr8Arena(result.body, arena);
   } else {
     // NOTE: Get emscripten contexts
     DN_NETEmcWSEvent *emc_event = emc_request->first_event;
@@ -332,7 +329,7 @@ static DN_NETResponse DN_NET_EmcHandleFinishedRequest_(DN_NETCore *net, DN_NETEm
     // NOTE: Build the result
     result.state   = emc_event->state;
     result.request = handle;
-    result.body    = DN_Str8FromStr8Arena(arena, emc_event->payload);
+    result.body    = DN_Str8FromStr8Arena(emc_event->payload, arena);
 
     // NOTE: Advance the event list
     {
@@ -374,10 +371,8 @@ static DN_NETResponse DN_NET_EmcHandleFinishedRequest_(DN_NETCore *net, DN_NETEm
 
     // NOTE: Deallocate the memory used in the request and reset the string builder (as all
     // payload(s) have been read from the request).
-    if (end_request)
-        DN_ArenaPopTo(&request->arena, 0);
-    else
-        DN_ArenaPopTo(&request->arena, request->start_response_arena_pos);
+    if (!end_request)
+        DN_ArenaTempEnd(&request->start_response_arena, DN_ArenaReset_Yes);
   }
 
   if (end_request) {

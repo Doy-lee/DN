@@ -449,11 +449,11 @@ static DN_UTCore DN_TST_BaseArena()
       // NOTE: Allocate 128 kilobytes, fill it with garbage, then reset the arena
       uintptr_t first_ptr_address = 0;
       {
-        DN_Arena temp_mem = DN_ArenaTempBeginFromArena(&arena);
-        void    *ptr      = DN_ArenaAlloc(&arena, alloc_size, alignment, DN_ZMem_Yes);
+        DN_U64 mem_p      = DN_MemListPos(arena.mem);
+        void  *ptr        = DN_ArenaAlloc(&arena, alloc_size, alignment, DN_ZMem_Yes);
         first_ptr_address = DN_Cast(uintptr_t) ptr;
         DN_Memset(ptr, 'z', alloc_size);
-        DN_ArenaTempEnd(&temp_mem, DN_ArenaReset_Yes);
+        DN_MemListPopTo(arena.mem, mem_p);
       }
 
       // NOTE: Reallocate 128 kilobytes
@@ -499,9 +499,9 @@ static DN_UTCore DN_TST_BaseArena()
       char *ptr_1mb = DN_Cast(char *) DN_ArenaAlloc(&arena, DN_Megabytes(1), 1 /*align*/, DN_ZMem_Yes);
       DN_UT_Assert(&result, ptr_1mb);
 
-      DN_Arena temp_memory = DN_ArenaTempBeginFromArena(&arena);
+      DN_Arena temp = DN_ArenaTempBeginFromArena(&arena);
       {
-        char *ptr_4mb = DN_ArenaNewArray(&arena, char, DN_Megabytes(4), DN_ZMem_Yes);
+        char *ptr_4mb = DN_ArenaNewArray(&temp, char, DN_Megabytes(4), DN_ZMem_Yes);
         DN_UT_Assert(&result, ptr_4mb);
 
         DN_MemBlock const *block_4mb_begin = arena.mem->curr;
@@ -514,7 +514,7 @@ static DN_UTCore DN_TST_BaseArena()
         DN_UT_AssertF(&result, ptr_1mb >= DN_Cast(char *) block_1mb_begin && ptr_1mb <= block_1mb_end, "Pointer was not allocated from correct memory block");
         DN_UT_AssertF(&result, ptr_4mb >= DN_Cast(char *) block_4mb_begin && ptr_4mb <= block_4mb_end, "Pointer was not allocated from correct memory block");
       }
-      DN_ArenaTempEnd(&temp_memory, DN_ArenaReset_Yes);
+      DN_ArenaTempEnd(&temp, DN_ArenaReset_Yes);
       DN_UT_Assert(&result, arena.mem->curr->prev == nullptr);
       DN_UT_AssertF(&result,
                     arena.mem->curr->reserve >= DN_Megabytes(1),

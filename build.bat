@@ -39,7 +39,7 @@ pushd %build_dir%
 
   where /q emcc && (
     echo [BUILD] Emscripten emcc detected, compiling ...
-    call emcc -g -msimd128 -msse2 %flags% -o %build_dir%\dn_unit_tests_emcc.js -s FETCH=1 -pthread -s ASYNCIFY=1 -lwebsocket -Wall || echo Failed&& exit /b 1
+    call emcc -g -msimd128 -msse2 %flags% -o %build_dir%\dn_unit_tests_emcc.js -s FETCH=1 -pthread -s ASYNCIFY=1 -lwebsocket -Wall || echo EMCC build failed&& exit /b 1
   )
 
   where /q cl && (

@@ -1,4 +1,4 @@
-#if (_CLANGD)
+#if defined(_CLANGD)
   #define DN_H_WITH_OS 1
   #include "dn.h"
 #endif

@@ -35,14 +35,11 @@ static void AppendCppFileLineByLine(DN_Str8Builder *dest, DN_Str8 cpp_path)
   DN_ErrSinkEndExitIfErrorF(err, -1, "Failed to load file from '%S' for appending", cpp_path);
 
   bool inside_clangd_preprocessor_block = false;
-  for (DN_Str8 inc_walker = buffer;;) {
-    DN_Str8BSplitResult split = DN_Str8BSplit(inc_walker, DN_Str8Lit("\n"));
-    if (split.lhs.size == 0)
-      break;
-    inc_walker = split.rhs;
-
+  for (DN_Str8 walker = buffer; walker.size;) {
     // NOTE: Trim the whitespace, mainly for windows, the file we read will have \r\n whereas we just want to emit \n
-    DN_Str8 line = DN_Str8TrimTailWhitespace(split.lhs);
+    DN_Str8BSplitResult split = DN_Str8BSplit(walker, DN_Str8Lit("\n"));
+    DN_Str8             line  = DN_Str8TrimTailWhitespace(split.lhs);
+    walker                    = split.rhs;
 
     // NOTE: Detect if we're inside a clangd preprocessor block
     // TODO: This breaks if there's any nested #if's in the block (we naiively match on #endif)
@@ -112,19 +109,17 @@ int main(int argc, char **argv)
 
   DN_Str8 const REL_FILE_PATHS[] = {
       DN_Str8Lit("dn"),
-      DN_Str8Lit("Extra/dn_async"),
       DN_Str8Lit("Extra/dn_bin_pack"),
       DN_Str8Lit("Extra/dn_csv"),
-      DN_Str8Lit("Extra/dn_helpers"),
   };
 
   for (DN_ForIndexU(type, FileType_Count)) {
     DN_TCScratch   scratch = DN_TCScratchBegin(nullptr, 0);
     DN_Str8Builder builder = DN_Str8BuilderFromArena(&scratch.arena);
     DN_Str8        suffix  = type == FileType_Header ? DN_Str8Lit("h") : DN_Str8Lit("cpp");
-    for (DN_ForItCArray(extra_it, DN_Str8 const, REL_FILE_PATHS)) {
-      DN_Str8 extra_path = DN_OS_PathF(&scratch.arena, "%S/%S.%S", dn_root_dir, *extra_it.data, suffix);
-      AppendCppFileLineByLine(&builder, extra_path);
+    for (DN_ForItCArray(it, DN_Str8 const, REL_FILE_PATHS)) {
+      DN_Str8 path = DN_OS_PathF(&scratch.arena, "%S/%S.%S", dn_root_dir, *it.data, suffix);
+      AppendCppFileLineByLine(&builder, path);
     }
 
     DN_Date date = DN_OS_DateLocalTimeNow();
