@@ -201,6 +201,6 @@ DN_API void DN_BinPackCBuffer(DN_BinPack *pack, DN_BinPackMode mode, char *ptr, 
 
 DN_API DN_Str8 DN_BinPackBuild(DN_BinPack const *pack, DN_Arena *arena)
 {
-  DN_Str8 result = DN_Str8BuilderBuild(&pack->writer, arena);
+  DN_Str8 result = DN_Str8FromStr8BuilderArena(&pack->writer, arena);
   return result;
 }

@@ -297,7 +297,8 @@ DN_API DN_MemFuncs               DN_MemFuncsFromType                          (D
 DN_API DN_MemFuncs               DN_MemFuncsDefault                           ();
 DN_API DN_MemList                DN_MemListFromHeap                           (DN_U64 size, DN_MemFlags flags);
 DN_API DN_MemList                DN_MemListFromVMem                           (DN_U64 reserve, DN_U64 commit, DN_MemFlags flags);
-
+DN_API DN_Arena                  DN_ArenaFromHeap                             (DN_U64 wize, DN_MemFlags flags);
+DN_API DN_Arena                  DN_ArenaFromVMem                             (DN_U64 reserve, DN_U64 commit, DN_MemFlags flags);
 
 DN_API DN_Str8                   DN_Str8FromHeapF                             (DN_FMT_ATTRIB char const *fmt, ...);
 DN_API DN_Str8                   DN_Str8FromHeap                              (DN_USize size, DN_ZMem z_mem);

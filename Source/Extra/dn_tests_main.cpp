@@ -35,8 +35,8 @@ DN_MSVC_WARNING_PUSH
 DN_MSVC_WARNING_DISABLE(6262) // Function uses '29804' bytes of stack.  Consider moving some data to heap.
 int main(int, char**)
 {
-  DN_Core dn = {};
-  DN_Init(&dn, DN_InitFlags_LogAllFeatures | DN_InitFlags_OS | DN_InitFlags_ThreadContext, nullptr);
+  DN_Core       dn      = {};
+  DN_Init(&dn, DN_InitFlags_LogAllFeatures | DN_InitFlags_OS | DN_InitFlags_ThreadContext, DN_TCInitArgsDefault());
   DN_TST_RunSuite(DN_TSTPrint_Yes);
   return 0;
 }

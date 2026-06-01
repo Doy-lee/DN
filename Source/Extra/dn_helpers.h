@@ -79,15 +79,12 @@ enum DN_BinarySearchType
 
 struct DN_BinarySearchResult
 {
-    bool      found;
-    DN_USize index;
+  bool     found;
+  DN_USize index;
 };
 
-template <typename T>
-using DN_QSortLessThanProc = bool(T const &a, T const &b, void *user_context);
-
 #if !defined(DN_NO_JSON_BUILDER)
-// NOTE: DN_JSONBuilder ////////////////////////////////////////////////////////////////////////////
+// NOTE: DN_JSONBuilder
 #define DN_JSONBuilder_Object(builder)              \
   DN_DeferLoop(DN_JSONBuilder_ObjectBegin(builder), \
                 DN_JSONBuilder_ObjectEnd(builder))
@@ -132,10 +129,6 @@ DN_API void                DN_JSONBuilder_BoolNamed               (DN_JSONBuilde
 // NOTE: DN_BinarySearch
 template <typename T> bool                  DN_BinarySearch_DefaultLessThan(T const &lhs, T const &rhs);
 template <typename T> DN_BinarySearchResult DN_BinarySearch                (T const *array, DN_USize array_size, T const &find, DN_BinarySearchType type = DN_BinarySearchType_Match, DN_BinarySearchLessThanProc<T> less_than = DN_BinarySearch_DefaultLessThan);
-
-// NOTE: DN_QSort
-template <typename T> bool DN_QSort_DefaultLessThan(T const &lhs, T const &rhs, void *user_context);
-template <typename T> void DN_QSort                (T *array, DN_USize array_size, void *user_context, DN_QSortLessThanProc<T> less_than = DN_QSort_DefaultLessThan);
 
 // NOTE: DN_BinarySearch
 template <typename T>
@@ -189,76 +182,4 @@ DN_BinarySearchResult DN_BinarySearch(T const                         *array,
     result.index = first - array;
     return result;
 }
-
-// NOTE: DN_QSort //////////////////////////////////////////////////////////////////////////////////
-template <typename T>
-bool DN_QSort_DefaultLessThan(T const &lhs, T const &rhs, void *user_context)
-{
-    (void)user_context;
-    bool result = lhs < rhs;
-    return result;
-}
-
-template <typename T>
-void DN_QSort(T *array, DN_USize array_size, void *user_context, DN_QSortLessThanProc<T> less_than)
-{
-    if (!array || array_size <= 1 || !less_than)
-        return;
-
-    // NOTE: Insertion Sort, under 24->32 is an optimal amount /////////////////////////////////////
-    const DN_USize QSORT_THRESHOLD = 24;
-    if (array_size < QSORT_THRESHOLD) {
-        for (DN_USize item_to_insert_index = 1; item_to_insert_index < array_size; item_to_insert_index++) {
-            for (DN_USize index = 0; index < item_to_insert_index; index++) {
-                if (!less_than(array[index], array[item_to_insert_index], user_context)) {
-                    T item_to_insert = array[item_to_insert_index];
-                    for (DN_USize i = item_to_insert_index; i > index; i--)
-                        array[i] = array[i - 1];
-
-                    array[index] = item_to_insert;
-                    break;
-                }
-            }
-        }
-        return;
-    }
-
-    // NOTE: Quick sort, under 24->32 is an optimal amount /////////////////////////////////////////
-    DN_USize last_index      = array_size - 1;
-    DN_USize pivot_index     = array_size / 2;
-    DN_USize partition_index = 0;
-    DN_USize start_index     = 0;
-
-    // Swap pivot with last index, so pivot is always at the end of the array.
-    // This makes logic much simpler.
-    DN_Swap(array[last_index], array[pivot_index]);
-    pivot_index = last_index;
-
-    // 4^, 8, 7, 5, 2, 3, 6
-    if (less_than(array[start_index], array[pivot_index], user_context))
-        partition_index++;
-    start_index++;
-
-    // 4, |8, 7, 5^, 2, 3, 6*
-    // 4, 5, |7, 8, 2^, 3, 6*
-    // 4, 5, 2, |8, 7, ^3, 6*
-    // 4, 5, 2, 3, |7, 8, ^6*
-    for (DN_USize index = start_index; index < last_index; index++) {
-        if (less_than(array[index], array[pivot_index], user_context)) {
-            DN_Swap(array[partition_index], array[index]);
-            partition_index++;
-        }
-    }
-
-    // Move pivot to right of partition
-    // 4, 5, 2, 3, |6, 8, ^7*
-    DN_Swap(array[partition_index], array[pivot_index]);
-    DN_QSort(array, partition_index, user_context, less_than);
-
-    // Skip the value at partion index since that is guaranteed to be sorted.
-    // 4, 5, 2, 3, (x), 8, 7
-    DN_USize one_after_partition_index = partition_index + 1;
-    DN_QSort(array + one_after_partition_index, (array_size - one_after_partition_index), user_context, less_than);
-}
-
 #endif // !defined(DN_HELPERS_H)

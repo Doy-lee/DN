@@ -93,7 +93,7 @@ static int32_t DN_NET_CurlThreadEntryPoint_(DN_OSThread *thread)
   DN_OS_ThreadSetNameFmt("%.*s", DN_Str8PrintFmt(curl->thread.name));
 
   while (!curl->kill_thread) {
-    DN_TCScratch tmem = DN_TCScratchBegin(nullptr, 0);
+    DN_TCScratch tmem = DN_TCScratchBeginArena(nullptr, 0);
 
     // NOTE: Handle events sitting in the ring queue
     for (bool dequeue_ring = true; dequeue_ring;) {
@@ -159,7 +159,7 @@ static int32_t DN_NET_CurlThreadEntryPoint_(DN_OSThread *thread)
           // NOTE: End the temp memory storing the WS data we just read and the user returned to us
           // (we got their receipt back). Then restart the temp memory scope for the next websocket
           // payload
-          DN_NET_EndFinishedRequest_(req);
+          DN_NET_EndFinishedRequest(req);
           req->start_response_arena = DN_ArenaTempBeginFromArena(&req->arena);
           curl_req->str8_builder    = DN_Str8BuilderFromArena(&req->start_response_arena);
 
@@ -175,12 +175,15 @@ static int32_t DN_NET_CurlThreadEntryPoint_(DN_OSThread *thread)
           DN_NETRequest *request = DN_Cast(DN_NETRequest *) event.request.handle;
 
           // NOTE: Release resources
-          DN_NET_EndFinishedRequest_(request);
+          DN_NET_EndFinishedRequest(request);
           DN_OS_SemaphoreDeinit(&request->completion_sem);
 
           curl_multi_remove_handle(curl->thread_curlm, curl_req->handle);
-          curl_easy_reset(curl_req->handle);
           curl_slist_free_all(curl_req->slist);
+          curl_easy_reset(curl_req->handle);
+          CURL *copy       = curl_req->handle;
+          *curl_req        = {};
+          curl_req->handle = copy;
 
           // NOTE: Zero the struct preserving just the data we need to retain
           DN_NETRequest resetter = {};
@@ -230,13 +233,13 @@ static int32_t DN_NET_CurlThreadEntryPoint_(DN_OSThread *thread)
               req->response.state = DN_NETResponseState_WSOpen;
             }
           } else {
-            req->response.error_str8 = DN_Str8FromFmtArena(&req->arena, "Failed to get HTTP response status (CURL %d): %s", msg->data.result, curl_easy_strerror(get_result));
+            req->response.error_str8 = DN_Str8FromFmtArena(&req->start_response_arena, "Failed to get HTTP response status (CURL %d): %s", msg->data.result, curl_easy_strerror(get_result));
             req->response.state      = DN_NETResponseState_Error;
           }
         } else {
           DN_USize curl_extended_error_size = DN_CStr8Size(curl_req->error);
           req->response.state               = DN_NETResponseState_Error;
-          req->response.error_str8          = DN_Str8FromFmtArena(&req->arena,
+          req->response.error_str8          = DN_Str8FromFmtArena(&req->start_response_arena,
                                                          "HTTP request '%.*s' failed (CURL %d): %s%s%s%s",
                                                          DN_Str8PrintFmt(req->url),
                                                          msg->data.result,
@@ -400,7 +403,7 @@ DN_NETInterface DN_NET_CurlInterface()
 
 void DN_NET_CurlInit(DN_NETCore *net, char *base, DN_U64 base_size)
 {
-  DN_NET_BaseInit_(net, base, base_size);
+  DN_NET_BaseInit(net, base, base_size);
   DN_NETCurlCore *curl = DN_ArenaNew(&net->arena, DN_NETCurlCore, DN_ZMem_Yes);
   net->context         = curl;
   net->api             = DN_NET_CurlInterface();
@@ -458,8 +461,7 @@ static DN_NETRequestHandle DN_NET_CurlDoRequest_(DN_NETCore *net, DN_Str8 url, D
   // NOTE: Setup the request
   DN_NETCurlRequest *curl_req = DN_NET_CurlRequestFromRequest_(req);
   {
-    result                 = DN_NET_SetupRequest_(req, url, method, args, type);
-    req->response.request  = result;
+    result                 = DN_NET_SetupRequest(req, url, method, args, type);
     req->context[1]        = DN_Cast(DN_UPtr) net;
     curl_req->str8_builder = DN_Str8BuilderFromArena(&req->start_response_arena);
   }
@@ -480,8 +482,10 @@ static DN_NETRequestHandle DN_NET_CurlDoRequest_(DN_NETCore *net, DN_Str8 url, D
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, req);
 
     // NOTE: Assign HTTP headers
-    for (DN_ForItSize(it, DN_Str8, req->args.headers, req->args.headers_size))
+    for (DN_ForItSize(it, DN_Str8, req->args.headers, req->args.headers_size)) {
+      DN_Assert(it.data->data[it.data->size] == 0);
       curl_req->slist = curl_slist_append(curl_req->slist, it.data->data);
+    }
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, curl_req->slist);
 
     // NOTE: Setup handle for protocol
@@ -593,7 +597,7 @@ static DN_NETResponse DN_NET_CurlHandleFinishedRequest_(DN_NETCurlCore *curl, DN
   DN_NETResponse     result   = req->response;
   DN_NETCurlRequest *curl_req = DN_NET_CurlRequestFromRequest_(req);
   {
-    result.body                 = DN_Str8BuilderBuild(&curl_req->str8_builder, arena);
+    result.body = DN_Str8FromStr8BuilderArena(&curl_req->str8_builder, arena);
     if (result.error_str8.size)
       result.error_str8 = DN_Str8FromStr8Arena(result.error_str8, arena);
   }

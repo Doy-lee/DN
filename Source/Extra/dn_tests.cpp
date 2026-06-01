@@ -365,6 +365,66 @@ static DN_UTCore DN_TST_Base()
       DN_UT_Assert(&result, mutex.ticket == ticket_b + 1);
     }
 
+    for (DN_UT_Test(&result, "QSort String (Natural)")) {
+      DN_Str8 list[] = {
+          DN_Str8Lit("item10"),
+          DN_Str8Lit("item2"),
+          DN_Str8Lit("item1"),
+          DN_Str8Lit("item20"),
+          DN_Str8Lit("item12"),
+          DN_Str8Lit("Afile"),
+          DN_Str8Lit("file2"),
+          DN_Str8Lit("file10"),
+          DN_Str8Lit("file1"),
+          DN_Str8Lit("z_last"),
+          DN_Str8Lit("m_middle"),
+          DN_Str8Lit("a_first"),
+          DN_Str8Lit("version-1.2.10"),
+          DN_Str8Lit("version-1.2.2"),
+          DN_Str8Lit("version-1.10.0"),
+      };
+
+      DN_QSortStr8NaturalAsc(list, DN_ArrayCountU(list), DN_Str8EqCase_Sensitive);
+
+      DN_USize list_index = 0;
+      DN_AssertF(DN_Str8Eq(list[list_index++], DN_Str8Lit("Afile")),          "%.*s", DN_Str8PrintFmt(list[list_index-1]));
+      DN_AssertF(DN_Str8Eq(list[list_index++], DN_Str8Lit("a_first")),        "%.*s", DN_Str8PrintFmt(list[list_index-1]));
+      DN_AssertF(DN_Str8Eq(list[list_index++], DN_Str8Lit("file1")),          "%.*s", DN_Str8PrintFmt(list[list_index-1]));
+      DN_AssertF(DN_Str8Eq(list[list_index++], DN_Str8Lit("file2")),          "%.*s", DN_Str8PrintFmt(list[list_index-1]));
+      DN_AssertF(DN_Str8Eq(list[list_index++], DN_Str8Lit("file10")),         "%.*s", DN_Str8PrintFmt(list[list_index-1]));
+      DN_AssertF(DN_Str8Eq(list[list_index++], DN_Str8Lit("item1")),          "%.*s", DN_Str8PrintFmt(list[list_index-1]));
+      DN_AssertF(DN_Str8Eq(list[list_index++], DN_Str8Lit("item2")),          "%.*s", DN_Str8PrintFmt(list[list_index-1]));
+      DN_AssertF(DN_Str8Eq(list[list_index++], DN_Str8Lit("item10")),         "%.*s", DN_Str8PrintFmt(list[list_index-1]));
+      DN_AssertF(DN_Str8Eq(list[list_index++], DN_Str8Lit("item12")),         "%.*s", DN_Str8PrintFmt(list[list_index-1]));
+      DN_AssertF(DN_Str8Eq(list[list_index++], DN_Str8Lit("item20")),         "%.*s", DN_Str8PrintFmt(list[list_index-1]));
+      DN_AssertF(DN_Str8Eq(list[list_index++], DN_Str8Lit("m_middle")),       "%.*s", DN_Str8PrintFmt(list[list_index-1]));
+      DN_AssertF(DN_Str8Eq(list[list_index++], DN_Str8Lit("version-1.2.2")),  "%.*s", DN_Str8PrintFmt(list[list_index-1]));
+      DN_AssertF(DN_Str8Eq(list[list_index++], DN_Str8Lit("version-1.2.10")), "%.*s", DN_Str8PrintFmt(list[list_index-1]));
+      DN_AssertF(DN_Str8Eq(list[list_index++], DN_Str8Lit("version-1.10.0")), "%.*s", DN_Str8PrintFmt(list[list_index-1]));
+      DN_AssertF(DN_Str8Eq(list[list_index++], DN_Str8Lit("z_last")),         "%.*s", DN_Str8PrintFmt(list[list_index-1]));
+    }
+
+    for (DN_UT_Test(&result, "QSort String (Lexicographic)")) {
+      DN_Str8 list[] = {
+          DN_Str8Lit("z_last"),
+          DN_Str8Lit("m_middle"),
+          DN_Str8Lit("a_first"),
+          DN_Str8Lit("version-1.2.10"),
+          DN_Str8Lit("version-1.2.2"),
+          DN_Str8Lit("version-1.10.0"),
+      };
+
+      DN_QSortStr8LexicographicAsc(list, DN_ArrayCountU(list), DN_Str8EqCase_Insensitive);
+
+      DN_USize list_index = 0;
+      DN_AssertF(DN_Str8Eq(list[list_index++], DN_Str8Lit("a_first")),        "%.*s", DN_Str8PrintFmt(list[list_index-1]));
+      DN_AssertF(DN_Str8Eq(list[list_index++], DN_Str8Lit("m_middle")),       "%.*s", DN_Str8PrintFmt(list[list_index-1]));
+      DN_AssertF(DN_Str8Eq(list[list_index++], DN_Str8Lit("version-1.10.0")), "%.*s", DN_Str8PrintFmt(list[list_index-1]));
+      DN_AssertF(DN_Str8Eq(list[list_index++], DN_Str8Lit("version-1.2.10")), "%.*s", DN_Str8PrintFmt(list[list_index-1]));
+      DN_AssertF(DN_Str8Eq(list[list_index++], DN_Str8Lit("version-1.2.2")),  "%.*s", DN_Str8PrintFmt(list[list_index-1]));
+      DN_AssertF(DN_Str8Eq(list[list_index++], DN_Str8Lit("z_last")),         "%.*s", DN_Str8PrintFmt(list[list_index-1]));
+    }
+
     // NOTE: MSVC SAL complains that we are using Interlocked functionality on
     // variables it has detected as *not* being shared across threads. This is
     // fine, we're just running some basic results, so permit it.
@@ -529,7 +589,7 @@ static DN_UTCore DN_TST_BaseArena()
 
 static DN_UTCore DN_TST_BaseBytesHex()
 {
-  DN_TCScratch scratch = DN_TCScratchBegin(nullptr, 0);
+  DN_TCScratch scratch = DN_TCScratchBeginArena(nullptr, 0);
   DN_UTCore    test    = DN_UT_Init();
   DN_UT_LogF(&test, "Bytes <-> Hex\n");
   {
@@ -935,7 +995,7 @@ static DN_UTCore DN_TST_BaseDSMap()
   DN_UTCore result = DN_UT_Init();
   DN_UT_LogF(&result, "DN_DSMap\n");
   {
-    DN_TCScratch scratch = DN_TCScratchBegin(nullptr, 0);
+    DN_TCScratch scratch = DN_TCScratchBeginArena(nullptr, 0);
     {
       DN_MemList         mem      = DN_MemListFromVMem(0, 0, DN_MemFlags_Nil);
       DN_Arena           arena    = DN_ArenaFromMemList(&mem);
@@ -1134,7 +1194,7 @@ static DN_UTCore DN_TST_BaseIArray()
     struct CustomArray
     {
       int     *data;
-      DN_USize size;
+      DN_USize count;
       DN_USize max;
     };
 
@@ -1145,24 +1205,24 @@ static DN_UTCore DN_TST_BaseIArray()
 
     for (DN_UT_Test(&result, "Make item")) {
       int *item = DN_IArrayMake(&array, DN_ZMem_Yes);
-      DN_UT_Assert(&result, item && array.size == 1);
+      DN_UT_Assert(&result, item && array.count == 1);
     }
   }
   return result;
 }
 
-static DN_UTCore DN_TST_BaseCArray2()
+static DN_UTCore DN_TST_BaseArray()
 {
   DN_UTCore result = DN_UT_Init();
-  DN_UT_LogF(&result, "DN_CArray2\n");
+  DN_UT_LogF(&result, "DN_Array\n");
   {
     for (DN_UT_Test(&result, "Positive count, middle of array, stable erase")) {
       int                 arr[]      = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
       DN_USize            size       = 10;
-      DN_ArrayEraseResult erase      = DN_CArrayEraseRange(arr, &size, sizeof(arr[0]), 3, 2, DN_ArrayErase_Stable);
+      DN_ArrayEraseResult erase      = DN_ArrayEraseRange(arr, &size, sizeof(arr[0]), 3, 2, DN_ArrayErase_Stable);
       int                 expected[] = {0, 1, 2, 5, 6, 7, 8, 9};
       DN_UT_Assert(&result, erase.items_erased == 2);
-      DN_UT_Assert(&result, erase.it_index == 3);
+      DN_UT_AssertF(&result, erase.it_index == 2, "erase.it_index=%zu", erase.it_index);
       DN_UT_Assert(&result, size == 8);
       DN_UT_Assert(&result, DN_Memcmp(arr, expected, size * sizeof(arr[0])) == 0);
     }
@@ -1170,10 +1230,10 @@ static DN_UTCore DN_TST_BaseCArray2()
     for (DN_UT_Test(&result, "Negative count, middle of array, stable erase")) {
       int                 arr[]      = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
       DN_USize            size       = 10;
-      DN_ArrayEraseResult erase      = DN_CArrayEraseRange(arr, &size, sizeof(arr[0]), 5, -3, DN_ArrayErase_Stable);
+      DN_ArrayEraseResult erase      = DN_ArrayEraseRange(arr, &size, sizeof(arr[0]), 5, -3, DN_ArrayErase_Stable);
       int                 expected[] = {0, 1, 2, 6, 7, 8, 9};
       DN_UT_Assert(&result, erase.items_erased == 3);
-      DN_UT_Assert(&result, erase.it_index == 3);
+      DN_UT_Assert(&result, erase.it_index == 2);
       DN_UT_Assert(&result, size == 7);
       DN_UT_Assert(&result, DN_Memcmp(arr, expected, size * sizeof(arr[0])) == 0);
     }
@@ -1181,10 +1241,10 @@ static DN_UTCore DN_TST_BaseCArray2()
     for (DN_UT_Test(&result, "count = -1, stable erase")) {
       int                 arr[]      = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
       DN_USize            size       = 10;
-      DN_ArrayEraseResult erase      = DN_CArrayEraseRange(arr, &size, sizeof(arr[0]), 5, -1, DN_ArrayErase_Stable);
+      DN_ArrayEraseResult erase      = DN_ArrayEraseRange(arr, &size, sizeof(arr[0]), 5, -1, DN_ArrayErase_Stable);
       int                 expected[] = {0, 1, 2, 3, 4, 6, 7, 8, 9};
       DN_UT_Assert(&result, erase.items_erased == 1);
-      DN_UT_Assert(&result, erase.it_index == 5);
+      DN_UT_Assert(&result, erase.it_index == 4);
       DN_UT_Assert(&result, size == 9);
       DN_UT_Assert(&result, DN_Memcmp(arr, expected, size * sizeof(arr[0])) == 0);
     }
@@ -1192,10 +1252,10 @@ static DN_UTCore DN_TST_BaseCArray2()
     for (DN_UT_Test(&result, "Positive count, unstable erase")) {
       int                 arr[]      = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
       DN_USize            size       = 10;
-      DN_ArrayEraseResult erase      = DN_CArrayEraseRange(arr, &size, sizeof(arr[0]), 3, 2, DN_ArrayErase_Unstable);
+      DN_ArrayEraseResult erase      = DN_ArrayEraseRange(arr, &size, sizeof(arr[0]), 3, 2, DN_ArrayErase_Unstable);
       int                 expected[] = {0, 1, 2, 8, 9, 5, 6, 7};
       DN_UT_Assert(&result, erase.items_erased == 2);
-      DN_UT_Assert(&result, erase.it_index == 3);
+      DN_UT_Assert(&result, erase.it_index == 2);
       DN_UT_Assert(&result, size == 8);
       DN_UT_Assert(&result, DN_Memcmp(arr, expected, size * sizeof(arr[0])) == 0);
     }
@@ -1203,10 +1263,10 @@ static DN_UTCore DN_TST_BaseCArray2()
     for (DN_UT_Test(&result, "Negative count, unstable erase")) {
       int                 arr[]      = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
       DN_USize            size       = 10;
-      DN_ArrayEraseResult erase      = DN_CArrayEraseRange(arr, &size, sizeof(arr[0]), 5, -3, DN_ArrayErase_Unstable);
+      DN_ArrayEraseResult erase      = DN_ArrayEraseRange(arr, &size, sizeof(arr[0]), 5, -3, DN_ArrayErase_Unstable);
       int                 expected[] = {0, 1, 2, 7, 8, 9, 6};
       DN_UT_Assert(&result, erase.items_erased == 3);
-      DN_UT_Assert(&result, erase.it_index == 3);
+      DN_UT_Assert(&result, erase.it_index == 2);
       DN_UT_Assert(&result, size == 7);
       DN_UT_Assert(&result, DN_Memcmp(arr, expected, size * sizeof(arr[0])) == 0);
     }
@@ -1214,7 +1274,7 @@ static DN_UTCore DN_TST_BaseCArray2()
     for (DN_UT_Test(&result, "Edge case - begin_index at start, negative count")) {
       int                 arr[]      = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
       DN_USize            size       = 10;
-      DN_ArrayEraseResult erase      = DN_CArrayEraseRange(arr, &size, sizeof(arr[0]), 0, -2, DN_ArrayErase_Stable);
+      DN_ArrayEraseResult erase      = DN_ArrayEraseRange(arr, &size, sizeof(arr[0]), 0, -2, DN_ArrayErase_Stable);
       int                 expected[] = {1, 2, 3, 4, 5, 6, 7, 8, 9};
       DN_UT_Assert(&result, erase.items_erased == 1);
       DN_UT_Assert(&result, erase.it_index == 0);
@@ -1225,10 +1285,10 @@ static DN_UTCore DN_TST_BaseCArray2()
     for (DN_UT_Test(&result, "Edge case - begin_index at end, positive count")) {
       int                 arr[]      = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
       DN_USize            size       = 10;
-      DN_ArrayEraseResult erase      = DN_CArrayEraseRange(arr, &size, sizeof(arr[0]), 9, 2, DN_ArrayErase_Stable);
+      DN_ArrayEraseResult erase      = DN_ArrayEraseRange(arr, &size, sizeof(arr[0]), 9, 2, DN_ArrayErase_Stable);
       int                 expected[] = {0, 1, 2, 3, 4, 5, 6, 7, 8};
       DN_UT_Assert(&result, erase.items_erased == 1);
-      DN_UT_Assert(&result, erase.it_index == 9);
+      DN_UT_Assert(&result, erase.it_index == 8);
       DN_UT_Assert(&result, size == 9);
       DN_UT_Assert(&result, DN_Memcmp(arr, expected, size * sizeof(arr[0])) == 0);
     }
@@ -1236,7 +1296,7 @@ static DN_UTCore DN_TST_BaseCArray2()
     for (DN_UT_Test(&result, "Invalid input - count = 0")) {
       int                 arr[]      = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
       DN_USize            size       = 10;
-      DN_ArrayEraseResult erase      = DN_CArrayEraseRange(arr, &size, sizeof(arr[0]), 5, 0, DN_ArrayErase_Stable);
+      DN_ArrayEraseResult erase      = DN_ArrayEraseRange(arr, &size, sizeof(arr[0]), 5, 0, DN_ArrayErase_Stable);
       int                 expected[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
       DN_UT_Assert(&result, erase.items_erased == 0);
       DN_UT_Assert(&result, erase.it_index == 0);
@@ -1246,7 +1306,7 @@ static DN_UTCore DN_TST_BaseCArray2()
 
     for (DN_UT_Test(&result, "Invalid input - null data")) {
       DN_USize            size  = 10;
-      DN_ArrayEraseResult erase = DN_CArrayEraseRange(nullptr, &size, sizeof(int), 5, 2, DN_ArrayErase_Stable);
+      DN_ArrayEraseResult erase = DN_ArrayEraseRange(nullptr, &size, sizeof(int), 5, 2, DN_ArrayErase_Stable);
       DN_UT_Assert(&result, erase.items_erased == 0);
       DN_UT_Assert(&result, erase.it_index == 0);
       DN_UT_Assert(&result, size == 10);
@@ -1254,7 +1314,7 @@ static DN_UTCore DN_TST_BaseCArray2()
 
     for (DN_UT_Test(&result, "Invalid input - null size")) {
       int                 arr[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
-      DN_ArrayEraseResult erase = DN_CArrayEraseRange(arr, NULL, sizeof(arr[0]), 5, 2, DN_ArrayErase_Stable);
+      DN_ArrayEraseResult erase = DN_ArrayEraseRange(arr, NULL, sizeof(arr[0]), 5, 2, DN_ArrayErase_Stable);
       DN_UT_Assert(&result, erase.items_erased == 0);
       DN_UT_Assert(&result, erase.it_index == 0);
     }
@@ -1262,7 +1322,7 @@ static DN_UTCore DN_TST_BaseCArray2()
     for (DN_UT_Test(&result, "Invalid input - empty array")) {
       int                 arr[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
       DN_USize            size  = 0;
-      DN_ArrayEraseResult erase = DN_CArrayEraseRange(arr, &size, sizeof(arr[0]), 5, 2, DN_ArrayErase_Stable);
+      DN_ArrayEraseResult erase = DN_ArrayEraseRange(arr, &size, sizeof(arr[0]), 5, 2, DN_ArrayErase_Stable);
       DN_UT_Assert(&result, erase.items_erased == 0);
       DN_UT_Assert(&result, erase.it_index == 0);
       DN_UT_Assert(&result, size == 0);
@@ -1271,10 +1331,10 @@ static DN_UTCore DN_TST_BaseCArray2()
     for (DN_UT_Test(&result, "Out-of-bounds begin_index")) {
       int                 arr[]      = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
       DN_USize            size       = 10;
-      DN_ArrayEraseResult erase      = DN_CArrayEraseRange(arr, &size, sizeof(arr[0]), 15, 2, DN_ArrayErase_Stable);
+      DN_ArrayEraseResult erase      = DN_ArrayEraseRange(arr, &size, sizeof(arr[0]), 15, 2, DN_ArrayErase_Stable);
       int                 expected[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
       DN_UT_Assert(&result, erase.items_erased == 0);
-      DN_UT_Assert(&result, erase.it_index == 10);
+      DN_UT_Assert(&result, erase.it_index == 9);
       DN_UT_Assert(&result, size == 10);
       DN_UT_Assert(&result, DN_Memcmp(arr, expected, size * sizeof(arr[0])) == 0);
     }
@@ -1632,7 +1692,7 @@ DN_Str8 const DN_UT_HASH_STRING_[] =
 
 void DN_TST_KeccakDispatch_(DN_UTCore *test, int hash_type, DN_Str8 input)
 {
-  DN_TCScratch scratch   = DN_TCScratchBegin(nullptr, 0);
+  DN_TCScratch scratch   = DN_TCScratchBeginArena(nullptr, 0);
   DN_Str8      input_hex = DN_HexFromPtrBytesArena(input.data, input.size, &scratch.arena, DN_TrimLeadingZero_No);
 
   switch (hash_type) {
@@ -1860,7 +1920,7 @@ static DN_UTCore DN_TST_OS()
     }
 
     for (DN_UT_Test(&result, "Query executable directory")) {
-      DN_TCScratch scratch      = DN_TCScratchBegin(nullptr, 0);
+      DN_TCScratch scratch      = DN_TCScratchBeginArena(nullptr, 0);
       DN_Str8      os_result = DN_OS_EXEDir(&scratch.arena);
       DN_UT_Assert(&result, os_result.size);
       DN_UT_AssertF(&result, DN_OS_PathIsDir(os_result), "result(%zu): %.*s", os_result.size, DN_Str8PrintFmt(os_result));
@@ -1911,7 +1971,7 @@ static DN_UTCore DN_TST_OS()
       DN_UT_Assert(&result, DN_OS_PathIsFile(SRC_FILE));
 
       // NOTE: Read step
-      DN_TCScratch scratch      = DN_TCScratchBegin(nullptr, 0);
+      DN_TCScratch scratch      = DN_TCScratchBeginArena(nullptr, 0);
       DN_Str8      read_file = DN_OS_FileReadAllArena(&scratch.arena, SRC_FILE, nullptr);
       DN_UT_AssertF(&result, read_file.size, "Failed to load file");
       DN_UT_AssertF(&result, read_file.size == 4, "File read wrong amount of bytes (%zu)", read_file.size);
@@ -2166,7 +2226,7 @@ static DN_UTCore DN_TST_BaseStrings()
     }
 
     for (DN_UT_Test(&result, "Initialise with format string")) {
-      DN_TCScratch scratch   = DN_TCScratchBegin(nullptr, 0);
+      DN_TCScratch scratch   = DN_TCScratchBeginArena(nullptr, 0);
       DN_Str8      string = DN_Str8FromFmtArena(&scratch.arena, "%s", "AB");
       DN_UT_AssertF(&result, string.size == 2, "size: %zu", string.size);
       DN_UT_AssertF(&result, string.data[0] == 'A', "string[0]: %c", string.data[0]);
@@ -2176,7 +2236,7 @@ static DN_UTCore DN_TST_BaseStrings()
     }
 
     for (DN_UT_Test(&result, "Copy string")) {
-      DN_TCScratch scratch   = DN_TCScratchBegin(nullptr, 0);
+      DN_TCScratch scratch   = DN_TCScratchBeginArena(nullptr, 0);
       DN_Str8      string = DN_Str8Lit("AB");
       DN_Str8      copy   = DN_Str8FromStr8Arena(string, &scratch.arena);
       DN_UT_AssertF(&result, copy.size == 2, "size: %zu", copy.size);
@@ -2192,7 +2252,7 @@ static DN_UTCore DN_TST_BaseStrings()
     }
 
     for (DN_UT_Test(&result, "Allocate string from arena")) {
-      DN_TCScratch scratch = DN_TCScratchBegin(nullptr, 0);
+      DN_TCScratch scratch = DN_TCScratchBeginArena(nullptr, 0);
       DN_Str8      string  = DN_Str8AllocArena(2, DN_ZMem_No, &scratch.arena);
       DN_UT_AssertF(&result, string.size == 2, "size: %zu", string.size);
       DN_TCScratchEnd(&scratch);
@@ -2530,7 +2590,7 @@ static DN_UTCore DN_TST_BaseStrings()
 
       // NOTE: DN_Str8TruncMiddle (arena wrapper)
       for (DN_UT_Test(&result, "TruncMiddle: Arena wrapper allocates and truncates correctly")) {
-        DN_TCScratch       scratch = DN_TCScratchBegin(nullptr, 0);
+        DN_TCScratch       scratch = DN_TCScratchBeginArena(nullptr, 0);
         DN_Str8            str     = DN_Str8Lit("HelloBeautifulWorld");
         DN_Str8            trunc   = DN_Str8Lit("...");
         DN_Str8TruncResult res     = DN_Str8TruncMiddle(str, 5, trunc, &scratch.arena);
@@ -2551,7 +2611,7 @@ static DN_UTCore DN_TST_Win()
   #if defined(DN_PLATFORM_WIN32)
   DN_UT_LogF(&result, "OS Win32\n");
   {
-    DN_TCScratch scratch    = DN_TCScratchBegin(nullptr, 0);
+    DN_TCScratch scratch = DN_TCScratchBeginArena(nullptr, 0);
     DN_Str8      input8  = DN_Str8Lit("String");
     DN_Str16     input16 = DN_Str16{(wchar_t *)(L"String"), sizeof(L"String") / sizeof(L"String"[0]) - 1};
 
@@ -2700,7 +2760,7 @@ DN_TSTResult DN_TST_RunSuite(DN_TSTPrint print)
           #endif
           DN_TST_BaseDSMap(),
           DN_TST_BaseIArray(),
-          DN_TST_BaseCArray2(),
+          DN_TST_BaseArray(),
           DN_TST_BaseVArray(),
           DN_TST_Keccak(),
           DN_TST_M4(),

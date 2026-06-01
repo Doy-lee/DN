@@ -14,7 +14,7 @@ DN_API DN_JSONBuilder DN_JSONBuilder_Init(DN_Arena *arena, int spaces_per_indent
 
 DN_API DN_Str8 DN_JSONBuilder_Build(DN_JSONBuilder const *builder, DN_Arena *arena)
 {
-  DN_Str8 result = DN_Str8BuilderBuild(&builder->string_builder, arena);
+  DN_Str8 result = DN_Str8FromStr8BuilderArena(&builder->string_builder, arena);
   return result;
 }
 
@@ -71,7 +71,7 @@ DN_API void DN_JSONBuilder_KeyValue(DN_JSONBuilder *builder, DN_Str8 key, DN_Str
 
 DN_API void DN_JSONBuilder_KeyValueFV(DN_JSONBuilder *builder, DN_Str8 key, char const *value_fmt, va_list args)
 {
-  DN_TCScratch scratch = DN_TCScratchBegin(&builder->string_builder.arena, 1);
+  DN_TCScratch scratch = DN_TCScratchBeginArena(&builder->string_builder.arena, 1);
   DN_Str8      value   = DN_Str8FromFmtVArena(&scratch.arena, value_fmt, args);
   DN_JSONBuilder_KeyValue(builder, key, value);
   DN_TCScratchEnd(&scratch);

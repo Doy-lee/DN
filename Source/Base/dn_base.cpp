@@ -6,6 +6,12 @@
   #include "../dn.h"
 #endif
 
+enum DN_ArenaUAFCheckReportType_
+{
+  DN_ArenaUAFCheckReportType_AllocViolation,
+  DN_ArenaUAFCheckReportType_TempEndOutOfOrder,
+};
+
 DN_API bool DN_MemStartsWith(void const *lhs, DN_USize lhs_size, void const *rhs, DN_USize rhs_size)
 {
   bool result = false;
@@ -977,12 +983,13 @@ static void DN_MemBlockDeinit_(DN_MemList const *mem, DN_MemBlock *block)
 
 DN_API void DN_MemListDeinit(DN_MemList *mem)
 {
+  bool mem_allocated_from_itself = DN_MemListOwnsPtr(mem, mem);
   for (DN_MemBlock *block = mem ? mem->curr : nullptr; block;) {
     DN_MemBlock *block_to_free = block;
-    block                        = block->prev;
+    block                      = block->prev;
     DN_MemBlockDeinit_(mem, block_to_free);
   }
-  if (mem)
+  if (mem && !mem_allocated_from_itself)
     *mem = {};
 }
 
@@ -1111,7 +1118,7 @@ DN_API void *DN_MemListAllocContiguous(DN_MemList *mem, DN_U64 size, uint8_t ali
 {
   DN_MemFlags prev_flags = mem->flags;
   mem->flags |= (DN_MemFlags_NoGrow | DN_MemFlags_NoPoison);
-  void *memory     = DN_MemListAlloc(mem, size, align, z_mem);
+  void *memory = DN_MemListAlloc(mem, size, align, z_mem);
   mem->flags = prev_flags;
   return memory;
 }
@@ -1208,9 +1215,9 @@ DN_API bool DN_MemListOwnsPtr(DN_MemList const *mem, void *ptr)
 DN_API DN_Str8x64 DN_MemListInfoStr8x64(DN_MemListInfo info)
 {
   DN_Str8x64 result  = {};
-  DN_Str8x32 used    = DN_ByteCountStr8x32(info.used);
-  DN_Str8x32 commit  = DN_ByteCountStr8x32(info.commit);
-  DN_Str8x32 reserve = DN_ByteCountStr8x32(info.reserve);
+  DN_Str8x32 used    = DN_Str8x32FromByteCountU64Auto(info.used);
+  DN_Str8x32 commit  = DN_Str8x32FromByteCountU64Auto(info.commit);
+  DN_Str8x32 reserve = DN_Str8x32FromByteCountU64Auto(info.reserve);
   // NOTE: Blocks, Used, Commit, Reserve
   result             = DN_Str8x64FromFmt("B=%u U=%.*s C=%.*s R=%.*s", DN_Cast(DN_U32)info.blocks, DN_Str8PrintFmt(used), DN_Str8PrintFmt(commit), DN_Str8PrintFmt(reserve));
   return result;
@@ -1248,9 +1255,10 @@ static bool DN_MemListUAFTracingEnabled_(DN_MemList *mem)
 }
 #endif
 
-DN_API void DN_ArenaUAFCheck(DN_Arena *arena)
+static void DN_ArenaUAFCheck_(DN_Arena *arena, DN_ArenaUAFCheckReportType_ type)
 {
   (void)arena;
+  (void)type;
   #if DN_ARENA_TEMP_MEM_UAF_GUARD
   DN_MemList *mem = arena->mem;
   if (!arena || !mem)
@@ -1261,32 +1269,52 @@ DN_API void DN_ArenaUAFCheck(DN_Arena *arena)
     // check which would cause infinite recursion so we set a flag here to prevent that.
     arena->uaf_guard_is_being_checked = true;
     if (mem->uaf_guard_active_id != arena->uaf_guard_id) {
+      // NOTE: We use the MemList on the arena directly to bypass any potential recursive UAF (if the
+      // current arena is triggering the UAF check then it's already violating so we use the
+      // underlying primitive to allocate memory).
+      DN_Allocator allocator = DN_AllocatorFromMemList(mem);
+
       // NOTE: MSVC does not recognise %'u which is a STB extension which causes a lot of incorrect
       // format arguments warnings that we mute here.
       DN_MSVC_WARNING_PUSH
       DN_MSVC_WARNING_DISABLE(6271) // Extra argument passed to 'DN_Str8FromFmtArena'
       DN_MSVC_WARNING_DISABLE(6067) // _Param_(10) in call to 'DN_LogPrint' must be the address of a string. Actual type: 'int'.
       DN_MSVC_WARNING_DISABLE(6273) // Non-integer passed as _Param_(11) when an integer is required in call to 'DN_LogPrint' Actual type: 'char *'.
-      DN_Str8    prefix = DN_Str8LineBreakStr8(DN_Str8FromFmtArena(arena,
-                                                                   "Arena use-after-free (UAF) detected in temporary memory usage! This allocation (trace "
-                                                                   "shown above) is attempting to allocate memory inside the active temporary region (id: %'u) "
-                                                                   "but belongs to a different region (id: %'u). This means when the active temporary region is "
-                                                                   "released, this allocation will be released and scrubbed causing a potential UAF.\n\nEnsure "
-                                                                   "that scratch memory is deconflicting correctly, scratch and or temporary memory regions have "
-                                                                   "matching begin and end pairs and only the arena view with the active temporary memory region "
-                                                                   "is being allocated from.",
-                                                                   mem->uaf_guard_active_id,
-                                                                   arena->uaf_guard_id),
-                                               100,
-                                               arena);
+      DN_Str8 error_msg = {};
+      if (type == DN_ArenaUAFCheckReportType_AllocViolation) {
+        error_msg = DN_Str8FromFmtAllocator(allocator,
+                                            "Arena use-after-free (UAF) detected in temporary memory usage! This allocation (trace "
+                                            "shown above) is attempting to allocate memory inside the active temporary region (id: %'u) "
+                                            "but belongs to a different region (id: %'u). This means when the active temporary region is "
+                                            "released, this allocation will be released and scrubbed causing a potential UAF.\n\nEnsure "
+                                            "that scratch memory is deconflicting correctly, scratch and or temporary memory regions have "
+                                            "matching begin and end pairs and only the arena view with the active temporary memory region "
+                                            "is being allocated from.",
+                                            mem->uaf_guard_active_id,
+                                            arena->uaf_guard_id);
+      } else {
+        error_msg = DN_Str8Lit("The active temporary memory region recorded on the arena is "
+                               "different from the current temporary memory region recorded on "
+                               "the memory list allocator. This means that a temporary region "
+                               "began but was not ended after the region was completed. Temporary "
+                               "memory regions are enforced in a first-in-last-out manner (FILO) "
+                               "to ensure the developer's intent of what the temporary region "
+                               "spans is logically consistent and always strictly ends and begins "
+                               "within a known lifetime.");
+      }
 
+      DN_Str8 prefix = DN_Str8LineBreakAllocator(error_msg, 100, DN_Str8Lit("\n"), DN_Str8LineBreakMode_AtWord, allocator);
       if (DN_MemListUAFTracingEnabled_(mem)) {
         DN_Str8 curr_stack_trace = DN_Str8Lit("<Unknown: Arena is not using temporary memory>");
         if (arena->uaf_guard_temp_mem)
-          curr_stack_trace = DN_StackTraceWalkResultToStr8(arena, &arena->uaf_guard_temp_mem->trace, 1);
-        curr_stack_trace = DN_Str8PadNewLines(curr_stack_trace, DN_Str8Lit("  "), arena);
+          curr_stack_trace = DN_Str8FromStackTraceAllocator(allocator, &arena->uaf_guard_temp_mem->trace, 1);
+        curr_stack_trace = DN_Str8PadNewLinesAllocator(curr_stack_trace, DN_Str8Lit("  "), allocator);
 
-        DN_Str8 active_stack_trace = DN_Str8PadNewLines(DN_StackTraceWalkResultToStr8(arena, &mem->uaf_guard_active_temp_mem->trace, 1), DN_Str8Lit("  "), arena);
+        DN_Str8 active_stack_trace = DN_Str8Lit("<Unknown: MemList does not have an active temporary memory>");
+        if (mem->uaf_guard_active_temp_mem)
+          active_stack_trace = DN_Str8FromStackTraceAllocator(allocator, &mem->uaf_guard_active_temp_mem->trace, 1);
+        active_stack_trace = DN_Str8PadNewLinesAllocator(active_stack_trace, DN_Str8Lit("  "), allocator);
+
         DN_AssertF(mem->uaf_guard_active_id == arena->uaf_guard_id,
                    "%.*s\n\nThe originating temporary memory region (id: %'u) was created at:"
                    "\n\n  %.*s\n\nThe active temporary memory region (id: %'u) was created at:\n\n  %.*s",
@@ -1296,7 +1324,7 @@ DN_API void DN_ArenaUAFCheck(DN_Arena *arena)
                    mem->uaf_guard_active_id,
                    DN_Str8PrintFmt(active_stack_trace));
       } else {
-        DN_Str8 suffix = DN_Str8LineBreakStr8(DN_MEM_LIST_UAF_TRACING_DISABLED_MORE_INFO_STR8_, 100, arena);
+        DN_Str8 suffix = DN_Str8LineBreakAllocator(DN_MEM_LIST_UAF_TRACING_DISABLED_MORE_INFO_STR8_, 100, DN_Str8Lit("\n"), DN_Str8LineBreakMode_AtWord, allocator);
         DN_AssertF(mem->uaf_guard_active_id == arena->uaf_guard_id, "%.*s%.*s", DN_Str8PrintFmt(prefix), DN_Str8PrintFmt(suffix));
       }
       DN_MSVC_WARNING_POP
@@ -1319,8 +1347,10 @@ DN_API DN_Arena DN_ArenaTempBeginFromMemList(DN_MemList* mem)
   DN_MemListTemp temp_mem = DN_MemListTempBegin(mem);
 
 #if DN_ARENA_TEMP_MEM_UAF_GUARD
+  // NOTE: Below we use the `MemList` and bypass the UAF checks which could cause infinite recursion
+  // depending on how, say, stack-traces are implemented.
   if (DN_MemListUAFTracingEnabled_(mem))
-    temp_mem.trace = DN_StackTraceWalk(&result, 256);
+    temp_mem.trace = DN_StackTraceFromAllocator(DN_AllocatorFromMemList(mem), 256);
 
   // NOTE: Create persistent temp mem and set it on the mem list
   result.uaf_guard_temp_mem      = DN_MemListNewCopy(mem, DN_MemListTemp, &temp_mem);
@@ -1348,50 +1378,9 @@ DN_API void DN_ArenaTempEnd(DN_Arena *arena, DN_ArenaReset reset)
 {
 #if DN_ARENA_TEMP_MEM_UAF_GUARD
   DN_AssertF(arena->uaf_guard_temp_mem, "Arena was not created with temp memory");
+  DN_ArenaUAFCheck_(arena, DN_ArenaUAFCheckReportType_TempEndOutOfOrder);
 #else
   DN_AssertF(arena->temp_mem.mem, "Arena was not created with temp memory");
-#endif
-
-#if DN_ARENA_TEMP_MEM_UAF_GUARD
-  DN_MemList *mem = arena->mem;
-  if (mem->uaf_guard_active_id != arena->uaf_guard_id) {
-    // NOTE: MSVC does not recognise %'u which is a STB extension which causes a lot of incorrect
-    // format arguments warnings that we mute here.
-    DN_MSVC_WARNING_PUSH
-    DN_MSVC_WARNING_DISABLE(6271) // Extra argument passed to 'DN_Str8FromFmtArena'
-    DN_MSVC_WARNING_DISABLE(6067) // _Param_(10) in call to 'DN_LogPrint' must be the address of a string. Actual type: 'int'.
-    DN_MSVC_WARNING_DISABLE(6273) // Non-integer passed as _Param_(11) when an integer is required in call to 'DN_LogPrint' Actual type: 'char *'.
-
-    // TODO: If this triggers, using the arena to format the error message is going to trigger the UAF check which is already failing.
-    DN_Str8 prefix = DN_Str8LineBreakStr8(DN_Str8Lit("The active temporary memory region recorded on the arena is "
-                                                    "different from the current temporary memory region recorded on "
-                                                    "the memory list allocator. This means that a temporary region "
-                                                    "began but was not ended after the region was completed. Temporary "
-                                                    "memory regions are enforced in a first-in-last-out manner (FILO) "
-                                                    "to ensure the developer's intent of what the temporary region "
-                                                    "spans is logically consistent and always strictly ends and begins "
-                                                    "within a known lifetime."),
-                                          100,
-                                          arena);
-
-    if (DN_MemListUAFTracingEnabled_(mem)) {
-      DN_Str8 curr_stack_trace   = DN_Str8PadNewLines(DN_StackTraceWalkResultToStr8(arena, &arena->uaf_guard_temp_mem->trace, 1), DN_Str8Lit("  "), arena);
-      DN_Str8 active_stack_trace = DN_Str8PadNewLines(DN_StackTraceWalkResultToStr8(arena, &mem->uaf_guard_active_temp_mem->trace, 1), DN_Str8Lit("  "), arena);
-      DN_AssertF(mem->uaf_guard_active_id == arena->uaf_guard_id,
-                 "%.*s\n\nThe originating temporary memory region (id: %'u) was created at:"
-                 "\n\n  %.*s\n\nThe active temporary memory region (id: %'u) was created at:\n\n  %.*s",
-                 DN_Str8PrintFmt(prefix),
-                 arena->uaf_guard_id,
-                 DN_Str8PrintFmt(curr_stack_trace),
-                 mem->uaf_guard_active_id,
-                 DN_Str8PrintFmt(active_stack_trace));
-    } else {
-      DN_Str8 suffix = DN_Str8LineBreakStr8(DN_MEM_LIST_UAF_TRACING_DISABLED_MORE_INFO_STR8_, 100, arena);
-      DN_AssertF(mem->uaf_guard_active_id == arena->uaf_guard_id, "%.*s%.*s", DN_Str8PrintFmt(prefix), DN_Str8PrintFmt(suffix));
-    }
-    DN_MSVC_WARNING_POP
-    DN_Assert(arena->mem->uaf_guard_active_id == arena->uaf_guard_id);
-  }
 #endif
 
   if (reset == DN_ArenaReset_Yes) {
@@ -1403,6 +1392,7 @@ DN_API void DN_ArenaTempEnd(DN_Arena *arena, DN_ArenaReset reset)
   }
 
 #if DN_ARENA_TEMP_MEM_UAF_GUARD
+  DN_MemList *mem                = arena->mem;
   mem->uaf_guard_active_id       = arena->uaf_guard_prev_id;
   mem->uaf_guard_active_temp_mem = arena->uaf_guard_prev_temp_mem;
 
@@ -1414,21 +1404,21 @@ DN_API void DN_ArenaTempEnd(DN_Arena *arena, DN_ArenaReset reset)
 
 DN_API void *DN_ArenaAlloc(DN_Arena *arena, DN_U64 size, uint8_t align, DN_ZMem z_mem)
 {
-  DN_ArenaUAFCheck(arena);
+  DN_ArenaUAFCheck_(arena, DN_ArenaUAFCheckReportType_AllocViolation);
   void *result = DN_MemListAlloc(arena->mem, size, align, z_mem);
   return result;
 }
 
 DN_API void *DN_ArenaAllocContiguous(DN_Arena *arena, DN_U64 size, uint8_t align, DN_ZMem z_mem)
 {
-  DN_ArenaUAFCheck(arena);
+  DN_ArenaUAFCheck_(arena, DN_ArenaUAFCheckReportType_AllocViolation);
   void *result = DN_MemListAllocContiguous(arena->mem, size, align, z_mem);
   return result;
 }
 
 DN_API void *DN_ArenaCopy(DN_Arena *arena, void const *data, DN_U64 size, uint8_t align)
 {
-  DN_ArenaUAFCheck(arena);
+  DN_ArenaUAFCheck_(arena, DN_ArenaUAFCheckReportType_AllocViolation);
   void *result = DN_MemListCopy(arena->mem, data, size, align);
   return result;
 }
@@ -1570,7 +1560,7 @@ DN_API DN_ErrSink* DN_ErrSinkBegin_(DN_ErrSink *err, DN_ErrSinkMode mode, DN_Cal
     DN_Str8Builder builder = DN_Str8BuilderFromArena(err->arena);
     for (DN_ForItSize(it, DN_ErrSinkNode, err->stack, err->stack_size))
       DN_Str8BuilderAppendF(&builder, "  [%04zu] %.*s:%u %.*s\n", it.index, DN_Str8PrintFmt(it.data->call_site.file), it.data->call_site.line, DN_Str8PrintFmt(it.data->call_site.function));
-    DN_Str8 msg = DN_Str8BuilderBuild(&builder, err->arena);
+    DN_Str8 msg = DN_Str8FromStr8BuilderArena(&builder, err->arena);
     DN_AssertF(err->stack_size < DN_ArrayCountU(err->stack), "Error sink has run out of error scopes, potential leak. Scopes were\n%.*s", DN_Str8PrintFmt(msg));
   }
 
@@ -1677,7 +1667,7 @@ DN_API DN_Str8 DN_ErrSinkEndStr8(DN_Arena *arena, DN_ErrSink *err)
   err->stack_size--;
   DN_MemListPopTo(err->arena->mem, node->arena_pos);
 
-  result = DN_Str8BuilderBuild(&builder, arena);
+  result = DN_Str8FromStr8BuilderArena(&builder, arena);
   return result;
 }
 
@@ -1711,7 +1701,7 @@ DN_API bool DN_ErrSinkEndLogError_(DN_ErrSink *err, DN_CallSite call_site, DN_St
     }
 
     // NOTE: Log the error
-    DN_Str8 log = DN_Str8BuilderBuild(&builder, err->arena);
+    DN_Str8 log = DN_Str8FromStr8BuilderArena(&builder, err->arena);
     DN_LogPrint(DN_LogTypeParamFromType(DN_LogType_Error), call_site, DN_LogFlags_Nil, "%.*s", DN_Str8PrintFmt(log));
 
     if (node->mode == DN_ErrSinkMode_DebugBreakOnErrorLog)
@@ -1786,43 +1776,52 @@ DN_API void DN_ErrSinkAppendF_(DN_ErrSink *err, DN_U32 error_code, DN_CallSite c
 
 DN_THREAD_LOCAL DN_TCCore *g_dn_thread_context;
 
-DN_API void DN_TCInit(DN_TCCore *tc, DN_U64 thread_id, DN_Arena *main_arena, DN_Arena *temp_a_arena, DN_Arena *temp_b_arena, DN_Arena *err_sink_arena)
+DN_API void DN_TCInit(DN_TCCore *tc, DN_U64 thread_id, DN_Arena *main_arena, DN_Arena *temp_arenas, DN_USize temp_arenas_count, DN_Arena *err_sink_arena)
 {
   tc->thread_id      = thread_id;
   tc->main_arena     = main_arena;
   tc->main_pool      = DN_PoolFromArena(tc->main_arena, 0);
-  tc->temp_a_arena   = temp_a_arena;
-  tc->temp_b_arena   = temp_b_arena;
   tc->err_sink.arena = err_sink_arena;
+  DN_Assert(temp_arenas_count < DN_ArrayCountU(tc->temp_arenas));
+  for (DN_ForIndexU(index, temp_arenas_count))
+    tc->temp_arenas[tc->temp_arenas_count++] = temp_arenas + index;
 }
 
-DN_API void DN_TCInitFromMemFuncs(DN_TCCore *tc, DN_U64 thread_id, DN_TCInitArgs *args, DN_MemFuncs mem_funcs)
+DN_API DN_TCInitArgs DN_TCInitArgsDefault()
 {
-  DN_U64 main_reserve     = (args && args->main_reserve)     ? args->main_reserve     : DN_Kilobytes(64);
-  DN_U64 main_commit      = (args && args->main_commit)      ? args->main_commit      : DN_Kilobytes(4);
-  DN_U64 temp_reserve     = (args && args->temp_reserve)     ? args->temp_reserve     : DN_Kilobytes(64);
-  DN_U64 temp_commit      = (args && args->temp_commit)      ? args->temp_commit      : DN_Kilobytes(4);
-  DN_U64 err_sink_reserve = (args && args->err_sink_reserve) ? args->err_sink_reserve : DN_Kilobytes(64);
-  DN_U64 err_sink_commit  = (args && args->err_sink_commit)  ? args->err_sink_commit  : DN_Kilobytes(4);
+  DN_TCInitArgs result    = {};
+  result.main_reserve     = DN_Kilobytes(64);
+  result.main_commit      = DN_Kilobytes(4);
+  result.temp_reserve     = DN_Kilobytes(64);
+  result.temp_commit      = DN_Kilobytes(4);
+  result.temp_count       = 2;
+  result.err_sink_reserve = DN_Kilobytes(64);
+  result.err_sink_commit  = DN_Kilobytes(4);
+  return result;
+}
 
-  tc->main_arena_mem_     = DN_MemListFromMemFuncs(main_reserve, main_commit, DN_MemFlags_AllocCanLeak | DN_MemFlags_NoAllocTrack, mem_funcs);
-  tc->temp_a_arena_mem_   = DN_MemListFromMemFuncs(temp_reserve, temp_commit, DN_MemFlags_AllocCanLeak | DN_MemFlags_NoAllocTrack, mem_funcs);
-  tc->temp_b_arena_mem_   = DN_MemListFromMemFuncs(temp_reserve, temp_commit, DN_MemFlags_AllocCanLeak | DN_MemFlags_NoAllocTrack, mem_funcs);
-  tc->err_sink_arena_mem_ = DN_MemListFromMemFuncs(err_sink_reserve, err_sink_commit, DN_MemFlags_AllocCanLeak | DN_MemFlags_NoAllocTrack, mem_funcs);
+DN_API void DN_TCInitFromMemFuncs(DN_TCCore *tc, DN_U64 thread_id, DN_TCInitArgs args, DN_MemFuncs mem_funcs)
+{
+  DN_Assert(args.temp_count <= DN_ArrayCountU(tc->temp_arenas));
+  tc->main_arena_mem_     = DN_MemListFromMemFuncs(args.main_reserve, args.main_commit, DN_MemFlags_AllocCanLeak | DN_MemFlags_NoAllocTrack, mem_funcs);
+  for (DN_ForIndexU(index, args.temp_count)) {
+    tc->temp_arena_mems_[index] = DN_MemListFromMemFuncs(args.temp_reserve, args.temp_commit, DN_MemFlags_AllocCanLeak | DN_MemFlags_NoAllocTrack, mem_funcs);
+    tc->temp_arenas_[index]     = DN_ArenaFromMemList(&tc->temp_arena_mems_[index]);
+  }
+  tc->err_sink_arena_mem_ = DN_MemListFromMemFuncs(args.err_sink_reserve, args.err_sink_commit, DN_MemFlags_AllocCanLeak | DN_MemFlags_NoAllocTrack, mem_funcs);
   tc->main_arena_         = DN_ArenaFromMemList(&tc->main_arena_mem_);
-  tc->temp_a_arena_       = DN_ArenaFromMemList(&tc->temp_a_arena_mem_);
-  tc->temp_b_arena_       = DN_ArenaFromMemList(&tc->temp_b_arena_mem_);
   tc->err_sink_arena_     = DN_ArenaFromMemList(&tc->err_sink_arena_mem_);
-
-  DN_TCInit(tc, thread_id, &tc->main_arena_, &tc->temp_a_arena_, &tc->temp_b_arena_, &tc->err_sink_arena_);
+  DN_TCInit(tc, thread_id, &tc->main_arena_, tc->temp_arenas_, args.temp_count, &tc->err_sink_arena_);
 }
 
 DN_API void DN_TCDeinit(DN_TCCore *tc, DN_TCDeinitArenas deinit_arenas)
 {
   if (deinit_arenas == DN_TCDeinitArenas_Yes) {
     DN_MemListDeinit(tc->main_arena->mem);
-    DN_MemListDeinit(tc->temp_a_arena->mem);
-    DN_MemListDeinit(tc->temp_b_arena->mem);
+    for (DN_ForIndexU(index, tc->temp_arenas_count)) {
+      DN_MemListDeinit(tc->temp_arenas[index]->mem);
+      DN_MemListDeinit(tc->temp_arenas[index]->mem);
+    }
     DN_MemListDeinit(tc->err_sink.arena->mem);
   }
 }
@@ -1850,19 +1849,74 @@ DN_API DN_Arena *DN_TCMainArena()
 
 DN_API DN_Pool *DN_TCMainPool()
 {
-  DN_TCCore *tc    = DN_TCGet();
-  DN_Pool  *result = &tc->main_pool;
+  DN_TCCore *tc     = DN_TCGet();
+  DN_Pool   *result = &tc->main_pool;
   return result;
 }
 
-DN_API DN_Arena DN_TCTempArena(DN_Arena **conflicts, DN_USize count)
+DN_API DN_Arena DN_TCTempArenaAllocator(DN_Allocator *conflicts, DN_USize count)
+{
+  DN_MemList *conflict_mem_lists[8];
+  DN_USize    conflict_mem_lists_count = 0;
+  for (DN_ForItSize(it, DN_Allocator, conflicts, count)) {
+    DN_Allocator *allocator = it.data;
+    if (!allocator->context)
+      continue;
+
+    DN_MemList *mem_list = nullptr;
+    switch (allocator->type) {
+      case DN_AllocatorType_MemList: mem_list = DN_Cast(DN_MemList *)allocator->context; break;
+
+      case DN_AllocatorType_Arena: {
+        DN_Arena *arena = DN_Cast(DN_Arena *) allocator->context;
+        mem_list        = arena->mem;
+      } break;
+
+      case DN_AllocatorType_Pool: {
+        DN_Pool *pool = DN_Cast(DN_Pool *) allocator->context;
+        mem_list      = pool->arena ? pool->arena->mem : nullptr;
+      } break;
+    }
+
+    if (!mem_list)
+      continue;
+
+    void *added = DN_LArrayAppend(conflict_mem_lists, &conflict_mem_lists_count, mem_list);
+    DN_Assert(added);
+  }
+
+  DN_TCCore  *tc     = DN_TCGet();
+  DN_Arena    result = {};
+  for (DN_ForItSize(it, DN_Arena *, tc->temp_arenas, tc->temp_arenas_count)) {
+    bool        is_usable = true;
+    DN_Arena   *rhs_arena = *it.data;
+    DN_MemList *rhs_mem   = rhs_arena->mem;
+    for (DN_ForItSize(conflict_it, DN_MemList*, conflict_mem_lists, conflict_mem_lists_count)) {
+      DN_MemList *lhs_mem = *conflict_it.data;
+      if (lhs_mem == rhs_mem) {
+        is_usable = false;
+        break;
+      }
+    }
+
+    if (is_usable) {
+      result = DN_ArenaTempBeginFromMemList(rhs_mem);
+      break;
+    }
+  }
+
+  DN_AssertF(result.mem, "All temp arenas are being used, there are none left to return to the caller");
+  return result;
+}
+
+DN_API DN_Arena DN_TCTempArenaFromArena(DN_Arena **conflicts, DN_USize count)
 {
   DN_TCCore  *tc           = DN_TCGet();
-  DN_MemList *candidates[] = {tc->temp_a_arena->mem, tc->temp_b_arena->mem};
   DN_Arena    result       = {};
-  for (DN_ForItCArray(it, DN_MemList *, candidates)) {
+  for (DN_ForItSize(it, DN_Arena *, tc->temp_arenas, tc->temp_arenas_count)) {
     bool        is_usable = true;
-    DN_MemList *rhs_mem   = *it.data;
+    DN_Arena   *rhs_arena = *it.data;
+    DN_MemList *rhs_mem   = rhs_arena->mem;
     for (DN_ForItSize(conflict_it, DN_Arena *, conflicts, count)) {
       DN_Arena   *lhs_arena = *conflict_it.data;
       DN_MemList *lhs_mem   = lhs_arena->mem;
@@ -1885,7 +1939,7 @@ DN_API DN_Arena DN_TCTempArena(DN_Arena **conflicts, DN_USize count)
 #if defined(__cplusplus)
 DN_TCScratchCpp::DN_TCScratchCpp(DN_Arena **conflicts, DN_USize count)
 {
-  this->data = DN_TCScratchBegin(conflicts, count);
+  this->data = DN_TCScratchBeginArena(conflicts, count);
 }
 
 DN_TCScratchCpp::~DN_TCScratchCpp()
@@ -1894,10 +1948,17 @@ DN_TCScratchCpp::~DN_TCScratchCpp()
 }
 #endif
 
-DN_API DN_TCScratch DN_TCScratchBegin(DN_Arena **conflicts, DN_USize count)
+DN_API DN_TCScratch DN_TCScratchBeginAllocator(DN_Allocator *conflicts, DN_USize count)
 {
   DN_TCScratch result = {};
-  result.arena        = DN_TCTempArena(conflicts, count);
+  result.arena        = DN_TCTempArenaAllocator(conflicts, count);
+  return result;
+}
+
+DN_API DN_TCScratch DN_TCScratchBeginArena(DN_Arena **conflicts, DN_USize count)
+{
+  DN_TCScratch result = {};
+  result.arena        = DN_TCTempArenaFromArena(conflicts, count);
   return result;
 }
 
@@ -2276,6 +2337,43 @@ DN_API DN_U8x32FromResult DN_U8x32FromDecimalStr8(DN_Str8 decimal)
   return result;
 }
 
+DN_API DN_Allocator DN_AllocatorFromMemList(DN_MemList *mem)
+{
+  DN_Allocator result = {};
+  result.type         = DN_AllocatorType_MemList;
+  result.context      = mem;
+  return result;
+}
+
+DN_API DN_Allocator DN_AllocatorFromArena(DN_Arena *arena)
+{
+  DN_Allocator result = {};
+  result.type         = DN_AllocatorType_Arena;
+  result.context      = arena;
+  return result;
+}
+
+DN_API DN_Allocator DN_AllocatorFromPool(DN_Pool *pool)
+{
+  DN_Allocator result = {};
+  result.type         = DN_AllocatorType_Pool;
+  result.context      = pool;
+  return result;
+}
+
+DN_API void *DN_AllocatorAlloc(DN_Allocator allocator, DN_USize size, DN_U8 align, DN_ZMem z_mem)
+{
+  void *result = nullptr;
+  if (allocator.context) {
+    switch (allocator.type) {
+      case DN_AllocatorType_Arena:   result = DN_ArenaAlloc  (DN_Cast(DN_Arena *) allocator.context,   size + 1, align, z_mem); break;
+      case DN_AllocatorType_Pool:    result = DN_PoolAlloc   (DN_Cast(DN_Pool *) allocator.context,    size + 1);               break;
+      case DN_AllocatorType_MemList: result = DN_MemListAlloc(DN_Cast(DN_MemList *) allocator.context, size + 1, align, z_mem); break;
+    }
+  }
+  return result;
+}
+
 DN_API DN_FmtAppendResult DN_FmtVAppend(char *buf, DN_USize *buf_size, DN_USize buf_max, char const *fmt, va_list args)
 {
   DN_FmtAppendResult result         = {};
@@ -2344,23 +2442,26 @@ DN_API DN_USize DN_CStr16Size(wchar_t const *src)
   return result;
 }
 
-DN_API DN_Str8 DN_Str8AllocArena(DN_USize size, DN_ZMem z_mem, DN_Arena *arena)
+DN_API DN_Str8 DN_Str8AllocAllocator(DN_USize size, DN_ZMem z_mem, DN_Allocator allocator)
 {
   DN_Str8 result = {};
-  result.data    = DN_ArenaNewArray(arena, char, size + 1, z_mem);
-  if (result.data)
-    result.size = size;
-  result.data[result.size] = 0;
+  result.data    = DN_Cast(char *) DN_AllocatorAlloc(allocator, size + 1, alignof(char), z_mem);
+  if (result.data) {
+    result.size              = size;
+    result.data[result.size] = 0;
+  }
+  return result;
+}
+
+DN_API DN_Str8 DN_Str8AllocArena(DN_USize size, DN_ZMem z_mem, DN_Arena *arena)
+{
+  DN_Str8 result = DN_Str8AllocAllocator(size, z_mem, DN_AllocatorFromArena(arena));
   return result;
 }
 
 DN_API DN_Str8 DN_Str8AllocPool(DN_USize size, DN_Pool *pool)
 {
-  DN_Str8 result = {};
-  result.data    = DN_PoolNewArray(pool, char, size + 1);
-  if (result.data)
-    result.size = size;
-  result.data[result.size] = 0;
+  DN_Str8 result = DN_Str8AllocAllocator(size, DN_ZMem_No, DN_AllocatorFromPool(pool));
   return result;
 }
 
@@ -2394,10 +2495,10 @@ DN_API DN_Str8 DN_Str8FromPtrPool(void const *data, DN_USize size, DN_Pool *pool
   return result;
 }
 
-DN_API DN_Str8 DN_Str8FromStr8Arena(DN_Str8 string, DN_Arena *arena)
+DN_API DN_Str8 DN_Str8FromStr8Allocator(DN_Str8 string, DN_Allocator allocator)
 {
   DN_Str8 result = {};
-  result.data    = DN_Cast(char *) DN_ArenaAlloc(arena, string.size + 1, alignof(char), DN_ZMem_No);
+  result.data    = DN_Cast(char *) DN_AllocatorAlloc(allocator, string.size + 1, alignof(char), DN_ZMem_No);
   if (result.data) {
     DN_Memcpy(result.data, string.data, string.size);
     result.data[string.size] = 0;
@@ -2406,27 +2507,42 @@ DN_API DN_Str8 DN_Str8FromStr8Arena(DN_Str8 string, DN_Arena *arena)
   return result;
 }
 
+DN_API DN_Str8 DN_Str8FromStr8Arena(DN_Str8 string, DN_Arena *arena)
+{
+  DN_Str8 result = DN_Str8FromStr8Allocator(string, DN_AllocatorFromArena(arena));
+  return result;
+}
+
 DN_API DN_Str8 DN_Str8FromStr8Pool(DN_Str8 string, DN_Pool *pool)
 {
-  DN_Str8 result = {};
-  result.data    = DN_Cast(char *) DN_PoolAlloc(pool, string.size + 1);
+  DN_Str8 result = DN_Str8FromStr8Allocator(string, DN_AllocatorFromPool(pool));
+  return result;
+}
+
+DN_API DN_Str8 DN_Str8FromFmtVAllocator(DN_Allocator allocator, DN_FMT_ATTRIB char const *fmt, va_list args)
+{
+  DN_USize size   = DN_FmtVSize(fmt, args);
+  DN_Str8  result = DN_Str8AllocAllocator(size, DN_ZMem_No, allocator);
   if (result.data) {
-    DN_Memcpy(result.data, string.data, string.size);
-    result.data[string.size] = 0;
-    result.size              = string.size;
+    DN_USize written = 0;
+    DN_FmtVAppend(result.data, &written, result.size + 1, fmt, args);
+    DN_Assert(written == result.size);
   }
   return result;
 }
 
 DN_API DN_Str8 DN_Str8FromFmtVArena(DN_Arena *arena, DN_FMT_ATTRIB char const *fmt, va_list args)
 {
-  DN_USize size   = DN_FmtVSize(fmt, args);
-  DN_Str8  result = DN_Str8AllocArena(size, DN_ZMem_No, arena);
-  if (result.data) {
-    DN_USize written = 0;
-    DN_FmtVAppend(result.data, &written, result.size + 1, fmt, args);
-    DN_Assert(written == result.size);
-  }
+  DN_Str8 result = DN_Str8FromFmtVAllocator(DN_AllocatorFromArena(arena), fmt, args);
+  return result;
+}
+
+DN_API DN_Str8 DN_Str8FromFmtAllocator(DN_Allocator allocator, DN_FMT_ATTRIB char const *fmt, ...)
+{
+  va_list va;
+  va_start(va, fmt);
+  DN_Str8 result = DN_Str8FromFmtVAllocator(allocator, fmt, va);
+  va_end(va);
   return result;
 }
 
@@ -2441,13 +2557,7 @@ DN_API DN_Str8 DN_Str8FromFmtArena(DN_Arena *arena, DN_FMT_ATTRIB char const *fm
 
 DN_API DN_Str8 DN_Str8FromFmtVPool(DN_Pool *pool, DN_FMT_ATTRIB char const *fmt, va_list args)
 {
-  DN_USize size   = DN_FmtVSize(fmt, args);
-  DN_Str8  result = DN_Str8AllocPool(size, pool);
-  if (result.data) {
-    DN_USize written = 0;
-    DN_FmtVAppend(result.data, &written, result.size + 1, fmt, args);
-    DN_Assert(written == result.size);
-  }
+  DN_Str8 result = DN_Str8FromFmtVAllocator(DN_AllocatorFromPool(pool), fmt, args);
   return result;
 }
 
@@ -3266,7 +3376,7 @@ DN_API DN_Str8 DN_Str8Replace(DN_Str8       string,
     return result;
   }
 
-  DN_TCScratch   scratch        = DN_TCScratchBegin(&arena, 1);
+  DN_TCScratch   scratch        = DN_TCScratchBeginArena(&arena, 1);
   DN_Str8Builder string_builder = DN_Str8BuilderFromArena(&scratch.arena);
   DN_USize       max            = string.size - find.size;
   DN_USize       head           = start_index;
@@ -3298,7 +3408,7 @@ DN_API DN_Str8 DN_Str8Replace(DN_Str8       string,
   } else {
     DN_Str8 remainder = DN_Str8FromPtr(string.data + head, string.size - head);
     DN_Str8BuilderAppendRef(&string_builder, remainder);
-    result = DN_Str8BuilderBuild(&string_builder, arena);
+    result = DN_Str8FromStr8BuilderArena(&string_builder, arena);
   }
   DN_TCScratchEnd(&scratch);
   return result;
@@ -3316,9 +3426,9 @@ DN_API DN_Str8 DN_Str8ReplaceInsensitive(DN_Str8 string, DN_Str8 find, DN_Str8 r
   return result;
 }
 
-DN_API DN_Str8 DN_Str8PadNewLines(DN_Str8 string, DN_Str8 pad_string, DN_Arena *arena)
+DN_API DN_Str8 DN_Str8PadNewLinesAllocator(DN_Str8 string, DN_Str8 pad_string, DN_Allocator allocator)
 {
-  DN_TCScratch   scratch = DN_TCScratchBegin(&arena, 1);
+  DN_TCScratch   scratch = DN_TCScratchBeginAllocator(&allocator, 1);
   DN_Str8Builder builder = DN_Str8BuilderFromArena(&scratch.arena);
   DN_Str8        it      = string;
   while (it.size) {
@@ -3327,8 +3437,14 @@ DN_API DN_Str8 DN_Str8PadNewLines(DN_Str8 string, DN_Str8 pad_string, DN_Arena *
     it = split.rhs;
   }
 
-  DN_Str8 result = DN_Str8BuilderBuildDelimited(&builder, pad_string, arena);
+  DN_Str8 result = DN_Str8FromStr8BuilderDelimitAllocator(&builder, pad_string, allocator);
   DN_TCScratchEnd(&scratch);
+  return result;
+}
+
+DN_API DN_Str8 DN_Str8PadNewLinesArena(DN_Str8 string, DN_Str8 pad_string, DN_Arena *arena)
+{
+  DN_Str8 result = DN_Str8PadNewLinesAllocator(string, pad_string, DN_AllocatorFromArena(arena));
   return result;
 }
 
@@ -3373,73 +3489,88 @@ DN_API DN_USize DN_USizeCodepointCountFromUTF8(DN_Str8 str, DN_CodepointCountFla
   return result;
 }
 
-DN_API DN_Str8 DN_Str8LineBreakStr8(DN_Str8 src, DN_USize desired_width, DN_Arena *arena)
+DN_API DN_Str8 DN_Str8LineBreakAllocator(DN_Str8 src, DN_USize desired_width, DN_Str8 delimiter, DN_Str8LineBreakMode mode, DN_Allocator allocator)
 {
-  DN_TCScratch   scratch = DN_TCScratchBegin(&arena, 1);
+  DN_TCScratch   scratch = DN_TCScratchBeginAllocator(&allocator, 1);
   DN_Str8Builder builder = DN_Str8BuilderFromArena(&scratch.arena);
 
-  char*   start = src.data;
-  char*   end   = src.data;
-  DN_Str8 it    = src;
-  while (it.size) {
-    DN_Str8             splitters[]      = {DN_Str8Lit(" "), DN_Str8Lit("\n")};
-    DN_Str8BSplitResult split            = DN_Str8BSplitArray(it, splitters, DN_ArrayCountU(splitters));
-    DN_USize            curr_line_length = end - start;
+  if (mode == DN_Str8LineBreakMode_AtWord) {
+    char*   start = src.data;
+    char*   end   = src.data;
+    DN_Str8 it    = src;
+    while (it.size) {
+      DN_Str8             splitters[]      = {DN_Str8Lit(" "), DN_Str8Lit("\n")};
+      DN_Str8BSplitResult split            = DN_Str8BSplitArray(it, splitters, DN_ArrayCountU(splitters));
+      DN_USize            curr_line_length = end - start;
 
-    // Handle explicit newlines in input
-    if (split.input_index == 1 /*the newline*/) {
-      if (curr_line_length == 0 && split.lhs.size)
+      // Handle explicit newlines in input
+      if (split.input_index == 1 /*the newline*/) {
+        if (curr_line_length == 0 && split.lhs.size)
+          start = split.lhs.data;
+        if (split.lhs.size)
+          end = DN_Str8End(split.lhs);
+        DN_Str8BuilderAppendRef(&builder, DN_Str8FromPtr(start, end - start));
+        start = split.rhs.data;
+        end   = split.rhs.data;
+        it    = split.rhs;
+        continue;
+      }
+
+      // Skip empty segments (multiple spaces, leading/trailing spaces)
+      if (split.lhs.size == 0) {
+        it = split.rhs;
+        continue;
+      }
+
+      // First word on this line
+      if (curr_line_length == 0) {
         start = split.lhs.data;
-      if (split.lhs.size)
+        end   = DN_Str8End(split.lhs);
+        it    = split.rhs;
+        continue;
+      }
+
+      // Check if adding this word (plus separator space) would overflow
+      DN_USize combined_length = curr_line_length + 1 + split.lhs.size;
+      if (combined_length > desired_width) {
+        // Commit current line, start new line with current word
+        DN_Str8BuilderAppendRef(&builder, DN_Str8FromPtr(start, end - start));
+        start = split.lhs.data;
+        end   = DN_Str8End(split.lhs);
+        it    = split.rhs;
+      } else {
+        // Add word to current line
         end = DN_Str8End(split.lhs);
+        it  = split.rhs;
+      }
+    }
+
+    // Append final line
+    if (end > start)
       DN_Str8BuilderAppendRef(&builder, DN_Str8FromPtr(start, end - start));
-      start = split.rhs.data;
-      end   = split.rhs.data;
-      it    = split.rhs;
-      continue;
-    }
-
-    // Skip empty segments (multiple spaces, leading/trailing spaces)
-    if (split.lhs.size == 0) {
-      it = split.rhs;
-      continue;
-    }
-
-    // First word on this line
-    if (curr_line_length == 0) {
-      start = split.lhs.data;
-      end   = DN_Str8End(split.lhs);
-      it    = split.rhs;
-      continue;
-    }
-
-    // Check if adding this word (plus separator space) would overflow
-    DN_USize combined_length = curr_line_length + 1 + split.lhs.size;
-    if (combined_length > desired_width) {
-      // Commit current line, start new line with current word
-      DN_Str8BuilderAppendRef(&builder, DN_Str8FromPtr(start, end - start));
-      start = split.lhs.data;
-      end   = DN_Str8End(split.lhs);
-      it    = split.rhs;
-    } else {
-      // Add word to current line
-      end = DN_Str8End(split.lhs);
-      it  = split.rhs;
+  } else {
+    DN_Str8 it = src;
+    while (it.size) {
+      DN_Str8 chunk = DN_Str8Subset(it, 0, desired_width);
+      DN_Str8BuilderAppendRef(&builder, chunk);
+      it = DN_Str8Advance(it, desired_width);
     }
   }
 
-  // Append final line
-  if (end > start)
-    DN_Str8BuilderAppendRef(&builder, DN_Str8FromPtr(start, end - start));
-
-  DN_Str8 result = DN_Str8BuilderBuildDelimited(&builder, DN_Str8Lit("\n"), arena);
+  DN_Str8 result = DN_Str8FromStr8BuilderDelimitAllocator(&builder, delimiter, allocator);
   DN_TCScratchEnd(&scratch);
+  return result;
+}
+
+DN_API DN_Str8 DN_Str8LineBreakArena(DN_Str8 src, DN_USize desired_width, DN_Str8 delimiter, DN_Str8LineBreakMode mode,  DN_Arena *arena)
+{
+  DN_Str8 result = DN_Str8LineBreakAllocator(src, desired_width, delimiter, mode, DN_AllocatorFromArena(arena));
   return result;
 }
 
 DN_API DN_Str8 DN_Str8Table(DN_Str8 const *rows, DN_USize num_rows, DN_USize num_cols, DN_Str8TableFlags flags, DN_Arena *arena)
 {
-  DN_TCScratch scratch         = DN_TCScratchBegin(&arena, 1);
+  DN_TCScratch scratch         = DN_TCScratchBeginArena(&arena, 1);
   DN_U16       col_widths[128] = {};
   for (DN_USize i = 0; i < num_cols; i++) {
     for (DN_USize j = 0; j < num_rows; j++) {
@@ -3492,7 +3623,7 @@ DN_API DN_Str8 DN_Str8Table(DN_Str8 const *rows, DN_USize num_rows, DN_USize num
     DN_Str8BuilderAppendF(&builder, "+");
   }
 
-  DN_Str8 result = DN_Str8BuilderBuild(&builder, arena);
+  DN_Str8 result = DN_Str8FromStr8BuilderArena(&builder, arena);
   DN_TCScratchEnd(&scratch);
   return result;
 }
@@ -3533,6 +3664,99 @@ DN_API DN_Str8 DN_Str8RenderSpaceSep(DN_Str8Slice slice, DN_Arena *arena)
   DN_Str8 result = DN_Str8SliceRender(slice, DN_Str8Lit(" "), arena);
   return result;
 }
+
+DN_API int DN_Str8CompareNatural(DN_Str8 lhs, DN_Str8 rhs, DN_Str8EqCase eq_case)
+{
+  const char *lhs_it = lhs.data;
+  const char *rhs_it = rhs.data;
+  const char *lhs_end = lhs.data + lhs.size;
+  const char *rhs_end = rhs.data + rhs.size;
+
+  while (lhs_it < lhs_end && rhs_it < rhs_end) {
+    // NOTE: Skip leading spaces
+    while (lhs_it < lhs_end && DN_CharIsWhitespace(*lhs_it))
+      lhs_it++;
+    while (rhs_it < rhs_end && DN_CharIsWhitespace(*rhs_it))
+      rhs_it++;
+
+    if (lhs_it >= lhs_end || rhs_it >= rhs_end)
+      break;
+
+    // NOTE: Check if current positions are digits
+    if (DN_CharIsDigit(*lhs_it) && DN_CharIsDigit(*rhs_it)) {
+      // NOTE: Extract full number from lhs
+      DN_U64 lhs_num = 0;
+      while (lhs_it < lhs_end && DN_CharIsDigit(*lhs_it)) {
+        lhs_num = lhs_num * 10 + (*lhs_it - '0');
+        lhs_it++;
+      }
+
+      // NOTE: Extract full number from rhs
+      DN_U64 rhs_num = 0;
+      while (rhs_it < rhs_end && DN_CharIsDigit(*rhs_it)) {
+        rhs_num = rhs_num * 10 + (*rhs_it - '0');
+        rhs_it++;
+      }
+
+      if (lhs_num != rhs_num)
+        return (lhs_num < rhs_num) ? -1 : 1;
+    } else {
+      // NOTE: Compare non-digit characters
+      char lhs_ch = *lhs_it;
+      char rhs_ch = *rhs_it;
+
+      if (eq_case == DN_Str8EqCase_Insensitive) {
+        if (DN_CharIsAlphabet(lhs_ch))
+          lhs_ch = DN_CharToLower(lhs_ch);
+        if (DN_CharIsAlphabet(rhs_ch))
+          rhs_ch = DN_CharToLower(rhs_ch);
+      }
+
+      if (lhs_ch != rhs_ch)
+        return (lhs_ch < rhs_ch) ? -1 : 1;
+      lhs_it++;
+      rhs_it++;
+    }
+  }
+
+  // NOTE: One string is prefix of other; shorter comes first
+  if (lhs_it < lhs_end)
+    return 1;
+  if (rhs_it < rhs_end)
+    return -1;
+  return 0;
+}
+
+DN_API int DN_Str8CompareLexicographic(DN_Str8 lhs, DN_Str8 rhs, DN_Str8EqCase eq_case)
+{
+  const char *lhs_it  = lhs.data;
+  const char *rhs_it  = rhs.data;
+  const char *lhs_end = lhs.data + lhs.size;
+  const char *rhs_end = rhs.data + rhs.size;
+
+  while (lhs_it < lhs_end && rhs_it < rhs_end) {
+      char lhs_ch = *lhs_it;
+      char rhs_ch = *rhs_it;
+      if (eq_case == DN_Str8EqCase_Insensitive) {
+        if (DN_CharIsAlphabet(lhs_ch))
+          lhs_ch = DN_CharToLower(lhs_ch);
+        if (DN_CharIsAlphabet(rhs_ch))
+          rhs_ch = DN_CharToLower(rhs_ch);
+      }
+      if (lhs_ch != rhs_ch)
+        return (lhs_ch < rhs_ch) ? -1 : 1;
+      lhs_it++;
+      rhs_it++;
+  }
+
+  // NOTE: One string is prefix of other; shorter comes first
+  if (lhs.size < rhs.size)
+    return -1;
+  if (rhs.size < lhs.size)
+    return 1;
+  return 0;
+}
+
 
 DN_API bool DN_Str16Eq(DN_Str16 lhs, DN_Str16 rhs)
 {
@@ -3821,37 +4045,47 @@ DN_API bool DN_Str8BuilderErase(DN_Str8Builder *builder, DN_Str8 string)
   return false;
 }
 
-DN_API DN_Str8 DN_Str8BuilderBuild(DN_Str8Builder const *builder, DN_Arena *arena)
+DN_API DN_Str8 DN_Str8FromStr8BuilderAllocator(DN_Str8Builder const *builder, DN_Allocator allocator)
 {
-  DN_Str8 result = DN_Str8BuilderBuildDelimited(builder, DN_Str8Lit(""), arena);
+  DN_Str8 result = DN_Str8FromStr8BuilderDelimitAllocator(builder, DN_Str8Lit(""), allocator);
   return result;
 }
 
-DN_API DN_Str8 DN_Str8BuilderBuildDelimited(DN_Str8Builder const *builder, DN_Str8 delimiter, DN_Arena *arena)
+DN_API DN_Str8 DN_Str8FromStr8BuilderArena(DN_Str8Builder const *builder, DN_Arena *arena)
 {
-  DN_Str8 result = DN_ZeroInit;
+  DN_Str8 result = DN_Str8FromStr8BuilderAllocator(builder, DN_AllocatorFromArena(arena));
+  return result;
+}
+
+DN_API DN_Str8 DN_Str8FromStr8BuilderDelimitAllocator(DN_Str8Builder const *builder, DN_Str8 delimiter, DN_Allocator allocator)
+{
+  DN_Str8 result = {};
   if (!builder || builder->string_size <= 0 || builder->count <= 0)
     return result;
 
   DN_USize size_for_delimiter = delimiter.size ? ((builder->count - 1) * delimiter.size) : 0;
-  result.data                 = DN_ArenaNewArray(arena,
-                                 char,
-                                 builder->string_size + size_for_delimiter + 1 /*null terminator*/,
-                                 DN_ZMem_No);
+  result                      = DN_Str8AllocAllocator(builder->string_size + size_for_delimiter, DN_ZMem_No, allocator);
   if (!result.data)
     return result;
 
+  DN_USize write_count = 0;
   for (DN_Str8Link *link = builder->head; link; link = link->next) {
-    DN_Memcpy(result.data + result.size, link->string.data, link->string.size);
-    result.size += link->string.size;
+    DN_Memcpy(result.data + write_count, link->string.data, link->string.size);
+    write_count += link->string.size;
     if (link->next && delimiter.size) {
-      DN_Memcpy(result.data + result.size, delimiter.data, delimiter.size);
-      result.size += delimiter.size;
+      DN_Memcpy(result.data + write_count, delimiter.data, delimiter.size);
+      write_count += delimiter.size;
     }
   }
 
-  result.data[result.size] = 0;
-  DN_Assert(result.size == builder->string_size + size_for_delimiter);
+  result.data[write_count] = 0;
+  DN_Assert(write_count == builder->string_size + size_for_delimiter);
+  return result;
+}
+
+DN_API DN_Str8 DN_Str8FromStr8BuilderDelimitArena(DN_Str8Builder const *builder, DN_Str8 delimiter, DN_Arena *arena)
+{
+  DN_Str8 result = DN_Str8FromStr8BuilderDelimitAllocator(builder, delimiter, DN_AllocatorFromArena(arena));
   return result;
 }
 
@@ -4045,8 +4279,22 @@ DN_API DN_USize DN_BytesFromHex(DN_Str8 hex, void *dest, DN_USize dest_count)
   if (hex_trimmed.size > (dest_count * 2))
     return result;
 
-  DN_U8 *ptr = DN_Cast(DN_U8 *) dest;
-  for (DN_USize index = 0; index < hex_trimmed.size; index += 2) {
+  DN_U8   *ptr   = DN_Cast(DN_U8 *) dest;
+  DN_USize index = 0;
+
+  // NOTE: We are given an odd-sized hex string e.g.: 'F' instead of '0F', we 'left-pad' the parser
+  // and support reading the single nibble as 'F'
+  if (hex_trimmed.size % 2 != 0) {
+    DN_U8 nibble0 = 0;
+    DN_U8 nibble1 = DN_U8FromHexNibble(hex_trimmed.data[index++]);
+    if (nibble1 == 0xFF)
+      return result;
+    *ptr++        = nibble0 << 4 | nibble1 << 0;
+    result++;
+  }
+
+  // NOTE: Parse the rest of the hex which is in byte pairs
+  for (; index < hex_trimmed.size; index += 2) {
     DN_U8 nibble0 = DN_U8FromHexNibble(hex_trimmed.data[index + 0]);
     DN_U8 nibble1 = DN_U8FromHexNibble(hex_trimmed.data[index + 1]);
     if (nibble0 == 0xFF || nibble1 == 0xFF)
@@ -4131,6 +4379,7 @@ DN_API DN_USize DN_HexFromPtrBytes(void const *bytes, DN_USize bytes_count, void
   DN_U8 const *src_u8        = DN_Cast(DN_U8 const *) bytes;
   DN_U8       *ptr           = DN_Cast(DN_U8 *) hex;
   bool         leading_zeros = true;
+
   for (DN_USize index = 0; index < bytes_count; index++) {
     char ch = src_u8[index];
     if (leading_zeros)
@@ -4168,6 +4417,17 @@ DN_API DN_Str8 DN_HexFromPtrBytesArena(void const *bytes, DN_USize bytes_count, 
 DN_API DN_USize DN_HexFromStr8Bytes(DN_Str8 bytes, void *hex, DN_USize hex_count, DN_TrimLeadingZero trim_leading_z)
 {
   DN_USize result = DN_HexFromPtrBytes(bytes.data, bytes.size, hex, hex_count, trim_leading_z);
+  return result;
+}
+
+DN_API DN_Str8 DN_HexFromStr8BytesArena(DN_Str8 bytes, DN_Arena *arena, DN_TrimLeadingZero trim_leading_z)
+{
+  DN_Str8 result = {};
+  if (bytes.size) {
+    result.data = DN_ArenaNewArray(arena, char, bytes.size * 2, DN_ZMem_No);
+    if (result.data)
+      result.size = DN_HexFromStr8Bytes(bytes, result.data, bytes.size * 2, trim_leading_z);
+  }
   return result;
 }
 
@@ -4388,40 +4648,40 @@ DN_API DN_U64 DN_UnixTimeMsFromDate(DN_Date date)
   return result;
 }
 
-DN_API DN_Str8 DN_Str8FromByteCountType(DN_ByteCountType type)
+DN_API DN_Str8 DN_Str8FromByteType(DN_ByteType type)
 {
   DN_Str8 result = DN_Str8Lit("");
   switch (type) {
-    case DN_ByteCountType_B:     result = DN_Str8Lit("B"); break;
-    case DN_ByteCountType_KiB:   result = DN_Str8Lit("KiB"); break;
-    case DN_ByteCountType_MiB:   result = DN_Str8Lit("MiB"); break;
-    case DN_ByteCountType_GiB:   result = DN_Str8Lit("GiB"); break;
-    case DN_ByteCountType_TiB:   result = DN_Str8Lit("TiB"); break;
-    case DN_ByteCountType_Count: result = DN_Str8Lit(""); break;
-    case DN_ByteCountType_Auto:  result = DN_Str8Lit(""); break;
+    case DN_ByteType_B:     result = DN_Str8Lit("B");   break;
+    case DN_ByteType_KiB:   result = DN_Str8Lit("KiB"); break;
+    case DN_ByteType_MiB:   result = DN_Str8Lit("MiB"); break;
+    case DN_ByteType_GiB:   result = DN_Str8Lit("GiB"); break;
+    case DN_ByteType_TiB:   result = DN_Str8Lit("TiB"); break;
+    case DN_ByteType_Count: result = DN_Str8Lit("");    break;
+    case DN_ByteType_Auto:  result = DN_Str8Lit("");    break;
   }
   return result;
 }
 
-DN_API DN_ByteCountResult DN_ByteCountFromType(DN_U64 bytes, DN_ByteCountType type)
+DN_API DN_ByteCount DN_ByteCountFromU64(DN_U64 bytes, DN_ByteType type)
 {
-  DN_Assert(type != DN_ByteCountType_Count);
-  DN_ByteCountResult result = {};
+  DN_Assert(type != DN_ByteType_Count);
+  DN_ByteCount result = {};
   result.bytes              = DN_Cast(DN_F64) bytes;
-  if (type == DN_ByteCountType_Auto)
-    for (; result.type < DN_ByteCountType_Count && result.bytes >= 1024.0; result.type = DN_Cast(DN_ByteCountType)(DN_Cast(DN_USize) result.type + 1))
+  if (type == DN_ByteType_Auto)
+    for (; result.type < DN_ByteType_Count && result.bytes >= 1024.0; result.type = DN_Cast(DN_ByteType)(DN_Cast(DN_USize) result.type + 1))
       result.bytes /= 1024.0;
   else
-    for (; result.type < type; result.type = DN_Cast(DN_ByteCountType)(DN_Cast(DN_USize) result.type + 1))
+    for (; result.type < type; result.type = DN_Cast(DN_ByteType)(DN_Cast(DN_USize) result.type + 1))
       result.bytes /= 1024.0;
-  result.suffix = DN_Str8FromByteCountType(result.type);
+  result.suffix = DN_Str8FromByteType(result.type);
   return result;
 }
 
-DN_API DN_Str8x32 DN_ByteCountStr8x32FromType(DN_U64 bytes, DN_ByteCountType type)
+DN_API DN_Str8x32 DN_Str8x32FromByteCountU64(DN_U64 bytes, DN_ByteType type)
 {
-  DN_ByteCountResult byte_count = DN_ByteCountFromType(bytes, type);
-  DN_Str8x32         result     = DN_Str8x32FromFmt("%.2f%.*s", byte_count.bytes, DN_Str8PrintFmt(byte_count.suffix));
+  DN_ByteCount byte_count = DN_ByteCountFromU64(bytes, type);
+  DN_Str8x32   result     = DN_Str8x32FromFmt("%.2f%.*s", byte_count.bytes, DN_Str8PrintFmt(byte_count.suffix));
   return result;
 }
 
@@ -4484,6 +4744,9 @@ DN_API DN_ProfilerZone DN_ProfilerBeginZone(DN_Profiler *profiler, DN_Str8 name,
   if (!profiler || profiler->paused)
     return result;
 
+  if (anchor_index != 0) {
+    DN_AssertF(profiler->frame_zone.profiler, "DN_ProfilerNewFrame() must be called before calling BeginZone");
+  }
   DN_Assert(anchor_index < profiler->anchors_per_frame);
   DN_ProfilerAnchor *anchor = DN_ProfilerFrameAnchors(profiler).data + anchor_index;
   anchor->name              = name;
@@ -4495,6 +4758,7 @@ DN_API DN_ProfilerZone DN_ProfilerBeginZone(DN_Profiler *profiler, DN_Str8 name,
         DN_AssertF(name == anchor->name, "Potentially overwriting a zone by accident? Anchor is '%.*s', name is '%.*s'", DN_Str8PrintFmt(anchor->name), DN_Str8PrintFmt(name));
   #endif
 
+  result.profiler                  = profiler;
   result.begin_tsc                 = profiler->tsc_now ? profiler->tsc_now() : DN_CPUGetTSC();
   result.anchor_index              = anchor_index;
   result.parent_zone               = profiler->parent_zone;
@@ -4503,8 +4767,9 @@ DN_API DN_ProfilerZone DN_ProfilerBeginZone(DN_Profiler *profiler, DN_Str8 name,
   return result;
 }
 
-DN_API void DN_ProfilerEndZone(DN_Profiler *profiler, DN_ProfilerZone zone)
+DN_API void DN_ProfilerEndZone(DN_ProfilerZone zone)
 {
+  DN_Profiler *profiler = zone.profiler;
   if (!profiler || profiler->paused)
     return;
 
@@ -4516,9 +4781,14 @@ DN_API void DN_ProfilerEndZone(DN_Profiler *profiler, DN_ProfilerZone zone)
   DN_U64                 tsc_now     = profiler->tsc_now ? profiler->tsc_now() : DN_CPUGetTSC();
   DN_U64                 elapsed_tsc = tsc_now - zone.begin_tsc;
 
+  // NOTE: We snap the elapsed TSC at the zone start and overwrite every time we end zones. If we
+  // nest zones, the nested zones will clobber the inclusive timestamp with their values.
+  // This is fine, as long as all the zones and begun and ended correctly, when the top-most zone
+  // in the stack ends, it will overwrite the TSC with the elapsed time overall for just that top
+  // most function, unclobbering the elapsed time sitting in the anchor.
+  anchor->tsc_inclusive  = zone.elapsed_tsc_at_zone_start + elapsed_tsc;
+  anchor->tsc_exclusive += elapsed_tsc;
   anchor->hit_count++;
-  anchor->tsc_inclusive             = zone.elapsed_tsc_at_zone_start + elapsed_tsc;
-  anchor->tsc_exclusive            += elapsed_tsc;
 
   if (zone.parent_zone != zone.anchor_index) {
     DN_ProfilerAnchor *parent_anchor  = array.data + zone.parent_zone;
@@ -4533,7 +4803,7 @@ DN_API void DN_ProfilerNewFrame(DN_Profiler *profiler)
     return;
 
   // NOTE: End the frame's zone
-  DN_ProfilerEndZone(profiler, profiler->frame_zone);
+  DN_ProfilerEndZone(profiler->frame_zone);
   DN_ProfilerAnchorArray old_frame_anchors = DN_ProfilerFrameAnchors(profiler);
   DN_ProfilerAnchor      old_frame_anchor  = old_frame_anchors.data[0];
   profiler->frame_avg_tsc                  = (profiler->frame_avg_tsc + old_frame_anchor.tsc_inclusive) / 2.f;
@@ -4550,33 +4820,48 @@ DN_API void DN_ProfilerNewFrame(DN_Profiler *profiler)
   profiler->frame_zone = DN_ProfilerBeginZone(profiler, DN_Str8Lit("Profiler Frame"), 0);
 }
 
-DN_API void DN_ProfilerDump(DN_Profiler *profiler)
+DN_API DN_USize DN_ProfilerFmtAnchor(DN_ProfilerAnchor anchor, DN_U64 tsc_frequency, char *buffer, DN_USize count)
+{
+  DN_USize result = 0;
+  if (!anchor.hit_count)
+    return result;
+
+  DN_U64   tsc_exclusive              = anchor.tsc_exclusive;
+  DN_U64   tsc_inclusive              = anchor.tsc_inclusive;
+  DN_F64   tsc_exclusive_milliseconds = tsc_exclusive * 1000 / DN_Cast(DN_F64) tsc_frequency;
+  if (tsc_exclusive == tsc_inclusive) {
+    DN_FmtAppend(buffer, &result, count, "%.*s[%u]: %.1fms", DN_Str8PrintFmt(anchor.name), anchor.hit_count, tsc_exclusive_milliseconds);
+  } else {
+    DN_F64 tsc_inclusive_milliseconds = tsc_inclusive * 1000 / DN_Cast(DN_F64) tsc_frequency;
+    DN_FmtAppend(buffer, &result, count, "%.*s[%u]: %.1f/%.1fms", DN_Str8PrintFmt(anchor.name), anchor.hit_count, tsc_exclusive_milliseconds, tsc_inclusive_milliseconds);
+  }
+  return result;
+}
+
+DN_API DN_Str8 DN_ProfilerFmtAnchorStr8(DN_ProfilerAnchor anchor, DN_U64 tsc_frequency, DN_Arena *arena)
+{
+  DN_Str8  result   = {};
+  DN_USize size_req = DN_ProfilerFmtAnchor(anchor, tsc_frequency, nullptr, 0);
+  if (size_req) {
+    result = DN_Str8AllocArena(size_req, DN_ZMem_No, arena);
+    DN_ProfilerFmtAnchor(anchor, tsc_frequency, result.data, result.size + 1);
+  }
+  return result;
+}
+
+DN_API void DN_ProfilerFmtToStdout(DN_Profiler *profiler)
 {
   if (!profiler || profiler->frame_index == 0)
     return;
 
   DN_USize frame_index = profiler->frame_index - 1;
-  DN_Assert(profiler->frame_index < profiler->anchors_per_frame);
-
   DN_ProfilerAnchor *anchors = profiler->anchors + (frame_index * profiler->anchors_per_frame);
   for (DN_USize index = 1; index < profiler->anchors_per_frame; index++) {
-    DN_ProfilerAnchor const *anchor = anchors + index;
-    if (!anchor->hit_count)
-      continue;
-
-    DN_U64 tsc_exclusive              = anchor->tsc_exclusive;
-    DN_U64 tsc_inclusive              = anchor->tsc_inclusive;
-    DN_F64 tsc_exclusive_milliseconds = tsc_exclusive * 1000 / DN_Cast(DN_F64) profiler->tsc_frequency;
-    if (tsc_exclusive == tsc_inclusive) {
-      DN_OS_PrintOutLnF("%.*s[%u]: %.1fms", DN_Str8PrintFmt(anchor->name), anchor->hit_count, tsc_exclusive_milliseconds);
-    } else {
-      DN_F64 tsc_inclusive_milliseconds = tsc_inclusive * 1000 / DN_Cast(DN_F64) profiler->tsc_frequency;
-      DN_OS_PrintOutLnF("%.*s[%u]: %.1f/%.1fms",
-                        DN_Str8PrintFmt(anchor->name),
-                        anchor->hit_count,
-                        tsc_exclusive_milliseconds,
-                        tsc_inclusive_milliseconds);
-    }
+    char buffer[2048];
+    buffer[0]        = 0;
+    DN_USize fmt_len = DN_ProfilerFmtAnchor(anchors[index], profiler->tsc_frequency, buffer, DN_ArrayCountU(buffer));
+    DN_Str8  msg     = DN_Str8FromPtr(buffer, fmt_len);
+    DN_OS_PrintOutLnF("%.*s", DN_Str8PrintFmt(msg));
   }
 }
 
@@ -4591,6 +4876,204 @@ DN_API DN_F64 DN_ProfilerMsFromTSC(DN_Profiler *profiler, DN_U64 duration_tsc)
   DN_F64 result = DN_Cast(DN_F64)duration_tsc / profiler->tsc_frequency * 1000.0;
   return result;
 }
+
+static void DN_QSortSetElem_(void *array, DN_USize elem_size, DN_USize dest_index, DN_USize src_index)
+{
+  char *src  = DN_Cast(char *) array + (src_index * elem_size);
+  char *dest = DN_Cast(char *) array + (dest_index * elem_size);
+  DN_Memcpy(dest, src, elem_size);
+}
+
+static void DN_QSortSwapElems_(void *array, DN_USize elem_size, DN_USize lhs_index, DN_USize rhs_index)
+{
+  if (lhs_index == rhs_index)
+    return;
+
+  char         temp_buffer[512];
+  bool         use_buffer = elem_size <= DN_ArrayCountU(temp_buffer);
+  DN_TCScratch scratch    = {};
+  char        *temp       = {};
+  if (use_buffer) {
+    temp = temp_buffer;
+  } else {
+    scratch = DN_TCScratchBeginArena(nullptr, 0);
+    temp    = DN_ArenaNewArray(&scratch.arena, char, elem_size, DN_ZMem_No);
+  }
+
+  char *lhs = DN_Cast(char *) array + (lhs_index * elem_size);
+  char *rhs = DN_Cast(char *) array + (rhs_index * elem_size);
+  DN_Memcpy(temp, lhs, elem_size);
+  DN_Memcpy(lhs, rhs, elem_size);
+  DN_Memcpy(rhs, temp, elem_size);
+
+  if (!use_buffer)
+    DN_TCScratchEnd(&scratch);
+}
+
+static void DN_QSortInsertion_(void *array, DN_USize array_size, DN_USize elem_size, void *user_context, DN_QSortCompareFunc *compare)
+{
+  char         temp_buffer[512];
+  bool         use_buffer = elem_size <= DN_ArrayCountU(temp_buffer);
+  DN_TCScratch scratch    = {};
+  char        *temp       = {};
+  if (use_buffer) {
+    temp = temp_buffer;
+  } else {
+    scratch = DN_TCScratchBeginArena(nullptr, 0);
+    temp    = DN_ArenaNewArray(&scratch.arena, char, elem_size, DN_ZMem_No);
+  }
+
+  DN_U8 *array_u8 = DN_Cast(DN_U8 *)array;
+  for (DN_USize item_to_insert_index = 1; item_to_insert_index < array_size; item_to_insert_index++) {
+    for (DN_USize index = 0; index < item_to_insert_index; index++) {
+      DN_U8 *lhs = array_u8 + (index * elem_size);
+      DN_U8 *rhs = array_u8 + (item_to_insert_index * elem_size);
+      if (compare(lhs, rhs, user_context))
+        continue;
+
+      DN_Memcpy(temp, rhs, elem_size);
+      for (DN_USize i = item_to_insert_index; i > index; i--)
+        DN_QSortSetElem_(array, elem_size, i, i - 1);
+      DN_Memcpy(lhs, temp, elem_size);
+      break;
+    }
+  }
+
+  if (!use_buffer)
+    DN_TCScratchEnd(&scratch);
+}
+
+DN_API void DN_QSort(void *array, DN_USize array_size, DN_USize elem_size, void *user_context, DN_QSortCompareFunc *compare)
+{
+  if (!array || array_size <= 1 || elem_size == 0 || !compare)
+      return;
+
+  // NOTE: Insertion Sort, under 24->32 is an optimal amount
+  DN_U8          *array_u8       = DN_Cast(DN_U8 *)array;
+  DN_USize const QSORT_THRESHOLD = 24;
+  if (array_size < QSORT_THRESHOLD) {
+    DN_QSortInsertion_(array, array_size, elem_size, user_context, compare);
+    return;
+  }
+
+  // NOTE: Quick sort, under 24->32 is an optimal amount
+  DN_USize last_index      = array_size - 1;
+  DN_USize pivot_index     = array_size / 2;
+  DN_USize partition_index = 0;
+  DN_USize start_index     = 0;
+
+  // Swap pivot with last index, so pivot is always at the end of the array.
+  // This makes logic much simpler.
+  DN_QSortSwapElems_(array, elem_size, last_index, pivot_index);
+  pivot_index = last_index;
+
+  // 4^, 8, 7, 5, 2, 3, 6
+  if (compare(array_u8 + (start_index * elem_size), array_u8 + (pivot_index * elem_size), user_context))
+      partition_index++;
+  start_index++;
+
+  // 4, |8, 7, 5^, 2, 3, 6*
+  // 4, 5, |7, 8, 2^, 3, 6*
+  // 4, 5, 2, |8, 7, ^3, 6*
+  // 4, 5, 2, 3, |7, 8, ^6*
+  for (DN_USize index = start_index; index < last_index; index++) {
+      if (compare(array_u8 + (index * elem_size), array_u8 + (pivot_index * elem_size), user_context)) {
+          DN_QSortSwapElems_(array, elem_size, partition_index, index);
+          partition_index++;
+      }
+  }
+
+  // Move pivot to right of partition
+  // 4, 5, 2, 3, |6, 8, ^7*
+  DN_QSortSwapElems_(array, elem_size, partition_index, pivot_index);
+  DN_QSort(array_u8, partition_index, elem_size, user_context, compare);
+
+  // Skip the value at partion index since that is guaranteed to be sorted.
+  // 4, 5, 2, 3, (x), 8, 7
+  DN_USize one_after_partition_index = partition_index + 1;
+  DN_QSort(array_u8 + (one_after_partition_index * elem_size), (array_size - one_after_partition_index), elem_size, user_context, compare);
+}
+
+DN_API bool DN_QSortCompareStr8NaturalAsc(void const* lhs, void const *rhs, void *user_context)
+{
+  DN_Str8EqCase eq_case  = *DN_Cast(DN_Str8EqCase *) user_context;
+  DN_Str8       lhs_str8 = *DN_Cast(DN_Str8 *) lhs;
+  DN_Str8       rhs_str8 = *DN_Cast(DN_Str8 *) rhs;
+  bool          result   = DN_Str8CompareNatural(lhs_str8, rhs_str8, eq_case) < 0;
+  return result;
+}
+
+DN_API bool DN_QSortCompareStr8NaturalDesc(void const* lhs, void const *rhs, void *user_context)
+{
+  DN_Str8EqCase eq_case  = *DN_Cast(DN_Str8EqCase *) user_context;
+  DN_Str8       lhs_str8 = *DN_Cast(DN_Str8 *) lhs;
+  DN_Str8       rhs_str8 = *DN_Cast(DN_Str8 *) rhs;
+  bool          result   = DN_Str8CompareNatural(lhs_str8, rhs_str8, eq_case) > 0;
+  return result;
+}
+
+DN_API bool DN_QSortCompareStr8LexicographicAsc(void const* lhs, void const *rhs, void *user_context)
+{
+  DN_Str8EqCase eq_case  = *DN_Cast(DN_Str8EqCase *) user_context;
+  DN_Str8       lhs_str8 = *DN_Cast(DN_Str8 *) lhs;
+  DN_Str8       rhs_str8 = *DN_Cast(DN_Str8 *) rhs;
+  bool          result   = DN_Str8CompareLexicographic(lhs_str8, rhs_str8, eq_case) < 0;
+  return result;
+}
+
+DN_API bool DN_QSortCompareStr8LexicographicDesc(void const* lhs, void const *rhs, void *user_context)
+{
+  DN_Str8EqCase eq_case  = *DN_Cast(DN_Str8EqCase *) user_context;
+  DN_Str8       lhs_str8 = *DN_Cast(DN_Str8 *) lhs;
+  DN_Str8       rhs_str8 = *DN_Cast(DN_Str8 *) rhs;
+  bool          result   = DN_Str8CompareLexicographic(lhs_str8, rhs_str8, eq_case) > 0;
+  return result;
+}
+
+DN_API bool DN_QSortCompareBytesLT(void const* lhs, void const *rhs, void *user_context)
+{
+  DN_USize elem_size = *DN_Cast(DN_USize *)user_context;
+  bool result = DN_Memcmp(lhs, rhs, elem_size) < 0;
+  return result;
+}
+
+DN_API bool DN_QSortCompareBytesGT(void const* lhs, void const *rhs, void *user_context)
+{
+  DN_USize elem_size = *DN_Cast(DN_USize *)user_context;
+  bool result = DN_Memcmp(lhs, rhs, elem_size) > 0;
+  return result;
+}
+
+DN_API void DN_QSortBytesLT(void *array, DN_USize array_size, DN_USize elem_size)
+{
+  DN_QSort(array, array_size, elem_size, &elem_size, DN_QSortCompareBytesLT);
+}
+
+DN_API void DN_QSortBytesGT(void *array, DN_USize array_size, DN_USize elem_size)
+{
+  DN_QSort(array, array_size, elem_size, &elem_size, DN_QSortCompareBytesGT);
+}
+
+DN_API void DN_QSortStr8NaturalAsc(DN_Str8 *array, DN_USize array_size, DN_Str8EqCase eq_case)
+{
+  DN_QSort(array, array_size, sizeof(*array), /*user_context=*/ &eq_case, DN_QSortCompareStr8NaturalAsc);
+}
+
+DN_API void DN_QSortStr8NaturalDesc(DN_Str8 *array, DN_USize array_size, DN_Str8EqCase eq_case)
+{
+  DN_QSort(array, array_size, sizeof(*array), /*user_context=*/ &eq_case, DN_QSortCompareStr8NaturalDesc);
+}
+
+DN_API void DN_QSortStr8LexicographicAsc(DN_Str8 *array, DN_USize array_size, DN_Str8EqCase eq_case)
+{
+  DN_QSort(array, array_size, sizeof(*array), /*user_context=*/ &eq_case, DN_QSortCompareStr8LexicographicAsc);
+}
+
+DN_API void DN_QSortStr8LexicographicDesc(DN_Str8 *array, DN_USize array_size, DN_Str8EqCase eq_case)
+{
+  DN_QSort(array, array_size, sizeof(*array), /*user_context=*/ &eq_case, DN_QSortCompareStr8LexicographicDesc);
+}
+
 
 #define DN_PCG_DEFAULT_MULTIPLIER_64 6364136223846793005ULL
 #define DN_PCG_DEFAULT_INCREMENT_64  1442695040888963407ULL
@@ -4953,7 +5436,7 @@ DN_API DN_Str8 DN_Str8FromStr8ANSIColourV3F32RGB255Arena(DN_ANSIColourMode mode,
 
 DN_API DN_Str8 DN_Str8ANSIColourU8RGBFromFmtVArena(DN_ANSIColourMode mode, DN_U8 r, DN_U8 g, DN_U8 b, DN_Arena *arena, char const *fmt, va_list args)
 {
-  DN_TCScratch scratch = DN_TCScratchBegin(&arena, 1);
+  DN_TCScratch scratch = DN_TCScratchBeginArena(&arena, 1);
   DN_Str8      string  = DN_Str8FromFmtVArena(&scratch.arena, fmt, args);
   DN_Str8      result  = DN_Str8FromStr8ANSIColourU8RGBArena(mode, string, r, g, b, arena);
   DN_TCScratchEnd(&scratch);

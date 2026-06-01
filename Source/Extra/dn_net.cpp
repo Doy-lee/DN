@@ -42,15 +42,40 @@ DN_NETRequestHandle DN_NET_HandleFromRequest(DN_NETRequest *request)
   return result;
 }
 
-void DN_NET_EndFinishedRequest_(DN_NETRequest *request)
+bool DN_NET_ResponseHasFailed(DN_NETResponse const* resp)
 {
-  // NOTE: Deallocate the memory used in the request and reset the string builder
-  DN_ArenaTempEnd(&request->start_response_arena, DN_ArenaReset_Yes);
-  // NOTE: Check that the request is completely detached
-  DN_Assert(request->next == nullptr);
+  bool result = false;
+  if (resp->type == DN_NETRequestType_HTTP)
+    result = resp->state == DN_NETResponseState_Error || resp->http_status >= 400;
+  else
+    result = resp->state == DN_NETResponseState_Error;
+  return result;
 }
 
-void DN_NET_BaseInit_(DN_NETCore *net, char *base, DN_U64 base_size)
+DN_Str8 DN_NET_Str8DiagnosticFromResponse(DN_NETResponse const* resp, DN_Arena *arena)
+{
+  DN_TCScratch   scratch     = DN_TCScratchBeginArena(&arena, 1);
+  DN_Str8Builder builder     = DN_Str8BuilderFromArena(&scratch.arena);
+  bool           resp_failed = DN_NET_ResponseHasFailed(resp);
+  DN_Str8BuilderAppendF(&builder, "Request %s (%s", resp_failed ? "failed" : "succeeded", resp->type == DN_NETRequestType_HTTP ? "HTTP" : "WS");
+  if (resp->type == DN_NETRequestType_HTTP) {
+    if (resp->http_status)
+      DN_Str8BuilderAppendF(&builder, " %u", resp->http_status);
+  }
+  DN_Str8BuilderAppendF(&builder, ")");
+  if (resp->body.size || resp->error_str8.size) {
+    DN_Str8BuilderAppendRef(&builder, DN_Str8Lit(" with "));
+    if (resp->body.size)
+      DN_Str8BuilderAppendF(&builder, "%.*s", DN_Str8PrintFmt(resp->body));
+    if (resp->error_str8.size)
+    DN_Str8BuilderAppendF(&builder, "%s%.*s", resp->body.size ? ". " : "", DN_Str8PrintFmt(resp->error_str8));
+  }
+  DN_Str8 result = DN_Str8FromStr8BuilderArena(&builder, arena);
+  DN_TCScratchEnd(&scratch);
+  return result;
+}
+
+void DN_NET_BaseInit(DN_NETCore *net, char *base, DN_U64 base_size)
 {
   net->base           = base;
   net->base_size      = base_size;
@@ -59,7 +84,7 @@ void DN_NET_BaseInit_(DN_NETCore *net, char *base, DN_U64 base_size)
   net->completion_sem = DN_OS_SemaphoreInit(0);
 }
 
-DN_NETRequestHandle DN_NET_SetupRequest_(DN_NETRequest *request, DN_Str8 url, DN_Str8 method, DN_NETDoHTTPArgs const *args, DN_NETRequestType type)
+DN_NETRequestHandle DN_NET_SetupRequest(DN_NETRequest *request, DN_Str8 url, DN_Str8 method, DN_NETDoHTTPArgs const *args, DN_NETRequestType type)
 {
   // NOTE: Setup request
   DN_Assert(request);
@@ -94,5 +119,14 @@ DN_NETRequestHandle DN_NET_SetupRequest_(DN_NETRequest *request, DN_Str8 url, DN
 
   DN_NETRequestHandle result = DN_NET_HandleFromRequest(request);
   request->response.request  = result;
+  request->response.type     = request->type;
   return result;
+}
+
+void DN_NET_EndFinishedRequest(DN_NETRequest *request)
+{
+  // NOTE: Deallocate the memory used in the request and reset the string builder
+  DN_ArenaTempEnd(&request->start_response_arena, DN_ArenaReset_Yes);
+  // NOTE: Check that the request is completely detached
+  DN_Assert(request->next == nullptr);
 }

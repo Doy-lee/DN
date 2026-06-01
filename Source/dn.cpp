@@ -20,7 +20,7 @@ DN_Core *g_dn_;
 #endif
 #endif
 
-DN_API void DN_Init(DN_Core *dn, DN_InitFlags flags, DN_InitArgs *args)
+DN_API void DN_Init(DN_Core *dn, DN_InitFlags flags, DN_TCInitArgs args)
 {
   DN_Set(dn);
   dn->init_flags = flags;
@@ -106,8 +106,7 @@ DN_API void DN_Init(DN_Core *dn, DN_InitFlags flags, DN_InitArgs *args)
   if (DN_BitIsSet(flags, DN_InitFlags_ThreadContext)) {
     DN_Assert(dn->os_init);
     #if DN_H_WITH_OS
-    DN_TCInitArgs *tc_init_args = args ? &args->thread_context_init_args : nullptr;
-    DN_TCInitFromMemFuncs(&dn->main_tc, DN_OS_ThreadID(), tc_init_args, DN_MemFuncsDefault());
+    DN_TCInitFromMemFuncs(&dn->main_tc, DN_OS_ThreadID(), args, DN_MemFuncsDefault());
     DN_TCEquip(&dn->main_tc);
     #endif
   }
@@ -139,24 +138,18 @@ DN_API void DN_Init(DN_Core *dn, DN_InitFlags flags, DN_InitArgs *args)
         case DN_MemFuncsType_Heap:    mem_funcs = DN_Str8Lit("Heap"); break;
         case DN_MemFuncsType_Virtual: mem_funcs = DN_Str8Lit("Virtual"); break;
       }
-      DN_Str8x32 main_commit  = DN_ByteCountStr8x32(dn->main_tc.main_arena->mem->curr->commit);
-      DN_Str8x32 main_reserve = DN_ByteCountStr8x32(dn->main_tc.main_arena->mem->curr->reserve);
-      DN_Str8x32 temp_commit  = DN_ByteCountStr8x32(dn->main_tc.temp_a_arena->mem->curr->commit);
-      DN_Str8x32 temp_reserve = DN_ByteCountStr8x32(dn->main_tc.temp_a_arena->mem->curr->reserve);
-      DN_Str8x32 err_commit   = DN_ByteCountStr8x32(dn->main_tc.err_sink.arena->mem->curr->commit);
-      DN_Str8x32 err_reserve  = DN_ByteCountStr8x32(dn->main_tc.err_sink.arena->mem->curr->reserve);
-      DN_FmtAppendTruncate(buf,
-                           &buf_size,
-                           sizeof(buf),
-                           DN_Str8Lit("..."),
-                           "M %.*s/%.*s S(x2) %.*s/%.*s E %.*s/%.*s (%.*s)\n",
-                           DN_Str8PrintFmt(main_commit),
-                           DN_Str8PrintFmt(main_reserve),
-                           DN_Str8PrintFmt(temp_commit),
-                           DN_Str8PrintFmt(temp_reserve),
-                           DN_Str8PrintFmt(err_commit),
-                           DN_Str8PrintFmt(err_reserve),
-                           DN_Str8PrintFmt(mem_funcs));
+      DN_Str8x32 main_commit  = DN_Str8x32FromByteCountU64Auto(dn->main_tc.main_arena->mem->curr->commit);
+      DN_Str8x32 main_reserve = DN_Str8x32FromByteCountU64Auto(dn->main_tc.main_arena->mem->curr->reserve);
+      DN_Str8x32 err_commit   = DN_Str8x32FromByteCountU64Auto(dn->main_tc.err_sink.arena->mem->curr->commit);
+      DN_Str8x32 err_reserve  = DN_Str8x32FromByteCountU64Auto(dn->main_tc.err_sink.arena->mem->curr->reserve);
+      DN_FmtAppendTruncate(buf, &buf_size, sizeof(buf), DN_Str8Lit("..."), "M %.*s/%.*s", DN_Str8PrintFmt(main_commit), DN_Str8PrintFmt(main_reserve));
+      if (dn->main_tc.temp_arenas_count) {
+        DN_Arena  *temp         = dn->main_tc.temp_arenas[0];
+        DN_Str8x32 temp_commit  = DN_Str8x32FromByteCountU64Auto(temp->mem->curr->commit);
+        DN_Str8x32 temp_reserve = DN_Str8x32FromByteCountU64Auto(temp->mem->curr->reserve);
+        DN_FmtAppendTruncate(buf, &buf_size, sizeof(buf), DN_Str8Lit("..."), " T(x%zu) %.*s/%.*s", dn->main_tc.temp_arenas_count, DN_Str8PrintFmt(temp_commit), DN_Str8PrintFmt(temp_reserve));
+      }
+      DN_FmtAppendTruncate(buf, &buf_size, sizeof(buf), DN_Str8Lit("..."), " E %.*s/%.*s (%.*s)\n", DN_Str8PrintFmt(err_commit), DN_Str8PrintFmt(err_reserve), DN_Str8PrintFmt(mem_funcs));
     } else {
       DN_FmtAppendTruncate(buf, &buf_size, sizeof(buf), DN_Str8Lit("..."), "N/A\n");
     }

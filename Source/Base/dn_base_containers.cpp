@@ -2,6 +2,13 @@
   #include "../dn.h"
 #endif
 
+struct DN_ArrayFindEqMemcmpContext_
+{
+  DN_USize    elem_size;
+  void const *find;
+};
+
+
 DN_API void *DN_SliceAllocArena(void **data, DN_USize *slice_size_field, DN_USize size, DN_USize elem_size, DN_U8 align, DN_ZMem zmem, DN_Arena *arena)
 {
   void *result = *data;
@@ -11,7 +18,42 @@ DN_API void *DN_SliceAllocArena(void **data, DN_USize *slice_size_field, DN_USiz
   return result;
 }
 
-DN_API void *DN_CArrayInsertArray(void *data, DN_USize *size, DN_USize max, DN_USize elem_size, DN_USize index, void const *items, DN_USize count)
+DN_API DN_ArrayFindResult DN_ArrayFind(void *data, DN_USize size, DN_USize elem_size, void const *find, DN_ArrayFindEqFunc *eq_func)
+{
+  DN_ArrayFindResult result = {};
+  DN_Assert(data);
+  DN_Assert(elem_size);
+  if (find) {
+    for (DN_ForIndexU(index, size)) {
+      DN_U8 *it = DN_Cast(DN_U8 *) data + (index * elem_size);
+      if (eq_func(it, find)) {
+        result.index   = index;
+        result.value   = it;
+        result.success = true;
+        break;
+      }
+    }
+  }
+  return result;
+}
+
+static bool DN_ArrayFindEqMemEqUnsafe_(void const *lhs, void const *find)
+{
+  DN_ArrayFindEqMemcmpContext_ *context = DN_Cast(DN_ArrayFindEqMemcmpContext_ *) find;
+  bool                          result  = DN_MemEqUnsafe(lhs, context->find, context->elem_size);
+  return result;
+}
+
+DN_API DN_ArrayFindResult DN_ArrayFindMemEq(void *data, DN_USize size, DN_USize elem_size, void const *find)
+{
+  DN_ArrayFindEqMemcmpContext_ context = {};
+  context.elem_size                    = elem_size;
+  context.find                         = find;
+  DN_ArrayFindResult result            = DN_ArrayFind(data, size, elem_size, &context, DN_ArrayFindEqMemEqUnsafe_);
+  return result;
+}
+
+DN_API void *DN_ArrayInsertArray(void *data, DN_USize *size, DN_USize max, DN_USize elem_size, DN_USize index, void const *items, DN_USize count)
 {
   void *result = nullptr;
   if (!data || !size || !items || count <= 0 || ((*size + count) > max))
@@ -32,7 +74,7 @@ DN_API void *DN_CArrayInsertArray(void *data, DN_USize *size, DN_USize max, DN_U
   return result;
 }
 
-DN_API void *DN_CArrayPopFront(void *data, DN_USize *size, DN_USize elem_size, DN_USize count)
+DN_API void *DN_ArrayPopFront(void *data, DN_USize *size, DN_USize elem_size, DN_USize count)
 {
   if (!data || !size || *size == 0 || count == 0)
     return nullptr;
@@ -51,7 +93,7 @@ DN_API void *DN_CArrayPopFront(void *data, DN_USize *size, DN_USize elem_size, D
   return result;
 }
 
-DN_API void *DN_CArrayPopBack(void *data, DN_USize *size, DN_USize elem_size, DN_USize count)
+DN_API void *DN_ArrayPopBack(void *data, DN_USize *size, DN_USize elem_size, DN_USize count)
 {
   if (!data || !size || *size == 0 || count == 0)
     return nullptr;
@@ -62,7 +104,7 @@ DN_API void *DN_CArrayPopBack(void *data, DN_USize *size, DN_USize elem_size, DN
   return DN_Cast(char *)data + (*size * elem_size);
 }
 
-DN_API DN_ArrayEraseResult DN_CArrayEraseRange(void *data, DN_USize *size, DN_USize elem_size, DN_USize begin_index, DN_ISize count, DN_ArrayErase erase)
+DN_API DN_ArrayEraseResult DN_ArrayEraseRange(void *data, DN_USize *size, DN_USize elem_size, DN_USize begin_index, DN_ISize count, DN_ArrayErase erase)
 {
   DN_ArrayEraseResult result = {};
   if (!data || !size || *size == 0 || count == 0)
@@ -104,48 +146,47 @@ DN_API DN_ArrayEraseResult DN_CArrayEraseRange(void *data, DN_USize *size, DN_US
   }
 
   result.items_erased = erase_count;
-  result.it_index     = start;
+  result.it_index     = start ? start - 1 : start;
   return result;
 }
 
-DN_API void *DN_CArrayMakeArray(void *data, DN_USize *size, DN_USize max, DN_USize data_size, DN_USize make_size, DN_ZMem z_mem)
+DN_API void *DN_ArrayMakeArray(void *data, DN_USize *size, DN_USize max, DN_USize elem_size, DN_USize make_count, DN_ZMem z_mem)
 {
-  void *result = nullptr;
-  DN_USize new_size = *size + make_size;
+  void    *result   = nullptr;
+  DN_USize new_size = *size + make_count;
   if (new_size <= max) {
-    result = DN_Cast(char *) data + (data_size * size[0]);
+    result = DN_Cast(char *) data + (elem_size * size[0]);
     *size  = new_size;
     if (z_mem == DN_ZMem_Yes)
-      DN_Memset(result, 0, data_size * make_size);
+      DN_Memset(result, 0, elem_size * make_count);
   }
-
   return result;
 }
 
-DN_API void *DN_CArrayAddArray(void *data, DN_USize *size, DN_USize max, DN_USize data_size, void const *elems, DN_USize elems_count, DN_ArrayAdd add)
+DN_API void *DN_ArrayAddArray(void *data, DN_USize *size, DN_USize max, DN_USize elem_size, void const *elems, DN_USize elems_count, DN_ArrayAdd add)
 {
-  void *result = DN_CArrayMakeArray(data, size, max, data_size, elems_count, DN_ZMem_No);
+  void *result = DN_ArrayMakeArray(data, size, max, elem_size, elems_count, DN_ZMem_No);
   if (result) {
     if (add == DN_ArrayAdd_Append) {
-      DN_Memcpy(result, elems, elems_count * data_size);
+      DN_Memcpy(result, elems, elems_count * elem_size);
     } else {
-      char *move_dest = DN_Cast(char *)data + (elems_count * data_size); // Shift elements forward
+      char *move_dest = DN_Cast(char *)data + (elems_count * elem_size); // Shift elements forward
       char *move_src  = DN_Cast(char *)data;
-      DN_Memmove(move_dest, move_src, data_size * size[0]);
-      DN_Memcpy(data, elems, data_size * elems_count);
+      DN_Memmove(move_dest, move_src, elem_size * size[0]);
+      DN_Memcpy(data, elems, elem_size * elems_count);
     }
   }
   return result;
 }
 
-DN_API bool DN_CArrayResizeFromArena(void **data, DN_USize *size, DN_USize *max, DN_USize data_size, DN_Pool *pool, DN_USize new_max)
+DN_API bool DN_ArrayResizeFromArena(void **data, DN_USize *size, DN_USize *max, DN_USize elem_size, DN_Pool *pool, DN_USize new_max)
 {
   bool result = true;
   if (new_max != *max) {
-    DN_USize bytes_to_alloc = data_size * new_max;
+    DN_USize bytes_to_alloc = elem_size * new_max;
     void    *buffer         = DN_PoolNewArray(pool, DN_U8, bytes_to_alloc);
     if (buffer) {
-      DN_USize bytes_to_copy = data_size * DN_Min(*size, new_max);
+      DN_USize bytes_to_copy = elem_size * DN_Min(*size, new_max);
       DN_Memcpy(buffer, *data, bytes_to_copy);
       DN_PoolDealloc(pool, *data);
       *data = buffer;
@@ -159,14 +200,14 @@ DN_API bool DN_CArrayResizeFromArena(void **data, DN_USize *size, DN_USize *max,
   return result;
 }
 
-DN_API bool DN_CArrayResizeFromPool(void **data, DN_USize *size, DN_USize *max, DN_USize data_size, DN_Pool *pool, DN_USize new_max)
+DN_API bool DN_ArrayResizeFromPool(void **data, DN_USize *size, DN_USize *max, DN_USize elem_size, DN_Pool *pool, DN_USize new_max)
 {
   bool result = true;
   if (new_max != *max) {
-    DN_USize bytes_to_alloc = data_size * new_max;
+    DN_USize bytes_to_alloc = elem_size * new_max;
     void    *buffer         = DN_PoolNewArray(pool, DN_U8, bytes_to_alloc);
     if (buffer) {
-      DN_USize bytes_to_copy = data_size * DN_Min(*size, new_max);
+      DN_USize bytes_to_copy = elem_size * DN_Min(*size, new_max);
       DN_Memcpy(buffer, *data, bytes_to_copy);
       DN_PoolDealloc(pool, *data);
       *data = buffer;
@@ -180,14 +221,14 @@ DN_API bool DN_CArrayResizeFromPool(void **data, DN_USize *size, DN_USize *max, 
   return result;
 }
 
-DN_API bool DN_CArrayResizeFromArena(void **data, DN_USize *size, DN_USize *max, DN_USize data_size, DN_Arena *arena, DN_USize new_max)
+DN_API bool DN_ArrayResizeFromArena(void **data, DN_USize *size, DN_USize *max, DN_USize elem_size, DN_Arena *arena, DN_USize new_max)
 {
   bool result = true;
   if (new_max != *max) {
-    DN_USize bytes_to_alloc = data_size * new_max;
+    DN_USize bytes_to_alloc = elem_size * new_max;
     void    *buffer         = DN_ArenaNewArray(arena, DN_U8, bytes_to_alloc, DN_ZMem_No);
     if (buffer) {
-      DN_USize bytes_to_copy = data_size * DN_Min(*size, new_max);
+      DN_USize bytes_to_copy = elem_size * DN_Min(*size, new_max);
       DN_Memcpy(buffer, *data, bytes_to_copy);
       *data = buffer;
       *max  = new_max;
@@ -200,41 +241,41 @@ DN_API bool DN_CArrayResizeFromArena(void **data, DN_USize *size, DN_USize *max,
   return result;
 }
 
-DN_API bool DN_CArrayGrowFromPool(void **data, DN_USize size, DN_USize *max, DN_USize data_size, DN_Pool *pool, DN_USize new_max)
+DN_API bool DN_ArrayGrowFromPool(void **data, DN_USize size, DN_USize *max, DN_USize elem_size, DN_Pool *pool, DN_USize new_max)
 {
   bool result = true;
   if (new_max > *max)
-    result = DN_CArrayResizeFromPool(data, &size, max, data_size, pool, new_max);
+    result = DN_ArrayResizeFromPool(data, &size, max, elem_size, pool, new_max);
   return result;
 }
 
-DN_API bool DN_CArrayGrowFromArena(void **data, DN_USize size, DN_USize *max, DN_USize data_size, DN_Arena *arena, DN_USize new_max)
+DN_API bool DN_ArrayGrowFromArena(void **data, DN_USize size, DN_USize *max, DN_USize elem_size, DN_Arena *arena, DN_USize new_max)
 {
   bool result = true;
   if (new_max > *max)
-    result = DN_CArrayResizeFromArena(data, &size, max, data_size, arena, new_max);
+    result = DN_ArrayResizeFromArena(data, &size, max, elem_size, arena, new_max);
   return result;
 }
 
 
-DN_API bool DN_CArrayGrowIfNeededFromPool(void **data, DN_USize size, DN_USize *max, DN_USize data_size, DN_Pool *pool, DN_USize add_count)
+DN_API bool DN_ArrayGrowIfNeededFromPool(void **data, DN_USize size, DN_USize *max, DN_USize elem_size, DN_Pool *pool, DN_USize add_count)
 {
   bool     result   = true;
   DN_USize new_size = size + add_count;
   if (new_size > *max) {
     DN_USize new_max = DN_Max(DN_Max(*max * 2, new_size), 8);
-    result           = DN_CArrayResizeFromPool(data, &size, max, data_size, pool, new_max);
+    result           = DN_ArrayResizeFromPool(data, &size, max, elem_size, pool, new_max);
   }
   return result;
 }
 
-DN_API bool DN_CArrayGrowIfNeededFromArena(void **data, DN_USize size, DN_USize *max, DN_USize data_size, DN_Arena *arena, DN_USize add_count)
+DN_API bool DN_ArrayGrowIfNeededFromArena(void **data, DN_USize size, DN_USize *max, DN_USize elem_size, DN_Arena *arena, DN_USize add_count)
 {
   bool     result   = true;
   DN_USize new_size = size + add_count;
   if (new_size > *max) {
     DN_USize new_max = DN_Max(DN_Max(*max * 2, new_size), 8);
-    result           = DN_CArrayResizeFromArena(data, &size, max, data_size, arena, new_max);
+    result           = DN_ArrayResizeFromArena(data, &size, max, elem_size, arena, new_max);
   }
   return result;
 }

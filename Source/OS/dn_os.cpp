@@ -67,6 +67,30 @@ DN_API DN_MemList DN_MemListFromVMem(DN_U64 reserve, DN_U64 commit, DN_MemFlags 
   return result;
 }
 
+DN_API DN_Arena DN_ArenaFromHeap(DN_U64 size, DN_MemFlags flags)
+{
+  DN_MemList mem     = DN_MemListFromHeap(size, flags);
+  DN_Arena   result  = {};
+  result.flags      |= DN_ArenaFlags_OwnsMemList;
+  result.mem         = DN_MemListNewCopy(&mem, DN_MemList, &mem);
+  return result;
+}
+
+DN_API DN_Arena DN_ArenaFromVMem(DN_U64 reserve, DN_U64 commit, DN_MemFlags flags)
+{
+  DN_MemList mem     = DN_MemListFromVMem(reserve, commit, flags);
+  DN_Arena   result  = {};
+  result.flags      |= DN_ArenaFlags_OwnsMemList;
+  result.mem         = DN_MemListNewCopy(&mem, DN_MemList, &mem);
+  return result;
+}
+
+DN_API void DN_ArenaDeinit(DN_Arena *arena)
+{
+  if (arena->flags & DN_ArenaFlags_OwnsMemList)
+    DN_MemListDeinit(arena->mem);
+}
+
 DN_API DN_Str8 DN_Str8FromHeapF(DN_FMT_ATTRIB char const *fmt, ...)
 {
   va_list args;
@@ -92,7 +116,7 @@ DN_API DN_Str8 DN_Str8FromHeap(DN_USize size, DN_ZMem z_mem)
 DN_API DN_Str8 DN_Str8PadNewLines(DN_Arena *arena, DN_Str8 src, DN_Str8 pad)
 {
   // TODO: Implement this without requiring TLS so it can go into base strings
-  DN_TCScratch        scratch = DN_TCScratchBegin(&arena, 1);
+  DN_TCScratch        scratch = DN_TCScratchBeginArena(&arena, 1);
   DN_Str8Builder      builder = DN_Str8BuilderFromArena(&scratch.arena);
   DN_Str8BSplitResult split   = DN_Str8BSplit(src, DN_Str8Lit("\n"));
   while (split.lhs.size) {
@@ -102,7 +126,7 @@ DN_API DN_Str8 DN_Str8PadNewLines(DN_Arena *arena, DN_Str8 src, DN_Str8 pad)
     if (split.lhs.size)
       DN_Str8BuilderAppendRef(&builder, DN_Str8Lit("\n"));
   }
-  DN_Str8 result = DN_Str8BuilderBuild(&builder, arena);
+  DN_Str8 result = DN_Str8FromStr8BuilderArena(&builder, arena);
   DN_TCScratchEnd(&scratch);
   return result;
 }
@@ -135,7 +159,7 @@ DN_API void DN_OS_LogPrint(DN_LogTypeParam type, void *user_data, DN_CallSite ca
   // NOTE: Open log file for appending if requested
   DN_TicketMutex_Begin(&os->log_file_mutex);
   if (os->log_to_file && !os->log_file.handle && !os->log_file.error) {
-    DN_TCScratch scratch  = DN_TCScratchBegin(nullptr, 0);
+    DN_TCScratch scratch  = DN_TCScratchBeginArena(nullptr, 0);
     DN_Str8      exe_dir  = DN_OS_EXEDir(&scratch.arena);
     DN_Str8      log_path = DN_OS_PathF(&scratch.arena, "%.*s/dn.log", DN_Str8PrintFmt(exe_dir));
     os->log_file          = DN_OS_FileOpen(log_path, DN_OSFileOpen_CreateAlways, DN_OSFileAccess_AppendOnly, nullptr);
@@ -250,7 +274,7 @@ DN_API DN_Str8 DN_OS_EXEDir(DN_Arena *arena)
   DN_Str8 result = {};
   if (!arena)
     return result;
-  DN_TCScratch        scratch      = DN_TCScratchBegin(&arena, 1);
+  DN_TCScratch        scratch      = DN_TCScratchBeginArena(&arena, 1);
   DN_Str8             exe_path     = DN_OS_EXEPath(&scratch.arena);
   DN_Str8             separators[] = {DN_Str8Lit("/"), DN_Str8Lit("\\")};
   DN_Str8BSplitResult split        = DN_Str8BSplitLastArray(exe_path, separators, DN_ArrayCountU(separators));
@@ -421,7 +445,7 @@ DN_API DN_Str8 DN_OS_FileReadAll(DN_Allocator allocator, DN_Str8 path, DN_ErrSin
   }
 
   if (!result.data) {
-    DN_Str8x32 bytes_str = DN_ByteCountStr8x32(path_info.size);
+    DN_Str8x32 bytes_str = DN_Str8x32FromByteCountU64Auto(path_info.size);
     DN_ErrSinkAppendF(err, 1 /*err_code*/, "Failed to allocate %.*s for reading file '%.*s'", DN_Str8PrintFmt(bytes_str), DN_Str8PrintFmt(path));
     return result;
   }
@@ -475,7 +499,7 @@ DN_API bool DN_OS_FileWriteAll(DN_Str8 path, DN_Str8 buffer, DN_ErrSink *error)
 
 DN_API bool DN_OS_FileWriteAllFV(DN_Str8 file_path, DN_ErrSink *error, DN_FMT_ATTRIB char const *fmt, va_list args)
 {
-  DN_TCScratch scratch = DN_TCScratchBegin(nullptr, 0);
+  DN_TCScratch scratch = DN_TCScratchBeginArena(nullptr, 0);
   DN_Str8      buffer  = DN_Str8FromFmtVArena(&scratch.arena, fmt, args);
   bool         result  = DN_OS_FileWriteAll(file_path, buffer, error);
   DN_TCScratchEnd(&scratch);
@@ -493,7 +517,7 @@ DN_API bool DN_OS_FileWriteAllF(DN_Str8 file_path, DN_ErrSink *error, DN_FMT_ATT
 
 DN_API bool DN_OS_FileWriteAllSafe(DN_Str8 path, DN_Str8 buffer, DN_ErrSink *error)
 {
-  DN_TCScratch scratch  = DN_TCScratchBegin(nullptr, 0);
+  DN_TCScratch scratch  = DN_TCScratchBeginArena(nullptr, 0);
   DN_Str8      tmp_path = DN_Str8FromFmtArena(&scratch.arena, "%.*s.tmp", DN_Str8PrintFmt(path));
   if (!DN_OS_FileWriteAll(tmp_path, buffer, error)) {
     DN_TCScratchEnd(&scratch);
@@ -513,7 +537,7 @@ DN_API bool DN_OS_FileWriteAllSafe(DN_Str8 path, DN_Str8 buffer, DN_ErrSink *err
 
 DN_API bool DN_OS_FileWriteAllSafeFV(DN_Str8 path, DN_ErrSink *error, DN_FMT_ATTRIB char const *fmt, va_list args)
 {
-  DN_TCScratch scratch = DN_TCScratchBegin(nullptr, 0);
+  DN_TCScratch scratch = DN_TCScratchBeginArena(nullptr, 0);
   DN_Str8      buffer  = DN_Str8FromFmtVArena(&scratch.arena, fmt, args);
   bool         result  = DN_OS_FileWriteAllSafe(path, buffer, error);
   DN_TCScratchEnd(&scratch);
@@ -630,7 +654,7 @@ DN_API DN_Str8 DN_OS_PathTo(DN_Arena *arena, DN_Str8 path, DN_Str8 path_separato
 
 DN_API DN_Str8 DN_OS_PathToF(DN_Arena *arena, DN_Str8 path_separator, DN_FMT_ATTRIB char const *fmt, ...)
 {
-  DN_TCScratch scratch = DN_TCScratchBegin(&arena, 1);
+  DN_TCScratch scratch = DN_TCScratchBeginArena(&arena, 1);
   va_list    args;
   va_start(args, fmt);
   DN_Str8 path = DN_Str8FromFmtVArena(&scratch.arena, fmt, args);
@@ -648,7 +672,7 @@ DN_API DN_Str8 DN_OS_Path(DN_Arena *arena, DN_Str8 path)
 
 DN_API DN_Str8 DN_OS_PathF(DN_Arena *arena, DN_FMT_ATTRIB char const *fmt, ...)
 {
-  DN_TCScratch scratch = DN_TCScratchBegin(&arena, 1);
+  DN_TCScratch scratch = DN_TCScratchBeginArena(&arena, 1);
   va_list    args;
   va_start(args, fmt);
   DN_Str8 path = DN_Str8FromFmtVArena(&scratch.arena, fmt, args);
@@ -714,9 +738,8 @@ DN_API DN_OSExecResult DN_OS_ExecOrAbort(DN_Str8Slice cmd_line, DN_OSExecArgs *a
 // NOTE: DN_OSThread
 static void DN_OS_ThreadExecute_(void *user_context)
 {
-  DN_OSThread     *thread    = DN_Cast(DN_OSThread *) user_context;
-  DN_MemFuncs mem_funcs = DN_MemFuncsDefault();
-  DN_TCInitFromMemFuncs(&thread->context, thread->thread_id, /*args=*/nullptr, mem_funcs);
+  DN_OSThread *thread    = DN_Cast(DN_OSThread *) user_context;
+  DN_TCInitFromMemFuncs(&thread->context, thread->thread_id, DN_TCInitArgsDefault(), DN_MemFuncsDefault());
   DN_TCEquip(&thread->context);
   if (thread->is_lane_set) {
     DN_OS_TCThreadLaneEquip(thread->lane);
@@ -833,7 +856,7 @@ DN_API DN_OSHttpResponse DN_OS_HttpRequest(DN_Arena *arena, DN_Str8 host, DN_Str
 {
   // TODO(doyle): Revise the memory allocation and its lifetime
   DN_OSHttpResponse result  = {};
-  DN_TCScratch      scratch = DN_TCScratchBegin(&arena, 1);
+  DN_TCScratch      scratch = DN_TCScratchBeginArena(&arena, 1);
   result.scratch_arena      = scratch.arena;
 
   DN_OS_HttpRequestAsync(&result, arena, host, path, secure, method, body, headers);
@@ -1116,7 +1139,7 @@ T *DN_OS_VArrayInsertArray(DN_VArray<T> *array, DN_USize index, T const *items, 
   if (!DN_OS_VArrayIsValid(array))
     return result;
   if (DN_OS_VArrayReserve(array, array->size + count))
-    result = DN_CArrayInsertArray(array->data, &array->size, array->max, index, items, count);
+    result = DN_ArrayInsertArray(array->data, &array->size, array->max, index, items, count);
   return result;
 }
 
@@ -1137,14 +1160,14 @@ T *DN_OS_VArrayInsert(DN_VArray<T> *array, DN_USize index, T const &item)
 template <typename T>
 T *DN_OS_VArrayPopFront(DN_VArray<T> *array, DN_USize count)
 {
-  T *result = DN_Cast(T *)DN_CArrayPopFront(array->data, &array->size, sizeof(T), count);
+  T *result = DN_Cast(T *)DN_ArrayPopFront(array->data, &array->size, sizeof(T), count);
   return result;
 }
 
 template <typename T>
 T *DN_OS_VArrayPopBack(DN_VArray<T> *array, DN_USize count)
 {
-  T *result = DN_Cast(T *)DN_CArrayPopBack(array->data, &array->size, sizeof(T), count);
+  T *result = DN_Cast(T *)DN_ArrayPopBack(array->data, &array->size, sizeof(T), count);
   return result;
 }
 
@@ -1154,7 +1177,7 @@ DN_ArrayEraseResult DN_OS_VArrayEraseRange(DN_VArray<T> *array, DN_USize begin_i
   DN_ArrayEraseResult result = {};
   if (!DN_OS_VArrayIsValid(array))
     return result;
-  result = DN_CArrayEraseRange(array->data, &array->size, sizeof(T), begin_index, count, erase);
+  result = DN_ArrayEraseRange(array->data, &array->size, sizeof(T), begin_index, count, erase);
   return result;
 }
 
@@ -1183,12 +1206,11 @@ bool DN_OS_VArrayReserve(DN_VArray<T> *array, DN_USize count)
   return result;
 }
 
-// NOTE: Stack Trace
-DN_API DN_StackTraceWalkResult DN_StackTraceWalk(DN_Arena *arena, DN_U16 limit)
+DN_API DN_StackTrace DN_StackTraceFromAllocator(DN_Allocator allocator, DN_U16 limit)
 {
-  DN_StackTraceWalkResult result = {};
+  DN_StackTrace result = {};
 #if defined(DN_OS_WIN32)
-  if (!arena)
+  if (!allocator.context)
     return result;
 
   static DN_TicketMutex mutex = {};
@@ -1202,7 +1224,7 @@ DN_API DN_StackTraceWalkResult DN_StackTraceWalk(DN_Arena *arena, DN_U16 limit)
     w32->sym_initialised = true;
     SymSetOptions(SYMOPT_LOAD_LINES);
     if (!SymInitialize(result.process, nullptr /*UserSearchPath*/, true /*fInvadeProcess*/)) {
-      DN_TCScratch  scratch = DN_TCScratchBegin(&arena, 1);
+      DN_TCScratch  scratch = DN_TCScratchBeginAllocator(&allocator, 1);
       DN_OSW32Error error   = DN_OS_W32LastError(&scratch.arena);
       DN_LogErrorF("SymInitialize failed, stack trace can not be generated (%lu): %.*s\n", error.code, DN_Str8PrintFmt(error.msg));
       DN_TCScratchEnd(&scratch);
@@ -1240,7 +1262,9 @@ DN_API DN_StackTraceWalkResult DN_StackTraceWalk(DN_Arena *arena, DN_U16 limit)
   }
   DN_TicketMutex_End(&mutex);
 
-  result.base_addr = DN_ArenaNewArray(arena, DN_U64, raw_frames_count, DN_ZMem_No);
+  result.base_addr = DN_Cast(DN_U64 *)DN_AllocatorAlloc(allocator, raw_frames_count * sizeof(DN_U64), alignof(DN_U64), DN_ZMem_No);
+  DN_Assert(result.base_addr);
+
   result.size      = DN_Cast(DN_U16) raw_frames_count;
   DN_Memcpy(result.base_addr, raw_frames, raw_frames_count * sizeof(raw_frames[0]));
 #else
@@ -1250,66 +1274,91 @@ DN_API DN_StackTraceWalkResult DN_StackTraceWalk(DN_Arena *arena, DN_U16 limit)
   return result;
 }
 
-static void DN_StackTraceAddWalkToStr8Builder(DN_StackTraceWalkResult const *walk, DN_Str8Builder *builder, DN_USize skip)
+
+DN_API DN_StackTrace DN_StackTraceFromArena(DN_Arena *arena, DN_U16 limit)
+{
+  DN_Allocator  allocator = DN_AllocatorFromArena(arena);
+  DN_StackTrace result    = DN_StackTraceFromAllocator(allocator, limit);
+  return result;
+}
+
+static void DN_StackTraceAddToStr8Builder_(DN_StackTrace const *trace, DN_Str8Builder *builder, DN_USize skip)
 {
   DN_StackTraceRawFrame raw_frame = {};
-  raw_frame.process               = walk->process;
-  for (DN_USize index = skip; index < walk->size; index++) {
-    raw_frame.base_addr      = walk->base_addr[index];
+  raw_frame.process               = trace->process;
+  for (DN_USize index = skip; index < trace->size; index++) {
+    raw_frame.base_addr      = trace->base_addr[index];
     DN_StackTraceFrame frame = DN_StackTraceRawFrameToFrame(builder->arena, raw_frame);
-    DN_Str8BuilderAppendF(builder, "%.*s(%zu): %.*s%s", DN_Str8PrintFmt(frame.file_name), frame.line_number, DN_Str8PrintFmt(frame.function_name), (DN_Cast(int) index == walk->size - 1) ? "" : "\n");
+    DN_Str8BuilderAppendF(builder, "%.*s(%zu): %.*s%s", DN_Str8PrintFmt(frame.file_name), frame.line_number, DN_Str8PrintFmt(frame.function_name), (DN_Cast(int) index == trace->size - 1) ? "" : "\n");
   }
 }
 
-DN_API bool DN_StackTraceWalkResultIterate(DN_StackTraceWalkResultIterator *it, DN_StackTraceWalkResult const *walk)
+DN_API bool DN_StackTraceIterate(DN_StackTraceIterator *it, DN_StackTrace const *trace)
 {
   bool result = false;
-  if (!it || !walk || !walk->base_addr || !walk->process)
+  if (!it || !trace || !trace->base_addr || !trace->process)
     return result;
 
-  if (it->index >= walk->size)
+  if (it->index >= trace->size)
     return false;
 
   result                  = true;
-  it->raw_frame.process   = walk->process;
-  it->raw_frame.base_addr = walk->base_addr[it->index++];
+  it->raw_frame.process   = trace->process;
+  it->raw_frame.base_addr = trace->base_addr[it->index++];
   return result;
 }
 
-DN_API DN_Str8 DN_StackTraceWalkResultToStr8(DN_Arena *arena, DN_StackTraceWalkResult const *walk, DN_U16 skip)
+DN_API DN_Str8 DN_Str8FromStackTraceAllocator(DN_Allocator allocator, DN_StackTrace const *trace, DN_U16 skip)
 {
-  DN_Str8 result{};
-  if (!walk || !arena)
+  DN_Str8 result = {};
+  if (!trace)
     return result;
 
-  DN_TCScratch   scratch = DN_TCScratchBegin(&arena, 1);
+  DN_TCScratch   scratch = DN_TCScratchBeginAllocator(&allocator, 1);
   DN_Str8Builder builder = DN_Str8BuilderFromArena(&scratch.arena);
-  DN_StackTraceAddWalkToStr8Builder(walk, &builder, skip);
-  result = DN_Str8BuilderBuild(&builder, arena);
+  DN_StackTraceAddToStr8Builder_(trace, &builder, skip);
+  result = DN_Str8FromStr8BuilderAllocator(&builder, allocator);
   DN_TCScratchEnd(&scratch);
   return result;
 }
 
-DN_API DN_Str8 DN_StackTraceWalkStr8(DN_Arena *arena, DN_U16 limit, DN_U16 skip)
+DN_API DN_Str8 DN_Str8FromStackTraceArena(DN_Arena *arena, DN_StackTrace const *trace, DN_U16 skip)
 {
-  DN_TCScratch            scratch = DN_TCScratchBegin(&arena, 1);
-  DN_StackTraceWalkResult walk    = DN_StackTraceWalk(&scratch.arena, limit);
-  DN_Str8                 result  = DN_StackTraceWalkResultToStr8(arena, &walk, skip);
+  DN_Str8 result = {};
+  if (!trace || !arena)
+    return result;
+
+  DN_TCScratch   scratch = DN_TCScratchBeginArena(&arena, 1);
+  DN_Str8Builder builder = DN_Str8BuilderFromArena(&scratch.arena);
+  DN_StackTraceAddToStr8Builder_(trace, &builder, skip);
+  result = DN_Str8FromStr8BuilderArena(&builder, arena);
   DN_TCScratchEnd(&scratch);
   return result;
 }
 
-DN_API DN_Str8 DN_StackTraceWalkStr8FromHeap(DN_U16 limit, DN_U16 skip)
+DN_API DN_Str8 DN_Str8FromStackTraceNowAllocator(DN_Allocator allocator, DN_U16 limit, DN_U16 skip)
 {
-  // NOTE: We don't use WalkResultToStr8 because that uses the TLS arenas which
-  // does not use the OS heap.
-  DN_MemList              mem     = DN_MemListFromHeap(DN_Kilobytes(64), DN_MemFlags_NoAllocTrack);
-  DN_Arena                arena   = DN_ArenaFromMemList(&mem);
-  DN_Str8Builder          builder = DN_Str8BuilderFromArena(&arena);
-  DN_StackTraceWalkResult walk    = DN_StackTraceWalk(&arena, limit);
-  DN_StackTraceAddWalkToStr8Builder(&walk, &builder, skip);
+  DN_TCScratch  scratch = DN_TCScratchBeginArena(DN_Cast(DN_Arena **) & allocator.context, 1);
+  DN_StackTrace walk    = DN_StackTraceFromArena(&scratch.arena, limit);
+  DN_Str8       result  = DN_Str8FromStackTraceAllocator(allocator, &walk, skip);
+  DN_TCScratchEnd(&scratch);
+  return result;
+}
+
+DN_API DN_Str8 DN_Str8FromStackTraceNowArena(DN_Arena *arena, DN_U16 limit, DN_U16 skip)
+{
+  DN_Str8 result = DN_Str8FromStackTraceNowAllocator(DN_AllocatorFromArena(arena), limit, skip);
+  return result;
+}
+
+DN_API DN_Str8 DN_Str8FromStackTraceNowHeap(DN_U16 limit, DN_U16 skip)
+{
+  DN_Arena       arena   = DN_ArenaFromHeap(DN_Kilobytes(64), DN_MemFlags_NoAllocTrack);
+  DN_Str8Builder builder = DN_Str8BuilderFromArena(&arena);
+  DN_StackTrace  walk    = DN_StackTraceFromArena(&arena, limit);
+  DN_StackTraceAddToStr8Builder_(&walk, &builder, skip);
   DN_Str8 result = DN_Str8BuilderBuildFromHeap(&builder);
-  DN_MemListDeinit(&mem);
+  DN_ArenaDeinit(&arena);
   return result;
 }
 
@@ -1319,12 +1368,12 @@ DN_API DN_StackTraceFrameSlice DN_StackTraceGetFrames(DN_Arena *arena, DN_U16 li
   if (!arena)
     return result;
 
-  DN_TCScratch            scratch = DN_TCScratchBegin(&arena, 1);
-  DN_StackTraceWalkResult walk    = DN_StackTraceWalk(&scratch.arena, limit);
+  DN_TCScratch            scratch = DN_TCScratchBeginArena(&arena, 1);
+  DN_StackTrace walk    = DN_StackTraceFromArena(&scratch.arena, limit);
   if (walk.size) {
     if (DN_ISliceAllocArena(&result, walk.size, DN_ZMem_No, arena)) {
       DN_USize slice_index = 0;
-      for (DN_StackTraceWalkResultIterator it = {}; DN_StackTraceWalkResultIterate(&it, &walk);)
+      for (DN_StackTraceIterator it = {}; DN_StackTraceIterate(&it, &walk);)
         result.data[slice_index++] = DN_StackTraceRawFrameToFrame(arena, it.raw_frame);
     }
   }
@@ -1381,7 +1430,7 @@ DN_API DN_StackTraceFrame DN_StackTraceRawFrameToFrame(DN_Arena *arena, DN_Stack
 
 DN_API void DN_StackTracePrint(DN_U16 limit)
 {
-  DN_TCScratch            scratch     = DN_TCScratchBegin(nullptr, 0);
+  DN_TCScratch            scratch     = DN_TCScratchBeginArena(nullptr, 0);
   DN_StackTraceFrameSlice stack_trace = DN_StackTraceGetFrames(&scratch.arena, limit);
   for (DN_ForItSize(it, DN_StackTraceFrame, stack_trace.data, stack_trace.count)) {
     DN_StackTraceFrame frame = *it.data;

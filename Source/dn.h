@@ -143,8 +143,6 @@
 //        occurs.
 
 #include "Base/dn_base.h"
-#include "Base/dn_base_assert.h"
-#include "Base/dn_base_containers.h"
 #include "Base/dn_base_leak.h"
 
 #if DN_H_WITH_OS
@@ -158,11 +156,6 @@
 #endif
 #include "OS/dn_os.h"
 #endif
-
-struct DN_InitArgs
-{
-  DN_TCInitArgs thread_context_init_args;
-};
 
 typedef DN_USize DN_InitFlags;
 enum DN_InitFlags_
@@ -193,7 +186,7 @@ struct DN_Core
   #endif
 };
 
-DN_API void     DN_Init      (DN_Core *dn, DN_InitFlags flags, DN_InitArgs *args);
+DN_API void     DN_Init      (DN_Core *dn, DN_InitFlags flags, DN_TCInitArgs args);
 DN_API void     DN_Set       (DN_Core *dn);
 DN_API DN_Core *DN_Get       ();
 DN_API void     DN_BeginFrame();
