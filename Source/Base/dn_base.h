@@ -943,12 +943,6 @@ struct DN_Allocator
   void*            context;
 };
 
-struct DN_ArenaStatsStr8x64
-{
-  DN_Str8x64 info;
-  DN_Str8x64 hwm;
-};
-
 enum DN_ArenaReset
 {
   DN_ArenaReset_No,
@@ -1106,6 +1100,7 @@ enum DN_Str8FindFlag_
 typedef DN_USize DN_Str8SplitFlags;
 enum DN_Str8SplitFlags_
 {
+  DN_Str8SplitFlags_Nil                 = 0,
   DN_Str8SplitFlags_ExcludeEmptyStrings = 1 << 0,
   DN_Str8SplitFlags_HandleQuotedStrings = 1 << 1,
 };

@@ -356,7 +356,7 @@ DN_API DN_CGenMapNodeToEnum DN_CGen_MapNodeToEnumOrExit(MD_Node const *node, DN_
       DN_Str8BuilderAppendF(&builder, DN_Cast(char *) "%s'%.*s'", index ? ", " : "", DN_Str8PrintFmt(validator->node_string));
     }
 
-    DN_Str8 error_msg = DN_Str8BuilderBuild(&builder, tmem.arena);
+    DN_Str8 error_msg = DN_Str8FromStr8BuilderArena(&builder, tmem.arena);
     DN_TCScratchEnd(&tmem);
     MD_PrintMessageFmt(stderr, loc, MD_MessageKind_Error, DN_Cast(char *) "%.*s", DN_Str8PrintFmt(error_msg));
     DN_OS_Exit(DN_Cast(uint32_t) - 1);
@@ -390,7 +390,7 @@ DN_API void DN_CGen_LogF(MD_MessageKind kind, MD_Node *node, DN_ErrSink *err, ch
   DN_Str8BuilderAppendFV(&builder, fmt, args);
   va_end(args);
 
-  DN_Str8 msg = DN_Str8BuilderBuild(&builder, err->arena);
+  DN_Str8 msg = DN_Str8FromStr8BuilderArena(&builder, err->arena);
   DN_TCScratchEnd(&tmem);
   DN_OS_ErrSinkAppendF(err, DN_Cast(uint32_t) - 1, "%.*s", DN_Str8PrintFmt(msg));
 }
@@ -413,7 +413,7 @@ DN_API bool DN_CGen_TableHasHeaders(DN_CGenTable const *table, DN_Str8 const *he
   }
 
   if (!result) {
-    DN_Str8 missing_headers = DN_Str8BuilderBuild(&builder, tmem.arena);
+    DN_Str8 missing_headers = DN_Str8FromStr8BuilderArena(&builder, tmem.arena);
     DN_CGen_LogF(MD_MessageKind_Error,
                  table->headers_node,
                  err,
@@ -957,7 +957,7 @@ DN_API void DN_CGen_EmitCodeForTables(DN_CGen *cgen, DN_CGenEmit emit, DN_CppFil
                                      DN_Str8PrintFmt(cpp_array_size_str8),
                                      DN_Str8PrintFmt(cpp_array_size_field_str8));
 
-              DN_Str8 line = DN_Str8BuilderBuild(&builder, tmem.arena);
+              DN_Str8 line = DN_Str8FromStr8BuilderArena(&builder, tmem.arena);
               DN_CppLine(cpp, "%.*s", DN_Str8PrintFmt(line));
             }
           } else {
@@ -1026,7 +1026,7 @@ DN_API void DN_CGen_EmitCodeForTables(DN_CGen *cgen, DN_CGenEmit emit, DN_CppFil
               DN_Str8BuilderAppendF(&builder, "/*array_size*/ 0, ");
               DN_Str8BuilderAppendF(&builder, "/*array_size_field*/ NULL},");
 
-              DN_Str8 line = DN_Str8BuilderBuild(&builder, tmem.arena);
+              DN_Str8 line = DN_Str8FromStr8BuilderArena(&builder, tmem.arena);
               DN_TCScratchEnd(&tmem);
               DN_CppLine(cpp, "%.*s", DN_Str8PrintFmt(line));
             }
@@ -1117,7 +1117,7 @@ DN_API void DN_CGen_EmitCodeForTables(DN_CGen *cgen, DN_CGenEmit emit, DN_CppFil
           // NOTE: DN_TypeField length
           DN_Str8BuilderAppendF(&builder, "/*count*/ %.*s},", DN_Str8PrintFmt(fields_count));
 
-          DN_Str8 line = DN_Str8BuilderBuild(&builder, tmem.arena);
+          DN_Str8 line = DN_Str8FromStr8BuilderArena(&builder, tmem.arena);
           DN_TCScratchEnd(&tmem);
           DN_CppLine(cpp, "%.*s", DN_Str8PrintFmt(line));
         }

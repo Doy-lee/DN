@@ -30,9 +30,9 @@ void DN_Demo()
 
   // NOTE: DN_HexFromBytes
   {
-    DN_TCScratch  scratch  = DN_TCScratchBegin(nullptr, 0);
+    DN_TCScratch  scratch  = DN_TCScratchBeginArena(nullptr, 0);
     unsigned char bytes[2] = {0xFA, 0xCE};
-    DN_Str8       hex      = DN_HexFromBytesPtrArena(bytes, sizeof(bytes), scratch.arena);
+    DN_Str8       hex      = DN_HexFromPtrBytesArena(bytes, sizeof(bytes), &scratch.arena, DN_TrimLeadingZero_No);
     DN_Assert(DN_Str8Eq(hex, DN_Str8Lit("face"))); // NOTE: Guaranteed to be null-terminated
     DN_TCScratchEnd(&scratch);
   }
@@ -428,7 +428,7 @@ void DN_Demo()
   // If 'tmp_path' is written to successfuly, the file will be copied over into
   // 'path'.
   if (0) {
-    DN_TCScratch scratch = DN_TCScratchBegin(nullptr, 0);
+    DN_TCScratch scratch = DN_TCScratchBeginArena(nullptr, 0);
     DN_ErrSink  *error   = DN_TCErrSinkBegin(DN_ErrSinkMode_Nil);
     DN_OS_FileWriteAllSafe(/*path*/ DN_Str8Lit("C:/Home/my.txt"), /*buffer*/ DN_Str8Lit("Hello world"), error);
     DN_ErrSinkEndLogErrorF(error, "");
@@ -553,8 +553,8 @@ void DN_Demo()
       DN_ProfilerNewFrame(&profiler);
       DN_ProfilerZone zone = DN_ProfilerBeginZone(&profiler, DN_Str8Lit("Main Loop"), DemoZone_MainLoop);
       DN_OS_SleepMs(100);
-      DN_ProfilerEndZone(&profiler, zone);
-      DN_ProfilerDump(&profiler);
+      DN_ProfilerEndZone(zone);
+      DN_ProfilerFmtToStdout(&profiler);
     }
   }
   #endif
@@ -621,7 +621,7 @@ void DN_Demo()
   // Int -> U32:    0         or UINT32_MAX
   // Int -> U64:    0         or UINT64_MAX
 
-  // NOTE: DN_OS_StackTrace
+  // NOTE: DN_StackTrace
   // Emit stack traces at the calling site that these functions are invoked
   // from.
   //
@@ -638,23 +638,23 @@ void DN_Demo()
   // the debug APIs are aware of how to resolve the new addresses imported
   // into the address space.
   {
-    DN_TCScratch scratch = DN_TCScratchBegin(nullptr, 0);
+    DN_TCScratch scratch = DN_TCScratchBeginArena(nullptr, 0);
 
-    // NOTE: DN_OS_StackTraceWalk
+    // NOTE: DN_StackTraceFromArena
     //
     // Generate a stack trace as a series of addresses to the base of the
     // functions on the call-stack at the current instruction pointer. The
     // addresses are stored in order from the current executing function
     // first to the most ancestor function last in the walk.
-    DN_StackTraceWalkResult walk = DN_StackTraceWalk(scratch.arena, /*depth limit*/ 128);
+    DN_StackTrace walk = DN_StackTraceFromArena(&scratch.arena, /*depth limit*/ 128);
 
     // Loop over the addresses produced in the stack trace
-    for (DN_StackTraceWalkResultIterator it = {}; DN_StackTraceWalkResultIterate(&it, &walk);) {
+    for (DN_StackTraceIterator it = {}; DN_StackTraceIterate(&it, &walk);) {
       // NOTE: DN_StackTraceRawFrameToFrame
       //
       // Converts the base address into a human readable stack trace
       // entry (e.g. address, line number, file and function name).
-      DN_StackTraceFrame frame = DN_StackTraceRawFrameToFrame(scratch.arena, it.raw_frame);
+      DN_StackTraceFrame frame = DN_StackTraceRawFrameToFrame(&scratch.arena, it.raw_frame);
 
       // You may then print out the frame like so
       if (0)
@@ -671,7 +671,7 @@ void DN_Demo()
     // Helper function to create a stack trace and automatically convert the
     // raw frames into human readable frames. This function effectively
     // calls 'Walk' followed by 'RawFrameToFrame'.
-    DN_StackTraceFrameSlice frames = DN_StackTraceGetFrames(scratch.arena, /*depth limit*/ 128);
+    DN_StackTraceFrameSlice frames = DN_StackTraceGetFrames(&scratch.arena, /*depth limit*/ 128);
     (void)frames;
 
     DN_TCScratchEnd(&scratch);
@@ -686,8 +686,8 @@ void DN_Demo()
   // The returned string's 'size' member variable does *not* include this
   // additional null-terminating byte.
   {
-    DN_TCScratch scratch = DN_TCScratchBegin(nullptr, 0);
-    DN_Str8      string  = DN_Str8AllocArena(scratch.arena, /*size*/ 1, DN_ZMem_Yes);
+    DN_TCScratch scratch = DN_TCScratchBeginArena(nullptr, 0);
+    DN_Str8      string  = DN_Str8AllocArena(/*size*/ 1, DN_ZMem_Yes, &scratch.arena);
     DN_Assert(string.size == 1);
     DN_Assert(string.data[string.size] == 0); // It is null-terminated!
     DN_TCScratchEnd(&scratch);
@@ -767,13 +767,13 @@ void DN_Demo()
   // always be a newly allocated copy, irrespective of if any replacements
   // were done or not.
   {
-    DN_TCScratch scratch   = DN_TCScratchBegin(nullptr, 0);
-    DN_Str8      string = DN_Str8Replace(/*string*/ DN_Str8Lit("Foo Foo Bar"),
-                                     /*find*/ DN_Str8Lit("Foo"),
-                                     /*replace*/ DN_Str8Lit("Moo"),
-                                     /*start_index*/ 1,
-                                     /*arena*/ scratch.arena,
-                                     /*eq_case*/ DN_Str8EqCase_Sensitive);
+    DN_TCScratch scratch = DN_TCScratchBeginArena(nullptr, 0);
+    DN_Str8      string  = DN_Str8Replace(/*string*/ DN_Str8Lit("Foo Foo Bar"),
+                                          /*find*/ DN_Str8Lit("Foo"),
+                                          /*replace*/ DN_Str8Lit("Moo"),
+                                          /*start_index*/ 1,
+                                          /*arena*/ &scratch.arena,
+                                          /*eq_case*/ DN_Str8EqCase_Sensitive);
     DN_Assert(DN_Str8Eq(string, DN_Str8Lit("Foo Moo Bar")));
     DN_TCScratchEnd(&scratch);
   }
@@ -786,8 +786,8 @@ void DN_Demo()
   // Reverse segment delimits the string counting 'segment_size' from the back
   // of the string.
   {
-    DN_TCScratch scratch   = DN_TCScratchBegin(nullptr, 0);
-    DN_Str8      string = DN_Str8Segment(scratch.arena, /*string*/ DN_Str8Lit("123456789"), /*segment_size*/ 3, /*segment_char*/ ',');
+    DN_TCScratch scratch = DN_TCScratchBeginArena(nullptr, 0);
+    DN_Str8      string  = DN_Str8Segment(&scratch.arena, /*string*/ DN_Str8Lit("123456789"), /*segment_size*/ 3, /*segment_char*/ ',');
     DN_Assert(DN_Str8Eq(string, DN_Str8Lit("123,456,789")));
     DN_TCScratchEnd(&scratch);
   }
@@ -796,12 +796,12 @@ void DN_Demo()
   {
     // Splits the string at each delimiter into substrings occuring prior and
     // after until the next delimiter.
-    DN_TCScratch scratch = DN_TCScratchBegin(nullptr, 0);
+    DN_TCScratch scratch = DN_TCScratchBeginArena(nullptr, 0);
     {
-      DN_Str8SplitResult splits = DN_Str8SplitArena(/*arena*/ scratch.arena,
-                                                    /*string*/ DN_Str8Lit("192.168.8.1"),
+      DN_Str8SplitResult splits = DN_Str8SplitArena(/*string*/ DN_Str8Lit("192.168.8.1"),
                                                     /*delimiter*/ DN_Str8Lit("."),
-                                                    /*mode*/ DN_Str8SplitIncludeEmptyStrings_No);
+                                                    DN_Str8SplitFlags_ExcludeEmptyStrings,
+                                                    &scratch.arena);
       DN_Assert(splits.count == 4);
       DN_Assert(DN_Str8Eq(splits.data[0], DN_Str8Lit("192")) &&
                 DN_Str8Eq(splits.data[1], DN_Str8Lit("168")) &&
@@ -812,10 +812,10 @@ void DN_Demo()
     // You can include empty strings that occur when splitting by setting
     // the split mode to include empty strings.
     {
-      DN_Str8SplitResult splits = DN_Str8SplitArena(/*arena*/ scratch.arena,
-                                                    /*string*/ DN_Str8Lit("a--b"),
+      DN_Str8SplitResult splits = DN_Str8SplitArena(/*string*/ DN_Str8Lit("a--b"),
                                                     /*delimiter*/ DN_Str8Lit("-"),
-                                                    /*mode*/ DN_Str8SplitIncludeEmptyStrings_Yes);
+                                                    DN_Str8SplitFlags_Nil,
+                                                    &scratch.arena);
       DN_Assert(splits.count == 3);
       DN_Assert(DN_Str8Eq(splits.data[0], DN_Str8Lit("a")) &&
                 DN_Str8Eq(splits.data[1], DN_Str8Lit("")) &&
@@ -955,13 +955,14 @@ void DN_Demo()
   // caller's arena. If arena aliasing occurs, with ASAN on, generally
   // the library will trap and report use-after-poison once violated.
   {
-    DN_TCScratch scratch_a = DN_TCScratchBegin(nullptr, 0);
+    DN_TCScratch scratch_a = DN_TCScratchBeginArena(nullptr, 0);
 
     // Now imagine we call a function where we pass scratch_a.arena down
     // into it .. If we call scratch again, we need to pass in the arena
     // to prevent aliasing.
-    DN_TCScratch scratch_b = DN_TCScratchBegin(&scratch_a.arena, 1);
-    DN_Assert(scratch_a.arena != scratch_b.arena);
+    DN_Arena    *conflicts[] = {&scratch_a.arena};
+    DN_TCScratch scratch_b   = DN_TCScratchBeginArena(conflicts, DN_ArrayCountU(conflicts));
+    DN_Assert(scratch_a.arena.mem != scratch_b.arena.mem);
 
     DN_TCScratchEnd(&scratch_b);
     DN_TCScratchEnd(&scratch_a);
@@ -989,7 +990,7 @@ void DN_Demo()
 
   // NOTE: DN_CVT_AgeFromU64
   {
-    DN_TCScratch scratch   = DN_TCScratchBegin(nullptr, 0);
+    DN_TCScratch scratch   = DN_TCScratchBeginArena(nullptr, 0);
     DN_Str8x128  string = DN_AgeStr8FromSecF64(DN_SecFromHours(2) + DN_SecFromMins(30), DN_AgeUnit_All);
     DN_Assert(DN_Str8Eq(DN_Str8FromStruct(&string), DN_Str8Lit("2h 30m")));
     DN_TCScratchEnd(&scratch);
@@ -1110,12 +1111,12 @@ void DN_Demo()
     if (0) {
       // Generate the error string for the last Win32 API called that return
       // an error value.
-      DN_TCScratch scratch            = DN_TCScratchBegin(nullptr, 0);
-      DN_OSW32Error get_last_error = DN_OS_W32LastError(scratch.arena);
+      DN_TCScratch  scratch        = DN_TCScratchBeginArena(nullptr, 0);
+      DN_OSW32Error get_last_error = DN_OS_W32LastError(&scratch.arena);
       printf("Error (%lu): %.*s", get_last_error.code, DN_Str8PrintFmt(get_last_error.msg));
 
       // Alternatively, pass in the error code directly
-      DN_OSW32Error error_msg_for_code = DN_OS_W32ErrorCodeToMsg(scratch.arena, /*error_code*/ 0);
+      DN_OSW32Error error_msg_for_code = DN_OS_W32ErrorCodeToMsg(&scratch.arena, /*error_code*/ 0);
       printf("Error (%lu): %.*s", error_msg_for_code.code, DN_Str8PrintFmt(error_msg_for_code.msg));
       DN_TCScratchEnd(&scratch);
     }

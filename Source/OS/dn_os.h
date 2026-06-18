@@ -368,7 +368,7 @@ DN_API bool                      DN_OS_FileWriteF                             (D
 DN_API bool                      DN_OS_FileFlush                              (DN_OSFile *file, DN_ErrSink *err);
 DN_API void                      DN_OS_FileClose                              (DN_OSFile *file);
 
-DN_API DN_Str8                   DN_OS_FileReadAll                            (DN_Allocator alloc_type, void *allocator, DN_Str8 path, DN_ErrSink *err);
+DN_API DN_Str8                   DN_OS_FileReadAll                            (DN_Allocator allocator, DN_Str8 path, DN_ErrSink *err);
 DN_API DN_Str8                   DN_OS_FileReadAllArena                       (DN_Arena *arena, DN_Str8 path, DN_ErrSink *err);
 DN_API DN_Str8                   DN_OS_FileReadAllPool                        (DN_Pool *pool, DN_Str8 path, DN_ErrSink *err);
 

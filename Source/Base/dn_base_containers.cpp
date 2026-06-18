@@ -114,12 +114,12 @@ DN_API DN_ArrayEraseResult DN_ArrayEraseRange(void *data, DN_USize *size, DN_USi
   // Compute the range to erase
   DN_USize start = 0, end = 0;
   if (count < 0) {
-    // Erase backwards from begin_index, inclusive of begin_index
-    // Range: [begin_index + count + 1, begin_index + 1)
-    // Which is: [begin_index - abs(count) + 1, begin_index + 1)
+    // Erase backwards from begin_index, not inclusive of begin_index
+    // Range: [begin_index + count, begin_index)
+    // Which is: [begin_index - abs(count), begin_index)
     DN_USize abs_count = DN_Abs(count);
-    start = (begin_index + 1 > abs_count) ? (begin_index + 1 - abs_count) : 0;
-    end   = begin_index + 1;
+    start = (begin_index > abs_count) ? (begin_index - abs_count) : 0;
+    end   = begin_index;
   } else {
     start = begin_index;
     end   = begin_index + count;
@@ -147,7 +147,14 @@ DN_API DN_ArrayEraseResult DN_ArrayEraseRange(void *data, DN_USize *size, DN_USi
   }
 
   result.items_erased = erase_count;
-  result.it_index     = start ? start - 1 : start;
+  // NOTE: If we are erasing from the current index of the iterator to the end of the array then
+  // there's no more elements in the array to iterate. So the returned index should b
+  // one-past-last index
+  if (begin_index == start && end >= *size) {
+    result.it_index = *size;
+  } else {
+    result.it_index = start ? start - 1 : 0;
+  }
   return result;
 }
 

@@ -2931,9 +2931,9 @@ DN_API DN_USize DN_Str8Split(DN_Str8 string, DN_Str8 delimiter, DN_Str8 *splits,
       DN_Str8FindResult find = DN_Str8FindStr8(DN_Str8Advance(it, 1), DN_Str8Lit("\""), DN_Str8EqCase_Sensitive);
       DN_Assert(find.found);
       item = find.start_to_before_match;
-      it   = DN_Str8BSplit(find.after_match_to_end_of_buffer, DN_Str8Lit(",")).rhs;
+      it   = DN_Str8BSplit(find.after_match_to_end_of_buffer, delimiter).rhs;
     } else {
-      DN_Str8BSplitResult sub_split = DN_Str8BSplit(it, DN_Str8Lit(","));
+      DN_Str8BSplitResult sub_split = DN_Str8BSplit(it, delimiter);
       item                          = sub_split.lhs;
       it                            = sub_split.rhs;
     }
@@ -2948,7 +2948,7 @@ DN_API DN_USize DN_Str8Split(DN_Str8 string, DN_Str8 delimiter, DN_Str8 *splits,
   return result;
 }
 
-DN_API DN_Str8SplitResult DN_Str8SplitArena(DN_Arena *arena, DN_Str8 string, DN_Str8 delimiter, DN_Str8SplitFlags mode)
+DN_API DN_Str8SplitResult DN_Str8SplitArena(DN_Str8 string, DN_Str8 delimiter, DN_Str8SplitFlags mode, DN_Arena *arena)
 {
   DN_Str8SplitResult result = {};
   DN_USize           count  = DN_Str8Split(string, delimiter, /*splits*/ nullptr, /*count*/ 0, mode);
