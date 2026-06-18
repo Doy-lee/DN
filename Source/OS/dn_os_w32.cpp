@@ -395,15 +395,9 @@ DN_API DN_OSFileRead DN_OS_FileRead(DN_OSFile *file, void *buffer, DN_USize size
   if (!file || !file->handle || file->error || !buffer || size <= 0)
     return result;
 
-  DN_TCScratch scratch = DN_TCScratchBeginArena(nullptr, 0);
-  if (!DN_Check(size <= (unsigned long)-1)) {
-    DN_Str8x32 buffer_size_str8 = DN_Str8x32FromByteCountU64Auto(size);
-    DN_ErrSinkAppendF(
-        err,
-        1 /*error_code*/,
-        "Current implementation doesn't support reading >4GiB file (requested %.*s), implement Win32 overlapped IO",
-        DN_Str8PrintFmt(buffer_size_str8));
-    DN_TCScratchEnd(&scratch);
+  if (size > ULONG_MAX) {
+    DN_Str8x32 desc = DN_Str8x32FromByteCountU64Auto(size);
+    DN_ErrSinkAppendF(err, 1 /*error_code*/, "Current implementation doesn't support reading >4GiB file (requested %.*s), implement Win32 overlapped IO", DN_Str8PrintFmt(desc));
     return result;
   }
 
@@ -414,6 +408,7 @@ DN_API DN_OSFileRead DN_OS_FileRead(DN_OSFile *file, void *buffer, DN_USize size
                                        /*LPDWORD      lpNumberOfByesRead*/ &bytes_read,
                                        /*LPOVERLAPPED lpOverlapped*/ nullptr);
   if (read_result == 0) {
+    DN_TCScratch  scratch   = DN_TCScratchBeginArena(nullptr, 0);
     DN_OSW32Error win_error = DN_OS_W32LastError(&scratch.arena);
     DN_ErrSinkAppendF(err, win_error.code, "Failed to read data from file: (%u) %.*s", win_error.code, DN_Str8PrintFmt(win_error.msg));
     DN_TCScratchEnd(&scratch);
@@ -421,6 +416,7 @@ DN_API DN_OSFileRead DN_OS_FileRead(DN_OSFile *file, void *buffer, DN_USize size
   }
 
   if (bytes_read != size) {
+    DN_TCScratch  scratch   = DN_TCScratchBeginArena(nullptr, 0);
     DN_OSW32Error win_error = DN_OS_W32LastError(&scratch.arena);
     DN_ErrSinkAppendF(
         err,
@@ -436,7 +432,6 @@ DN_API DN_OSFileRead DN_OS_FileRead(DN_OSFile *file, void *buffer, DN_USize size
 
   result.bytes_read = bytes_read;
   result.success    = true;
-  DN_TCScratchEnd(&scratch);
   return result;
 }
 
@@ -732,7 +727,7 @@ DN_API DN_OSExecResult DN_OS_ExecPump(DN_OSExecAsyncHandle handle,
     DN_ErrSinkAppendF(err, result.os_error_code, "Executed command failed to terminate: %.*s", DN_Str8PrintFmt(win_error.msg));
     DN_TCScratchEnd(&scratch);
     return result;
-  } else if (DN_Check(exec_result == WAIT_TIMEOUT || exec_result == WAIT_OBJECT_0)) {
+  } else if (exec_result == WAIT_TIMEOUT || exec_result == WAIT_OBJECT_0) {
     // NOTE: Read stdout from process
     // If the pipes are full, the process will block. We periodically
     // flush the pipes to make sure this doesn't happen
@@ -1341,204 +1336,6 @@ DN_API void DN_OS_W32ThreadSetName(DN_Str8 name)
   DN_TCScratchEnd(&scratch);
 }
 
-void DN_OS_HttpRequestWin32Callback(HINTERNET session, DWORD *dwContext, DWORD dwInternetStatus, VOID *lpvStatusInformation, DWORD dwStatusInformationLength)
-{
-  (void)session;
-  (void)dwStatusInformationLength;
-
-  DN_OSHttpResponse *response         = DN_Cast(DN_OSHttpResponse *) dwContext;
-  HINTERNET          request          = DN_Cast(HINTERNET) response->w32_request_handle;
-  DN_OSW32Error        error            = {};
-  DWORD const        READ_BUFFER_SIZE = DN_Megabytes(1);
-
-  if (dwInternetStatus == WINHTTP_CALLBACK_STATUS_RESOLVING_NAME) {
-  } else if (dwInternetStatus == WINHTTP_CALLBACK_STATUS_NAME_RESOLVED) {
-  } else if (dwInternetStatus == WINHTTP_CALLBACK_STATUS_CONNECTING_TO_SERVER) {
-  } else if (dwInternetStatus == WINHTTP_CALLBACK_STATUS_CONNECTED_TO_SERVER) {
-  } else if (dwInternetStatus == WINHTTP_CALLBACK_STATUS_SENDING_REQUEST) {
-  } else if (dwInternetStatus == WINHTTP_CALLBACK_STATUS_REQUEST_SENT) {
-  } else if (dwInternetStatus == WINHTTP_CALLBACK_STATUS_RECEIVING_RESPONSE) {
-  } else if (dwInternetStatus == WINHTTP_CALLBACK_STATUS_RESPONSE_RECEIVED) {
-  } else if (dwInternetStatus == WINHTTP_CALLBACK_STATUS_CLOSING_CONNECTION) {
-  } else if (dwInternetStatus == WINHTTP_CALLBACK_STATUS_CONNECTION_CLOSED) {
-  } else if (dwInternetStatus == WINHTTP_CALLBACK_STATUS_CONNECTION_CLOSED) {
-  } else if (dwInternetStatus == WINHTTP_CALLBACK_STATUS_HANDLE_CREATED) {
-  } else if (dwInternetStatus == WINHTTP_CALLBACK_STATUS_HANDLE_CLOSING) {
-  } else if (dwInternetStatus == WINHTTP_CALLBACK_STATUS_DETECTING_PROXY) {
-  } else if (dwInternetStatus == WINHTTP_CALLBACK_STATUS_REDIRECT) {
-  } else if (dwInternetStatus == WINHTTP_CALLBACK_STATUS_INTERMEDIATE_RESPONSE) {
-  } else if (dwInternetStatus == WINHTTP_CALLBACK_STATUS_SECURE_FAILURE) {
-  } else if (dwInternetStatus == WINHTTP_CALLBACK_STATUS_HEADERS_AVAILABLE) {
-    DWORD status      = 0;
-    DWORD status_size = sizeof(status_size);
-    if (WinHttpQueryHeaders(request,
-                            WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
-                            WINHTTP_HEADER_NAME_BY_INDEX,
-                            &status,
-                            &status_size,
-                            WINHTTP_NO_HEADER_INDEX)) {
-      response->http_status = DN_Cast(uint16_t) status;
-
-      // NOTE: You can normally call into WinHttpQueryDataAvailable which means the kernel
-      // will buffer the response into a single buffer and return us the full size of the
-      // request.
-      //
-      // or
-      //
-      // You may call WinHttpReadData directly to write the memory into our buffer directly.
-      // This is advantageous to avoid a copy from the kernel buffer into our buffer. If the
-      // end user application knows the typical payload size then they can optimise for this
-      // to prevent unnecessary allocation on the user side.
-      void *buffer = DN_ArenaAlloc(response->builder.arena, READ_BUFFER_SIZE, 1 /*align*/, DN_ZMem_No);
-      if (!WinHttpReadData(request, buffer, READ_BUFFER_SIZE, nullptr))
-        error = DN_OS_W32LastError(&response->tmp_arena);
-    } else {
-      error = DN_OS_W32LastError(&response->tmp_arena);
-    }
-  } else if (dwInternetStatus == WINHTTP_CALLBACK_STATUS_DATA_AVAILABLE) {
-  } else if (dwInternetStatus == WINHTTP_CALLBACK_STATUS_READ_COMPLETE) {
-    DWORD bytes_read = dwStatusInformationLength;
-    if (bytes_read) {
-      DN_Str8 prev_buffer = DN_Str8FromPtr(DN_Cast(char *) lpvStatusInformation, bytes_read);
-      DN_Str8BuilderAppendRef(&response->builder, prev_buffer);
-
-      void *buffer = DN_ArenaAlloc(response->builder.arena, READ_BUFFER_SIZE, 1 /*align*/, DN_ZMem_No);
-      if (!WinHttpReadData(request, buffer, READ_BUFFER_SIZE, nullptr))
-        error = DN_OS_W32LastError(&response->tmp_arena);
-    }
-  } else if (dwInternetStatus == WINHTTP_CALLBACK_STATUS_WRITE_COMPLETE) {
-  } else if (dwInternetStatus == WINHTTP_CALLBACK_STATUS_REQUEST_ERROR) {
-    WINHTTP_ASYNC_RESULT *async_result = DN_Cast(WINHTTP_ASYNC_RESULT *) lpvStatusInformation;
-    error                              = DN_OS_W32ErrorCodeToMsg(&response->tmp_arena, DN_Cast(DN_U32) async_result->dwError);
-  } else if (dwInternetStatus == WINHTTP_CALLBACK_STATUS_SENDREQUEST_COMPLETE) {
-    if (!WinHttpReceiveResponse(request, 0))
-      error = DN_OS_W32LastError(&response->tmp_arena);
-  }
-
-  // NOTE: If the request handle is missing, then, the response has been freed.
-  // MSDN says that this callback can still be called after closing the handle
-  // and trigger the WINHTTP_CALLBACK_STATUS_REQUEST_ERROR.
-  if (request) {
-    bool read_complete = dwInternetStatus == WINHTTP_CALLBACK_STATUS_READ_COMPLETE && dwStatusInformationLength == 0;
-    if (read_complete)
-      response->body = DN_Str8FromStr8BuilderArena(&response->builder, response->arena);
-
-    if (read_complete || dwInternetStatus == WINHTTP_CALLBACK_STATUS_REQUEST_ERROR || error.code) {
-      DN_OS_SemaphoreIncrement(&response->on_complete_semaphore, 1);
-      DN_AtomicAddU32(&response->done, 1);
-    }
-
-    if (error.code) {
-      response->error_code = error.code;
-      response->error_msg  = error.msg;
-    }
-  }
-}
-
-DN_API void DN_OS_HttpRequestAsync(DN_OSHttpResponse     *response,
-                                   DN_Arena              *arena,
-                                   DN_Str8                host,
-                                   DN_Str8                path,
-                                   DN_OSHttpRequestSecure secure,
-                                   DN_Str8                method,
-                                   DN_Str8                body,
-                                   DN_Str8                headers)
-{
-  if (!response || !arena)
-    return;
-
-  response->arena   = arena;
-  response->builder = DN_Str8BuilderFromArena(response->scratch_arena.mem ? &response->scratch_arena : &response->tmp_arena);
-
-  DN_TCScratch scratch_ = DN_TCScratchBeginArena(&arena, 1);
-  if (!response->scratch_arena.mem)
-    response->scratch_arena = scratch_.arena;
-
-  DN_OSW32Error error = {};
-  DN_DEFER
-  {
-    response->error_msg  = error.msg;
-    response->error_code = error.code;
-    if (error.code) {
-      // NOTE: 'Wait' handles failures gracefully, skipping the wait and
-      // cleans up the request
-      DN_OS_HttpRequestWait(response);
-      DN_AtomicAddU32(&response->done, 1);
-    }
-    DN_TCScratchEnd(&scratch_);
-  };
-
-  response->w32_request_session = WinHttpOpen(nullptr /*user agent*/, WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY, WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, WINHTTP_FLAG_ASYNC);
-  if (!response->w32_request_session) {
-    error = DN_OS_W32LastError(&response->tmp_arena);
-    return;
-  }
-
-  DWORD callback_flags = WINHTTP_CALLBACK_STATUS_HEADERS_AVAILABLE |
-                         WINHTTP_CALLBACK_STATUS_READ_COMPLETE |
-                         WINHTTP_CALLBACK_STATUS_REQUEST_ERROR |
-                         WINHTTP_CALLBACK_STATUS_SENDREQUEST_COMPLETE;
-  if (WinHttpSetStatusCallback(response->w32_request_session,
-                               DN_Cast(WINHTTP_STATUS_CALLBACK) DN_OS_HttpRequestWin32Callback,
-                               callback_flags,
-                               DN_Cast(DWORD_PTR) nullptr /*dwReserved*/) == WINHTTP_INVALID_STATUS_CALLBACK) {
-    error = DN_OS_W32LastError(&response->tmp_arena);
-    return;
-  }
-
-  DN_Str16 host16                  = DN_OS_W32Str8ToStr16(&response->scratch_arena, host);
-  response->w32_request_connection = WinHttpConnect(response->w32_request_session, host16.data, secure ? INTERNET_DEFAULT_HTTPS_PORT : INTERNET_DEFAULT_HTTP_PORT, 0 /*reserved*/);
-  if (!response->w32_request_connection) {
-    error = DN_OS_W32LastError(&response->tmp_arena);
-    return;
-  }
-
-  DN_Str16 method16            = DN_OS_W32Str8ToStr16(&response->scratch_arena, method);
-  DN_Str16 path16              = DN_OS_W32Str8ToStr16(&response->scratch_arena, path);
-  response->w32_request_handle = WinHttpOpenRequest(response->w32_request_connection,
-                                                    method16.data,
-                                                    path16.data,
-                                                    nullptr /*version*/,
-                                                    nullptr /*referrer*/,
-                                                    nullptr /*accept types*/,
-                                                    secure ? WINHTTP_FLAG_SECURE : 0);
-  if (!response->w32_request_handle) {
-    error = DN_OS_W32LastError(&response->tmp_arena);
-    return;
-  }
-
-  DN_Str16 headers16              = DN_OS_W32Str8ToStr16(&response->scratch_arena, headers);
-  response->on_complete_semaphore = DN_OS_SemaphoreInit(0);
-  if (!WinHttpSendRequest(response->w32_request_handle,
-                          headers16.data,
-                          DN_Cast(DWORD) headers16.size,
-                          body.data /*optional data*/,
-                          DN_Cast(DWORD) body.size /*optional length*/,
-                          DN_Cast(DWORD) body.size /*total content length*/,
-                          DN_Cast(DWORD_PTR) response)) {
-    error = DN_OS_W32LastError(&response->tmp_arena);
-    return;
-  }
-}
-
-DN_API void DN_OS_HttpRequestFree(DN_OSHttpResponse *response)
-{
-  // NOTE: Cleanup
-  // NOTE: These calls are synchronous even when the HTTP request is async.
-  WinHttpCloseHandle(response->w32_request_handle);
-  WinHttpCloseHandle(response->w32_request_connection);
-  WinHttpCloseHandle(response->w32_request_session);
-
-  response->w32_request_session    = nullptr;
-  response->w32_request_connection = nullptr;
-  response->w32_request_handle     = nullptr;
-  DN_MemListDeinit(response->tmp_arena.mem);
-  DN_OS_SemaphoreDeinit(&response->on_complete_semaphore);
-
-  *response = {};
-}
-
-// NOTE: DN_OS_W32
 DN_API DN_Str16 DN_OS_W32ErrorCodeToMsg16Alloc(DN_U32 error_code)
 {
   DWORD flags                     = FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS;
@@ -1638,7 +1435,8 @@ DN_API DN_Str16 DN_OS_W32Str8ToStr16(DN_Arena *arena, DN_Str8 src)
     return result;
 
   int chars_written = MultiByteToWideChar(CP_UTF8, 0 /*dwFlags*/, src.data, DN_Cast(int) src.size, buffer, required_size);
-  if (DN_Check(chars_written == required_size)) {
+  DN_Assert(chars_written == required_size);
+  if (chars_written == required_size) {
     result.data              = buffer;
     result.size              = chars_written;
     result.data[result.size] = 0;
@@ -1700,7 +1498,8 @@ DN_API DN_Str8 DN_OS_W32Str16ToStr8(DN_Arena *arena, DN_Str16 src)
   DN_Str8  buffer = DN_Str8AllocArena(required_size, DN_ZMem_No, &temp);
   if (buffer.size) {
     int chars_written = WideCharToMultiByte(CP_UTF8, 0 /*dwFlags*/, src.data, src_size, buffer.data, DN_Cast(int) buffer.size, nullptr, nullptr);
-    if (DN_Check(chars_written == required_size)) {
+    DN_Assert(chars_written == required_size);
+    if (chars_written == required_size) {
       result                   = buffer;
       result.data[result.size] = 0;
     }
@@ -1730,7 +1529,8 @@ DN_API DN_Str8 DN_OS_W32Str16ToStr8FromHeap(DN_Str16 src)
     return result;
 
   int chars_written = WideCharToMultiByte(CP_UTF8, 0 /*dwFlags*/, src.data, src_size, buffer.data, DN_Cast(int) buffer.size, nullptr, nullptr);
-  if (DN_Check(chars_written == required_size)) {
+  DN_Assert(chars_written == required_size);
+  if (chars_written == required_size) {
     result                   = buffer;
     result.data[result.size] = 0;
   } else {

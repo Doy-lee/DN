@@ -4,8 +4,6 @@
 #endif
 
 #include "Base/dn_base.cpp"
-#include "Base/dn_base_containers.cpp"
-#include "Base/dn_base_leak.cpp"
 
 DN_Core *g_dn_;
 
@@ -224,14 +222,6 @@ DN_API void DN_BeginFrame()
   #endif
 }
 
-#if DN_H_WITH_HELPERS
-#include "Extra/dn_helpers.cpp"
-#endif
-
-#if DN_H_WITH_ASYNC
-#include "Extra/dn_async.cpp"
-#endif
-
 #if DN_H_WITH_NET
 #include "Extra/dn_net.cpp"
 #endif
@@ -239,8 +229,3 @@ DN_API void DN_BeginFrame()
 #if DN_CPP_WITH_TESTS
 #include "Extra/dn_tests.cpp"
 #endif
-
-#if DN_CPP_WITH_DEMO
-#include "Extra/dn_demo.cpp"
-#endif
-

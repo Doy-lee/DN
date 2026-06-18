@@ -883,27 +883,122 @@ DN_API DN_OSThreadLane DN_OS_TCThreadLaneEquip(DN_OSThreadLane lane)
   return result;
 }
 
-// NOTE: DN_OSHttp
-DN_API void DN_OS_HttpRequestWait(DN_OSHttpResponse *response)
+static DN_I32 DN_OS_AsyncThreadEntryPoint_(DN_OSThread *thread)
 {
-  if (response && response->on_complete_semaphore.handle != 0)
-    DN_OS_SemaphoreWait(&response->on_complete_semaphore, DN_OS_SEMAPHORE_INFINITE_TIMEOUT);
+  DN_OS_ThreadSetNameFmt("%.*s", DN_Str8PrintFmt(thread->name));
+  DN_OSAsyncCore *async = DN_Cast(DN_OSAsyncCore *) thread->user_context;
+  DN_Ring      *ring  = &async->ring;
+  for (;;) {
+    DN_OS_SemaphoreWait(&async->worker_sem, UINT32_MAX);
+    if (async->join_threads)
+        break;
+
+    DN_OSAsyncTask task = {};
+    for (DN_OS_MutexScope(&async->ring_mutex)) {
+      if (DN_RingHasData(ring, sizeof(task)))
+        DN_RingRead(ring, &task, sizeof(task));
+    }
+
+    if (task.work.func) {
+      DN_OS_ConditionVariableBroadcast(&async->ring_write_cv); // Resume any blocked ring write(s)
+
+      DN_OSAsyncWorkArgs args = {};
+      args.input            = task.work.input;
+      args.thread           = thread;
+
+      DN_AtomicAddU32(&async->busy_threads, 1);
+      task.work.func(args);
+      DN_AtomicSubU32(&async->busy_threads, 1);
+
+      if (task.completion_sem.handle != 0)
+        DN_OS_SemaphoreIncrement(&task.completion_sem, 1);
+    }
+  }
+
+  return 0;
 }
 
-DN_API DN_OSHttpResponse DN_OS_HttpRequest(DN_Arena *arena, DN_Str8 host, DN_Str8 path, DN_OSHttpRequestSecure secure, DN_Str8 method, DN_Str8 body, DN_Str8 headers)
+DN_API void DN_OS_AsyncInit(DN_OSAsyncCore *async, char *base, DN_USize base_size, DN_OSThread *threads, DN_U32 threads_size)
 {
-  // TODO(doyle): Revise the memory allocation and its lifetime
-  DN_OSHttpResponse result  = {};
-  DN_TCScratch      scratch = DN_TCScratchBeginArena(&arena, 1);
-  result.scratch_arena      = scratch.arena;
+  DN_Assert(async);
+  async->ring.size     = base_size;
+  async->ring.base     = base;
+  async->ring_mutex    = DN_OS_MutexInit();
+  async->ring_write_cv = DN_OS_ConditionVariableInit();
+  async->worker_sem    = DN_OS_SemaphoreInit(0);
+  async->thread_count  = threads_size;
+  async->threads       = threads;
+  for (DN_ForIndexU(index, async->thread_count)) {
+    DN_OSThread    *thread = async->threads + index;
+    DN_OS_ThreadInit(thread, DN_OS_AsyncThreadEntryPoint_, /*lane=*/ nullptr, DN_TCInitArgsDefault(), async);
+  }
+}
 
-  DN_OS_HttpRequestAsync(&result, arena, host, path, secure, method, body, headers);
-  DN_OS_HttpRequestWait(&result);
-  DN_TCScratchEnd(&scratch);
+DN_API void DN_OS_AsyncDeinit(DN_OSAsyncCore *async)
+{
+  DN_Assert(async);
+  DN_AtomicSetValue32(&async->join_threads, true);
+  DN_OS_SemaphoreIncrement(&async->worker_sem, async->thread_count);
+  for (DN_ForItSize(it, DN_OSThread, async->threads, async->thread_count))
+    DN_OS_ThreadJoin(it.data, DN_TCDeinitArenas_Yes);
+}
+
+static bool DN_OS_AsyncQueueTask_(DN_OSAsyncCore *async, DN_OSAsyncTask const *task, DN_U64 wait_time_ms) {
+  DN_U64 end_time_ms = DN_OS_DateUnixTimeMs() + wait_time_ms;
+  bool result = false;
+  for (DN_OS_MutexScope(&async->ring_mutex)) {
+    for (;;) {
+      if (DN_RingHasSpace(&async->ring, sizeof(*task))) {
+        DN_RingWriteStruct(&async->ring, task);
+        result = true;
+        break;
+      }
+      DN_OS_ConditionVariableWaitUntil(&async->ring_write_cv, &async->ring_mutex, end_time_ms);
+      if (DN_OS_DateUnixTimeMs() >= end_time_ms)
+        break;
+    }
+  }
+
+  if (result)
+    DN_OS_SemaphoreIncrement(&async->worker_sem, 1); // Flag that a job is available
+
   return result;
 }
 
-// NOTE: DN_OSPrint
+DN_API bool DN_OS_AsyncQueueWork(DN_OSAsyncCore *async, DN_OSAsyncWorkFunc *func, void *input, DN_U64 wait_time_ms)
+{
+  DN_OSAsyncTask task = {};
+  task.work.func    = func;
+  task.work.input   = input;
+  bool result       = DN_OS_AsyncQueueTask_(async, &task, wait_time_ms);
+  return result;
+}
+
+DN_API DN_OSAsyncTask DN_OS_AsyncQueueTask(DN_OSAsyncCore *async, DN_OSAsyncWorkFunc *func, void *input, DN_U64 wait_time_ms)
+{
+  DN_OSAsyncTask result   = {};
+  result.work.func      = func;
+  result.work.input     = input;
+  result.completion_sem = DN_OS_SemaphoreInit(0);
+  result.queued         = DN_OS_AsyncQueueTask_(async, &result, wait_time_ms);
+  if (!result.queued)
+      DN_OS_SemaphoreDeinit(&result.completion_sem);
+  return result;
+}
+
+DN_API bool DN_OS_AsyncWaitTask(DN_OSAsyncTask *task, DN_U32 timeout_ms)
+{
+  bool result = true;
+  if (!task->queued)
+    return result;
+
+  DN_OSSemaphoreWaitResult wait = DN_OS_SemaphoreWait(&task->completion_sem, timeout_ms);
+  result                        = wait == DN_OSSemaphoreWaitResult_Success;
+  if (result)
+    DN_OS_SemaphoreDeinit(&task->completion_sem);
+  return result;
+}
+
 DN_API DN_LogStyle DN_OS_PrintStyleColour(uint8_t r, uint8_t g, uint8_t b, DN_LogBold bold)
 {
   DN_LogStyle result = {};
@@ -1075,173 +1170,6 @@ DN_API void DN_OS_PrintLnFVStyle(DN_OSPrintDest dest, DN_LogStyle style, DN_FMT_
 {
   DN_OS_PrintFVStyle(dest, style, fmt, args);
   DN_OS_Print(dest, DN_Str8Lit("\n"));
-}
-
-// NOTE: DN_VArray
-template <typename T>
-DN_VArray<T> DN_OS_VArrayInitByteSize(DN_USize byte_size)
-{
-  DN_VArray<T> result = {};
-  result.data         = DN_Cast(T *) DN_OS_MemReserve(byte_size, DN_MemCommit_No, DN_MemPage_ReadWrite);
-  if (result.data)
-    result.max = byte_size / sizeof(T);
-  return result;
-}
-
-template <typename T>
-DN_VArray<T> DN_OS_VArrayInit(DN_USize max)
-{
-  DN_VArray<T> result = DN_OS_VArrayInitByteSize<T>(max * sizeof(T));
-  DN_Assert(result.max >= max);
-  return result;
-}
-
-template <typename T, DN_USize N>
-DN_VArray<T> DN_OS_VArrayInitCArray(T const (&items)[N], DN_USize max)
-{
-  DN_USize     real_max = DN_Max(N, max);
-  DN_VArray<T> result   = DN_OS_VArrayInit<T>(real_max);
-  if (DN_OS_VArrayIsValid(&result))
-    DN_OS_VArrayAddArray(&result, items, N);
-  return result;
-}
-
-template <typename T>
-void DN_OS_VArrayDeinit(DN_VArray<T> *array)
-{
-  DN_OS_MemRelease(array->data, array->max * sizeof(T));
-  *array = {};
-}
-
-template <typename T>
-bool DN_OS_VArrayIsValid(DN_VArray<T> const *array)
-{
-  bool result = array->data && array->size <= array->max;
-  return result;
-}
-
-template <typename T>
-T *DN_OS_VArrayAddArray(DN_VArray<T> *array, T const *items, DN_USize count)
-{
-  T *result = DN_OS_VArrayMakeArray(array, count, DN_ZMem_No);
-  if (result)
-    DN_Memcpy(result, items, count * sizeof(T));
-  return result;
-}
-
-template <typename T, DN_USize N>
-T *DN_OS_VArrayAddCArray(DN_VArray<T> *array, T const (&items)[N])
-{
-  T *result = DN_OS_VArrayAddArray(array, items, N);
-  return result;
-}
-
-template <typename T>
-T *DN_OS_VArrayAdd(DN_VArray<T> *array, T const &item)
-{
-  T *result = DN_OS_VArrayAddArray(array, &item, 1);
-  return result;
-}
-
-template <typename T>
-T *DN_OS_VArrayMakeArray(DN_VArray<T> *array, DN_USize count, DN_ZMem z_mem)
-{
-  if (!DN_OS_VArrayIsValid(array))
-    return nullptr;
-
-  if (!DN_CheckF((array->size + count) < array->max, "Array is out of space (user requested +%zu items, array has %zu/%zu items)", count, array->size, array->max))
-    return nullptr;
-
-  if (!DN_OS_VArrayReserve(array, count))
-    return nullptr;
-
-  // TODO: Use placement new
-  T *result = array->data + array->size;
-  array->size += count;
-  if (z_mem == DN_ZMem_Yes)
-    DN_Memset(result, 0, count * sizeof(T));
-  return result;
-}
-
-template <typename T>
-T *DN_OS_VArrayMake(DN_VArray<T> *array, DN_ZMem z_mem)
-{
-  T *result = DN_OS_VArrayMakeArray(array, 1, z_mem);
-  return result;
-}
-
-template <typename T>
-T *DN_OS_VArrayInsertArray(DN_VArray<T> *array, DN_USize index, T const *items, DN_USize count)
-{
-  T *result = nullptr;
-  if (!DN_OS_VArrayIsValid(array))
-    return result;
-  if (DN_OS_VArrayReserve(array, array->size + count))
-    result = DN_ArrayInsertArray(array->data, &array->size, array->max, index, items, count);
-  return result;
-}
-
-template <typename T, DN_USize N>
-T *DN_OS_VArrayInsertCArray(DN_VArray<T> *array, DN_USize index, T const (&items)[N])
-{
-  T *result = DN_OS_VArrayInsertArray(array, index, items, N);
-  return result;
-}
-
-template <typename T>
-T *DN_OS_VArrayInsert(DN_VArray<T> *array, DN_USize index, T const &item)
-{
-  T *result = DN_OS_VArrayInsertArray(array, index, &item, 1);
-  return result;
-}
-
-template <typename T>
-T *DN_OS_VArrayPopFront(DN_VArray<T> *array, DN_USize count)
-{
-  T *result = DN_Cast(T *)DN_ArrayPopFront(array->data, &array->size, sizeof(T), count);
-  return result;
-}
-
-template <typename T>
-T *DN_OS_VArrayPopBack(DN_VArray<T> *array, DN_USize count)
-{
-  T *result = DN_Cast(T *)DN_ArrayPopBack(array->data, &array->size, sizeof(T), count);
-  return result;
-}
-
-template <typename T>
-DN_ArrayEraseResult DN_OS_VArrayEraseRange(DN_VArray<T> *array, DN_USize begin_index, DN_ISize count, DN_ArrayErase erase)
-{
-  DN_ArrayEraseResult result = {};
-  if (!DN_OS_VArrayIsValid(array))
-    return result;
-  result = DN_ArrayEraseRange(array->data, &array->size, sizeof(T), begin_index, count, erase);
-  return result;
-}
-
-template <typename T>
-void DN_OS_VArrayClear(DN_VArray<T> *array, DN_ZMem z_mem)
-{
-  if (array) {
-    if (z_mem == DN_ZMem_Yes)
-      DN_Memset(array->data, 0, array->size * sizeof(T));
-    array->size = 0;
-  }
-}
-
-template <typename T>
-bool DN_OS_VArrayReserve(DN_VArray<T> *array, DN_USize count)
-{
-  if (!DN_OS_VArrayIsValid(array) || count == 0)
-    return false;
-
-  DN_USize real_commit    = (array->size + count) * sizeof(T);
-  DN_USize aligned_commit = DN_AlignUpPowerOfTwo(real_commit, DN_Get()->os.page_size);
-  if (array->commit >= aligned_commit)
-    return true;
-  bool result   = DN_OS_MemCommit(array->data, aligned_commit, DN_MemPage_ReadWrite);
-  array->commit = aligned_commit;
-  return result;
 }
 
 DN_API DN_StackTrace DN_StackTraceFromAllocator(DN_Allocator allocator, DN_U16 limit)

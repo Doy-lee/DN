@@ -2,11 +2,12 @@
 #define DN_BASE_H
 
 #if defined(_CLANGD)
+  #define DN_STR8_AVX512F 1
   #include "../dn.h"
 #endif
 
 // NOTE: Compiler identification
-// Warning! Order is important here, clang-cl on Windows defines _MSC_VER
+// NOTE: Warning! Order is important here, clang-cl on Windows defines _MSC_VER
 #if defined(_MSC_VER)
   #if defined(__clang__)
     #define DN_COMPILER_CLANG_CL
@@ -21,7 +22,8 @@
 #endif
 
 // NOTE: __has_feature
-// MSVC for example does not support the feature detection macro for instance so we compile it out
+// NOTE: MSVC for example does not support the feature detection macro for instance so we compile it
+// out
 #if defined(__has_feature)
   #define DN_HAS_FEATURE(expr) __has_feature(expr)
 #else
@@ -29,7 +31,7 @@
 #endif
 
 // NOTE: __has_builtin
-// MSVC for example does not support the feature detection macro for instance so we compile it out
+// NOTE: MSVC for example does not support the feature detection macro for instance so we compile it out
 #if defined(__has_builtin)
   #define DN_HAS_BUILTIN(expr) __has_builtin(expr)
 #else
@@ -243,15 +245,6 @@
   DN_GCC_WARNING_DISABLE(-Wunused-local-typedefs)                                 \
   typedef char DN_TokenCombine(static_assert_dummy__, __LINE__)[(expr) ? 1 : -1]; \
   DN_GCC_WARNING_POP
-
-#define DN_Check(expr) DN_CheckF(expr, "")
-#if defined(DN_NO_CHECK_BREAK)
-  #define DN_CheckF(expr, fmt, ...) \
-    ((expr) ? true : (DN_LogWarningF(fmt, ##__VA_ARGS__), false))
-#else
-  #define DN_CheckF(expr, fmt, ...) \
-    ((expr) ? true : (DN_LogErrorF(fmt, ##__VA_ARGS__), DN_StackTracePrint(128 /*limit*/), DN_DebugBreak, false))
-#endif
 
 #if defined(__aarch64__) || defined(_M_X64) || defined(__x86_64__) || defined(__x86_64)
   #define DN_64_BIT
@@ -1760,7 +1753,7 @@ DN_API DN_I16                   DN_SaturateCastI64ToI16                         
 DN_API DN_I32                   DN_SaturateCastI64ToI32                                (DN_I64 val);
 
 DN_API DN_UInt                  DN_SaturateCastI64ToUInt                               (DN_I64 val);
-DN_API DN_ISize                 DN_SaturateCastI64ToUSize                              (DN_I64 val);
+DN_API DN_USize                 DN_SaturateCastI64ToUSize                              (DN_I64 val);
 DN_API DN_U8                    DN_SaturateCastI64ToU8                                 (DN_I64 val);
 DN_API DN_U16                   DN_SaturateCastI64ToU16                                (DN_I64 val);
 DN_API DN_U32                   DN_SaturateCastI64ToU32                                (DN_I64 val);
@@ -1969,12 +1962,14 @@ DN_API DN_USize                 DN_CStr16Size                                   
 
 #define                         DN_Str8Lit(c_str)                                      DN_Literal(DN_Str8){(char *)(c_str), sizeof(c_str) - 1}
 #define                         DN_Str8PrintFmt(string)                                (int)((string).size), (string).data
+
 #define                         DN_Str8FromPtr(data, size)                             DN_Literal(DN_Str8){(char *)(data), (DN_USize)(size)}
 #define                         DN_Str8FromStruct(ptr)                                 DN_Str8FromPtr((ptr)->data, (ptr)->size)
 #define                         DN_Str8FromLitArray(c_array)                           DN_Str8FromPtr(c_array, DN_ArrayCountU(c_array))
 DN_API DN_Str8                  DN_Str8AllocAllocator                                  (DN_USize size, DN_ZMem z_mem, DN_Allocator allocator);
 DN_API DN_Str8                  DN_Str8AllocArena                                      (DN_USize size, DN_ZMem z_mem, DN_Arena *arena);
 DN_API DN_Str8                  DN_Str8AllocPool                                       (DN_USize size, DN_Pool *pool);
+
 DN_API DN_Str8                  DN_Str8FromCStr8                                       (char const *src);
 DN_API DN_Str8                  DN_Str8FromCStr8Arena                                  (char const *src, DN_Arena *arena);
 DN_API DN_Str8                  DN_Str8FromPtrArena                                    (void const *data, DN_USize size, DN_Arena *arena);
@@ -1988,6 +1983,7 @@ DN_API DN_Str8                  DN_Str8FromFmtAllocator                         
 DN_API DN_Str8                  DN_Str8FromFmtArena                                    (DN_Arena *arena, DN_FMT_ATTRIB char const *fmt, ...);
 DN_API DN_Str8                  DN_Str8FromFmtVPool                                    (DN_Pool *pool, DN_FMT_ATTRIB char const *fmt, va_list args);
 DN_API DN_Str8                  DN_Str8FromFmtPool                                     (DN_Pool *pool, DN_FMT_ATTRIB char const *fmt, ...);
+
 DN_API DN_Str8x16               DN_Str8x16FromFmt                                      (DN_FMT_ATTRIB char const *fmt, ...);
 DN_API DN_Str8x16               DN_Str8x16FromFmtV                                     (DN_FMT_ATTRIB char const *fmt, va_list args);
 DN_API DN_Str8x32               DN_Str8x32FromFmt                                      (DN_FMT_ATTRIB char const *fmt, ...);
@@ -2016,6 +2012,7 @@ DN_API void                     DN_Str8x512AppendFmt                            
 DN_API void                     DN_Str8x512AppendFmtV                                  (DN_Str8x512 *str, DN_FMT_ATTRIB char const *fmt, va_list args);
 DN_API void                     DN_Str8x1024AppendFmt                                  (DN_Str8x1024 *str, DN_FMT_ATTRIB char const *fmt, ...);
 DN_API void                     DN_Str8x1024AppendFmtV                                 (DN_Str8x1024 *str, DN_FMT_ATTRIB char const *fmt, va_list args);
+
 DN_API DN_Str8x32               DN_Str8x32FromU64                                      (DN_U64 val, char separator);
 DN_API bool                     DN_Str8IsAll                                           (DN_Str8 string, DN_Str8IsAllType is_all);
 DN_API char *                   DN_Str8End                                             (DN_Str8 string);
@@ -2040,6 +2037,7 @@ DN_API bool                     DN_Str8StartsWithInsensitive                    
 DN_API bool                     DN_Str8EndsWith                                        (DN_Str8 string, DN_Str8 prefix, DN_Str8EqCase eq_case = DN_Str8EqCase_Sensitive);
 DN_API bool                     DN_Str8EndsWithInsensitive                             (DN_Str8 string, DN_Str8 prefix);
 DN_API bool                     DN_Str8HasChar                                         (DN_Str8 string, char ch);
+
 DN_API DN_Str8                  DN_Str8TrimPrefix                                      (DN_Str8 string, DN_Str8 prefix, DN_Str8EqCase eq_case = DN_Str8EqCase_Sensitive);
 DN_API DN_Str8                  DN_Str8TrimHexPrefix                                   (DN_Str8 string);
 DN_API DN_Str8                  DN_Str8TrimSuffix                                      (DN_Str8 string, DN_Str8 suffix, DN_Str8EqCase eq_case = DN_Str8EqCase_Sensitive);
@@ -2048,6 +2046,7 @@ DN_API DN_Str8                  DN_Str8TrimHeadWhitespace                       
 DN_API DN_Str8                  DN_Str8TrimTailWhitespace                              (DN_Str8 string);
 DN_API DN_Str8                  DN_Str8TrimWhitespaceAround                            (DN_Str8 string);
 DN_API DN_Str8                  DN_Str8TrimByteOrderMark                               (DN_Str8 string);
+
 DN_API DN_Str8                  DN_Str8FileNameFromPath                                (DN_Str8 path);
 DN_API DN_Str8                  DN_Str8FileNameNoExtension                             (DN_Str8 path);
 DN_API DN_Str8                  DN_Str8FilePathNoExtension                             (DN_Str8 path);
@@ -2070,6 +2069,15 @@ DN_API DN_Str8                  DN_Str8PadNewLinesArena                         
 DN_API DN_Str8                  DN_Str8LineBreakAllocator                              (DN_Str8 src, DN_USize desired_width, DN_Str8 delimiter, DN_Str8LineBreakMode mode, DN_Allocator allocator);
 DN_API DN_Str8                  DN_Str8LineBreakArena                                  (DN_Str8 src, DN_USize desired_width, DN_Str8 delimiter, DN_Str8LineBreakMode mode, DN_Arena *arena);
 DN_API DN_Str8                  DN_Str8Table                                           (DN_Str8 const* rows, DN_USize num_rows, DN_USize num_cols, DN_Str8TableFlags flags, DN_Arena *arena);
+
+#if DN_STR8_AVX512F
+DN_API DN_Str8FindResult        DN_Str8FindStr8AVX512F                                 (DN_Str8 string, DN_Str8 find);
+DN_API DN_Str8FindResult        DN_Str8FindLastStr8AVX512F                             (DN_Str8 string, DN_Str8 find);
+DN_API DN_Str8BSplitResult      DN_Str8BSplitAVX512F                                   (DN_Str8 string, DN_Str8 find);
+DN_API DN_Str8BSplitResult      DN_Str8BSplitLastAVX512F                               (DN_Str8 string, DN_Str8 find);
+DN_API DN_USize                 DN_Str8SplitAVX512F                                    (DN_Str8 string, DN_Str8 delimiter, DN_Str8 *splits, DN_USize splits_count, DN_Str8SplitFlags flags);
+DN_API DN_Str8Slice             DN_Str8SplitAllocAVX512F                               (DN_Arena *arena, DN_Str8 string, DN_Str8 delimiter, DN_Str8SplitFlags flags);
+#endif
 
 DN_API DN_Str8                  DN_Str8SliceRender                                     (DN_Str8Slice array, DN_Str8 separator, DN_Arena *arena);
 DN_API DN_Str8                  DN_Str8RenderSpaceSep                                  (DN_Str8Slice array, DN_Arena *arena);
@@ -2552,8 +2560,8 @@ DN_API DN_M4                   DN_M4MulF                                        
 DN_API DN_M4                   DN_M4DivF                                               (DN_M4 lhs, DN_F32 rhs);
 DN_API DN_Str8x256             DN_M4ColumnMajorString                                  (DN_M4 mat);
 
-DN_API bool                    operator==                                              (DN_M2x3 const &lhs, DN_M2x3 const &rhs);
-DN_API bool                    operator!=                                              (DN_M2x3 const &lhs, DN_M2x3 const &rhs);
+DN_API bool                    DN_M2x3Eq                                               (DN_M2x3 const *lhs, DN_M2x3 const *rhs);
+DN_API bool                    DN_M2x3NotEq                                            (DN_M2x3 const *lhs, DN_M2x3 const *rhs);
 DN_API DN_M2x3                 DN_M2x3Identity                                         ();
 DN_API DN_M2x3                 DN_M2x3Translate                                        (DN_V2F32 offset);
 DN_API DN_V2F32                DN_M2x3ScaleGet                                         (DN_M2x3 m2x3);
@@ -2573,7 +2581,6 @@ DN_API DN_Rect                 DN_M2x3MulRect                                   
 #define                        DN_RectFrom4N(x, y, w, h)                               DN_Literal(DN_Rect){DN_Literal(DN_V2F32){{x, y}}, DN_Literal(DN_V2F32){{w, h}}}
 #define                        DN_RectZero                                             DN_RectFrom4N(0, 0, 0, 0)
 
-DN_API bool                    operator==                                              (const DN_Rect& lhs, const DN_Rect& rhs);
 DN_API DN_V2F32                DN_RectCenter                                           (DN_Rect rect);
 DN_API bool                    DN_RectContainsPoint                                    (DN_Rect rect, DN_V2F32 p);
 DN_API bool                    DN_RectContainsRect                                     (DN_Rect a, DN_Rect b);
@@ -3040,9 +3047,10 @@ DN_API void                               DN_RingWrite                   (DN_Rin
 DN_API void                               DN_RingRead                    (DN_Ring *ring, void *dest, DN_U64 dest_size);
 #define                                   DN_RingReadStruct(ring, dest)  DN_RingRead((ring), (dest), sizeof(*(dest)))
 
+// TODO: Replace with a C-style hash table
+#if defined(__cplusplus)
 DN_U32 const DN_DS_MAP_DEFAULT_HASH_SEED = 0x8a1ced49;
 DN_U32 const DN_DS_MAP_SENTINEL_SLOT     = 0;
-
 template <typename T> DN_DSMap<T>        DN_DSMapInit                  (DN_Arena *arena, DN_U32 size, DN_DSMapFlags flags);
 template <typename T> void               DN_DSMapDeinit                (DN_DSMap<T> *map, DN_ZMem z_mem);
 template <typename T> bool               DN_DSMapIsValid               (DN_DSMap<T> const *map);
@@ -3069,7 +3077,240 @@ template <typename T> DN_DSMapKey        DN_DSMapKeyStr8               (DN_DSMap
 DN_API                DN_DSMapKey        DN_DSMapKeyU64NoHash          (DN_U64 u64);
 DN_API                bool               DN_DSMapKeyEquals             (DN_DSMapKey lhs, DN_DSMapKey rhs);
 DN_API                bool               operator==                    (DN_DSMapKey lhs, DN_DSMapKey rhs);
+#endif
 
+enum DN_BinPackMode
+{
+  DN_BinPackMode_Serialise,
+  DN_BinPackMode_Deserialise,
+};
+
+struct DN_BinPack
+{
+  DN_Str8Builder writer;
+  DN_Str8        read;
+  DN_USize       read_index;
+};
+
+DN_API bool    DN_BinPackIsEndOfReadStream(DN_BinPack const *pack);
+DN_API void    DN_BinPackUSize            (DN_BinPack *pack, DN_BinPackMode mode, DN_USize *item);
+DN_API void    DN_BinPackU64              (DN_BinPack *pack, DN_BinPackMode mode, DN_U64 *item);
+DN_API void    DN_BinPackU32              (DN_BinPack *pack, DN_BinPackMode mode, DN_U32 *item);
+DN_API void    DN_BinPackU16              (DN_BinPack *pack, DN_BinPackMode mode, DN_U16 *item);
+DN_API void    DN_BinPackU8               (DN_BinPack *pack, DN_BinPackMode mode, DN_U8 *item);
+DN_API void    DN_BinPackI64              (DN_BinPack *pack, DN_BinPackMode mode, DN_I64 *item);
+DN_API void    DN_BinPackI32              (DN_BinPack *pack, DN_BinPackMode mode, DN_I32 *item);
+DN_API void    DN_BinPackI16              (DN_BinPack *pack, DN_BinPackMode mode, DN_I16 *item);
+DN_API void    DN_BinPackI8               (DN_BinPack *pack, DN_BinPackMode mode, DN_I8 *item);
+DN_API void    DN_BinPackF64              (DN_BinPack *pack, DN_BinPackMode mode, DN_F64 *item);
+DN_API void    DN_BinPackF32              (DN_BinPack *pack, DN_BinPackMode mode, DN_F32 *item);
+DN_API void    DN_BinPackV2               (DN_BinPack *pack, DN_BinPackMode mode, DN_V2F32 *item);
+DN_API void    DN_BinPackV4               (DN_BinPack *pack, DN_BinPackMode mode, DN_V4F32 *item);
+DN_API void    DN_BinPackBool             (DN_BinPack *pack, DN_BinPackMode mode, bool *item);
+DN_API void    DN_BinPackStr8FromArena    (DN_BinPack *pack, DN_Arena *arena, DN_BinPackMode mode, DN_Str8 *string);
+DN_API void    DN_BinPackStr8FromPool     (DN_BinPack *pack, DN_Pool *pool, DN_BinPackMode mode, DN_Str8 *string);
+DN_API DN_Str8 DN_BinPackStr8FromBuffer   (DN_BinPack *pack, DN_BinPackMode mode, char *ptr, DN_USize *size, DN_USize max);
+DN_API void    DN_BinPackBytesFromArena   (DN_BinPack *pack, DN_Arena *arena, DN_BinPackMode mode, void **ptr, DN_USize *size);
+DN_API void    DN_BinPackBytesFromPool    (DN_BinPack *pack, DN_Pool *pool, DN_BinPackMode mode, void **ptr, DN_USize *size);
+DN_API void    DN_BinPackCArray           (DN_BinPack *pack, DN_BinPackMode mode, void *ptr, DN_USize size);
+DN_API void    DN_BinPackCBuffer          (DN_BinPack *pack, DN_BinPackMode mode, char *ptr, DN_USize *size, DN_USize max);
+DN_API DN_Str8 DN_BinPackBuild            (DN_BinPack const *pack, DN_Arena *arena);
+
+enum DN_CSVSerialise
+{
+  DN_CSVSerialise_Read,
+  DN_CSVSerialise_Write,
+};
+
+struct DN_CSVTokeniser
+{
+  bool        bad;
+  DN_Str8     string;
+  char        delimiter;
+  char const *it;
+  bool        end_of_line;
+};
+
+struct DN_CSVPack
+{
+  DN_Str8Builder  write_builder;
+  DN_USize        write_column;
+  DN_CSVTokeniser read_tokeniser;
+};
+
+// NOTE: Data structures to create and parse CSV files, supports Python style escaped quotes (e.g.
+// Using "" to escape quotes inside a quoted string).
+//
+// API
+//  DN_CSVTokeniserNextN: Reads the next N consecutive fields from the parser. If `column_iterator`
+//  is `false` then the read of the N consecutive fields does not proceed past the end of the
+//  current CSV row. If `true` then it reads the next N fields even if reading would progress onto
+//  the next row.
+DN_API DN_CSVTokeniser DN_CSVTokeniserInit       (DN_Str8 string, char delimiter);
+DN_API bool            DN_CSVTokeniserValid      (DN_CSVTokeniser *tokeniser);
+DN_API bool            DN_CSVTokeniserNextRow    (DN_CSVTokeniser *tokeniser);
+DN_API DN_Str8         DN_CSVTokeniserNextField  (DN_CSVTokeniser *tokeniser);
+DN_API DN_Str8         DN_CSVTokeniserNextColumn (DN_CSVTokeniser *tokeniser);
+DN_API void            DN_CSVTokeniserSkipLine   (DN_CSVTokeniser *tokeniser);
+DN_API int             DN_CSVTokeniserNextN      (DN_CSVTokeniser *tokeniser, DN_Str8 *fields, int fields_size, bool column_iterator);
+DN_API int             DN_CSVTokeniserNextColumnN(DN_CSVTokeniser *tokeniser, DN_Str8 *fields, int fields_size);
+DN_API int             DN_CSVTokeniserNextFieldN (DN_CSVTokeniser *tokeniser, DN_Str8 *fields, int fields_size);
+DN_API void            DN_CSVTokeniserSkipLineN  (DN_CSVTokeniser *tokeniser, int count);
+DN_API void            DN_CSVPackU64             (DN_CSVPack *pack, DN_CSVSerialise serialise, DN_U64 *value);
+DN_API void            DN_CSVPackI64             (DN_CSVPack *pack, DN_CSVSerialise serialise, DN_I64 *value);
+DN_API void            DN_CSVPackI32             (DN_CSVPack *pack, DN_CSVSerialise serialise, DN_I32 *value);
+DN_API void            DN_CSVPackI16             (DN_CSVPack *pack, DN_CSVSerialise serialise, DN_I16 *value);
+DN_API void            DN_CSVPackI8              (DN_CSVPack *pack, DN_CSVSerialise serialise, DN_I8 *value);
+DN_API void            DN_CSVPackU32             (DN_CSVPack *pack, DN_CSVSerialise serialise, DN_U32 *value);
+DN_API void            DN_CSVPackU16             (DN_CSVPack *pack, DN_CSVSerialise serialise, DN_U16 *value);
+DN_API void            DN_CSVPackBoolAsU64       (DN_CSVPack *pack, DN_CSVSerialise serialise, bool *value);
+DN_API void            DN_CSVPackStr8            (DN_CSVPack *pack, DN_CSVSerialise serialise, DN_Str8 *str8, DN_Arena *arena);
+DN_API void            DN_CSVPackBuffer          (DN_CSVPack *pack, DN_CSVSerialise serialise, void *dest, size_t *size);
+DN_API void            DN_CSVPackBufferWithMax   (DN_CSVPack *pack, DN_CSVSerialise serialise, void *dest, size_t *size, size_t max);
+DN_API bool            DN_CSVPackNewLine         (DN_CSVPack *pack, DN_CSVSerialise serialise);
+
+// TODO: Replace with a C implementation
+template <typename T>
+using DN_BinarySearchLessThanProc = bool(T const &lhs, T const &rhs);
+
+template <typename T>
+bool DN_BinarySearch_DefaultLessThan(T const &lhs, T const &rhs);
+
+enum DN_BinarySearchType
+{
+    // Index of the match. If no match is found, found is set to false and the
+    // index is set to the index where the match should be inserted/exist, if
+    // it were in the array
+    DN_BinarySearchType_Match,
+
+    // Index of the first element in the array that is `element >= find`. If no such
+    // item is found or the array is empty, then, the index is set to the array
+    // size and found is set to `false`.
+    //
+    // For example:
+    //   int array[] = {0, 1, 2, 3, 4, 5};
+    //   DN_BinarySearchResult result = DN_BinarySearch(array, DN_ArrayCountU(array), 4, DN_BinarySearchType_LowerBound);
+    //   printf("%zu\n", result.index); // Prints index '4'
+
+    DN_BinarySearchType_LowerBound,
+
+    // Index of the first element in the array that is `element > find`. If no such
+    // item is found or the array is empty, then, the index is set to the array
+    // size and found is set to `false`.
+    //
+    // For example:
+    //   int array[] = {0, 1, 2, 3, 4, 5};
+    //   DN_BinarySearchResult result = DN_BinarySearch(array, DN_ArrayCountU(array), 4, DN_BinarySearchType_UpperBound);
+    //   printf("%zu\n", result.index); // Prints index '5'
+
+    DN_BinarySearchType_UpperBound,
+};
+
+struct DN_BinarySearchResult
+{
+  bool     found;
+  DN_USize index;
+};
+
+template <typename T> bool                  DN_BinarySearch_DefaultLessThan(T const &lhs, T const &rhs);
+template <typename T> DN_BinarySearchResult DN_BinarySearch                (T const *array, DN_USize array_size, T const &find, DN_BinarySearchType type = DN_BinarySearchType_Match, DN_BinarySearchLessThanProc<T> less_than = DN_BinarySearch_DefaultLessThan);
+
+template <typename T>
+bool DN_BinarySearch_DefaultLessThan(T const &lhs, T const &rhs)
+{
+    bool result = lhs < rhs;
+    return result;
+}
+
+template <typename T>
+DN_BinarySearchResult DN_BinarySearch(T const                         *array,
+                                        DN_USize                        array_size,
+                                        T const                         &find,
+                                        DN_BinarySearchType             type,
+                                        DN_BinarySearchLessThanProc<T>  less_than)
+{
+    DN_BinarySearchResult result = {};
+    if (!array || array_size <= 0 || !less_than)
+        return result;
+
+    T const *end   = array + array_size;
+    T const *first = array;
+    T const *last  = end;
+    while (first != last) {
+        DN_USize count = last - first;
+        T const *it     = first + (count / 2);
+
+        bool advance_first = false;
+        if (type == DN_BinarySearchType_UpperBound)
+            advance_first = !less_than(find, it[0]);
+        else
+            advance_first = less_than(it[0], find);
+
+        if (advance_first)
+            first = it + 1;
+        else
+            last  = it;
+    }
+
+    switch (type) {
+        case DN_BinarySearchType_Match: {
+            result.found = first != end && !less_than(find, *first);
+        } break;
+
+        case DN_BinarySearchType_LowerBound: /*FALLTHRU*/
+        case DN_BinarySearchType_UpperBound: {
+            result.found = first != end;
+        } break;
+    }
+
+    result.index = first - array;
+    return result;
+}
+
+enum DN_LeakAllocFlag
+{
+  DN_LeakAllocFlag_Freed         = 1 << 0,
+  DN_LeakAllocFlag_LeakPermitted = 1 << 1,
+};
+
+struct DN_LeakAlloc
+{
+  void     *ptr;               // 8  Pointer to the allocation being tracked
+  DN_USize  size;              // 16 Size of the allocation
+  DN_USize  freed_size;        // 24 Store the size of the allocation when it is freed
+  DN_Str8   stack_trace;       // 40 Stack trace at the point of allocation
+  DN_Str8   freed_stack_trace; // 56 Stack trace of where the allocation was freed
+  DN_U16    flags;             // 72 Bit flags from `DN_LeakAllocFlag`
+};
+
+// NOTE: We aim to keep the allocation record as light as possible as memory tracking can get
+// expensive. Enforce that there is no unexpected padding.
+DN_StaticAssert(sizeof(DN_LeakAlloc) == 64 || sizeof(DN_LeakAlloc) == 32); // NOTE: 64 bit vs 32 bit pointers respectively
+
+struct DN_LeakTracker
+{
+  DN_DSMap<DN_LeakAlloc> alloc_table;
+  DN_TicketMutex         alloc_table_mutex;
+  DN_MemList             alloc_table_mem;
+  DN_Arena               alloc_table_arena;
+  DN_U64                 alloc_table_bytes_allocated_for_stack_traces;
+};
+
+DN_API void DN_LeakTrackAlloc_  (DN_LeakTracker *leak, void *ptr, DN_USize size, bool alloc_can_leak);
+DN_API void DN_LeakTrackDealloc_(DN_LeakTracker *leak, void *ptr);
+DN_API void DN_LeakDump_        (DN_LeakTracker *leak);
+
+#if defined(DN_LEAK_TRACKING)
+#define     DN_LeakTrackAlloc(leak, ptr, size, alloc_can_leak) DN_LeakTrackAlloc_(leak, ptr, size, alloc_can_leak)
+#define     DN_LeakTrackDealloc(leak, ptr)                     DN_LeakTrackDealloc_(leak, ptr)
+#define     DN_LeakDump(leak)                                  DN_LeakDump_(leak)
+#else
+#define     DN_LeakTrackAlloc(leak, ptr, size, alloc_can_leak) do { (void)ptr; (void)size; (void)alloc_can_leak; } while (0)
+#define     DN_LeakTrackDealloc(leak, ptr)                     do { (void)ptr;                                   } while (0)
+#define     DN_LeakDump(leak)                                  do {                                              } while (0)
+#endif
+
+// NOTE: Template implementations
 #if defined(__cplusplus)
 template <typename T> T *DN_TMemCopyObj(T *dest, T const *src, DN_USize count)
 {

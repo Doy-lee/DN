@@ -141,9 +141,13 @@
 //        Tracing incurs an additional much heavier performance penalty than the UAF guard due to
 //        the stacktrace that is stored per region to report to the user when a UAF guard violation
 //        occurs.
+//
+//      Str8 AVX512F variants
+//        We have some AVX512 string functions that can be enabled by defining the following
+//
+//          #define DN_STR8_AVX512F 1
 
 #include "Base/dn_base.h"
-#include "Base/dn_base_leak.h"
 
 #if DN_H_WITH_OS
 #if defined(DN_PLATFORM_WIN32)
@@ -190,14 +194,6 @@ DN_API void     DN_Init      (DN_Core *dn, DN_InitFlags flags, DN_TCInitArgs arg
 DN_API void     DN_Set       (DN_Core *dn);
 DN_API DN_Core *DN_Get       ();
 DN_API void     DN_BeginFrame();
-
-#if DN_H_WITH_HELPERS
-#include "Extra/dn_helpers.h"
-#endif
-
-#if DN_H_WITH_ASYNC
-#include "Extra/dn_async.h"
-#endif
 
 #if DN_H_WITH_NET
 #include "Extra/dn_net.h"

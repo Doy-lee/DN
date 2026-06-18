@@ -1342,90 +1342,6 @@ static DN_UTCore DN_TST_BaseArray()
   return result;
 }
 
-static DN_UTCore DN_TST_BaseVArray()
-{
-  DN_UTCore result = DN_UT_Init();
-  DN_UT_LogF(&result, "DN_VArray\n");
-  {
-    {
-      DN_VArray<DN_U32> array = DN_OS_VArrayInitByteSize<DN_U32>(DN_Kilobytes(64));
-      DN_DEFER
-      {
-        DN_OS_VArrayDeinit(&array);
-      };
-
-      for (DN_UT_Test(&result, "Test adding an array of items to the array")) {
-        DN_U32 array_literal[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
-        DN_OS_VArrayAddArray<DN_U32>(&array, array_literal, DN_ArrayCountU(array_literal));
-        DN_UT_Assert(&result, array.size == DN_ArrayCountU(array_literal));
-        DN_UT_Assert(&result, DN_Memcmp(array.data, array_literal, DN_ArrayCountU(array_literal) * sizeof(array_literal[0])) == 0);
-      }
-
-      for (DN_UT_Test(&result, "Test adding an array of items")) {
-        DN_U32 array_literal[] = {0, 1, 2, 3};
-        DN_OS_VArrayAddArray<DN_U32>(&array, array_literal, DN_ArrayCountU(array_literal));
-
-        DN_U32 expected_literal[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 0, 1, 2, 3};
-        DN_UT_Assert(&result, array.size == DN_ArrayCountU(expected_literal));
-        DN_UT_Assert(&result, DN_Memcmp(array.data, expected_literal, DN_ArrayCountU(expected_literal) * sizeof(expected_literal[0])) == 0);
-      }
-    }
-
-    for (DN_UT_Test(&result, "Array of unaligned objects are contiguously laid out in memory")) {
-      // NOTE: Since we allocate from a virtual memory block, each time
-      // we request memory from the block we can demand some alignment
-      // on the returned pointer from the memory block. If there's
-      // additional alignment done in that function then we can no
-      // longer access the items in the array contiguously leading to
-      // confusing memory "corruption" errors.
-      //
-      // This result makes sure that the unaligned objects are allocated
-      // from the memory block (and hence the array) contiguously
-      // when the size of the object is not aligned with the required
-      // alignment of the object.
-      DN_MSVC_WARNING_PUSH
-      DN_MSVC_WARNING_DISABLE(4324) // warning C4324: 'TestVArray::UnalignedObject': structure was padded due to alignment specifier
-
-      struct alignas(8) UnalignedObject
-      {
-        char data[511];
-      };
-
-      DN_MSVC_WARNING_POP
-
-      DN_VArray<UnalignedObject> array = DN_OS_VArrayInitByteSize<UnalignedObject>(DN_Kilobytes(64));
-      DN_DEFER
-      {
-        DN_OS_VArrayDeinit(&array);
-      };
-
-      // NOTE: Verify that the items returned from the data array are
-      // contiguous in memory.
-      UnalignedObject *make_item_a = DN_OS_VArrayMakeArray(&array, 1, DN_ZMem_Yes);
-      UnalignedObject *make_item_b = DN_OS_VArrayMakeArray(&array, 1, DN_ZMem_Yes);
-      DN_Memset(make_item_a->data, 'a', sizeof(make_item_a->data));
-      DN_Memset(make_item_b->data, 'b', sizeof(make_item_b->data));
-      DN_UT_Assert(&result, (uintptr_t)make_item_b == (uintptr_t)(make_item_a + 1));
-
-      // NOTE: Verify that accessing the items from the data array yield
-      // the same object.
-      DN_UT_Assert(&result, array.size == 2);
-      UnalignedObject *data_item_a = array.data + 0;
-      UnalignedObject *data_item_b = array.data + 1;
-      DN_UT_Assert(&result, (uintptr_t)data_item_b == (uintptr_t)(data_item_a + 1));
-      DN_UT_Assert(&result, (uintptr_t)data_item_b == (uintptr_t)(make_item_a + 1));
-      DN_UT_Assert(&result, (uintptr_t)data_item_b == (uintptr_t)make_item_b);
-
-      for (DN_USize i = 0; i < sizeof(data_item_a->data); i++)
-        DN_UT_Assert(&result, data_item_a->data[i] == 'a');
-
-      for (DN_USize i = 0; i < sizeof(data_item_b->data); i++)
-        DN_UT_Assert(&result, data_item_b->data[i] == 'b');
-    }
-  }
-  return result;
-}
-
 #if defined(DN_UNIT_TESTS_WITH_KECCAK)
 DN_GCC_WARNING_PUSH
 DN_GCC_WARNING_DISABLE(-Wunused-parameter)
@@ -2695,7 +2611,6 @@ DN_TSTResult DN_TST_RunSuite(DN_TSTPrint print)
           DN_TST_BaseDSMap(),
           DN_TST_BaseIArray(),
           DN_TST_BaseArray(),
-          DN_TST_BaseVArray(),
           DN_TST_Keccak(),
           DN_TST_M4(),
           DN_TST_OS(),

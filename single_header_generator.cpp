@@ -109,8 +109,6 @@ int main(int argc, char **argv)
 
   DN_Str8 const REL_FILE_PATHS[] = {
       DN_Str8Lit("dn"),
-      DN_Str8Lit("Extra/dn_bin_pack"),
-      DN_Str8Lit("Extra/dn_csv"),
   };
 
   for (DN_ForIndexU(type, FileType_Count)) {

@@ -31,10 +31,6 @@
   #endif
 #endif
 
-#if defined(DN_PLATFORM_EMSCRIPTEN)
-  #include <emscripten/fetch.h> // emscripten_fetch (for DN_OSHttpResponse)
-#endif
-
 extern DN_CPUFeatureDecl g_dn_cpu_feature_decl[DN_CPUFeature_Count];
 
 struct DN_OSTimer /// Record time between two time-points using the OS's performance counter.
@@ -227,42 +223,6 @@ struct DN_OSThread
   DN_OSThreadFunc *func;
   DN_OSSemaphore   init_semaphore;
   DN_TCInitArgs    tc_init_args;
-};
-
-// NOTE: DN_OSHttp
-enum DN_OSHttpRequestSecure
-{
-  DN_OSHttpRequestSecure_No,
-  DN_OSHttpRequestSecure_Yes,
-};
-
-struct DN_OSHttpResponse
-{
-  // NOTE: Response data
-  DN_U32   error_code;
-  DN_Str8  error_msg;
-  DN_U16   http_status;
-  DN_Str8  body;
-  DN_B32   done;
-
-  // NOTE: Book-keeping
-  DN_Arena *arena; // Allocates memory for the response
-
-  // NOTE: Async book-keeping
-  // Synchronous HTTP response uses the TLS scratch arena whereas async
-  // calls use their own dedicated arena.
-  DN_Arena       tmp_arena;
-  DN_Arena       scratch_arena;
-  DN_Str8Builder builder;
-  DN_OSSemaphore on_complete_semaphore;
-
-  #if defined(DN_PLATFORM_EMSCRIPTEN)
-  emscripten_fetch_t *em_handle;
-  #elif defined(DN_PLATFORM_WIN32)
-  HINTERNET w32_request_session;
-  HINTERNET w32_request_connection;
-  HINTERNET w32_request_handle;
-  #endif
 };
 
 struct DN_OSCore
@@ -509,10 +469,52 @@ DN_API DN_OSThreadLane*          DN_OS_TCThreadLane                           ()
 DN_API void                      DN_OS_TCThreadLaneSync                       (void **ptr_to_share);
 DN_API DN_OSThreadLane           DN_OS_TCThreadLaneEquip                      (DN_OSThreadLane lane);
 
-DN_API void                      DN_OS_HttpRequestAsync                       (DN_OSHttpResponse *response, DN_Arena *arena, DN_Str8 host, DN_Str8 path, DN_OSHttpRequestSecure secure, DN_Str8 method, DN_Str8 body, DN_Str8 headers);
-DN_API void                      DN_OS_HttpRequestWait                        (DN_OSHttpResponse *response);
-DN_API void                      DN_OS_HttpRequestFree                        (DN_OSHttpResponse *response);
-DN_API DN_OSHttpResponse         DN_OS_HttpRequest                            (DN_Arena *arena, DN_Str8 host, DN_Str8 path, DN_OSHttpRequestSecure secure, DN_Str8 method, DN_Str8 body, DN_Str8 headers);
+enum DN_OSAsyncPriority
+{
+  DN_OSAsyncPriority_Low,
+  DN_OSAsyncPriority_High,
+  DN_OSAsyncPriority_Count,
+};
+
+struct DN_OSAsyncCore
+{
+  DN_OSMutex             ring_mutex;
+  DN_OSConditionVariable ring_write_cv;
+  DN_OSSemaphore         worker_sem;
+  DN_Ring                ring;
+  DN_OSThread           *threads;
+  DN_U32                 thread_count;
+  DN_U32                 busy_threads;
+  DN_U32                 join_threads;
+};
+
+struct DN_OSAsyncWorkArgs
+{
+  DN_OSThread *thread;
+  void        *input;
+};
+
+typedef void(DN_OSAsyncWorkFunc)(DN_OSAsyncWorkArgs work_args);
+
+struct DN_OSAsyncWork
+{
+  DN_OSAsyncWorkFunc *func;
+  void             *input;
+  void             *output;
+};
+
+struct DN_OSAsyncTask
+{
+  bool           queued;
+  DN_OSAsyncWork   work;
+  DN_OSSemaphore completion_sem;
+};
+
+DN_API void           DN_OS_AsyncInit     (DN_OSAsyncCore *async, char *base, DN_USize base_size, DN_OSThread *threads, DN_U32 threads_size);
+DN_API void           DN_OS_AsyncDeinit   (DN_OSAsyncCore *async);
+DN_API bool           DN_OS_AsyncQueueWork(DN_OSAsyncCore *async, DN_OSAsyncWorkFunc *func, void *input, DN_U64 wait_time_ms);
+DN_API DN_OSAsyncTask DN_OS_AsyncQueueTask(DN_OSAsyncCore *async, DN_OSAsyncWorkFunc *func, void *input, DN_U64 wait_time_ms);
+DN_API bool           DN_OS_AsyncWaitTask (DN_OSAsyncTask *task, DN_U32 timeout_ms);
 
 // NOTE: DN_OSPrint
 enum DN_OSPrintDest
@@ -570,46 +572,4 @@ DN_API void DN_OS_PrintLnFV            (DN_OSPrintDest dest, DN_FMT_ATTRIB char 
 DN_API void DN_OS_PrintLnStyle         (DN_OSPrintDest dest, DN_LogStyle style, DN_Str8 string);
 DN_API void DN_OS_PrintLnFStyle        (DN_OSPrintDest dest, DN_LogStyle style, DN_FMT_ATTRIB char const *fmt, ...);
 DN_API void DN_OS_PrintLnFVStyle       (DN_OSPrintDest dest, DN_LogStyle style, DN_FMT_ATTRIB char const *fmt, va_list args);
-
-// NOTE: DN_VArray
-// TODO(doyle): Add an API for shrinking the array by decomitting pages back to the OS.
-template <typename T> struct DN_VArray
-{
-  T       *data;   // Pointer to the start of the array items in the block of memory
-  DN_USize size;   // Number of items currently in the array
-  DN_USize max;    // Maximum number of items this array can store
-  DN_USize commit; // Bytes committed
-
-  T       *begin()       { return data; }
-  T       *end  ()       { return data + size; }
-  T const *begin() const { return data; }
-  T const *end  () const { return data + size; }
-};
-
-template <typename T>                           DN_VArray<T>          DN_OS_VArrayInitByteSize          (DN_USize byte_size);
-template <typename T>                           DN_VArray<T>          DN_OS_VArrayInit                  (DN_USize max);
-template <typename T, DN_USize N>               DN_VArray<T>          DN_OS_VArrayInitCArray            (T const (&items)[N], DN_USize max);
-template <typename T>                           void                  DN_OS_VArrayDeinit                (DN_VArray<T> *array);
-template <typename T>                           bool                  DN_OS_VArrayIsValid               (DN_VArray<T> const *array);
-template <typename T>                           bool                  DN_OS_VArrayReserve               (DN_VArray<T> *array, DN_USize count);
-template <typename T>                           T *                   DN_OS_VArrayAddArray              (DN_VArray<T> *array, T const *items, DN_USize count);
-template <typename T, DN_USize N>               T *                   DN_OS_VArrayAddCArray             (DN_VArray<T> *array, T const (&items)[N]);
-template <typename T>                           T *                   DN_OS_VArrayAdd                   (DN_VArray<T> *array, T const &item);
-#define                                                               DN_OS_VArrayAddArrayAssert(...)   DN_HardAssert(DN_OS_VArrayAddArray(__VA_ARGS__))
-#define                                                               DN_OS_VArrayAddCArrayAssert(...)  DN_HardAssert(DN_OS_VArrayAddCArray(__VA_ARGS__))
-#define                                                               DN_OS_VArrayAddAssert(...)        DN_HardAssert(DN_OS_VArrayAdd(__VA_ARGS__))
-template <typename T>                           T *                   DN_OS_VArrayMakeArray             (DN_VArray<T> *array, DN_USize count, DN_ZMem z_mem);
-template <typename T>                           T *                   DN_OS_VArrayMake                  (DN_VArray<T> *array, DN_ZMem z_mem);
-#define                                                               DN_OS_VArrayMakeArrayAssert(...)  DN_HardAssert(DN_OS_VArrayMakeArray(__VA_ARGS__))
-#define                                                               DN_OS_VArrayMakeAssert(...)       DN_HardAssert(DN_OS_VArrayMake(__VA_ARGS__))
-template <typename T>                           T *                   DN_OS_VArrayInsertArray           (DN_VArray<T> *array, DN_USize index, T const *items, DN_USize count);
-template <typename T, DN_USize N>               T *                   DN_OS_VArrayInsertCArray          (DN_VArray<T> *array, DN_USize index, T const (&items)[N]);
-template <typename T>                           T *                   DN_OS_VArrayInsert                (DN_VArray<T> *array, DN_USize index, T const &item);
-#define                                                               DN_OS_VArrayInsertArrayAssert(...) DN_HardAssert(DN_OS_VArrayInsertArray(__VA_ARGS__))
-#define                                                               DN_OS_VArrayInsertCArrayAssert(...) DN_HardAssert(DN_OS_VArrayInsertCArray(__VA_ARGS__))
-#define                                                               DN_OS_VArrayInsertAssert(...)     DN_HardAssert(DN_OS_VArrayInsert(__VA_ARGS__))
-template <typename T>                           T                     DN_OS_VArrayPopFront              (DN_VArray<T> *array, DN_USize count);
-template <typename T>                           T                     DN_OS_VArrayPopBack               (DN_VArray<T> *array, DN_USize count);
-template <typename T>                           DN_ArrayEraseResult   DN_OS_VArrayEraseRange            (DN_VArray<T> *array, DN_USize begin_index, DN_ISize count, DN_ArrayErase erase);
-template <typename T>                           void                  DN_OS_VArrayClear                 (DN_VArray<T> *array, DN_ZMem z_mem);
 #endif // !defined(DN_OS_H)

@@ -6,6 +6,10 @@
   #include "../dn.h"
 #endif
 
+#if DN_STR8_AVX512F
+  #include <immintrin.h>
+#endif
+
 enum DN_ArenaUAFCheckReportType_
 {
   DN_ArenaUAFCheckReportType_AllocViolation,
@@ -297,7 +301,7 @@ DN_API DN_CPUReport DN_CPUGetReport()
 // NOTE: DN_TicketMutex ////////////////////////////////////////////////////////////////////////////
 DN_API void DN_TicketMutex_Begin(DN_TicketMutex *mutex)
 {
-  unsigned int ticket = DN_AtomicAddU32(&mutex->ticket, 1);
+  DN_UInt ticket = DN_AtomicAddU32(&mutex->ticket, 1);
   DN_TicketMutex_BeginTicket(mutex, ticket);
 }
 
@@ -360,163 +364,159 @@ DN_API bool DN_BitIsNotSet(DN_USize bits, DN_USize bits_to_check)
   return result;
 }
 
-// NOTE: DN_Safe ///////////////////////////////////////////////////////////////////////////////////
-DN_API DN_I64 DN_SafeAddI64(int64_t a, int64_t b)
+DN_API DN_I64 DN_SafeAddI64(DN_I64 a, DN_I64 b)
 {
-  DN_I64 result = DN_CheckF(a <= INT64_MAX - b, "a=%zd, b=%zd", a, b) ? (a + b) : INT64_MAX;
+  DN_I64 result = a <= INT64_MAX - b ? (a + b) : INT64_MAX;
   return result;
 }
 
-DN_API DN_I64 DN_SafeMulI64(int64_t a, int64_t b)
+DN_API DN_I64 DN_SafeMulI64(DN_I64 a, DN_I64 b)
 {
-  DN_I64 result = DN_CheckF(a <= INT64_MAX / b, "a=%zd, b=%zd", a, b) ? (a * b) : INT64_MAX;
+  DN_I64 result = a <= INT64_MAX / b ? (a * b) : INT64_MAX;
   return result;
 }
 
 DN_API DN_U64 DN_SafeAddU64(DN_U64 a, DN_U64 b)
 {
-  DN_U64 result = DN_CheckF(a <= UINT64_MAX - b, "a=%zu, b=%zu", a, b) ? (a + b) : UINT64_MAX;
+  DN_U64 result = a <= UINT64_MAX - b ? (a + b) : UINT64_MAX;
   return result;
 }
 
 DN_API DN_U64 DN_SafeSubU64(DN_U64 a, DN_U64 b)
 {
-  DN_U64 result = DN_CheckF(a >= b, "a=%zu, b=%zu", a, b) ? (a - b) : 0;
+  DN_U64 result = a >= b ? (a - b) : 0;
   return result;
 }
 
 DN_API DN_U64 DN_SafeMulU64(DN_U64 a, DN_U64 b)
 {
-  DN_U64 result = DN_CheckF(a <= UINT64_MAX / b, "a=%zu, b=%zu", a, b) ? (a * b) : UINT64_MAX;
+  DN_U64 result = a <= UINT64_MAX / b ? (a * b) : UINT64_MAX;
   return result;
 }
 
 DN_API DN_U32 DN_SafeSubU32(DN_U32 a, DN_U32 b)
 {
-  DN_U32 result = DN_CheckF(a >= b, "a=%u, b=%u", a, b) ? (a - b) : 0;
+  DN_U32 result = a >= b ? (a - b) : 0;
   return result;
 }
 
-// NOTE: DN_SaturateCastUSizeToI* ////////////////////////////////////////////////////////////
-// INT*_MAX literals will be promoted to the type of uintmax_t as uintmax_t is
-// the highest possible rank (unsigned > signed).
+// NOTE: INT*_MAX literals will be promoted to the type of uintmax_t as uintmax_t is the highest
+// possible rank (unsigned > signed).
 DN_API int DN_SaturateCastUSizeToInt(DN_USize val)
 {
-  int result = DN_Check(DN_Cast(uintmax_t) val <= INT_MAX) ? DN_Cast(int) val : INT_MAX;
+  int result = DN_Cast(uintmax_t) val <= INT_MAX ? DN_Cast(int) val : INT_MAX;
   return result;
 }
 
-DN_API int8_t DN_SaturateCastUSizeToI8(DN_USize val)
+DN_API DN_I8 DN_SaturateCastUSizeToI8(DN_USize val)
 {
-  int8_t result = DN_Check(DN_Cast(uintmax_t) val <= INT8_MAX) ? DN_Cast(int8_t) val : INT8_MAX;
+  DN_I8 result = DN_Cast(uintmax_t) val <= INT8_MAX ? DN_Cast(DN_I8) val : INT8_MAX;
   return result;
 }
 
 DN_API DN_I16 DN_SaturateCastUSizeToI16(DN_USize val)
 {
-  DN_I16 result = DN_Check(DN_Cast(uintmax_t) val <= INT16_MAX) ? DN_Cast(DN_I16) val : INT16_MAX;
+  DN_I16 result = DN_Cast(uintmax_t) val <= INT16_MAX ? DN_Cast(DN_I16) val : INT16_MAX;
   return result;
 }
 
 DN_API DN_I32 DN_SaturateCastUSizeToI32(DN_USize val)
 {
-  DN_I32 result = DN_Check(DN_Cast(uintmax_t) val <= INT32_MAX) ? DN_Cast(DN_I32) val : INT32_MAX;
+  DN_I32 result = DN_Cast(uintmax_t) val <= INT32_MAX ? DN_Cast(DN_I32) val : INT32_MAX;
   return result;
 }
 
-DN_API int64_t DN_SaturateCastUSizeToI64(DN_USize val)
+DN_API DN_I64 DN_SaturateCastUSizeToI64(DN_USize val)
 {
-  int64_t result = DN_Check(DN_Cast(uintmax_t) val <= INT64_MAX) ? DN_Cast(int64_t) val : INT64_MAX;
+  DN_I64 result = DN_Cast(uintmax_t) val <= INT64_MAX ? DN_Cast(DN_I64) val : INT64_MAX;
   return result;
 }
 
-// NOTE: DN_SaturateCastUSizeToU* ////////////////////////////////////////////////////////////
-// Both operands are unsigned and the lowest rank operand will be promoted to
+// NOTE: Both operands are unsigned and the lowest rank operand will be promoted to
 // match the highest rank operand.
 DN_API DN_U8 DN_SaturateCastUSizeToU8(DN_USize val)
 {
-  DN_U8 result = DN_Check(val <= UINT8_MAX) ? DN_Cast(DN_U8) val : UINT8_MAX;
+  DN_U8 result = val <= UINT8_MAX ? DN_Cast(DN_U8) val : UINT8_MAX;
   return result;
 }
 
 DN_API DN_U16 DN_SaturateCastUSizeToU16(DN_USize val)
 {
-  DN_U16 result = DN_Check(val <= UINT16_MAX) ? DN_Cast(DN_U16) val : UINT16_MAX;
+  DN_U16 result = val <= UINT16_MAX ? DN_Cast(DN_U16) val : UINT16_MAX;
   return result;
 }
 
 DN_API DN_U32 DN_SaturateCastUSizeToU32(DN_USize val)
 {
-  DN_U32 result = DN_Check(val <= UINT32_MAX) ? DN_Cast(DN_U32) val : UINT32_MAX;
+  DN_U32 result = val <= UINT32_MAX ? DN_Cast(DN_U32) val : UINT32_MAX;
   return result;
 }
 
 DN_API DN_U64 DN_SaturateCastUSizeToU64(DN_USize val)
 {
-  DN_U64 result = DN_Check(DN_Cast(DN_U64) val <= UINT64_MAX) ? DN_Cast(DN_U64) val : UINT64_MAX;
+  DN_U64 result = DN_Cast(DN_U64) val <= UINT64_MAX ? DN_Cast(DN_U64) val : UINT64_MAX;
   return result;
 }
 
-// NOTE: DN_SaturateCastU64To* ///////////////////////////////////////////////////////////////
+// NOTE: DN_SaturateCastU64To*
 DN_API int DN_SaturateCastU64ToInt(DN_U64 val)
 {
-  int result = DN_Check(val <= INT_MAX) ? DN_Cast(int) val : INT_MAX;
+  int result = val <= INT_MAX ? DN_Cast(int) val : INT_MAX;
   return result;
 }
 
-DN_API int8_t DN_SaturateCastU64ToI8(DN_U64 val)
+DN_API DN_I8 DN_SaturateCastU64ToI8(DN_U64 val)
 {
-  int8_t result = DN_Check(val <= INT8_MAX) ? DN_Cast(int8_t) val : INT8_MAX;
+  DN_I8 result = val <= INT8_MAX ? DN_Cast(DN_I8) val : INT8_MAX;
   return result;
 }
 
 DN_API DN_I16 DN_SaturateCastU64ToI16(DN_U64 val)
 {
-  DN_I16 result = DN_Check(val <= INT16_MAX) ? DN_Cast(DN_I16) val : INT16_MAX;
+  DN_I16 result = val <= INT16_MAX ? DN_Cast(DN_I16) val : INT16_MAX;
   return result;
 }
 
 DN_API DN_I32 DN_SaturateCastU64ToI32(DN_U64 val)
 {
-  DN_I32 result = DN_Check(val <= INT32_MAX) ? DN_Cast(DN_I32) val : INT32_MAX;
+  DN_I32 result = val <= INT32_MAX ? DN_Cast(DN_I32) val : INT32_MAX;
   return result;
 }
 
-DN_API int64_t DN_SaturateCastU64ToI64(DN_U64 val)
+DN_API DN_I64 DN_SaturateCastU64ToI64(DN_U64 val)
 {
-  int64_t result = DN_Check(val <= INT64_MAX) ? DN_Cast(int64_t) val : INT64_MAX;
+  DN_I64 result = val <= INT64_MAX ? DN_Cast(DN_I64) val : INT64_MAX;
   return result;
 }
 
-// Both operands are unsigned and the lowest rank operand will be promoted to
-// match the highest rank operand.
-DN_API unsigned int DN_SaturateCastU64ToUInt(DN_U64 val)
+// NOTE: Both operands are unsigned and the lowest rank operand will be promoted to match the
+// highest rank operand.
+DN_API DN_UInt DN_SaturateCastU64ToUInt(DN_U64 val)
 {
-  unsigned int result = DN_Check(val <= UINT8_MAX) ? DN_Cast(unsigned int) val : UINT_MAX;
+  DN_UInt result = val <= UINT8_MAX ? DN_Cast(DN_UInt) val : UINT_MAX;
   return result;
 }
 
 DN_API DN_U8 DN_SaturateCastU64ToU8(DN_U64 val)
 {
-  DN_U8 result = DN_Check(val <= UINT8_MAX) ? DN_Cast(DN_U8) val : UINT8_MAX;
+  DN_U8 result = val <= UINT8_MAX ? DN_Cast(DN_U8) val : UINT8_MAX;
   return result;
 }
 
 DN_API DN_U16 DN_SaturateCastU64ToU16(DN_U64 val)
 {
-  DN_U16 result = DN_Check(val <= UINT16_MAX) ? DN_Cast(DN_U16) val : UINT16_MAX;
+  DN_U16 result = val <= UINT16_MAX ? DN_Cast(DN_U16) val : UINT16_MAX;
   return result;
 }
 
 DN_API DN_U32 DN_SaturateCastU64ToU32(DN_U64 val)
 {
-  DN_U32 result = DN_Check(val <= UINT32_MAX) ? DN_Cast(DN_U32) val : UINT32_MAX;
+  DN_U32 result = val <= UINT32_MAX ? DN_Cast(DN_U32) val : UINT32_MAX;
   return result;
 }
 
-// NOTE: DN_SaturateCastISizeToI* ////////////////////////////////////////////////////////////
-// Both operands are signed so the lowest rank operand will be promoted to
-// match the highest rank operand.
+// NOTE: Both operands are signed so the lowest rank operand will be promoted to match the highest
+// rank operand.
 DN_API int DN_SaturateCastISizeToInt(DN_ISize val)
 {
   DN_Assert(val >= INT_MIN && val <= INT_MAX);
@@ -524,10 +524,10 @@ DN_API int DN_SaturateCastISizeToInt(DN_ISize val)
   return result;
 }
 
-DN_API int8_t DN_SaturateCastISizeToI8(DN_ISize val)
+DN_API DN_I8 DN_SaturateCastISizeToI8(DN_ISize val)
 {
   DN_Assert(val >= INT8_MIN && val <= INT8_MAX);
-  int8_t result = DN_Cast(int8_t) DN_Clamp(val, INT8_MIN, INT8_MAX);
+  DN_I8 result = DN_Cast(DN_I8) DN_Clamp(val, INT8_MIN, INT8_MAX);
   return result;
 }
 
@@ -545,23 +545,21 @@ DN_API DN_I32 DN_SaturateCastISizeToI32(DN_ISize val)
   return result;
 }
 
-DN_API int64_t DN_SaturateCastISizeToI64(DN_ISize val)
+DN_API DN_I64 DN_SaturateCastISizeToI64(DN_ISize val)
 {
-  DN_Assert(DN_Cast(int64_t) val >= INT64_MIN && DN_Cast(int64_t) val <= INT64_MAX);
-  int64_t result = DN_Cast(int64_t) DN_Clamp(DN_Cast(int64_t) val, INT64_MIN, INT64_MAX);
+  DN_Assert(DN_Cast(DN_I64) val >= INT64_MIN && DN_Cast(DN_I64) val <= INT64_MAX);
+  DN_I64 result = DN_Cast(DN_I64) DN_Clamp(DN_Cast(DN_I64) val, INT64_MIN, INT64_MAX);
   return result;
 }
 
-// NOTE: DN_SaturateCastISizeToU* ////////////////////////////////////////////////////////////
-// If the value is a negative integer, we clamp to 0. Otherwise, we know that
-// the value is >=0, we can upcast safely to bounds check against the maximum
-// allowed value.
-DN_API unsigned int DN_SaturateCastISizeToUInt(DN_ISize val)
+// NOTE: If the value is a negative integer, we clamp to 0. Otherwise, we know that the value is
+// >=0, we can upcast safely to bounds check against the maximum allowed value.
+DN_API DN_UInt DN_SaturateCastISizeToUInt(DN_ISize val)
 {
-  unsigned int result = 0;
-  if (DN_Check(val >= DN_Cast(DN_ISize) 0)) {
-    if (DN_Check(DN_Cast(uintmax_t) val <= UINT_MAX))
-      result = DN_Cast(unsigned int) val;
+  DN_UInt result = 0;
+  if (val >= DN_Cast(DN_ISize)0) {
+    if (DN_Cast(uintmax_t) val <= UINT_MAX)
+      result = DN_Cast(DN_UInt) val;
     else
       result = UINT_MAX;
   }
@@ -571,8 +569,8 @@ DN_API unsigned int DN_SaturateCastISizeToUInt(DN_ISize val)
 DN_API DN_U8 DN_SaturateCastISizeToU8(DN_ISize val)
 {
   DN_U8 result = 0;
-  if (DN_Check(val >= DN_Cast(DN_ISize) 0)) {
-    if (DN_Check(DN_Cast(uintmax_t) val <= UINT8_MAX))
+  if (val >= DN_Cast(DN_ISize) 0) {
+    if (DN_Cast(uintmax_t) val <= UINT8_MAX)
       result = DN_Cast(DN_U8) val;
     else
       result = UINT8_MAX;
@@ -583,8 +581,8 @@ DN_API DN_U8 DN_SaturateCastISizeToU8(DN_ISize val)
 DN_API DN_U16 DN_SaturateCastISizeToU16(DN_ISize val)
 {
   DN_U16 result = 0;
-  if (DN_Check(val >= DN_Cast(DN_ISize) 0)) {
-    if (DN_Check(DN_Cast(uintmax_t) val <= UINT16_MAX))
+  if (val >= DN_Cast(DN_ISize) 0) {
+    if (DN_Cast(uintmax_t) val <= UINT16_MAX)
       result = DN_Cast(DN_U16) val;
     else
       result = UINT16_MAX;
@@ -595,8 +593,8 @@ DN_API DN_U16 DN_SaturateCastISizeToU16(DN_ISize val)
 DN_API DN_U32 DN_SaturateCastISizeToU32(DN_ISize val)
 {
   DN_U32 result = 0;
-  if (DN_Check(val >= DN_Cast(DN_ISize) 0)) {
-    if (DN_Check(DN_Cast(uintmax_t) val <= UINT32_MAX))
+  if (val >= DN_Cast(DN_ISize) 0) {
+    if (DN_Cast(uintmax_t) val <= UINT32_MAX)
       result = DN_Cast(DN_U32) val;
     else
       result = UINT32_MAX;
@@ -607,8 +605,8 @@ DN_API DN_U32 DN_SaturateCastISizeToU32(DN_ISize val)
 DN_API DN_U64 DN_SaturateCastISizeToU64(DN_ISize val)
 {
   DN_U64 result = 0;
-  if (DN_Check(val >= DN_Cast(DN_ISize) 0)) {
-    if (DN_Check(DN_Cast(uintmax_t) val <= UINT64_MAX))
+  if (val >= DN_Cast(DN_ISize) 0) {
+    if (DN_Cast(uintmax_t) val <= UINT64_MAX)
       result = DN_Cast(DN_U64) val;
     else
       result = UINT64_MAX;
@@ -616,54 +614,49 @@ DN_API DN_U64 DN_SaturateCastISizeToU64(DN_ISize val)
   return result;
 }
 
-// NOTE: DN_SaturateCastI64To* ///////////////////////////////////////////////////////////////
-// Both operands are signed so the lowest rank operand will be promoted to
-// match the highest rank operand.
-DN_API DN_ISize DN_SaturateCastI64ToISize(int64_t val)
+// NOTE: Both operands are signed so the lowest rank operand will be promoted to match the highest
+// rank operand.
+DN_API DN_ISize DN_SaturateCastI64ToISize(DN_I64 val)
 {
-  DN_Check(val >= DN_ISIZE_MIN && val <= DN_ISIZE_MAX);
-  DN_ISize result = DN_Cast(int64_t) DN_Clamp(val, DN_ISIZE_MIN, DN_ISIZE_MAX);
+  DN_ISize result = DN_Cast(DN_I64) DN_Clamp(val, DN_ISIZE_MIN, DN_ISIZE_MAX);
   return result;
 }
 
-DN_API int8_t DN_SaturateCastI64ToI8(int64_t val)
+DN_API DN_I8 DN_SaturateCastI64ToI8(DN_I64 val)
 {
-  DN_Check(val >= INT8_MIN && val <= INT8_MAX);
-  int8_t result = DN_Cast(int8_t) DN_Clamp(val, INT8_MIN, INT8_MAX);
+  DN_I8 result = DN_Cast(DN_I8) DN_Clamp(val, INT8_MIN, INT8_MAX);
   return result;
 }
 
-DN_API DN_I16 DN_SaturateCastI64ToI16(int64_t val)
+DN_API DN_I16 DN_SaturateCastI64ToI16(DN_I64 val)
 {
-  DN_Check(val >= INT16_MIN && val <= INT16_MAX);
   DN_I16 result = DN_Cast(DN_I16) DN_Clamp(val, INT16_MIN, INT16_MAX);
   return result;
 }
 
-DN_API DN_I32 DN_SaturateCastI64ToI32(int64_t val)
+DN_API DN_I32 DN_SaturateCastI64ToI32(DN_I64 val)
 {
-  DN_Check(val >= INT32_MIN && val <= INT32_MAX);
   DN_I32 result = DN_Cast(DN_I32) DN_Clamp(val, INT32_MIN, INT32_MAX);
   return result;
 }
 
-DN_API unsigned int DN_SaturateCastI64ToUInt(int64_t val)
+DN_API DN_UInt DN_SaturateCastI64ToUInt(DN_I64 val)
 {
-  unsigned int result = 0;
-  if (DN_Check(val >= DN_Cast(int64_t) 0)) {
-    if (DN_Check(DN_Cast(uintmax_t) val <= UINT_MAX))
-      result = DN_Cast(unsigned int) val;
+  DN_UInt result = 0;
+  if (val >= DN_Cast(DN_I64) 0) {
+    if (DN_Cast(uintmax_t) val <= UINT_MAX)
+      result = DN_Cast(DN_UInt) val;
     else
       result = UINT_MAX;
   }
   return result;
 }
 
-DN_API DN_ISize DN_SaturateCastI64ToUSize(int64_t val)
+DN_API DN_USize DN_SaturateCastI64ToUSize(DN_I64 val)
 {
   DN_USize result = 0;
-  if (DN_Check(val >= DN_Cast(int64_t) 0)) {
-    if (DN_Check(DN_Cast(uintmax_t) val <= DN_USIZE_MAX))
+  if (val >= DN_Cast(DN_I64) 0) {
+    if (DN_Cast(uintmax_t) val <= DN_USIZE_MAX)
       result = DN_Cast(DN_USize) val;
     else
       result = DN_USIZE_MAX;
@@ -671,11 +664,11 @@ DN_API DN_ISize DN_SaturateCastI64ToUSize(int64_t val)
   return result;
 }
 
-DN_API DN_U8 DN_SaturateCastI64ToU8(int64_t val)
+DN_API DN_U8 DN_SaturateCastI64ToU8(DN_I64 val)
 {
   DN_U8 result = 0;
-  if (DN_Check(val >= DN_Cast(int64_t) 0)) {
-    if (DN_Check(DN_Cast(uintmax_t) val <= UINT8_MAX))
+  if (val >= DN_Cast(DN_I64) 0) {
+    if (DN_Cast(uintmax_t) val <= UINT8_MAX)
       result = DN_Cast(DN_U8) val;
     else
       result = UINT8_MAX;
@@ -683,11 +676,11 @@ DN_API DN_U8 DN_SaturateCastI64ToU8(int64_t val)
   return result;
 }
 
-DN_API DN_U16 DN_SaturateCastI64ToU16(int64_t val)
+DN_API DN_U16 DN_SaturateCastI64ToU16(DN_I64 val)
 {
   DN_U16 result = 0;
-  if (DN_Check(val >= DN_Cast(int64_t) 0)) {
-    if (DN_Check(DN_Cast(uintmax_t) val <= UINT16_MAX))
+  if (val >= DN_Cast(DN_I64) 0) {
+    if (DN_Cast(uintmax_t) val <= UINT16_MAX)
       result = DN_Cast(DN_U16) val;
     else
       result = UINT16_MAX;
@@ -695,11 +688,11 @@ DN_API DN_U16 DN_SaturateCastI64ToU16(int64_t val)
   return result;
 }
 
-DN_API DN_U32 DN_SaturateCastI64ToU32(int64_t val)
+DN_API DN_U32 DN_SaturateCastI64ToU32(DN_I64 val)
 {
   DN_U32 result = 0;
-  if (DN_Check(val >= DN_Cast(int64_t) 0)) {
-    if (DN_Check(DN_Cast(uintmax_t) val <= UINT32_MAX))
+  if (val >= DN_Cast(DN_I64) 0) {
+    if (DN_Cast(uintmax_t) val <= UINT32_MAX)
       result = DN_Cast(DN_U32) val;
     else
       result = UINT32_MAX;
@@ -707,11 +700,11 @@ DN_API DN_U32 DN_SaturateCastI64ToU32(int64_t val)
   return result;
 }
 
-DN_API DN_U64 DN_SaturateCastI64ToU64(int64_t val)
+DN_API DN_U64 DN_SaturateCastI64ToU64(DN_I64 val)
 {
   DN_U64 result = 0;
-  if (DN_Check(val >= DN_Cast(int64_t) 0)) {
-    if (DN_Check(DN_Cast(uintmax_t) val <= UINT64_MAX))
+  if (val >= DN_Cast(DN_I64) 0) {
+    if (DN_Cast(uintmax_t) val <= UINT64_MAX)
       result = DN_Cast(DN_U64) val;
     else
       result = UINT64_MAX;
@@ -719,16 +712,14 @@ DN_API DN_U64 DN_SaturateCastI64ToU64(int64_t val)
   return result;
 }
 
-DN_API int8_t DN_SaturateCastIntToI8(int val)
+DN_API DN_I8 DN_SaturateCastIntToI8(int val)
 {
-  DN_Check(val >= INT8_MIN && val <= INT8_MAX);
-  int8_t result = DN_Cast(int8_t) DN_Clamp(val, INT8_MIN, INT8_MAX);
+  DN_I8 result = DN_Cast(DN_I8) DN_Clamp(val, INT8_MIN, INT8_MAX);
   return result;
 }
 
 DN_API DN_I16 DN_SaturateCastIntToI16(int val)
 {
-  DN_Check(val >= INT16_MIN && val <= INT16_MAX);
   DN_I16 result = DN_Cast(DN_I16) DN_Clamp(val, INT16_MIN, INT16_MAX);
   return result;
 }
@@ -736,8 +727,8 @@ DN_API DN_I16 DN_SaturateCastIntToI16(int val)
 DN_API DN_U8 DN_SaturateCastIntToU8(int val)
 {
   DN_U8 result = 0;
-  if (DN_Check(val >= DN_Cast(DN_ISize) 0)) {
-    if (DN_Check(DN_Cast(uintmax_t) val <= UINT8_MAX))
+  if (val >= DN_Cast(DN_ISize) 0) {
+    if (DN_Cast(uintmax_t) val <= UINT8_MAX)
       result = DN_Cast(DN_U8) val;
     else
       result = UINT8_MAX;
@@ -748,8 +739,8 @@ DN_API DN_U8 DN_SaturateCastIntToU8(int val)
 DN_API DN_U16 DN_SaturateCastIntToU16(int val)
 {
   DN_U16 result = 0;
-  if (DN_Check(val >= DN_Cast(DN_ISize) 0)) {
-    if (DN_Check(DN_Cast(uintmax_t) val <= UINT16_MAX))
+  if (val >= DN_Cast(DN_ISize) 0) {
+    if (DN_Cast(uintmax_t) val <= UINT16_MAX)
       result = DN_Cast(DN_U16) val;
     else
       result = UINT16_MAX;
@@ -759,27 +750,25 @@ DN_API DN_U16 DN_SaturateCastIntToU16(int val)
 
 DN_API DN_U32 DN_SaturateCastIntToU32(int val)
 {
-  static_assert(sizeof(val) <= sizeof(DN_U32), "Sanity check to allow simplifying of casting");
+  DN_StaticAssert(sizeof(val) <= sizeof(DN_U32) && "Sanity check to allow simplifying of casting");
   DN_U32 result = 0;
-  if (DN_Check(val >= 0))
+  if (val >= 0)
     result = DN_Cast(DN_U32) val;
   return result;
 }
 
 DN_API DN_U64 DN_SaturateCastIntToU64(int val)
 {
-  static_assert(sizeof(val) <= sizeof(DN_U64), "Sanity check to allow simplifying of casting");
+  DN_StaticAssert(sizeof(val) <= sizeof(DN_U64) && "Sanity check to allow simplifying of casting");
   DN_U64 result = 0;
-  if (DN_Check(val >= 0))
+  if (val >= 0)
     result = DN_Cast(DN_U64) val;
   return result;
 }
 
 // NOTE: DN_Asan
-static_assert(DN_IsPowerOfTwoAligned(DN_ASAN_POISON_GUARD_SIZE, DN_ASAN_POISON_ALIGNMENT),
-              "ASAN poison guard size must be a power-of-two and aligned to ASAN's alignment"
-              "requirement (8 bytes)");
-
+DN_StaticAssert(DN_IsPowerOfTwoAligned(DN_ASAN_POISON_GUARD_SIZE, DN_ASAN_POISON_ALIGNMENT) &&
+                "ASAN poison guard size must be a power-of-two and aligned to ASAN's alignment" "requirement (8 bytes)");
 DN_API void DN_ASanPoisonMemoryRegion(void const volatile *ptr, DN_USize size)
 {
   if (!ptr || !size)
@@ -998,14 +987,19 @@ DN_API bool DN_MemListCommitTo(DN_MemList *mem, DN_U64 pos)
   if (!mem || !mem->curr)
     return false;
 
+  // NOTE: Early out if the position to commit to is already committed
   DN_MemBlock *curr = mem->curr;
   if (pos <= curr->commit)
     return true;
 
+  // NOTE: Sanity check position is within the bounds of the memory block
   DN_U64 real_pos = pos;
-  if (!DN_Check(pos <= curr->reserve))
+  if (pos > curr->reserve) {
+    DN_Assert(pos <= curr->reserve);
     real_pos = curr->reserve;
+  }
 
+  // NOTE: Do the commit
   DN_Assert(mem->funcs.virtual_page_size);
   DN_USize end_commit  = DN_AlignUpPowerOfTwo(real_pos, mem->funcs.virtual_page_size);
   DN_USize commit_size = end_commit - curr->commit;
@@ -1046,7 +1040,7 @@ DN_API bool DN_MemListGrow(DN_MemList *mem, DN_U64 reserve, DN_U64 commit)
   return result;
 }
 
-DN_API void *DN_MemListAlloc(DN_MemList *mem, DN_U64 size, uint8_t align, DN_ZMem z_mem)
+DN_API void *DN_MemListAlloc(DN_MemList *mem, DN_U64 size, DN_U8 align, DN_ZMem z_mem)
 {
   if (!mem)
     return nullptr;
@@ -1062,7 +1056,7 @@ DN_API void *DN_MemListAlloc(DN_MemList *mem, DN_U64 size, uint8_t align, DN_ZMe
   try_alloc_again:
     DN_MemBlock *curr       = mem->curr;
     bool         poison     = DN_ArenaHasPoison_(mem->flags);
-    uint8_t      real_align = poison ? DN_Max(align, DN_ASAN_POISON_ALIGNMENT) : align;
+    DN_U8      real_align = poison ? DN_Max(align, DN_ASAN_POISON_ALIGNMENT) : align;
     DN_U64       offset_pos = DN_AlignUpPowerOfTwo(curr->used, real_align) + (poison ? DN_ASAN_POISON_GUARD_SIZE : 0);
     DN_U64       end_pos    = offset_pos + size;
     DN_U64       alloc_size = end_pos - curr->used;
@@ -1114,7 +1108,7 @@ DN_API void *DN_MemListAlloc(DN_MemList *mem, DN_U64 size, uint8_t align, DN_ZMe
   return result;
 }
 
-DN_API void *DN_MemListAllocContiguous(DN_MemList *mem, DN_U64 size, uint8_t align, DN_ZMem z_mem)
+DN_API void *DN_MemListAllocContiguous(DN_MemList *mem, DN_U64 size, DN_U8 align, DN_ZMem z_mem)
 {
   DN_MemFlags prev_flags = mem->flags;
   mem->flags |= (DN_MemFlags_NoGrow | DN_MemFlags_NoPoison);
@@ -1123,7 +1117,7 @@ DN_API void *DN_MemListAllocContiguous(DN_MemList *mem, DN_U64 size, uint8_t ali
   return memory;
 }
 
-DN_API void *DN_MemListCopy(DN_MemList *mem, void const *data, DN_U64 size, uint8_t align)
+DN_API void *DN_MemListCopy(DN_MemList *mem, void const *data, DN_U64 size, DN_U8 align)
 {
   if (!mem || !data || size == 0)
     return nullptr;
@@ -1182,10 +1176,9 @@ DN_API void DN_MemListPopTo(DN_MemList *mem, DN_U64 init_used)
 DN_API void DN_MemListPop(DN_MemList *mem, DN_U64 amount)
 {
   DN_MemBlock *curr     = mem->curr;
-  DN_USize       used_sum = curr->reserve_sum + curr->used;
-  if (!DN_Check(amount <= used_sum))
-    amount = used_sum;
-  DN_USize pop_to = used_sum - amount;
+  DN_USize     used_sum = curr->reserve_sum + curr->used;
+  amount                = DN_Min(amount, used_sum);
+  DN_USize pop_to       = used_sum - amount;
   DN_MemListPopTo(mem, pop_to);
 }
 
@@ -1402,28 +1395,28 @@ DN_API void DN_ArenaTempEnd(DN_Arena *arena, DN_ArenaReset reset)
 #endif
 }
 
-DN_API void *DN_ArenaAlloc(DN_Arena *arena, DN_U64 size, uint8_t align, DN_ZMem z_mem)
+DN_API void *DN_ArenaAlloc(DN_Arena *arena, DN_U64 size, DN_U8 align, DN_ZMem z_mem)
 {
   DN_ArenaUAFCheck_(arena, DN_ArenaUAFCheckReportType_AllocViolation);
   void *result = DN_MemListAlloc(arena->mem, size, align, z_mem);
   return result;
 }
 
-DN_API void *DN_ArenaAllocContiguous(DN_Arena *arena, DN_U64 size, uint8_t align, DN_ZMem z_mem)
+DN_API void *DN_ArenaAllocContiguous(DN_Arena *arena, DN_U64 size, DN_U8 align, DN_ZMem z_mem)
 {
   DN_ArenaUAFCheck_(arena, DN_ArenaUAFCheckReportType_AllocViolation);
   void *result = DN_MemListAllocContiguous(arena->mem, size, align, z_mem);
   return result;
 }
 
-DN_API void *DN_ArenaCopy(DN_Arena *arena, void const *data, DN_U64 size, uint8_t align)
+DN_API void *DN_ArenaCopy(DN_Arena *arena, void const *data, DN_U64 size, DN_U8 align)
 {
   DN_ArenaUAFCheck_(arena, DN_ArenaUAFCheckReportType_AllocViolation);
   void *result = DN_MemListCopy(arena->mem, data, size, align);
   return result;
 }
 
-DN_API DN_Pool DN_PoolFromArena(DN_Arena *arena, uint8_t align)
+DN_API DN_Pool DN_PoolFromArena(DN_Arena *arena, DN_U8 align)
 {
   DN_Pool result = {};
   if (arena) {
@@ -1446,7 +1439,7 @@ DN_API void *DN_PoolAlloc(DN_Pool *pool, DN_USize size)
     return result;
 
   DN_USize const required_size       = sizeof(DN_PoolSlot) + pool->align + size;
-  DN_USize const size_to_slot_offset = 5; // __lzcnt64(32) e.g. DN_PoolSlotSize_32B
+  DN_USize const DN_USizeo_slot_offset = 5; // __lzcnt64(32) e.g. DN_PoolSlotSize_32B
   DN_USize       slot_index          = 0;
   if (required_size > 32) {
     // NOTE: Round up if not PoT as the low bits are set.
@@ -1454,14 +1447,16 @@ DN_API void *DN_PoolAlloc(DN_Pool *pool, DN_USize size)
     dist_to_next_msb -= DN_Cast(DN_USize)(!DN_IsPowerOfTwo(required_size));
 
     DN_USize const register_size = sizeof(DN_USize) * 8;
-    DN_AssertF(register_size >= (dist_to_next_msb - size_to_slot_offset), "lhs=%zu, rhs=%zu", register_size, (dist_to_next_msb - size_to_slot_offset));
-    slot_index = register_size - dist_to_next_msb - size_to_slot_offset;
+    DN_AssertF(register_size >= (dist_to_next_msb - DN_USizeo_slot_offset), "lhs=%zu, rhs=%zu", register_size, (dist_to_next_msb - DN_USizeo_slot_offset));
+    slot_index = register_size - dist_to_next_msb - DN_USizeo_slot_offset;
   }
 
-  if (!DN_CheckF(slot_index < DN_PoolSlotSize_Count, "Chunk pool does not support the requested allocation size"))
+  if (slot_index >= DN_PoolSlotSize_Count) {
+    DN_AssertF(slot_index < DN_PoolSlotSize_Count, "Chunk pool does not support the requested allocation size");
     return result;
+  }
 
-  DN_USize slot_size_in_bytes = 1ULL << (slot_index + size_to_slot_offset);
+  DN_USize slot_size_in_bytes = 1ULL << (slot_index + DN_USizeo_slot_offset);
   DN_AssertF(required_size <= (slot_size_in_bytes << 0), "slot_index=%zu, lhs=%zu, rhs=%zu", slot_index, required_size, (slot_size_in_bytes << 0));
   DN_AssertF(required_size >= (slot_size_in_bytes >> 1), "slot_index=%zu, lhs=%zu, rhs=%zu", slot_index, required_size, (slot_size_in_bytes >> 1));
 
@@ -1545,8 +1540,8 @@ static void DN_ErrSinkCheck_(DN_ErrSink const *err)
   // NOTE: Walk the list ensuring we eventually terminate at the sentinel (e.g. we have a
   // well formed doubly-linked-list terminated by a sentinel, or otherwise we will hit the
   // walk limit or dereference a null pointer and assert)
-  size_t WALK_LIMIT = 99'999;
-  size_t walk       = 0;
+  DN_USize WALK_LIMIT = 99'999;
+  DN_USize walk       = 0;
   for (DN_ErrSinkMsg *it = node->msg_sentinel->next; it != node->msg_sentinel; it = it->next, walk++) {
     DN_AssertF(it, "Encountered null pointer which should not happen in a sentinel DLL");
     DN_Assert(walk < WALK_LIMIT);
@@ -1572,7 +1567,7 @@ DN_API DN_ErrSink* DN_ErrSinkBegin_(DN_ErrSink *err, DN_ErrSinkMode mode, DN_Cal
   DN_SentinelDoublyLLInitArena(node->msg_sentinel, DN_ErrSinkMsg, err->arena);
 
   // NOTE: Handle allocation error
-  if (!DN_Check(node && node->msg_sentinel)) {
+  if (!node || !node->msg_sentinel) {
     DN_MemListPopTo(err->arena->mem, node->arena_pos);
     node->msg_sentinel = nullptr;
     err->stack_size--;
@@ -1756,14 +1751,13 @@ DN_API void DN_ErrSinkAppendFV_(DN_ErrSink *err, DN_U32 error_code, DN_CallSite 
   DN_AssertF(node, "Error sink must be begun by calling 'Begin' before using this function.");
 
   DN_ErrSinkMsg *msg = DN_ArenaNew(err->arena, DN_ErrSinkMsg, DN_ZMem_Yes);
-  if (DN_Check(msg)) {
-    msg->msg        = DN_Str8FromFmtVArena(err->arena, fmt, args);
-    msg->error_code = error_code;
-    msg->call_site  = call_site;
-    DN_SentinelDoublyLLPrepend(node->msg_sentinel, msg);
-    if (node->mode == DN_ErrSinkMode_ExitOnError)
-      DN_ErrSinkEndExitIfErrorF_(err, msg->call_site, error_code, "Fatal error %u", error_code);
-  }
+  DN_Assert(msg);
+  msg->msg        = DN_Str8FromFmtVArena(err->arena, fmt, args);
+  msg->error_code = error_code;
+  msg->call_site  = call_site;
+  DN_SentinelDoublyLLPrepend(node->msg_sentinel, msg);
+  if (node->mode == DN_ErrSinkMode_ExitOnError)
+    DN_ErrSinkEndExitIfErrorF_(err, msg->call_site, error_code, "Fatal error %u", error_code);
 }
 
 DN_API void DN_ErrSinkAppendF_(DN_ErrSink *err, DN_U32 error_code, DN_CallSite call_site, DN_FMT_ATTRIB char const *fmt, ...)
@@ -1990,7 +1984,7 @@ DN_API DN_ErrSink *DN_TCErrSink()
   return result;
 }
 
-DN_API void *DN_PoolCopy(DN_Pool *pool, void const *data, DN_U64 size, uint8_t align)
+DN_API void *DN_PoolCopy(DN_Pool *pool, void const *data, DN_U64 size, DN_U8 align)
 {
   if (!pool || !data || size == 0)
     return nullptr;
@@ -2087,7 +2081,7 @@ DN_API DN_U64FromResult DN_U64FromStr8(DN_Str8 string, char separator)
       return result;
 
     result.value   = DN_SafeMulU64(result.value, 10);
-    uint64_t digit = ch - '0';
+    DN_U64 digit = ch - '0';
     result.value   = DN_SafeAddU64(result.value, digit);
   }
 
@@ -2244,9 +2238,9 @@ DN_API DN_I64FromResult DN_I64FromStr8(DN_Str8 string, char separator)
     if (!DN_CharIsDigit(ch))
       return result;
 
-    result.value   = DN_SafeMulU64(result.value, 10);
-    uint64_t digit = ch - '0';
-    result.value   = DN_SafeAddU64(result.value, digit);
+    result.value = DN_SafeMulU64(result.value, 10);
+    DN_U64 digit = ch - '0';
+    result.value = DN_SafeAddU64(result.value, digit);
   }
 
   if (negative)
@@ -2864,7 +2858,7 @@ DN_API DN_Str8BSplitResult DN_Str8BSplitArray(DN_Str8 string, DN_Str8 const *fin
     return result;
 
   result.lhs = string;
-  for (size_t index = 0; !result.rhs.data && index < string.size; index++) {
+  for (DN_USize index = 0; !result.rhs.data && index < string.size; index++) {
     for (DN_USize find_index = 0; find_index < find_size; find_index++) {
       DN_Str8 find_item    = find[find_index];
       DN_Str8 string_slice = DN_Str8Subset(string, index, find_item.size);
@@ -2894,7 +2888,7 @@ DN_API DN_Str8BSplitResult DN_Str8BSplitLastArray(DN_Str8 string, DN_Str8 const 
     return result;
 
   result.lhs = string;
-  for (size_t index = string.size - 1; !result.rhs.data && index < string.size; index--) {
+  for (DN_USize index = string.size - 1; !result.rhs.data && index < string.size; index--) {
     for (DN_USize find_index = 0; find_index < find_size; find_index++) {
       DN_Str8 find_item    = find[find_index];
       DN_Str8 string_slice = DN_Str8Subset(string, index, find_item.size);
@@ -2990,7 +2984,7 @@ DN_API DN_Str8FindResult DN_Str8FindStr8(DN_Str8 string, DN_Str8 find, DN_Str8Eq
 DN_API DN_Str8FindResult DN_Str8Find(DN_Str8 string, DN_Str8FindFlag flags)
 {
   DN_Str8FindResult result = {};
-  for (size_t index = 0; !result.found && index < string.size; index++) {
+  for (DN_USize index = 0; !result.found && index < string.size; index++) {
     result.found |= ((flags & DN_Str8FindFlag_Digit) && DN_CharIsDigit(string.data[index]));
     result.found |= ((flags & DN_Str8FindFlag_Alphabet) && DN_CharIsAlphabet(string.data[index]));
     result.found |= ((flags & DN_Str8FindFlag_Whitespace) && DN_CharIsWhitespace(string.data[index]));
@@ -3051,7 +3045,7 @@ DN_API DN_Str8 DN_Str8ReverseSegment(DN_Arena *arena, DN_Str8 src, DN_USize segm
 
   DN_MSVC_WARNING_PUSH
   DN_MSVC_WARNING_DISABLE(6293) // NOTE: Ill-defined loop
-  for (size_t src_index = src.size - 1; src_index < src.size; src_index--) {
+  for (DN_USize src_index = src.size - 1; src_index < src.size; src_index--) {
     DN_MSVC_WARNING_POP
     result.data[write_index--] = src.data[src_index];
     if (++write_counter % segment_size == 0 && segment_counter < segments) {
@@ -3628,6 +3622,276 @@ DN_API DN_Str8 DN_Str8Table(DN_Str8 const *rows, DN_USize num_rows, DN_USize num
   return result;
 }
 
+#if DN_STR8_AVX512F
+DN_API DN_Str8FindResult DN_Str8FindStr8AVX512F(DN_Str8 string, DN_Str8 find)
+{
+  // NOTE: Algorithm as described in http://0x80.pl/articles/simd-strfind.html
+  DN_Str8FindResult result = {};
+  if (string.size == 0 || find.size == 0 || find.size > string.size)
+    return result;
+
+  __m512i const find_first_ch = _mm512_set1_epi8(find.data[0]);
+  __m512i const find_last_ch  = _mm512_set1_epi8(find.data[find.size - 1]);
+
+  DN_USize const search_size     = string.size - find.size;
+  DN_USize       simd_iterations = search_size / sizeof(__m512i);
+  char const    *ptr             = string.data;
+
+  while (simd_iterations--) {
+    __m512i find_first_ch_block = _mm512_loadu_si512(ptr);
+    __m512i find_last_ch_block  = _mm512_loadu_si512(ptr + find.size - 1);
+
+    // NOTE: AVX512F does not have a cmpeq so we use XOR to place a 0 bit
+    // where matches are found.
+    __m512i first_ch_matches = _mm512_xor_si512(find_first_ch_block, find_first_ch);
+
+    // NOTE: We can combine the 2nd XOR and merge the 2 XOR results into one
+    // operation using the ternarylogic intrinsic.
+    //
+    // A = first_ch_matches (find_first_ch_block ^ find_first_ch)
+    // B = find_last_ch_block
+    // C = find_last_ch
+    //
+    // ternarylogic op => A | (B ^ C) => 0b1111'0110 => 0xf6
+    //
+    // / A / B / C / B ^ C / A | (B ^ C) /
+    // | 0 | 0 | 0 | 0     | 0           |
+    // | 0 | 0 | 1 | 1     | 1           |
+    // | 0 | 1 | 0 | 1     | 1           |
+    // | 0 | 1 | 1 | 0     | 0           |
+    // | 1 | 0 | 0 | 0     | 1           |
+    // | 1 | 0 | 1 | 1     | 1           |
+    // | 1 | 1 | 0 | 1     | 1           |
+    // | 1 | 1 | 1 | 0     | 1           |
+
+    __m512i ch_matches = _mm512_ternarylogic_epi32(first_ch_matches, find_last_ch_block, find_last_ch, 0xf6);
+
+    // NOTE: Matches were XOR-ed and are hence indicated as zero so we mask
+    // out which 32 bit elements in the vector had zero bytes. This uses a
+    // bit twiddling trick
+    // https://graphics.stanford.edu/~seander/bithacks.html#ZeroInWord
+    __mmask16 zero_byte_mask = {};
+    {
+      const __m512i v01  = _mm512_set1_epi32(0x01010101u);
+      const __m512i v80  = _mm512_set1_epi32(0x80808080u);
+      const __m512i v1   = _mm512_sub_epi32(ch_matches, v01);
+      const __m512i tmp1 = _mm512_ternarylogic_epi32(v1, ch_matches, v80, 0x20);
+      zero_byte_mask     = _mm512_test_epi32_mask(tmp1, tmp1);
+    }
+
+    while (zero_byte_mask) {
+      uint64_t const lsb_zero_pos = _tzcnt_u64(zero_byte_mask);
+      char const    *base_ptr     = ptr + (4 * lsb_zero_pos);
+
+      if (DN_Memcmp(base_ptr + 0, find.data, find.size) == 0) {
+        result.found = true;
+        result.index = base_ptr - string.data;
+      } else if (DN_Memcmp(base_ptr + 1, find.data, find.size) == 0) {
+        result.found = true;
+        result.index = base_ptr - string.data + 1;
+      } else if (DN_Memcmp(base_ptr + 2, find.data, find.size) == 0) {
+        result.found = true;
+        result.index = base_ptr - string.data + 2;
+      } else if (DN_Memcmp(base_ptr + 3, find.data, find.size) == 0) {
+        result.found = true;
+        result.index = base_ptr - string.data + 3;
+      }
+
+      if (result.found) {
+        result.start_to_before_match        = DN_Str8FromPtr(string.data, result.index);
+        result.match                        = DN_Str8FromPtr(string.data + result.index, find.size);
+        result.match_to_end_of_buffer       = DN_Str8FromPtr(result.match.data, string.size - result.index);
+        result.after_match_to_end_of_buffer = DN_Str8Advance(result.match_to_end_of_buffer, find.size);
+        return result;
+      }
+
+      zero_byte_mask = DN_BitClearNextLSB(zero_byte_mask);
+    }
+
+    ptr += sizeof(__m512i);
+  }
+
+  for (DN_USize index = ptr - string.data; index < string.size; index++) {
+    DN_Str8 string_slice = DN_Str8Subset(string, index, find.size);
+    if (DN_Str8Eq(string_slice, find)) {
+      result.found                        = true;
+      result.index                        = index;
+      result.start_to_before_match        = DN_Str8FromPtr(string.data, index);
+      result.match                        = DN_Str8FromPtr(string.data + index, find.size);
+      result.match_to_end_of_buffer       = DN_Str8FromPtr(result.match.data, string.size - index);
+      result.after_match_to_end_of_buffer = DN_Str8Advance(result.match_to_end_of_buffer, find.size);
+      return result;
+    }
+  }
+
+  return result;
+}
+
+DN_API DN_Str8FindResult DN_Str8FindLastStr8AVX512F(DN_Str8 string, DN_Str8 find)
+{
+  // NOTE: Algorithm as described in http://0x80.pl/articles/simd-strfind.html
+  DN_Str8FindResult result = {};
+  if (string.size == 0 || find.size == 0 || find.size > string.size)
+    return result;
+
+  __m512i const find_first_ch = _mm512_set1_epi8(find.data[0]);
+  __m512i const find_last_ch  = _mm512_set1_epi8(find.data[find.size - 1]);
+
+  DN_USize const search_size     = string.size - find.size;
+  DN_USize       simd_iterations = search_size / sizeof(__m512i);
+  char const    *ptr             = string.data + search_size + 1;
+
+  while (simd_iterations--) {
+    ptr -= sizeof(__m512i);
+    __m512i find_first_ch_block = _mm512_loadu_si512(ptr);
+    __m512i find_last_ch_block  = _mm512_loadu_si512(ptr + find.size - 1);
+
+    // NOTE: AVX512F does not have a cmpeq so we use XOR to place a 0 bit
+    // where matches are found.
+    __m512i first_ch_matches = _mm512_xor_si512(find_first_ch_block, find_first_ch);
+
+    // NOTE: We can combine the 2nd XOR and merge the 2 XOR results into one
+    // operation using the ternarylogic intrinsic.
+    //
+    // A = first_ch_matches (find_first_ch_block ^ find_first_ch)
+    // B = find_last_ch_block
+    // C = find_last_ch
+    //
+    // ternarylogic op => A | (B ^ C) => 0b1111'0110 => 0xf6
+    //
+    // / A / B / C / B ^ C / A | (B ^ C) /
+    // | 0 | 0 | 0 | 0     | 0           |
+    // | 0 | 0 | 1 | 1     | 1           |
+    // | 0 | 1 | 0 | 1     | 1           |
+    // | 0 | 1 | 1 | 0     | 0           |
+    // | 1 | 0 | 0 | 0     | 1           |
+    // | 1 | 0 | 1 | 1     | 1           |
+    // | 1 | 1 | 0 | 1     | 1           |
+    // | 1 | 1 | 1 | 0     | 1           |
+
+    __m512i ch_matches = _mm512_ternarylogic_epi32(first_ch_matches, find_last_ch_block, find_last_ch, 0xf6);
+
+    // NOTE: Matches were XOR-ed and are hence indicated as zero so we mask
+    // out which 32 bit elements in the vector had zero bytes. This uses a
+    // bit twiddling trick
+    // https://graphics.stanford.edu/~seander/bithacks.html#ZeroInWord
+    __mmask16 zero_byte_mask = {};
+    {
+      const __m512i v01  = _mm512_set1_epi32(0x01010101u);
+      const __m512i v80  = _mm512_set1_epi32(0x80808080u);
+      const __m512i v1   = _mm512_sub_epi32(ch_matches, v01);
+      const __m512i tmp1 = _mm512_ternarylogic_epi32(v1, ch_matches, v80, 0x20);
+      zero_byte_mask     = _mm512_test_epi32_mask(tmp1, tmp1);
+    }
+
+    while (zero_byte_mask) {
+      uint64_t const lsb_zero_pos = _tzcnt_u64(zero_byte_mask);
+      char const    *base_ptr     = ptr + (4 * lsb_zero_pos);
+
+      if (DN_Memcmp(base_ptr + 0, find.data, find.size) == 0) {
+        result.found = true;
+        result.index = base_ptr - string.data;
+      } else if (DN_Memcmp(base_ptr + 1, find.data, find.size) == 0) {
+        result.found = true;
+        result.index = base_ptr - string.data + 1;
+      } else if (DN_Memcmp(base_ptr + 2, find.data, find.size) == 0) {
+        result.found = true;
+        result.index = base_ptr - string.data + 2;
+      } else if (DN_Memcmp(base_ptr + 3, find.data, find.size) == 0) {
+        result.found = true;
+        result.index = base_ptr - string.data + 3;
+      }
+
+      if (result.found) {
+        result.start_to_before_match  = DN_Str8FromPtr(string.data, result.index);
+        result.match                  = DN_Str8FromPtr(string.data + result.index, find.size);
+        result.match_to_end_of_buffer = DN_Str8FromPtr(result.match.data, string.size - result.index);
+        return result;
+      }
+
+      zero_byte_mask = DN_BitClearNextLSB(zero_byte_mask);
+    }
+  }
+
+  for (DN_USize index = ptr - string.data - 1; index < string.size; index--) {
+    DN_Str8 string_slice = DN_Str8Subset(string, index, find.size);
+    if (DN_Str8Eq(string_slice, find)) {
+      result.found                  = true;
+      result.index                  = index;
+      result.start_to_before_match  = DN_Str8FromPtr(string.data, index);
+      result.match                  = DN_Str8FromPtr(string.data + index, find.size);
+      result.match_to_end_of_buffer = DN_Str8FromPtr(result.match.data, string.size - index);
+      return result;
+    }
+  }
+
+  return result;
+}
+
+DN_API DN_Str8BSplitResult DN_Str8BSplitAVX512F(DN_Str8 string, DN_Str8 find)
+{
+  DN_Str8BSplitResult result      = {};
+  DN_Str8FindResult        find_result = DN_Str8FindAVX512F(string, find);
+  if (find_result.found) {
+    result.lhs.data = string.data;
+    result.lhs.size = find_result.index;
+    result.rhs      = DN_Str8Advance(find_result.match_to_end_of_buffer, find.size);
+  } else {
+    result.lhs = string;
+  }
+
+  return result;
+}
+
+DN_API DN_Str8BSplitResult DN_Str8BSplitLastAVX512F(DN_Str8 string, DN_Str8 find)
+{
+  DN_Str8BSplitResult result      = {};
+  DN_Str8FindResult   find_result = DN_Str8FindLastAVX512F(string, find);
+  if (find_result.found) {
+    result.lhs.data = string.data;
+    result.lhs.size = find_result.index;
+    result.rhs      = DN_Str8Advance(find_result.match_to_end_of_buffer, find.size);
+  } else {
+    result.lhs = string;
+  }
+
+  return result;
+}
+
+DN_API DN_USize DN_Str8SplitAVX512F(DN_Str8 string, DN_Str8 delimiter, DN_Str8 *splits, DN_USize splits_count, DN_Str8SplitFlags flags)
+{
+  DN_USize result = 0; // The number of splits in the actual string.
+  if (string.size == 0 || delimiter.size == 0 || delimiter.size <= 0)
+    return result;
+
+  DN_Str8BSplitResult split = {};
+  DN_Str8             first = string;
+  do {
+    split = DN_Str8BSplitAVX512F(first, delimiter);
+    if (split.lhs.size || DN_BitIsNotSet(flags, DN_Str8SplitFlags_ExcludeEmptyStrings)) {
+      if (splits && result < splits_count)
+        splits[result] = split.lhs;
+      result++;
+    }
+    first = split.rhs;
+  } while (first.size);
+
+  return result;
+}
+
+DN_API DN_Str8Slice DN_Str8SplitAllocAVX512F(DN_Arena *arena, DN_Str8 string, DN_Str8 delimiter, DN_Str8SplitFlags flags)
+{
+  DN_Str8Slice result               = {};
+  DN_USize     splits_required      = DN_Str8SplitAVX512F(string, delimiter, /*splits*/ nullptr, /*count*/ 0, flags);
+  result.data                       = DN_ArenaNewArray(arena, DN_Str8, splits_required, DN_ZMem_No);
+  if (result.data) {
+    result.count = DN_Str8SplitAVX512F(string, delimiter, result.data, splits_required, flags);
+    DN_Assert(splits_required == result.count);
+  }
+  return result;
+}
+#endif // DN_STR8_AVX512F
+
 DN_API DN_Str8 DN_Str8SliceRender(DN_Str8Slice slice, DN_Str8 separator, DN_Arena *arena)
 {
   DN_Str8 result = {};
@@ -4103,7 +4367,7 @@ DN_API int DN_UTF8Encode(DN_U8 utf8[4], DN_U32 codepoint)
   // ----------------------------------------+----------------------------+--------------------+
 
   if (codepoint <= 0b0111'1111) {
-    utf8[0] = DN_Cast(uint8_t) codepoint;
+    utf8[0] = DN_Cast(DN_U8) codepoint;
     return 1;
   }
 
@@ -5127,7 +5391,7 @@ DN_API DN_F32 DN_PCG32NextF32(DN_PCG32 *rng)
 DN_API DN_F64 DN_PCG32NextF64(DN_PCG32 *rng)
 {
   DN_U64 x = DN_PCG32Next64(rng);
-  return (DN_F64)(int64_t)(x >> 11) * 0x1.0p-53;
+  return (DN_F64)(DN_I64)(x >> 11) * 0x1.0p-53;
 }
 
 DN_API void DN_PCG32Advance(DN_PCG32 *rng, DN_U64 delta)
@@ -6871,15 +7135,15 @@ DN_API DN_Str8x256 DN_M4ColumnMajorString(DN_M4 mat)
   return result;
 }
 
-DN_API bool operator==(DN_M2x3 const &lhs, DN_M2x3 const &rhs)
+DN_API bool DN_M2x3Eq(DN_M2x3 const *lhs, DN_M2x3 const *rhs)
 {
-  bool result = DN_Memcmp(lhs.e, rhs.e, sizeof(lhs.e[0]) * DN_ArrayCountU(lhs.e)) == 0;
+  bool result = DN_Memcmp(lhs->e, rhs->e, sizeof(lhs->e[0]) * DN_ArrayCountU(lhs->e)) == 0;
   return result;
 }
 
-DN_API bool operator!=(DN_M2x3 const &lhs, DN_M2x3 const &rhs)
+DN_API bool DN_M2x3NotEq(DN_M2x3 const *lhs, DN_M2x3 const *rhs)
 {
-  bool result = !(lhs == rhs);
+  bool result = !DN_M2x3Eq(lhs, rhs);
   return result;
 }
 
@@ -7069,12 +7333,6 @@ DN_API DN_Rect DN_M2x3MulRect(DN_M2x3 m1, DN_Rect rect)
   result_range.max       = DN_V2F32Max(m1_min, m1_max);
 
   DN_Rect   result       = DN_RectFrom2V2(result_range.min, DN_V2F32Abs(result_range.max - result_range.min));
-  return result;
-}
-
-DN_API bool operator==(const DN_Rect &lhs, const DN_Rect &rhs)
-{
-  bool result = (lhs.pos == rhs.pos) && (lhs.size == rhs.size);
   return result;
 }
 
@@ -7312,4 +7570,1441 @@ DN_API DN_RaycastV2 DN_RaycastLineIntersectV2(DN_V2F32 origin_a, DN_V2F32 dir_a,
     result.hit = true;
   }
   return result;
+}
+
+struct DN_ArrayFindEqMemcmpContext_
+{
+  DN_USize    elem_size;
+  void const *find;
+};
+
+DN_API void *DN_SliceAllocArena(void **data, DN_USize *slice_size_field, DN_USize size, DN_USize elem_size, DN_U8 align, DN_ZMem zmem, DN_Arena *arena)
+{
+  void *result = *data;
+  *data        = DN_ArenaAlloc(arena, size * elem_size, align, zmem);
+  if (*data)
+    *slice_size_field = size;
+  return result;
+}
+
+DN_API DN_ArrayFindResult DN_ArrayFind(void *data, DN_USize size, DN_USize elem_size, void const *find, DN_ArrayFindEqFunc *eq_func)
+{
+  DN_ArrayFindResult result = {};
+  DN_Assert(data);
+  DN_Assert(elem_size);
+  if (find) {
+    for (DN_ForIndexU(index, size)) {
+      DN_U8 *it = DN_Cast(DN_U8 *) data + (index * elem_size);
+      if (eq_func(it, find)) {
+        result.index   = index;
+        result.value   = it;
+        result.success = true;
+        break;
+      }
+    }
+  }
+  return result;
+}
+
+static bool DN_ArrayFindEqMemEqUnsafe_(void const *lhs, void const *find)
+{
+  DN_ArrayFindEqMemcmpContext_ *context = DN_Cast(DN_ArrayFindEqMemcmpContext_ *) find;
+  bool                          result  = DN_MemEqUnsafe(lhs, context->find, context->elem_size);
+  return result;
+}
+
+DN_API DN_ArrayFindResult DN_ArrayFindMemEq(void *data, DN_USize size, DN_USize elem_size, void const *find)
+{
+  DN_ArrayFindEqMemcmpContext_ context = {};
+  context.elem_size                    = elem_size;
+  context.find                         = find;
+  DN_ArrayFindResult result            = DN_ArrayFind(data, size, elem_size, &context, DN_ArrayFindEqMemEqUnsafe_);
+  return result;
+}
+
+DN_API void *DN_ArrayInsertArray(void *data, DN_USize *size, DN_USize max, DN_USize elem_size, DN_USize index, void const *items, DN_USize count)
+{
+  void *result = nullptr;
+  if (!data || !size || !items || count <= 0 || ((*size + count) > max))
+    return result;
+
+  DN_USize clamped_index = DN_Min(index, *size);
+  if (clamped_index != *size) {
+    char const *src           = DN_Cast(char *)data + (clamped_index * elem_size);
+    char const *dest          = DN_Cast(char *)data + ((clamped_index + count) * elem_size);
+    char const *end           = DN_Cast(char *)data + (size[0] * elem_size);
+    DN_USize    bytes_to_move = end - src;
+    DN_Memmove(DN_Cast(void *) dest, src, bytes_to_move);
+  }
+
+  result = DN_Cast(char *)data + (clamped_index * elem_size);
+  DN_Memcpy(result, items, elem_size * count);
+  *size += count;
+  return result;
+}
+
+DN_API void *DN_ArrayPopFront(void *data, DN_USize *size, DN_USize elem_size, DN_USize count)
+{
+  if (!data || !size || *size == 0 || count == 0)
+    return nullptr;
+
+  DN_USize pop_count = DN_Min(count, *size);
+  void *result = data;
+
+  if (pop_count < *size) {
+    char *src = DN_Cast(char *)data + (pop_count * elem_size);
+    char *dest = DN_Cast(char *)data;
+    DN_USize bytes_to_move = (*size - pop_count) * elem_size;
+    DN_Memmove(dest, src, bytes_to_move);
+  }
+
+  *size -= pop_count;
+  return result;
+}
+
+DN_API void *DN_ArrayPopBack(void *data, DN_USize *size, DN_USize elem_size, DN_USize count)
+{
+  if (!data || !size || *size == 0 || count == 0)
+    return nullptr;
+
+  DN_USize pop_count = DN_Min(count, *size);
+  *size -= pop_count;
+
+  return DN_Cast(char *)data + (*size * elem_size);
+}
+
+DN_API DN_ArrayEraseResult DN_ArrayEraseRange(void *data, DN_USize *size, DN_USize elem_size, DN_USize begin_index, DN_ISize count, DN_ArrayErase erase)
+{
+  DN_ArrayEraseResult result = {};
+  result.it_index            = begin_index;
+  if (!data || !size || *size == 0 || count == 0)
+    return result;
+
+  // Compute the range to erase
+  DN_USize start = 0, end = 0;
+  if (count < 0) {
+    // Erase backwards from begin_index, not inclusive of begin_index
+    // Range: [begin_index + count, begin_index)
+    // Which is: [begin_index - abs(count), begin_index)
+    DN_USize abs_count = DN_Abs(count);
+    start = (begin_index > abs_count) ? (begin_index - abs_count) : 0;
+    end   = begin_index;
+  } else {
+    start = begin_index;
+    end   = begin_index + count;
+  }
+
+  // Clamp indices to valid bounds
+  start = DN_Min(start, *size);
+  end   = DN_Min(end,   *size);
+
+  // Erase the range [start, end)
+  DN_USize erase_count = end > start ? end - start : 0;
+  if (erase_count) {
+    char    *dest      = (char *)data + (elem_size * start);
+    char    *array_end = (char *)data + (elem_size * *size);
+    char    *src       = dest + (elem_size * erase_count);
+    if (erase == DN_ArrayErase_Stable) {
+      DN_USize move_size = array_end - src;
+      DN_Memmove(dest, src, move_size);
+    } else {
+      char    *unstable_src = array_end - (elem_size * erase_count);
+      DN_USize move_size    = array_end - unstable_src;
+      DN_Memcpy(dest, unstable_src, move_size);
+    }
+    *size -= erase_count;
+  }
+
+  result.items_erased = erase_count;
+  // NOTE: If we are erasing from the current index of the iterator to the end of the array then
+  // there's no more elements in the array to iterate. So the returned index should b
+  // one-past-last index
+  if (begin_index == start && end >= *size) {
+    result.it_index = *size;
+  } else {
+    result.it_index = start ? start - 1 : 0;
+  }
+  return result;
+}
+
+DN_API void *DN_ArrayMakeArray(void *data, DN_USize *size, DN_USize max, DN_USize elem_size, DN_USize make_count, DN_ZMem z_mem)
+{
+  void    *result   = nullptr;
+  DN_USize new_size = *size + make_count;
+  if (new_size <= max) {
+    result = DN_Cast(char *) data + (elem_size * size[0]);
+    *size  = new_size;
+    if (z_mem == DN_ZMem_Yes)
+      DN_Memset(result, 0, elem_size * make_count);
+  }
+  return result;
+}
+
+DN_API void *DN_ArrayMakeArrayAssert(void *data, DN_USize *size, DN_USize max, DN_USize elem_size, DN_USize make_count, DN_ZMem z_mem, DN_CallSite call_site)
+{
+  void *result = DN_ArrayMakeArray(data, size, max, elem_size, make_count, z_mem);
+  DN_AssertArgsF(result, call_site, "array=%p size=%zu max=%zu", data, *size, max);
+  return result;
+}
+
+DN_API void *DN_ArrayAddArray(void *data, DN_USize *size, DN_USize max, DN_USize elem_size, void const *elems, DN_USize elems_count, DN_ArrayAdd add)
+{
+  void *result = DN_ArrayMakeArray(data, size, max, elem_size, elems_count, DN_ZMem_No);
+  if (result) {
+    if (add == DN_ArrayAdd_Append) {
+      DN_Memcpy(result, elems, elems_count * elem_size);
+    } else {
+      char *move_dest = DN_Cast(char *)data + (elems_count * elem_size); // Shift elements forward
+      char *move_src  = DN_Cast(char *)data;
+      DN_Memmove(move_dest, move_src, elem_size * size[0]);
+      DN_Memcpy(data, elems, elem_size * elems_count);
+    }
+  }
+  return result;
+}
+
+DN_API void *DN_ArrayAddArrayAssert(void *data, DN_USize *size, DN_USize max, DN_USize elem_size, void const *elems, DN_USize elems_count, DN_ArrayAdd add, DN_CallSite call_site)
+{
+  void *result = DN_ArrayAddArray(data, size, max, elem_size, elems, elems_count, add);
+  DN_AssertArgsF(result, call_site, "array=%p size=%zu max=%zu", data, *size, max);
+  return result;
+}
+
+DN_API bool DN_ArrayResizeFromArena(void **data, DN_USize *size, DN_USize *max, DN_USize elem_size, DN_Pool *pool, DN_USize new_max)
+{
+  bool result = true;
+  if (new_max != *max) {
+    DN_USize bytes_to_alloc = elem_size * new_max;
+    void    *buffer         = DN_PoolNewArray(pool, DN_U8, bytes_to_alloc);
+    if (buffer) {
+      DN_USize bytes_to_copy = elem_size * DN_Min(*size, new_max);
+      DN_Memcpy(buffer, *data, bytes_to_copy);
+      DN_PoolDealloc(pool, *data);
+      *data = buffer;
+      *max  = new_max;
+      *size = DN_Min(*size, new_max);
+    } else {
+      result = false;
+    }
+  }
+
+  return result;
+}
+
+DN_API bool DN_ArrayResizeFromPool(void **data, DN_USize *size, DN_USize *max, DN_USize elem_size, DN_Pool *pool, DN_USize new_max)
+{
+  bool result = true;
+  if (new_max != *max) {
+    DN_USize bytes_to_alloc = elem_size * new_max;
+    void    *buffer         = DN_PoolNewArray(pool, DN_U8, bytes_to_alloc);
+    if (buffer) {
+      DN_USize bytes_to_copy = elem_size * DN_Min(*size, new_max);
+      DN_Memcpy(buffer, *data, bytes_to_copy);
+      DN_PoolDealloc(pool, *data);
+      *data = buffer;
+      *max  = new_max;
+      *size = DN_Min(*size, new_max);
+    } else {
+      result = false;
+    }
+  }
+
+  return result;
+}
+
+DN_API bool DN_ArrayResizeFromArena(void **data, DN_USize *size, DN_USize *max, DN_USize elem_size, DN_Arena *arena, DN_USize new_max)
+{
+  bool result = true;
+  if (new_max != *max) {
+    DN_USize bytes_to_alloc = elem_size * new_max;
+    void    *buffer         = DN_ArenaNewArray(arena, DN_U8, bytes_to_alloc, DN_ZMem_No);
+    if (buffer) {
+      DN_USize bytes_to_copy = elem_size * DN_Min(*size, new_max);
+      DN_Memcpy(buffer, *data, bytes_to_copy);
+      *data = buffer;
+      *max  = new_max;
+      *size = DN_Min(*size, new_max);
+    } else {
+      result = false;
+    }
+  }
+
+  return result;
+}
+
+DN_API bool DN_ArrayGrowFromPool(void **data, DN_USize size, DN_USize *max, DN_USize elem_size, DN_Pool *pool, DN_USize new_max)
+{
+  bool result = true;
+  if (new_max > *max)
+    result = DN_ArrayResizeFromPool(data, &size, max, elem_size, pool, new_max);
+  return result;
+}
+
+DN_API bool DN_ArrayGrowFromArena(void **data, DN_USize size, DN_USize *max, DN_USize elem_size, DN_Arena *arena, DN_USize new_max)
+{
+  bool result = true;
+  if (new_max > *max)
+    result = DN_ArrayResizeFromArena(data, &size, max, elem_size, arena, new_max);
+  return result;
+}
+
+
+DN_API bool DN_ArrayGrowIfNeededFromPool(void **data, DN_USize size, DN_USize *max, DN_USize elem_size, DN_Pool *pool, DN_USize add_count)
+{
+  bool     result   = true;
+  DN_USize new_size = size + add_count;
+  if (new_size > *max) {
+    DN_USize new_max = DN_Max(DN_Max(*max * 2, new_size), 8);
+    result           = DN_ArrayResizeFromPool(data, &size, max, elem_size, pool, new_max);
+  }
+  return result;
+}
+
+DN_API bool DN_ArrayGrowIfNeededFromArena(void **data, DN_USize size, DN_USize *max, DN_USize elem_size, DN_Arena *arena, DN_USize add_count)
+{
+  bool     result   = true;
+  DN_USize new_size = size + add_count;
+  if (new_size > *max) {
+    DN_USize new_max = DN_Max(DN_Max(*max * 2, new_size), 8);
+    result           = DN_ArrayResizeFromArena(data, &size, max, elem_size, arena, new_max);
+  }
+  return result;
+}
+
+DN_API void *DN_SinglyLLDetach(void **link, void **next)
+{
+  void *result = *link;
+  if (*link) {
+    *link = *next;
+    *next = nullptr;
+  }
+  return result;
+}
+
+DN_API bool DN_RingHasSpace(DN_Ring const *ring, DN_U64 size)
+{
+  DN_U64 avail  = ring->write_pos - ring->read_pos;
+  DN_U64 space  = ring->size - avail;
+  bool   result = space >= size;
+  return result;
+}
+
+DN_API bool DN_RingHasData(DN_Ring const *ring, DN_U64 size)
+{
+  DN_U64 data   = ring->write_pos - ring->read_pos;
+  bool   result = data >= size;
+  return result;
+}
+
+DN_API void DN_RingWrite(DN_Ring *ring, void const *src, DN_U64 src_size)
+{
+  DN_Assert(src_size <= ring->size);
+  DN_U64 offset               = ring->write_pos % ring->size;
+  DN_U64 bytes_before_split   = ring->size - offset;
+  DN_U64 pre_split_bytes      = DN_Min(bytes_before_split, src_size);
+  DN_U64 post_split_bytes     = src_size - pre_split_bytes;
+  void const *pre_split_data  = src;
+  void const *post_split_data = ((char *)src + pre_split_bytes);
+  DN_Memcpy(ring->base + offset, pre_split_data,  pre_split_bytes);
+  DN_Memcpy(ring->base,          post_split_data, post_split_bytes);
+  ring->write_pos += src_size;
+}
+
+DN_API void DN_RingRead(DN_Ring *ring, void *dest, DN_U64 dest_size)
+{
+  DN_Assert(dest_size <= ring->size);
+  DN_U64 offset             = ring->read_pos % ring->size;
+  DN_U64 bytes_before_split = ring->size - offset;
+  DN_U64 pre_split_bytes    = DN_Min(bytes_before_split, dest_size);
+  DN_U64 post_split_bytes   = dest_size - pre_split_bytes;
+  DN_Memcpy(dest,                           ring->base + offset, pre_split_bytes);
+  DN_Memcpy((char *)dest + pre_split_bytes, ring->base,          post_split_bytes);
+  ring->read_pos += dest_size;
+}
+
+#if defined(__cplusplus)
+template <typename T>
+DN_DSMap<T> DN_DSMapInit(DN_Arena *arena, DN_U32 size, DN_DSMapFlags flags)
+{
+  DN_AssertF(DN_IsPowerOfTwo(size), "Power-of-two size required, given size was '%u'", size);
+  DN_Assert(arena);
+
+  DN_DSMap<T> result = {};
+  if (size <= 0)
+    return result;
+  if (!arena)
+    return result;
+
+  result.arena        = arena;
+  result.pool         = DN_PoolFromArena(arena, DN_POOL_DEFAULT_ALIGN);
+  result.hash_to_slot = DN_ArenaNewArray(result.arena, DN_U32, size, DN_ZMem_Yes);
+  result.slots        = DN_ArenaNewArray(result.arena, DN_DSMapSlot<T>, size, DN_ZMem_Yes);
+  result.occupied     = 1; // For sentinel
+  result.size         = size;
+  result.initial_size = size;
+  result.flags        = flags;
+  DN_AssertF(result.hash_to_slot && result.slots, "We pre-allocated a block of memory sufficient in size for the 2 arrays. Maybe the pointers needed extra space because of natural alignment?");
+  return result;
+}
+
+template <typename T>
+void DN_DSMapDeinit(DN_DSMap<T> *map, DN_ZMem z_mem)
+{
+  if (!map)
+    return;
+  // TODO(doyle): Use z_mem
+  (void)z_mem;
+  DN_MemListDeinit(map->arena->mem);
+  *map = {};
+}
+
+template <typename T>
+bool DN_DSMapIsValid(DN_DSMap<T> const *map)
+{
+  bool result = map &&
+                map->arena &&
+                map->hash_to_slot &&                  // Hash to slot mapping array must be allocated
+                map->slots &&                         // Slots array must be allocated
+                (map->size & (map->size - 1)) == 0 && // Must be power of two size
+                map->occupied >= 1;                   // DN_DS_MAP_SENTINEL_SLOT takes up one slot
+  return result;
+}
+
+template <typename T>
+DN_U32 DN_DSMapHash(DN_DSMap<T> const *map, DN_DSMapKey key)
+{
+  DN_U32 result = 0;
+  if (!map)
+    return result;
+
+  if (key.type == DN_DSMapKeyType_U64NoHash) {
+    result = DN_Cast(DN_U32) key.u64;
+    return result;
+  }
+
+  if (key.type == DN_DSMapKeyType_BufferAsU64NoHash) {
+    result = key.hash;
+    return result;
+  }
+
+  DN_U32 seed = map->hash_seed ? map->hash_seed : DN_DS_MAP_DEFAULT_HASH_SEED;
+  if (map->hash_function) {
+    map->hash_function(key, seed);
+  } else {
+    // NOTE: Courtesy of Demetri Spanos (which this hash table was inspired
+    // from), the following is a hashing function snippet provided for
+    // reliable, quick and simple quality hashing functions for hash table
+    // use.
+    // Source: https://github.com/demetri/scribbles/blob/c475464756c104c91bab83ed4e14badefef12ab5/hashing/ub_aware_hash_functions.c
+
+    char const *key_ptr = nullptr;
+    DN_U32      len     = 0;
+    DN_U32      h       = seed;
+    switch (key.type) {
+      case DN_DSMapKeyType_BufferAsU64NoHash: /*FALLTHRU*/
+      case DN_DSMapKeyType_U64NoHash:         DN_InvalidCodePath; /*FALLTHRU*/
+      case DN_DSMapKeyType_Invalid:           break;
+
+      case DN_DSMapKeyType_Buffer:
+        key_ptr = DN_Cast(char const *) key.buffer_data;
+        len     = key.buffer_size;
+        break;
+
+      case DN_DSMapKeyType_U64:
+        key_ptr = DN_Cast(char const *) & key.u64;
+        len     = sizeof(key.u64);
+        break;
+    }
+
+    // Murmur3 32-bit without UB unaligned accesses
+    // DN_U32 mur3_32_no_UB(const void *key, int len, DN_U32 h)
+
+    // main body, work on 32-bit blocks at a time
+    for (DN_U32 i = 0; i < len / 4; i++) {
+      DN_U32 k;
+      memcpy(&k, &key_ptr[i * 4], sizeof(k));
+
+      k *= 0xcc9e2d51;
+      k = ((k << 15) | (k >> 17)) * 0x1b873593;
+      h = (((h ^ k) << 13) | ((h ^ k) >> 19)) * 5 + 0xe6546b64;
+    }
+
+    // load/mix up to 3 remaining tail bytes into a tail block
+    DN_U32   t    = 0;
+    uint8_t *tail = ((uint8_t *)key_ptr) + 4 * (len / 4);
+    switch (len & 3) {
+      case 3: t ^= tail[2] << 16;
+      case 2: t ^= tail[1] << 8;
+      case 1: {
+        t ^= tail[0] << 0;
+        h ^= ((0xcc9e2d51 * t << 15) | (0xcc9e2d51 * t >> 17)) * 0x1b873593;
+      }
+    }
+
+    // finalization mix, including key length
+    h      = ((h ^ len) ^ ((h ^ len) >> 16)) * 0x85ebca6b;
+    h      = (h ^ (h >> 13)) * 0xc2b2ae35;
+    result = h ^ (h >> 16);
+  }
+  return result;
+}
+
+template <typename T>
+DN_U32 DN_DSMapHashToSlotIndex(DN_DSMap<T> const *map, DN_DSMapKey key)
+{
+  DN_Assert(key.type != DN_DSMapKeyType_Invalid);
+  DN_U32 result = DN_DS_MAP_SENTINEL_SLOT;
+  if (!DN_DSMapIsValid(map))
+    return result;
+
+  result = key.hash & (map->size - 1);
+  for (;;) {
+    if (result == DN_DS_MAP_SENTINEL_SLOT) // Sentinel is reserved
+      result++;
+
+    if (map->hash_to_slot[result] == DN_DS_MAP_SENTINEL_SLOT) // Slot is vacant, can use
+      return result;
+
+    DN_DSMapSlot<T> *slot = map->slots + map->hash_to_slot[result];
+    if (slot->key.type == DN_DSMapKeyType_Invalid || (slot->key.hash == key.hash && slot->key == key))
+      return result;
+
+    result = (result + 1) & (map->size - 1);
+  }
+}
+
+template <typename T>
+DN_DSMapResult<T> DN_DSMapFind(DN_DSMap<T> const *map, DN_DSMapKey key)
+{
+  DN_DSMapResult<T> result = {};
+  if (DN_DSMapIsValid(map)) {
+    DN_U32 index = DN_DSMapHashToSlotIndex(map, key);
+    if (index != DN_DS_MAP_SENTINEL_SLOT && map->hash_to_slot[index] == DN_DS_MAP_SENTINEL_SLOT) {
+      result.slot = map->slots; // NOTE: Set to sentinel value
+    } else {
+      result.slot  = map->slots + map->hash_to_slot[index];
+      result.found = true;
+    }
+    result.value = &result.slot->value;
+  }
+  return result;
+}
+
+template <typename T>
+DN_DSMapResult<T> DN_DSMapMake(DN_DSMap<T> *map, DN_DSMapKey key)
+{
+  DN_DSMapResult<T> result = {};
+  if (!DN_DSMapIsValid(map))
+    return result;
+
+  DN_U32 index = DN_DSMapHashToSlotIndex(map, key);
+  if (map->hash_to_slot[index] == DN_DS_MAP_SENTINEL_SLOT) {
+    // NOTE: Create the slot
+    if (index != DN_DS_MAP_SENTINEL_SLOT)
+      map->hash_to_slot[index] = map->occupied++;
+
+    // NOTE: Check if resize is required
+    bool map_is_75pct_full = (map->occupied * 4) > (map->size * 3);
+    if (map_is_75pct_full) {
+      if (!DN_DSMapResize(map, map->size * 2))
+        return result;
+      result = DN_DSMapMake(map, key);
+    } else {
+      result.slot      = map->slots + map->hash_to_slot[index];
+      result.slot->key = key; // NOTE: Assign key to new slot
+      if ((key.type == DN_DSMapKeyType_Buffer ||
+           key.type == DN_DSMapKeyType_BufferAsU64NoHash) &&
+          !key.no_copy_buffer)
+        result.slot->key.buffer_data = DN_PoolNewArrayCopy(&map->pool, char, key.buffer_data, key.buffer_size);
+    }
+  } else {
+    result.slot  = map->slots + map->hash_to_slot[index];
+    result.found = true;
+  }
+
+  result.value = &result.slot->value;
+  DN_Assert(result.slot->key.type != DN_DSMapKeyType_Invalid);
+  return result;
+}
+
+template <typename T>
+DN_DSMapResult<T> DN_DSMapSet(DN_DSMap<T> *map, DN_DSMapKey key, T const &value)
+{
+  DN_DSMapResult<T> result = {};
+  if (!DN_DSMapIsValid(map))
+    return result;
+
+  result             = DN_DSMapMake(map, key);
+  result.slot->value = value;
+  return result;
+}
+
+template <typename T>
+DN_DSMapResult<T> DN_DSMapFindKeyU64(DN_DSMap<T> const *map, DN_U64 key)
+{
+  DN_DSMapKey       map_key = DN_DSMapKeyU64(map, key);
+  DN_DSMapResult<T> result  = DN_DSMapFind(map, map_key);
+  return result;
+}
+
+template <typename T>
+DN_DSMapResult<T> DN_DSMapMakeKeyU64(DN_DSMap<T> *map, DN_U64 key)
+{
+  DN_DSMapKey       map_key = DN_DSMapKeyU64(map, key);
+  DN_DSMapResult<T> result  = DN_DSMapMake(map, map_key);
+  return result;
+}
+
+template <typename T>
+DN_DSMapResult<T> DN_DSMapSetKeyU64(DN_DSMap<T> *map, DN_U64 key, T const &value)
+{
+  DN_DSMapKey       map_key = DN_DSMapKeyU64(map, key);
+  DN_DSMapResult<T> result  = DN_DSMapSet(map, map_key, value);
+  return result;
+}
+
+template <typename T>
+DN_DSMapResult<T> DN_DSMapFindKeyStr8(DN_DSMap<T> const *map, DN_Str8 key)
+{
+  DN_DSMapKey       map_key = DN_DSMapKeyStr8(map, key);
+  DN_DSMapResult<T> result  = DN_DSMapFind(map, map_key);
+  return result;
+}
+
+template <typename T>
+DN_DSMapResult<T> DN_DSMapMakeKeyStr8(DN_DSMap<T> *map, DN_Str8 key)
+{
+  DN_DSMapKey       map_key = DN_DSMapKeyStr8(map, key);
+  DN_DSMapResult<T> result  = DN_DSMapMake(map, map_key);
+  return result;
+}
+
+template <typename T>
+DN_DSMapResult<T> DN_DSMapSetKeyStr8(DN_DSMap<T> *map, DN_Str8 key, T const &value)
+{
+  DN_DSMapKey       map_key = DN_DSMapKeyStr8(map, key);
+  DN_DSMapResult<T> result  = DN_DSMapSet(map, map_key);
+  return result;
+}
+
+template <typename T>
+bool DN_DSMapResize(DN_DSMap<T> *map, DN_U32 size)
+{
+  if (!DN_DSMapIsValid(map) || size < map->occupied || size < map->initial_size)
+    return false;
+
+  DN_Arena *prev_arena = map->arena;
+  DN_MemList *new_mem  = prev_arena->mem;
+  DN_MemList prev_mem  = *prev_arena->mem;
+  prev_arena->mem      = &prev_mem;
+
+  *new_mem             = {};
+  new_mem->funcs       = prev_mem.funcs;
+  new_mem->flags       = prev_mem.flags;
+
+  DN_Arena  new_arena  = {};
+  new_arena.mem        = new_mem;
+
+  DN_DSMap<T> new_map = DN_DSMapInit<T>(&new_arena, size, map->flags);
+  if (!DN_DSMapIsValid(&new_map))
+    return false;
+
+  new_map.initial_size = map->initial_size;
+  for (DN_U32 old_index = 1 /*Sentinel*/; old_index < map->occupied; old_index++) {
+    DN_DSMapSlot<T> *old_slot = map->slots + old_index;
+    DN_DSMapKey      old_key  = old_slot->key;
+    if (old_key.type == DN_DSMapKeyType_Invalid)
+      continue;
+    DN_DSMapSet(&new_map, old_key, old_slot->value);
+  }
+
+  if ((map->flags & DN_DSMapFlags_DontFreeArenaOnResize) == 0)
+    DN_DSMapDeinit(map, DN_ZMem_No);
+  *map            = new_map;    // Update the map inplace
+  map->arena      = prev_arena; // Restore the previous arena pointer, it's been de-init-ed
+  *map->arena     = new_arena;  // Re-init the old arena with the new data
+  map->pool.arena = map->arena;
+  return true;
+}
+
+template <typename T>
+bool DN_DSMapErase(DN_DSMap<T> *map, DN_DSMapKey key)
+{
+  if (!DN_DSMapIsValid(map))
+    return false;
+
+  DN_U32 index = DN_DSMapHashToSlotIndex(map, key);
+  if (index == 0)
+    return true;
+
+  DN_U32 slot_index = map->hash_to_slot[index];
+  if (slot_index == DN_DS_MAP_SENTINEL_SLOT)
+    return false;
+
+  // NOTE: Mark the slot as unoccupied
+  map->hash_to_slot[index] = DN_DS_MAP_SENTINEL_SLOT;
+
+  DN_DSMapSlot<T> *slot = map->slots + slot_index;
+  if (!slot->key.no_copy_buffer)
+    DN_PoolDealloc(&map->pool, DN_Cast(void *) slot->key.buffer_data);
+  *slot = {}; // TODO: Optional?
+
+  if (map->occupied > 1 /*Sentinel*/) {
+    // NOTE: Repair the hash chain, e.g. rehash all the items after the removed
+    // element and reposition them if necessary.
+    for (DN_U32 probe_index = index;;) {
+      probe_index = (probe_index + 1) & (map->size - 1);
+      if (map->hash_to_slot[probe_index] == DN_DS_MAP_SENTINEL_SLOT)
+        break;
+
+      DN_DSMapSlot<T> *probe     = map->slots + map->hash_to_slot[probe_index];
+      DN_U32           new_index = probe->key.hash & (map->size - 1);
+      if (index <= probe_index) {
+        if (index < new_index && new_index <= probe_index)
+          continue;
+      } else {
+        if (index < new_index || new_index <= probe_index)
+          continue;
+      }
+
+      map->hash_to_slot[index]       = map->hash_to_slot[probe_index];
+      map->hash_to_slot[probe_index] = DN_DS_MAP_SENTINEL_SLOT;
+      index                          = probe_index;
+    }
+
+    // NOTE: We have erased a slot from the hash table, this leaves a gap
+    // in our contiguous array. After repairing the chain, the hash mapping
+    // is correct.
+    // We will now fill in the vacant spot that we erased using the last
+    // element in the slot list.
+    if (map->occupied >= 3 /*Ignoring sentinel, at least 2 other elements to unstable erase*/) {
+      DN_U32 last_index = map->occupied - 1;
+      if (last_index != slot_index) {
+        // NOTE: Copy in last slot to the erase slot
+        DN_DSMapSlot<T> *last_slot = map->slots + last_index;
+        map->slots[slot_index]     = *last_slot;
+
+        // NOTE: Update the hash-to-slot mapping for the value that was copied in
+        DN_U32 hash_to_slot_index             = DN_DSMapHashToSlotIndex(map, last_slot->key);
+        map->hash_to_slot[hash_to_slot_index] = slot_index;
+        *last_slot                            = {}; // TODO: Optional?
+      }
+    }
+  }
+
+  map->occupied--;
+  bool map_is_below_25pct_full = (map->occupied * 4) < (map->size * 1);
+  if (map_is_below_25pct_full && (map->size / 2) >= map->initial_size)
+    DN_DSMapResize(map, map->size / 2);
+
+  return true;
+}
+
+template <typename T>
+bool DN_DSMapEraseKeyU64(DN_DSMap<T> *map, DN_U64 key)
+{
+  DN_DSMapKey map_key = DN_DSMapKeyU64(map, key);
+  bool        result  = DN_DSMapErase(map, map_key);
+  return result;
+}
+
+template <typename T>
+bool DN_DSMapEraseKeyStr8(DN_DSMap<T> *map, DN_Str8 key)
+{
+  DN_DSMapKey map_key = DN_DSMapKeyStr8(map, key);
+  bool        result  = DN_DSMapErase(map, map_key);
+  return result;
+}
+
+template <typename T>
+DN_DSMapKey DN_DSMapKeyBuffer(DN_DSMap<T> const *map, void const *data, DN_USize size)
+{
+  DN_Assert(size > 0 && size <= UINT32_MAX);
+  DN_DSMapKey result = {};
+  result.type        = DN_DSMapKeyType_Buffer;
+  result.buffer_data = data;
+  result.buffer_size = DN_Cast(DN_U32) size;
+  result.hash        = DN_DSMapHash(map, result);
+  return result;
+}
+
+template <typename T>
+DN_DSMapKey DN_DSMapKeyBufferAsU64NoHash(DN_DSMap<T> const *map, void const *data, DN_USize size)
+{
+  DN_DSMapKey result = {};
+  result.type        = DN_DSMapKeyType_BufferAsU64NoHash;
+  result.buffer_data = data;
+  result.buffer_size = DN_Cast(DN_U32) size;
+  DN_Assert(size >= sizeof(result.hash));
+  DN_Memcpy(&result.hash, data, sizeof(result.hash));
+  return result;
+}
+
+template <typename T>
+DN_DSMapKey DN_DSMapKeyU64(DN_DSMap<T> const *map, DN_U64 u64)
+{
+  DN_DSMapKey result = {};
+  result.type        = DN_DSMapKeyType_U64;
+  result.u64         = u64;
+  result.hash        = DN_DSMapHash(map, result);
+  return result;
+}
+
+template <typename T>
+DN_DSMapKey DN_DSMapKeyStr8(DN_DSMap<T> const *map, DN_Str8 string)
+{
+  DN_DSMapKey result = DN_DSMapKeyBuffer(map, string.data, string.size);
+  return result;
+}
+
+// NOTE: DN_DSMap
+DN_API DN_DSMapKey DN_DSMapKeyU64NoHash(DN_U64 u64)
+{
+  DN_DSMapKey result = {};
+  result.type        = DN_DSMapKeyType_U64NoHash;
+  result.u64         = u64;
+  result.hash        = DN_Cast(DN_U32) u64;
+  return result;
+}
+
+DN_API bool DN_DSMapKeyEquals(DN_DSMapKey lhs, DN_DSMapKey rhs)
+{
+  bool result = false;
+  if (lhs.type == rhs.type && lhs.hash == rhs.hash) {
+    switch (lhs.type) {
+      case DN_DSMapKeyType_Invalid: result = true; break;
+      case DN_DSMapKeyType_U64NoHash: result = true; break;
+      case DN_DSMapKeyType_U64: result = lhs.u64 == rhs.u64; break;
+
+      case DN_DSMapKeyType_BufferAsU64NoHash: /*FALLTHRU*/
+      case DN_DSMapKeyType_Buffer: {
+        if (lhs.buffer_size == rhs.buffer_size)
+          result = DN_Memcmp(lhs.buffer_data, rhs.buffer_data, lhs.buffer_size) == 0;
+      } break;
+    }
+  }
+  return result;
+}
+
+DN_API bool operator==(DN_DSMapKey lhs, DN_DSMapKey rhs)
+{
+  bool result = DN_DSMapKeyEquals(lhs, rhs);
+  return result;
+}
+#endif // defined(__cplusplus)
+
+DN_API void DN_BinPackU64(DN_BinPack *pack, DN_BinPackMode mode, DN_U64 *item)
+{
+  DN_U64 const VALUE_MASK   = 0b0111'1111;
+  DN_U8 const  CONTINUE_BIT = 0b1000'0000;
+
+  if (mode == DN_BinPackMode_Serialise) {
+    DN_U64 it = *item;
+    do {
+      DN_U8 write_value = DN_Cast(DN_U8)(it & VALUE_MASK);
+      it >>= 7;
+      if (it)
+        write_value |= CONTINUE_BIT;
+      DN_Str8BuilderAppendBytesCopy(&pack->writer, &write_value, sizeof(write_value));
+    } while (it);
+  } else {
+    *item              = 0;
+    DN_USize bits_read = 0;
+    for (DN_U8 src = CONTINUE_BIT; (src & CONTINUE_BIT) && bits_read < 64; bits_read += 7) {
+      src              = pack->read.data[pack->read_index++];
+      DN_U8 masked_src = src & VALUE_MASK;
+      *item |= (DN_Cast(DN_U64) masked_src << bits_read);
+    }
+  }
+}
+
+DN_API void DN_BinPackVarInt_(DN_BinPack *pack, DN_BinPackMode mode, void *item, DN_USize size)
+{
+  DN_U64 value = 0;
+  DN_AssertF(size <= sizeof(value),
+             "An item larger than 64 bits (%zu) is trying to be packed as a variable integer which is not supported",
+             size * 8);
+
+  if (mode == DN_BinPackMode_Serialise) // Read `item` into U64 `value`
+    DN_Memcpy(&value, item, size);
+
+  DN_BinPackU64(pack, mode, &value);
+
+  if (mode == DN_BinPackMode_Deserialise) // Write U64 `value` into `item`
+    DN_Memcpy(item, &value, size);
+}
+
+DN_API bool DN_BinPackIsEndOfReadStream(DN_BinPack const *pack)
+{
+  bool result = pack->read_index == pack->read.size;
+  return result;
+}
+
+DN_API void DN_BinPackUSize(DN_BinPack *pack, DN_BinPackMode mode, DN_USize *item)
+{
+  DN_BinPackVarInt_(pack, mode, item, sizeof(*item));
+}
+
+DN_API void DN_BinPackU32(DN_BinPack *pack, DN_BinPackMode mode, DN_U32 *item)
+{
+  DN_BinPackVarInt_(pack, mode, item, sizeof(*item));
+}
+
+DN_API void DN_BinPackU16(DN_BinPack *pack, DN_BinPackMode mode, DN_U16 *item)
+{
+  DN_BinPackVarInt_(pack, mode, item, sizeof(*item));
+}
+
+DN_API void DN_BinPackU8(DN_BinPack *pack, DN_BinPackMode mode, DN_U8 *item)
+{
+  DN_BinPackVarInt_(pack, mode, item, sizeof(*item));
+}
+
+DN_API void DN_BinPackI64(DN_BinPack *pack, DN_BinPackMode mode, DN_I64 *item)
+{
+  DN_BinPackVarInt_(pack, mode, item, sizeof(*item));
+}
+
+DN_API void DN_BinPackI32(DN_BinPack *pack, DN_BinPackMode mode, DN_I32 *item)
+{
+  DN_BinPackVarInt_(pack, mode, item, sizeof(*item));
+}
+
+DN_API void DN_BinPackI16(DN_BinPack *pack, DN_BinPackMode mode, DN_I16 *item)
+{
+  DN_BinPackVarInt_(pack, mode, item, sizeof(*item));
+}
+
+DN_API void DN_BinPackI8(DN_BinPack *pack, DN_BinPackMode mode, DN_I8 *item)
+{
+  DN_BinPackVarInt_(pack, mode, item, sizeof(*item));
+}
+
+DN_API void DN_BinPackF64(DN_BinPack *pack, DN_BinPackMode mode, DN_F64 *item)
+{
+  DN_BinPackVarInt_(pack, mode, item, sizeof(*item));
+}
+
+DN_API void DN_BinPackF32(DN_BinPack *pack, DN_BinPackMode mode, DN_F32 *item)
+{
+  DN_BinPackVarInt_(pack, mode, item, sizeof(*item));
+}
+
+DN_API void DN_BinPackV2(DN_BinPack *pack, DN_BinPackMode mode, DN_V2F32 *item)
+{
+  DN_BinPackF32(pack, mode, &item->x);
+  DN_BinPackF32(pack, mode, &item->y);
+}
+
+DN_API void DN_BinPackV4(DN_BinPack *pack, DN_BinPackMode mode, DN_V4F32 *item)
+{
+  DN_BinPackF32(pack, mode, &item->x);
+  DN_BinPackF32(pack, mode, &item->y);
+  DN_BinPackF32(pack, mode, &item->z);
+  DN_BinPackF32(pack, mode, &item->w);
+}
+
+DN_API void DN_BinPackBool(DN_BinPack *pack, DN_BinPackMode mode, bool *item)
+{
+  DN_BinPackVarInt_(pack, mode, item, sizeof(*item));
+}
+
+DN_API void DN_BinPackStr8FromArena(DN_BinPack *pack, DN_Arena *arena, DN_BinPackMode mode, DN_Str8 *string)
+{
+  DN_BinPackVarInt_(pack, mode, &string->size, sizeof(string->size));
+  if (mode == DN_BinPackMode_Serialise) {
+    DN_Str8BuilderAppendBytesCopy(&pack->writer, string->data, string->size);
+  } else {
+    DN_Str8 src = DN_Str8Subset(pack->read, pack->read_index, string->size);
+    *string     = DN_Str8FromStr8Arena(src, arena);
+    pack->read_index += src.size;
+  }
+}
+
+DN_API void DN_BinPackStr8FromPool(DN_BinPack *pack, DN_Pool *pool, DN_BinPackMode mode, DN_Str8 *string)
+{
+  DN_BinPackVarInt_(pack, mode, &string->size, sizeof(string->size));
+  if (mode == DN_BinPackMode_Serialise) {
+    DN_Str8BuilderAppendBytesCopy(&pack->writer, string->data, string->size);
+  } else {
+    DN_Str8 src = DN_Str8Subset(pack->read, pack->read_index, string->size);
+    *string     = DN_Str8FromStr8Pool(src, pool);
+    pack->read_index += src.size;
+  }
+}
+
+DN_API DN_Str8 DN_BinPackStr8FromBuffer(DN_BinPack *pack, DN_BinPackMode mode, char *ptr, DN_USize *size, DN_USize max)
+{
+  DN_BinPackCBuffer(pack, mode, ptr, size, max);
+  DN_Str8 result = DN_Str8FromPtr(ptr, *size);
+  return result;
+}
+
+DN_API void DN_BinPackBytesFromArena(DN_BinPack *pack, DN_Arena *arena, DN_BinPackMode mode, void **ptr, DN_USize *size)
+{
+  DN_Str8 string = DN_Str8FromPtr(*ptr, *size);
+  DN_BinPackStr8FromArena(pack, arena, mode, &string);
+  *ptr  = string.data;
+  *size = string.size;
+}
+
+DN_API void DN_BinPackBytesFromPool(DN_BinPack *pack, DN_Pool *pool, DN_BinPackMode mode, void **ptr, DN_USize *size)
+{
+  DN_Str8 string = DN_Str8FromPtr(*ptr, *size);
+  DN_BinPackStr8FromPool(pack, pool, mode, &string);
+  *ptr  = string.data;
+  *size = string.size;
+}
+
+DN_API void DN_BinPackCArray(DN_BinPack *pack, DN_BinPackMode mode, void *ptr, DN_USize size)
+{
+  DN_BinPackVarInt_(pack, mode, &size, sizeof(size));
+  if (mode == DN_BinPackMode_Serialise) {
+    DN_Str8BuilderAppendBytesCopy(&pack->writer, ptr, size);
+  } else {
+    DN_Str8 src = DN_Str8Subset(pack->read, pack->read_index, size);
+    DN_Assert(src.size == size);
+    DN_Memcpy(ptr, src.data, DN_Min(src.size, size));
+    pack->read_index += src.size;
+  }
+}
+
+DN_API void DN_BinPackCBuffer(DN_BinPack *pack, DN_BinPackMode mode, char *ptr, DN_USize *size, DN_USize max)
+{
+  if (mode == DN_BinPackMode_Serialise) {
+    DN_BinPackUSize(pack, mode, size);
+    DN_Str8BuilderAppendBytesCopy(&pack->writer, ptr, *size);
+  } else {
+    DN_U64 size_u64 = 0;
+    DN_BinPackU64(pack, mode, &size_u64);
+    DN_Assert(size_u64 < DN_USIZE_MAX);
+    DN_Assert(size_u64 <= max);
+
+    *size = DN_Min(size_u64, max);
+    DN_Memcpy(ptr, pack->read.data + pack->read_index, *size);
+    pack->read_index += size_u64;
+  }
+}
+
+DN_API DN_Str8 DN_BinPackBuild(DN_BinPack const *pack, DN_Arena *arena)
+{
+  DN_Str8 result = DN_Str8FromStr8BuilderArena(&pack->writer, arena);
+  return result;
+}
+
+DN_API DN_CSVTokeniser DN_CSVTokeniserInit(DN_Str8 string, char delimiter)
+{
+  DN_CSVTokeniser result = {};
+  result.string          = string;
+  result.delimiter       = delimiter;
+  return result;
+}
+
+DN_API bool DN_CSVTokeniserValid(DN_CSVTokeniser *tokeniser)
+{
+  bool result = tokeniser && !tokeniser->bad;
+  return result;
+}
+
+static void DN_CSVTokeniserEatNewLines_(DN_CSVTokeniser *tokeniser)
+{
+  char const *end = tokeniser->string.data + tokeniser->string.size;
+  while (tokeniser->it[0] == '\n' || tokeniser->it[0] == '\r')
+    if (++tokeniser->it == end)
+      break;
+}
+
+DN_API bool DN_CSVTokeniserNextRow(DN_CSVTokeniser *tokeniser)
+{
+  bool result = false;
+  if (DN_CSVTokeniserValid(tokeniser) && tokeniser->string.size) {
+    // NOTE: First time querying row iterator is nil, let tokeniser advance
+    if (tokeniser->it) {
+      // NOTE: Only advance the tokeniser if we're at the end of the line and
+      // there's more to tokenise.
+      char const *end = tokeniser->string.data + tokeniser->string.size;
+      if (tokeniser->it != end && tokeniser->end_of_line) {
+        tokeniser->end_of_line = false;
+        result                 = true;
+      }
+    }
+  }
+
+  return result;
+}
+
+DN_API DN_Str8 DN_CSVTokeniserNextField(DN_CSVTokeniser *tokeniser)
+{
+  DN_Str8 result = {};
+  if (!DN_CSVTokeniserValid(tokeniser))
+    return result;
+
+  if (tokeniser->string.size == 0) {
+    tokeniser->bad = true;
+    return result;
+  }
+
+  // NOTE: First time tokeniser is invoked with a string, set up initial state.
+  char const *string_end = tokeniser->string.data + tokeniser->string.size;
+  if (!tokeniser->it) {
+    tokeniser->it = tokeniser->string.data;
+    DN_CSVTokeniserEatNewLines_(tokeniser); // NOTE: Skip any leading new lines
+  }
+
+  // NOTE: Tokeniser pointing at end, no more valid data to parse.
+  if (tokeniser->it == string_end)
+    return result;
+
+  // NOTE: Scan forward until the next control character.
+  // 1. '"'                   Double quoted field,  extract everything between the quotes.
+  // 2. tokeniser->delimiter  End of the field,     extract everything leading up to the delimiter.
+  // 3. '\n'                  Last field in record, extract everything leading up the the new line.
+  char const *begin = tokeniser->it;
+  while (tokeniser->it != string_end && (tokeniser->it[0] != '"' &&
+                                         tokeniser->it[0] != tokeniser->delimiter &&
+                                         tokeniser->it[0] != '\n'))
+    tokeniser->it++;
+
+  bool quoted_field = (tokeniser->it != string_end) && tokeniser->it[0] == '"';
+  if (quoted_field) {
+    begin = ++tokeniser->it; // Begin after the quote
+
+  // NOTE: Scan forward until the next '"' which marks the end
+  // of the field unless it is escaped by another '"'.
+  find_next_quote:
+    while (tokeniser->it != string_end && tokeniser->it[0] != '"')
+      tokeniser->it++;
+
+    // NOTE: If we encounter a '"' right after, the quotes were escaped
+    // and we need to skip to the next instance of a '"'.
+    if (tokeniser->it != string_end && tokeniser->it + 1 != string_end && tokeniser->it[1] == '"') {
+      tokeniser->it += 2;
+      goto find_next_quote;
+    }
+  }
+
+  // NOTE: Mark the end of the field
+  char const *end        = tokeniser->it;
+  tokeniser->end_of_line = tokeniser->it == string_end || end[0] == '\n';
+
+  // NOTE: In files with \r\n style new lines ensure that we don't include
+  // the \r byte in the CSV field we produce.
+  if (end != string_end && end[0] == '\n') {
+    DN_Assert((uintptr_t)(end - 1) > (uintptr_t)tokeniser->string.data &&
+               "Internal error: The string iterator is pointing behind the start of the string we're reading");
+    if (end[-1] == '\r')
+      end = end - 1;
+  }
+
+  // NOTE: Quoted fields may have whitespace after the closing quote, we skip
+  // until we reach the field terminator.
+  if (quoted_field)
+    while (tokeniser->it != string_end && (tokeniser->it[0] != tokeniser->delimiter && tokeniser->it[0] != '\n'))
+      tokeniser->it++;
+
+  // NOTE: Advance the tokeniser past the field terminator.
+  if (tokeniser->it != string_end)
+    tokeniser->it++;
+
+  // NOTE: Generate the record
+  result.data = DN_Cast(char *) begin;
+  result.size = DN_Cast(int)(end - begin);
+  return result;
+}
+
+DN_API DN_Str8 DN_CSVTokeniserNextColumn(DN_CSVTokeniser *tokeniser)
+{
+  DN_Str8 result = {};
+  if (!DN_CSVTokeniserValid(tokeniser))
+    return result;
+
+  // NOTE: End of line, the user must explicitly advance to the next row
+  if (tokeniser->end_of_line)
+    return result;
+
+  // NOTE: Advance tokeniser to the next field in the row
+  result = DN_CSVTokeniserNextField(tokeniser);
+  return result;
+}
+
+DN_API void DN_CSVTokeniserSkipLine(DN_CSVTokeniser *tokeniser)
+{
+  while (DN_CSVTokeniserValid(tokeniser) && !tokeniser->end_of_line)
+    DN_CSVTokeniserNextColumn(tokeniser);
+  DN_CSVTokeniserNextRow(tokeniser);
+}
+
+DN_API int DN_CSVTokeniserNextN(DN_CSVTokeniser *tokeniser, DN_Str8 *fields, int fields_size, bool column_iterator)
+{
+  if (!DN_CSVTokeniserValid(tokeniser) || !fields || fields_size <= 0)
+    return 0;
+
+  int result = 0;
+  for (; result < fields_size; result++) {
+    fields[result] = column_iterator ? DN_CSVTokeniserNextColumn(tokeniser) : DN_CSVTokeniserNextField(tokeniser);
+    if (!DN_CSVTokeniserValid(tokeniser) || !fields[result].data)
+      break;
+  }
+
+  return result;
+}
+
+DN_API int DN_CSVTokeniserNextColumnN(DN_CSVTokeniser *tokeniser, DN_Str8 *fields, int fields_size)
+{
+  int result = DN_CSVTokeniserNextN(tokeniser, fields, fields_size, true /*column_iterator*/);
+  return result;
+}
+
+DN_API int DN_CSVTokeniserNextFieldN(DN_CSVTokeniser *tokeniser, DN_Str8 *fields, int fields_size)
+{
+  int result = DN_CSVTokeniserNextN(tokeniser, fields, fields_size, false /*column_iterator*/);
+  return result;
+}
+
+DN_API void DN_CSVTokeniserSkipLineN(DN_CSVTokeniser *tokeniser, int count)
+{
+  for (int i = 0; i < count && DN_CSVTokeniserValid(tokeniser); i++)
+    DN_CSVTokeniserSkipLine(tokeniser);
+}
+
+DN_API void DN_CSVPackU64(DN_CSVPack *pack, DN_CSVSerialise serialise, DN_U64 *value)
+{
+  if (serialise == DN_CSVSerialise_Read) {
+    DN_Str8          csv_value = DN_CSVTokeniserNextColumn(&pack->read_tokeniser);
+    DN_U64FromResult to_u64    = DN_U64FromStr8(csv_value, 0);
+    DN_Assert(to_u64.success);
+    *value = to_u64.value;
+  } else {
+    DN_Str8BuilderAppendF(&pack->write_builder, "%s%I64u", pack->write_column++ ? "," : "", *value);
+  }
+}
+
+DN_API void DN_CSVPackI64(DN_CSVPack *pack, DN_CSVSerialise serialise, DN_I64 *value)
+{
+  if (serialise == DN_CSVSerialise_Read) {
+    DN_Str8          csv_value = DN_CSVTokeniserNextColumn(&pack->read_tokeniser);
+    DN_I64FromResult to_i64    = DN_I64FromStr8(csv_value, 0);
+    DN_Assert(to_i64.success);
+    *value = to_i64.value;
+  } else {
+    DN_Str8BuilderAppendF(&pack->write_builder, "%s%I64d", pack->write_column++ ? "," : "", *value);
+  }
+}
+
+DN_API void DN_CSVPackI32(DN_CSVPack *pack, DN_CSVSerialise serialise, DN_I32 *value)
+{
+  DN_I64 u64 = *value;
+  DN_CSVPackI64(pack, serialise, &u64);
+  if (serialise == DN_CSVSerialise_Read)
+    *value = DN_SaturateCastI64ToI32(u64);
+}
+
+DN_API void DN_CSVPackI16(DN_CSVPack *pack, DN_CSVSerialise serialise, DN_I16 *value)
+{
+  DN_I64 u64 = *value;
+  DN_CSVPackI64(pack, serialise, &u64);
+  if (serialise == DN_CSVSerialise_Read)
+    *value = DN_SaturateCastI64ToI16(u64);
+}
+
+DN_API void DN_CSVPackI8(DN_CSVPack *pack, DN_CSVSerialise serialise, DN_I8 *value)
+{
+  DN_I64 u64 = *value;
+  DN_CSVPackI64(pack, serialise, &u64);
+  if (serialise == DN_CSVSerialise_Read)
+    *value = DN_SaturateCastI64ToI8(u64);
+}
+
+DN_API void DN_CSVPackU32(DN_CSVPack *pack, DN_CSVSerialise serialise, DN_U32 *value)
+{
+  DN_U64 u64 = *value;
+  DN_CSVPackU64(pack, serialise, &u64);
+  if (serialise == DN_CSVSerialise_Read)
+    *value = DN_SaturateCastU64ToU32(u64);
+}
+
+DN_API void DN_CSVPackU16(DN_CSVPack *pack, DN_CSVSerialise serialise, DN_U16 *value)
+{
+  DN_U64 u64 = *value;
+  DN_CSVPackU64(pack, serialise, &u64);
+  if (serialise == DN_CSVSerialise_Read)
+    *value = DN_SaturateCastU64ToU16(u64);
+}
+
+DN_API void DN_CSVPackBoolAsU64(DN_CSVPack *pack, DN_CSVSerialise serialise, bool *value)
+{
+  DN_U64 u64 = *value;
+  DN_CSVPackU64(pack, serialise, &u64);
+  if (serialise == DN_CSVSerialise_Read)
+    *value = u64 ? 1 : 0;
+}
+
+DN_API void DN_CSVPackStr8(DN_CSVPack *pack, DN_CSVSerialise serialise, DN_Str8 *str8, DN_Arena *arena)
+{
+  if (serialise == DN_CSVSerialise_Read) {
+    DN_Str8 csv_value = DN_CSVTokeniserNextColumn(&pack->read_tokeniser);
+    *str8             = DN_Str8FromStr8Arena(csv_value, arena);
+  } else {
+    DN_Str8BuilderAppendF(&pack->write_builder, "%s%.*s", pack->write_column++ ? "," : "", DN_Str8PrintFmt(*str8));
+  }
+}
+
+DN_API void DN_CSVPackBuffer(DN_CSVPack *pack, DN_CSVSerialise serialise, void *dest, DN_USize *size)
+{
+  if (serialise == DN_CSVSerialise_Read) {
+    DN_Str8 csv_value = DN_CSVTokeniserNextColumn(&pack->read_tokeniser);
+    *size             = DN_Min(*size, csv_value.size);
+    DN_Memcpy(dest, csv_value.data, *size);
+  } else {
+    DN_Str8BuilderAppendF(&pack->write_builder, "%s%.*s", pack->write_column++ ? "," : "", DN_Cast(int)(*size), DN_Cast(char *)dest);
+  }
+}
+
+DN_API void DN_CSVPackBufferWithMax(DN_CSVPack *pack, DN_CSVSerialise serialise, void *dest, DN_USize *size, DN_USize max)
+{
+  if (serialise == DN_CSVSerialise_Read)
+    *size = max;
+  DN_CSVPackBuffer(pack, serialise, dest, size);
+}
+
+DN_API bool DN_CSVPackNewLine(DN_CSVPack *pack, DN_CSVSerialise serialise)
+{
+  bool result = true;
+  if (serialise == DN_CSVSerialise_Read) {
+    result = DN_CSVTokeniserNextRow(&pack->read_tokeniser);
+  } else {
+    pack->write_column = 0;
+    result             = DN_Str8BuilderAppendRef(&pack->write_builder, DN_Str8Lit("\n"));
+  }
+  return result;
+}
+
+DN_API void DN_LeakTrackAlloc_(DN_LeakTracker *leak, void *ptr, DN_USize size, bool leak_permitted)
+{
+  if (!ptr)
+    return;
+
+  DN_TicketMutex_Begin(&leak->alloc_table_mutex);
+
+  DN_Str8                      stack_trace = DN_Str8FromStackTraceNowHeap(128, 3 /*skip*/);
+  DN_DSMap<DN_LeakAlloc>      *alloc_table = &leak->alloc_table;
+  DN_DSMapResult<DN_LeakAlloc> alloc_entry = DN_DSMapMakeKeyU64(alloc_table, DN_Cast(DN_U64) ptr);
+  DN_LeakAlloc                *alloc       = alloc_entry.value;
+  if (alloc_entry.found) {
+    if ((alloc->flags & DN_LeakAllocFlag_Freed) == 0) {
+      DN_Str8x32 alloc_size     = DN_Str8x32FromByteCountU64Auto(alloc->size);
+      DN_Str8x32 new_alloc_size = DN_Str8x32FromByteCountU64Auto(size);
+      DN_HardAssertF(
+          alloc->flags & DN_LeakAllocFlag_Freed,
+          "This pointer is already in the leak tracker, however it has not been freed yet. This "
+          "same pointer is being ask to be tracked twice in the allocation table, e.g. one if its "
+          "previous free calls has not being marked freed with an equivalent call to "
+          "DN_LeakTrackDealloc()\n"
+          "\n"
+          "The pointer (0x%p) originally allocated %.*s at:\n"
+          "\n"
+          "%.*s\n"
+          "\n"
+          "The pointer is allocating %.*s again at:\n"
+          "\n"
+          "%.*s\n",
+          ptr,
+          DN_Str8PrintFmt(alloc_size),
+          DN_Str8PrintFmt(alloc->stack_trace),
+          DN_Str8PrintFmt(new_alloc_size),
+          DN_Str8PrintFmt(stack_trace));
+    }
+
+    // NOTE: Pointer was reused, clean up the prior entry
+    leak->alloc_table_bytes_allocated_for_stack_traces -= alloc->stack_trace.size;
+    leak->alloc_table_bytes_allocated_for_stack_traces -= alloc->freed_stack_trace.size;
+
+    DN_OS_MemDealloc(alloc->stack_trace.data);
+    DN_OS_MemDealloc(alloc->freed_stack_trace.data);
+    *alloc = {};
+  }
+
+  alloc->ptr         = ptr;
+  alloc->size        = size;
+  alloc->stack_trace = stack_trace;
+  alloc->flags |= leak_permitted ? DN_LeakAllocFlag_LeakPermitted : 0;
+  leak->alloc_table_bytes_allocated_for_stack_traces += alloc->stack_trace.size;
+  DN_TicketMutex_End(&leak->alloc_table_mutex);
+}
+
+DN_API void DN_LeakTrackDealloc_(DN_LeakTracker *leak, void *ptr)
+{
+  if (!ptr)
+    return;
+
+  DN_TicketMutex_Begin(&leak->alloc_table_mutex);
+
+  DN_Str8                      stack_trace = DN_Str8FromStackTraceNowHeap(128, 3 /*skip*/);
+  DN_DSMap<DN_LeakAlloc>      *alloc_table = &leak->alloc_table;
+  DN_DSMapResult<DN_LeakAlloc> alloc_entry = DN_DSMapFindKeyU64(alloc_table, DN_Cast(uintptr_t) ptr);
+  DN_HardAssertF(alloc_entry.found,
+                 "Allocated pointer can not be removed as it does not exist in the "
+                 "allocation table. When this memory was allocated, the pointer was "
+                 "not added to the allocation table [ptr=%p]",
+                 ptr);
+
+  DN_LeakAlloc *alloc = alloc_entry.value;
+  if (alloc->flags & DN_LeakAllocFlag_Freed) {
+    DN_Str8x32 freed_size = DN_Str8x32FromByteCountU64Auto(alloc->freed_size);
+    DN_HardAssertF((alloc->flags & DN_LeakAllocFlag_Freed) == 0,
+                   "Double free detected, pointer to free was already marked "
+                   "as freed. Either the pointer was reallocated but not "
+                   "traced, or, the pointer was freed twice.\n"
+                   "\n"
+                   "The pointer (0x%p) originally allocated %.*s at:\n"
+                   "\n"
+                   "%.*s\n"
+                   "\n"
+                   "The pointer was freed at:\n"
+                   "\n"
+                   "%.*s\n"
+                   "\n"
+                   "The pointer is being freed again at:\n"
+                   "\n"
+                   "%.*s\n",
+                   ptr,
+                   DN_Str8PrintFmt(freed_size),
+                   DN_Str8PrintFmt(alloc->stack_trace),
+                   DN_Str8PrintFmt(alloc->freed_stack_trace),
+                   DN_Str8PrintFmt(stack_trace));
+  }
+
+  DN_Assert(alloc->freed_stack_trace.size == 0);
+  alloc->flags |= DN_LeakAllocFlag_Freed;
+  alloc->freed_stack_trace = stack_trace;
+  leak->alloc_table_bytes_allocated_for_stack_traces += alloc->freed_stack_trace.size;
+  DN_TicketMutex_End(&leak->alloc_table_mutex);
+}
+
+DN_API void DN_LeakDump_(DN_LeakTracker *leak)
+{
+  DN_U64 leak_count   = 0;
+  DN_U64 leaked_bytes = 0;
+  for (DN_USize index = 1; index < leak->alloc_table.occupied; index++) {
+    DN_DSMapSlot<DN_LeakAlloc> *slot           = leak->alloc_table.slots + index;
+    DN_LeakAlloc               *alloc          = &slot->value;
+    bool                        alloc_leaked   = (alloc->flags & DN_LeakAllocFlag_Freed) == 0;
+    bool                        leak_permitted = (alloc->flags & DN_LeakAllocFlag_LeakPermitted);
+    if (alloc_leaked && !leak_permitted) {
+      leaked_bytes += alloc->size;
+      leak_count++;
+      DN_Str8x32 alloc_size = DN_Str8x32FromByteCountU64Auto(alloc->size);
+      DN_LogWarningF(
+          "Pointer (0x%p) leaked %.*s at:\n"
+          "%.*s",
+          alloc->ptr,
+          DN_Str8PrintFmt(alloc_size),
+          DN_Str8PrintFmt(alloc->stack_trace));
+    }
+  }
+
+  if (leak_count) {
+    DN_Str8x32 leak_size = DN_Str8x32FromByteCountU64Auto(leaked_bytes);
+    DN_LogWarningF("There were %I64u leaked allocations totalling %.*s", leak_count, DN_Str8PrintFmt(leak_size));
+  }
 }
