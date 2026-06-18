@@ -107,6 +107,7 @@ DN_API void *DN_ArrayPopBack(void *data, DN_USize *size, DN_USize elem_size, DN_
 DN_API DN_ArrayEraseResult DN_ArrayEraseRange(void *data, DN_USize *size, DN_USize elem_size, DN_USize begin_index, DN_ISize count, DN_ArrayErase erase)
 {
   DN_ArrayEraseResult result = {};
+  result.it_index            = begin_index;
   if (!data || !size || *size == 0 || count == 0)
     return result;
 
@@ -163,6 +164,13 @@ DN_API void *DN_ArrayMakeArray(void *data, DN_USize *size, DN_USize max, DN_USiz
   return result;
 }
 
+DN_API void *DN_ArrayMakeArrayAssert(void *data, DN_USize *size, DN_USize max, DN_USize elem_size, DN_USize make_count, DN_ZMem z_mem, DN_CallSite call_site)
+{
+  void *result = DN_ArrayMakeArray(data, size, max, elem_size, make_count, z_mem);
+  DN_AssertArgsF(result, call_site, "array=%p size=%zu max=%zu", data, *size, max);
+  return result;
+}
+
 DN_API void *DN_ArrayAddArray(void *data, DN_USize *size, DN_USize max, DN_USize elem_size, void const *elems, DN_USize elems_count, DN_ArrayAdd add)
 {
   void *result = DN_ArrayMakeArray(data, size, max, elem_size, elems_count, DN_ZMem_No);
@@ -176,6 +184,13 @@ DN_API void *DN_ArrayAddArray(void *data, DN_USize *size, DN_USize max, DN_USize
       DN_Memcpy(data, elems, elem_size * elems_count);
     }
   }
+  return result;
+}
+
+DN_API void *DN_ArrayAddArrayAssert(void *data, DN_USize *size, DN_USize max, DN_USize elem_size, void const *elems, DN_USize elems_count, DN_ArrayAdd add, DN_CallSite call_site)
+{
+  void *result = DN_ArrayAddArray(data, size, max, elem_size, elems, elems_count, add);
+  DN_AssertArgsF(result, call_site, "array=%p size=%zu max=%zu", data, *size, max);
   return result;
 }
 

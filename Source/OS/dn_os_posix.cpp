@@ -228,7 +228,7 @@ DN_API bool DN_OS_SetEnvVar(DN_Str8 name, DN_Str8 value)
 
 DN_API DN_OSDiskSpace DN_OS_DiskSpace(DN_Str8 path)
 {
-  DN_TCScratch   scratch           = DN_TCScratchBegin(nullptr, 0);
+  DN_TCScratch   scratch           = DN_TCScratchBeginArena(nullptr, 0);
   DN_OSDiskSpace result            = {};
   DN_Str8        path_z_terminated = DN_Str8FromStr8Arena(path, &scratch.arena);
   struct statvfs info              = {};
@@ -387,7 +387,7 @@ DN_API bool DN_OS_FileCopy(DN_Str8 src, DN_Str8 dest, bool overwrite, DN_ErrSink
   result                = (bytes_written == stat_existing.st_size);
   if (!result) {
     int        error_code = errno;
-    DN_TCScratch scratch               = DN_TCScratchBegin(nullptr, 0);
+    DN_TCScratch scratch               = DN_TCScratchBeginArena(nullptr, 0);
     DN_Str8      file_size_str8     = DN_Str8FromByteCount(scratch.arena, stat_existing.st_size, DN_ByteCountType_Auto);
     DN_Str8      bytes_written_str8 = DN_Str8FromByteCount(scratch.arena, bytes_written, DN_ByteCountType_Auto);
     DN_rrSinkAppendF(error,
@@ -517,8 +517,8 @@ DN_API DN_OSFileRead DN_OS_FileRead(DN_OSFile *file, void *buffer, DN_USize size
 
   result.bytes_read = fread(buffer, 1, size, DN_Cast(FILE *) file->handle);
   if (feof(DN_Cast(FILE*)file->handle)) {
-    DN_TCScratch scratch             = DN_TCScratchBegin(nullptr, 0);
-    DN_Str8x32   buffer_size_str8 = DN_ByteCountStr8x32(size);
+    DN_TCScratch scratch          = DN_TCScratchBeginArena(nullptr, 0);
+    DN_Str8x32   buffer_size_str8 = DN_Str8x32FromByteCountU64Auto(size);
     DN_ErrSinkAppendF(err, 1, "Failed to read %S from file", buffer_size_str8);
     DN_TCScratchEnd(&scratch);
     return result;
@@ -536,8 +536,8 @@ DN_API bool DN_OS_FileWritePtr(DN_OSFile *file, void const *buffer, DN_USize siz
       fwrite(buffer, DN_Cast(DN_USize) size, 1 /*count*/, DN_Cast(FILE *) file->handle) ==
       1 /*count*/;
   if (!result) {
-    DN_TCScratch scratch             = DN_TCScratchBegin(nullptr, 0);
-    DN_Str8x32   buffer_size_str8 = DN_ByteCountStr8x32(size);
+    DN_TCScratch scratch          = DN_TCScratchBeginArena(nullptr, 0);
+    DN_Str8x32   buffer_size_str8 = DN_Str8x32FromByteCountU64Auto(size);
     DN_ErrSinkAppendF(err, 1, "Failed to write buffer (%s) to file handle", DN_Str8PrintFmt(buffer_size_str8));
     DN_TCScratchEnd(&scratch);
   }
@@ -627,7 +627,7 @@ DN_API bool DN_OS_PathIsDir(DN_Str8 path)
 
 DN_API bool DN_OS_PathMakeDir(DN_Str8 path)
 {
-  DN_TCScratch scratch = DN_TCScratchBegin(nullptr, 0);
+  DN_TCScratch scratch = DN_TCScratchBeginArena(nullptr, 0);
   bool         result  = true;
 
   // TODO(doyle): Implement this without using the path indexes, it's not
@@ -793,7 +793,7 @@ DN_API DN_OSExecResult DN_OS_ExecWait(DN_OSExecAsyncHandle handle,
 
   // NOTE: Read the data from the read end of the pipe
   if (result.os_error_code == 0) {
-    DN_TCScratch scratch = DN_TCScratchBegin(&arena, 1);
+    DN_TCScratch scratch = DN_TCScratchBeginArena(&arena, 1);
     if (arena && handle.stdout_read) {
       char           buffer[4096];
       DN_Str8Builder builder = DN_Str8BuilderFromArena(&scratch.arena);
@@ -805,7 +805,7 @@ DN_API DN_OSExecResult DN_OS_ExecWait(DN_OSExecAsyncHandle handle,
         DN_Str8BuilderAppendF(&builder, "%.*s", bytes_read, buffer);
       }
 
-      result.stdout_text = DN_Str8BuilderBuild(&builder, arena);
+      result.stdout_text = DN_Str8FromStr8BuilderArena(&builder, arena);
     }
 
     if (arena && handle.stderr_read) {
@@ -819,7 +819,7 @@ DN_API DN_OSExecResult DN_OS_ExecWait(DN_OSExecAsyncHandle handle,
         DN_Str8BuilderAppendF(&builder, "%.*s", bytes_read, buffer);
       }
 
-      result.stderr_text = DN_Str8BuilderBuild(&builder, arena);
+      result.stderr_text = DN_Str8FromStr8BuilderArena(&builder, arena);
     }
     DN_TCScratchEnd(&scratch);
   }
@@ -842,7 +842,7 @@ DN_API DN_OSExecAsyncHandle DN_OS_ExecAsync(DN_Str8Slice   cmd_line,
   if (cmd_line.count == 0)
     return result;
 
-  DN_TCScratch scratch = DN_TCScratchBegin(nullptr, 0);
+  DN_TCScratch scratch = DN_TCScratchBeginArena(nullptr, 0);
   DN_DEFER { DN_TCScratchEnd(&scratch); };
   DN_Str8    cmd_rendered                      = DN_Str8SliceRender(cmd_line, DN_Str8Lit(" "), &scratch.arena);
   int        stdout_pipe[DN_OSPipeType__Count] = {};
@@ -1286,7 +1286,7 @@ static void *DN_OS_ThreadFunc_(void *user_context)
   return nullptr;
 }
 
-DN_API bool DN_OS_ThreadInit(DN_OSThread *thread, DN_OSThreadFunc *func, DN_OSThreadLane *lane, void *user_context)
+DN_API bool DN_OS_ThreadInit(DN_OSThread *thread, DN_OSThreadFunc *func, DN_OSThreadLane *lane, DN_TCInitArgs tc_init_args, void *user_context)
 {
   bool result = false;
   if (!thread)
@@ -1296,6 +1296,7 @@ DN_API bool DN_OS_ThreadInit(DN_OSThread *thread, DN_OSThreadFunc *func, DN_OSTh
   thread->user_context   = user_context;
   thread->init_semaphore = DN_OS_SemaphoreInit(0 /*initial_count*/);
   thread->lane           = *lane;
+  thread->tc_init_args   = tc_init_args;
 
   // TODO(doyle): Check if semaphore is valid
   // NOTE: pthread_t is essentially the thread ID. In Windows, the handle and
@@ -1370,7 +1371,7 @@ DN_API void DN_OS_PosixThreadSetName(DN_Str8 name)
 #if defined(DN_PLATFORM_EMSCRIPTEN)
   (void)name;
 #else
-  DN_TCScratch scratch = DN_TCScratchBegin(nullptr, 0);
+  DN_TCScratch scratch = DN_TCScratchBeginArena(nullptr, 0);
   DN_Str8      copy    = DN_Str8FromStr8Arena(name, &scratch.arena);
   pthread_t    thread  = pthread_self();
   pthread_setname_np(thread, (char *)copy.data);
@@ -1394,7 +1395,7 @@ DN_API DN_OSPosixProcSelfStatus DN_OS_PosixProcSelfStatus()
   DN_OSFile    file = DN_OS_FileOpen(DN_Str8Lit("/proc/self/status"), DN_OSFileOpen_OpenIfExist, DN_OSFileAccess_Read, nullptr);
 
   if (!file.error) {
-    DN_TCScratch   scratch = DN_TCScratchBegin(nullptr, 0);
+    DN_TCScratch   scratch = DN_TCScratchBeginArena(nullptr, 0);
     char           buf[256];
     DN_Str8Builder builder = DN_Str8BuilderFromArena(&scratch.arena);
     for (;;) {
@@ -1408,7 +1409,7 @@ DN_API DN_OSPosixProcSelfStatus DN_OS_PosixProcSelfStatus()
     DN_Str8 const      PID        = DN_Str8Lit("Pid:");
     DN_Str8 const      VM_PEAK    = DN_Str8Lit("VmPeak:");
     DN_Str8 const      VM_SIZE    = DN_Str8Lit("VmSize:");
-    DN_Str8            status_buf = DN_Str8BuilderBuild(&builder, &scratch.arena);
+    DN_Str8            status_buf = DN_Str8FromStr8BuilderArena(&builder, &scratch.arena);
     DN_Str8SplitResult lines      = DN_Str8SplitArena(status_buf, DN_Str8Lit("\n"), DN_Str8SplitFlags_ExcludeEmptyStrings, &scratch.arena);
 
     for (DN_ForItSize(line_it, DN_Str8, lines.data, lines.count)) {
@@ -1535,7 +1536,7 @@ DN_API void DN_OS_HttpRequestAsync(DN_OSHttpResponse     *response,
   response->builder.arena = response->scratch_arena.mem ? &response->scratch_arena : &response->tmp_arena;
 
   DN_Arena    *scratch  = &response->scratch_arena;
-  DN_TCScratch scratch_ = DN_TCScratchBegin(&arena, 1);
+  DN_TCScratch scratch_ = DN_TCScratchBeginArena(&arena, 1);
   DN_DEFER { DN_TCScratchEnd(&scratch_); };
   if (!scratch)
     scratch = &scratch_.arena;

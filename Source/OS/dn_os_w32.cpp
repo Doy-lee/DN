@@ -1239,7 +1239,7 @@ static DWORD __stdcall DN_OS_ThreadFunc_(void *user_context)
   return 0;
 }
 
-DN_API bool DN_OS_ThreadInit(DN_OSThread *thread, DN_OSThreadFunc *func, DN_OSThreadLane *lane, void *user_context)
+DN_API bool DN_OS_ThreadInit(DN_OSThread *thread, DN_OSThreadFunc *func, DN_OSThreadLane *lane, DN_TCInitArgs tc_init_args, void *user_context)
 {
   bool result = false;
   if (!thread)
@@ -1248,6 +1248,7 @@ DN_API bool DN_OS_ThreadInit(DN_OSThread *thread, DN_OSThreadFunc *func, DN_OSTh
   thread->func           = func;
   thread->user_context   = user_context;
   thread->init_semaphore = DN_OS_SemaphoreInit(0 /*initial_count*/);
+  thread->tc_init_args   = tc_init_args;
   if (lane) {
     thread->is_lane_set = true;
     thread->lane        = *lane;

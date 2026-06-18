@@ -112,7 +112,7 @@ static int32_t DN_NET_CurlThreadEntryPoint_(DN_OSThread *thread)
           DN_Assert(req->response.state == DN_NETResponseState_Nil);
           DN_Assert(req->type           != DN_NETRequestType_Nil);
 
-          // NOTE: Attach it to the CURL thread's request list 
+          // NOTE: Attach it to the CURL thread's request list
           for (DN_OS_MutexScope(&curl->list_mutex)) {
             DN_Assert(DN_NET_CurlRequestIsInList(curl->request_list, req));
             DN_DoublyLLDetach(curl->request_list, req);
@@ -174,13 +174,21 @@ static int32_t DN_NET_CurlThreadEntryPoint_(DN_OSThread *thread)
           DN_Assert(event.request.handle != 0);
           DN_NETRequest *request = DN_Cast(DN_NETRequest *) event.request.handle;
 
-          // NOTE: Release resources
+          // NOTE: Detach the request from the deinit list. This brings the request into this
+          // thread's provenance, no other threads modifying the deinit list will race with us.
+          for (DN_OS_MutexScope(&curl->list_mutex)) {
+            DN_Assert(DN_NET_CurlRequestIsInList(curl->deinit_list, request));
+            DN_DoublyLLDetach(curl->deinit_list, request);
+          }
+
+          // NOTE: Now we can modify the request, release resources
           DN_NET_EndFinishedRequest(request);
           DN_OS_SemaphoreDeinit(&request->completion_sem);
 
           curl_multi_remove_handle(curl->thread_curlm, curl_req->handle);
           curl_slist_free_all(curl_req->slist);
           curl_easy_reset(curl_req->handle);
+
           CURL *copy       = curl_req->handle;
           *curl_req        = {};
           curl_req->handle = copy;
@@ -190,14 +198,11 @@ static int32_t DN_NET_CurlThreadEntryPoint_(DN_OSThread *thread)
           resetter.arena         = request->arena;
           resetter.gen           = request->gen;
           DN_Memcpy(resetter.context, request->context, sizeof(resetter.context));
-          *request = resetter;
+          *request               = resetter;
 
           // NOTE: Add it to the free list
-          for (DN_OS_MutexScope(&curl->list_mutex)) {
-            DN_Assert(DN_NET_CurlRequestIsInList(curl->deinit_list, request));
-            DN_DoublyLLDetach(curl->deinit_list, request);
+          for (DN_OS_MutexScope(&curl->list_mutex))
             DN_DoublyLLAppend(curl->free_list, request);
-          }
         } break;
       }
     }
@@ -374,7 +379,7 @@ static int32_t DN_NET_CurlThreadEntryPoint_(DN_OSThread *thread)
       }
 
       DN_NETRequest *request_copy = req;
-      req                             = req->prev;
+      req                         = req->prev;
       DN_NET_CurlMarkRequestDone_(net, request_copy);
       if (!req)
         break;
@@ -418,7 +423,7 @@ void DN_NET_CurlInit(DN_NETCore *net, char *base, DN_U64 base_size)
   curl->thread_curlm = DN_Cast(CURLM *) curl_multi_init();
 
   DN_FmtAppend(curl->thread.name.data, &curl->thread.name.size, sizeof(curl->thread.name.data), "NET (CURL)");
-  DN_OS_ThreadInit(&curl->thread, DN_NET_CurlThreadEntryPoint_, nullptr, net);
+  DN_OS_ThreadInit(&curl->thread, DN_NET_CurlThreadEntryPoint_, nullptr, DN_TCInitArgsDefault(), net);
 }
 
 void DN_NET_CurlDeinit(DN_NETCore *net)
@@ -445,13 +450,16 @@ static DN_NETRequestHandle DN_NET_CurlDoRequest_(DN_NETCore *net, DN_Str8 url, D
 
     // NOTE None in the free list so allocate one
     if (!req) {
+      DN_OS_MutexLock(&curl_core->list_mutex);
       DN_U64 arena_pos            = DN_MemListPos(net->arena.mem);
-      req                         = DN_ArenaNew(&net->arena, DN_NETRequest, DN_ZMem_Yes);
-      DN_NETCurlRequest *curl_req = DN_ArenaNew(&net->arena, DN_NETCurlRequest, DN_ZMem_Yes);
+      req                         = DN_ArenaNewZ(&net->arena, DN_NETRequest);
+      DN_NETCurlRequest *curl_req = DN_ArenaNewZ(&net->arena, DN_NETCurlRequest);
       if (!req || !curl_req) {
         DN_MemListPopTo(net->arena.mem, arena_pos);
+        DN_OS_MutexUnlock(&curl_core->list_mutex);
         return result;
       }
+      DN_OS_MutexUnlock(&curl_core->list_mutex);
 
       curl_req->handle = DN_Cast(CURL *) curl_easy_init();
       req->context[0]  = DN_Cast(DN_UPtr) curl_req;

@@ -148,7 +148,7 @@ static void DN_NET_EmcHTTPProgressCallback(emscripten_fetch_t *fetch)
 
 void DN_NET_EmcInit(DN_NETCore *net, char *base, DN_U64 base_size)
 {
-  DN_NET_BaseInit_(net, base, base_size);
+  DN_NET_BaseInit(net, base, base_size);
   DN_NETEmcCore *emc = DN_ArenaNew(&net->arena, DN_NETEmcCore, DN_ZMem_Yes);
   emc->pool          = DN_PoolFromArena(&net->arena, 0);
   net->context       = emc;
@@ -192,7 +192,7 @@ static DN_NETRequest *DN_NET_EmcAllocRequest_(DN_NETCore *net)
 DN_NETRequestHandle DN_NET_EmcDoHTTP(DN_NETCore *net, DN_Str8 url, DN_Str8 method, DN_NETDoHTTPArgs const *args)
 {
   DN_NETRequest      *req    = DN_NET_EmcAllocRequest_(net);
-  DN_NETRequestHandle result = DN_NET_SetupRequest_(req, url, method, args, DN_NETRequestType_HTTP);
+  DN_NETRequestHandle result = DN_NET_SetupRequest(req, url, method, args, DN_NETRequestType_HTTP);
 
   // NOTE: Setup the HTTP request via Emscripten
   emscripten_fetch_attr_t fetch_attribs = {};
@@ -254,7 +254,7 @@ DN_NETRequestHandle DN_NET_EmcDoWS(DN_NETCore *net, DN_Str8 url)
 {
   DN_Assert(emscripten_websocket_is_supported());
   DN_NETRequest      *req    = DN_NET_EmcAllocRequest_(net);
-  DN_NETRequestHandle result = DN_NET_SetupRequest_(req, url, /*method=*/DN_Str8Lit(""), /*args=*/nullptr, DN_NETRequestType_WS);
+  DN_NETRequestHandle result = DN_NET_SetupRequest(req, url, /*method=*/DN_Str8Lit(""), /*args=*/nullptr, DN_NETRequestType_WS);
   if (!req)
     return result;
 
@@ -376,7 +376,7 @@ static DN_NETResponse DN_NET_EmcHandleFinishedRequest_(DN_NETCore *net, DN_NETEm
   }
 
   if (end_request) {
-    DN_NET_EndFinishedRequest_(request);
+    DN_NET_EndFinishedRequest(request);
     emscripten_websocket_delete(emc_request->socket);
     emc_request->socket = 0;
 

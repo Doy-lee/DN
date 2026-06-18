@@ -4360,10 +4360,11 @@ DN_API DN_U8x32 DN_BytesFromHex64Ptr(char const *hex, DN_USize hex_count)
   return result;
 }
 
-DN_API DN_HexU64Str8 DN_HexFromU64(DN_U64 value, DN_HexFromU64Type type)
+DN_API DN_HexU64 DN_HexFromU64(DN_U64 value, DN_HexFromU64Type type)
 {
-  DN_HexU64Str8 result = {};
-  DN_HexFromPtrBytes(&value, sizeof(value), result.data, sizeof(result.data), DN_TrimLeadingZero_No);
+  DN_HexU64 result = {};
+  DN_USize  size   = DN_HexFromPtrBytes(&value, sizeof(value), result.data, sizeof(result.data), DN_TrimLeadingZero_No);
+  result.size      = DN_SaturateCastUSizeToU8(size);
   if (type == DN_HexFromU64Type_Uppercase) {
     for (DN_USize index = 0; index < result.size; index++)
       result.data[index] = DN_CharToUpper(result.data[index]);
@@ -5536,7 +5537,8 @@ DN_API void DN_LogPrint(DN_LogTypeParam type, DN_CallSite call_site, DN_LogFlags
 {
   DN_Core *dn = DN_Get();
   if (type.is_u32_enum) {
-    if (type.u32 < dn->log_level_to_show_from)
+    DN_Assert(dn->log_level_to_show_from >= 0);
+    if (type.u32 < DN_Cast(DN_U32)dn->log_level_to_show_from)
       return;
   }
 

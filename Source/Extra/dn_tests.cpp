@@ -1222,7 +1222,7 @@ static DN_UTCore DN_TST_BaseArray()
       DN_ArrayEraseResult erase      = DN_ArrayEraseRange(arr, &size, sizeof(arr[0]), 3, 2, DN_ArrayErase_Stable);
       int                 expected[] = {0, 1, 2, 5, 6, 7, 8, 9};
       DN_UT_Assert(&result, erase.items_erased == 2);
-      DN_UT_AssertF(&result, erase.it_index == 2, "erase.it_index=%zu", erase.it_index);
+      DN_UT_Assert(&result, erase.it_index == 3);
       DN_UT_Assert(&result, size == 8);
       DN_UT_Assert(&result, DN_Memcmp(arr, expected, size * sizeof(arr[0])) == 0);
     }
@@ -1233,7 +1233,7 @@ static DN_UTCore DN_TST_BaseArray()
       DN_ArrayEraseResult erase      = DN_ArrayEraseRange(arr, &size, sizeof(arr[0]), 5, -3, DN_ArrayErase_Stable);
       int                 expected[] = {0, 1, 2, 6, 7, 8, 9};
       DN_UT_Assert(&result, erase.items_erased == 3);
-      DN_UT_Assert(&result, erase.it_index == 2);
+      DN_UT_Assert(&result, erase.it_index == 3);
       DN_UT_Assert(&result, size == 7);
       DN_UT_Assert(&result, DN_Memcmp(arr, expected, size * sizeof(arr[0])) == 0);
     }
@@ -1244,7 +1244,7 @@ static DN_UTCore DN_TST_BaseArray()
       DN_ArrayEraseResult erase      = DN_ArrayEraseRange(arr, &size, sizeof(arr[0]), 5, -1, DN_ArrayErase_Stable);
       int                 expected[] = {0, 1, 2, 3, 4, 6, 7, 8, 9};
       DN_UT_Assert(&result, erase.items_erased == 1);
-      DN_UT_Assert(&result, erase.it_index == 4);
+      DN_UT_Assert(&result, erase.it_index == 5);
       DN_UT_Assert(&result, size == 9);
       DN_UT_Assert(&result, DN_Memcmp(arr, expected, size * sizeof(arr[0])) == 0);
     }
@@ -1255,7 +1255,7 @@ static DN_UTCore DN_TST_BaseArray()
       DN_ArrayEraseResult erase      = DN_ArrayEraseRange(arr, &size, sizeof(arr[0]), 3, 2, DN_ArrayErase_Unstable);
       int                 expected[] = {0, 1, 2, 8, 9, 5, 6, 7};
       DN_UT_Assert(&result, erase.items_erased == 2);
-      DN_UT_Assert(&result, erase.it_index == 2);
+      DN_UT_Assert(&result, erase.it_index == 3);
       DN_UT_Assert(&result, size == 8);
       DN_UT_Assert(&result, DN_Memcmp(arr, expected, size * sizeof(arr[0])) == 0);
     }
@@ -1266,7 +1266,7 @@ static DN_UTCore DN_TST_BaseArray()
       DN_ArrayEraseResult erase      = DN_ArrayEraseRange(arr, &size, sizeof(arr[0]), 5, -3, DN_ArrayErase_Unstable);
       int                 expected[] = {0, 1, 2, 7, 8, 9, 6};
       DN_UT_Assert(&result, erase.items_erased == 3);
-      DN_UT_Assert(&result, erase.it_index == 2);
+      DN_UT_Assert(&result, erase.it_index == 3);
       DN_UT_Assert(&result, size == 7);
       DN_UT_Assert(&result, DN_Memcmp(arr, expected, size * sizeof(arr[0])) == 0);
     }
@@ -1288,7 +1288,7 @@ static DN_UTCore DN_TST_BaseArray()
       DN_ArrayEraseResult erase      = DN_ArrayEraseRange(arr, &size, sizeof(arr[0]), 9, 2, DN_ArrayErase_Stable);
       int                 expected[] = {0, 1, 2, 3, 4, 5, 6, 7, 8};
       DN_UT_Assert(&result, erase.items_erased == 1);
-      DN_UT_Assert(&result, erase.it_index == 8);
+      DN_UT_Assert(&result, erase.it_index == 9);
       DN_UT_Assert(&result, size == 9);
       DN_UT_Assert(&result, DN_Memcmp(arr, expected, size * sizeof(arr[0])) == 0);
     }
@@ -1334,7 +1334,7 @@ static DN_UTCore DN_TST_BaseArray()
       DN_ArrayEraseResult erase      = DN_ArrayEraseRange(arr, &size, sizeof(arr[0]), 15, 2, DN_ArrayErase_Stable);
       int                 expected[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
       DN_UT_Assert(&result, erase.items_erased == 0);
-      DN_UT_Assert(&result, erase.it_index == 9);
+      DN_UT_Assert(&result, erase.it_index == 10);
       DN_UT_Assert(&result, size == 10);
       DN_UT_Assert(&result, DN_Memcmp(arr, expected, size * sizeof(arr[0])) == 0);
     }

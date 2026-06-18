@@ -127,6 +127,4 @@ void DN_NET_EndFinishedRequest(DN_NETRequest *request)
 {
   // NOTE: Deallocate the memory used in the request and reset the string builder
   DN_ArenaTempEnd(&request->start_response_arena, DN_ArenaReset_Yes);
-  // NOTE: Check that the request is completely detached
-  DN_Assert(request->next == nullptr);
 }

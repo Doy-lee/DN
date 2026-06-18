@@ -207,6 +207,14 @@ struct DN_OSThreadLane
   void*        shared_mem;
 };
 
+struct DN_OSThreadLaneway
+{
+  DN_OSThread* threads;
+  DN_USize     threads_count;
+  DN_UPtr*     shared_mem;
+  DN_OSBarrier barrier;
+};
+
 struct DN_OSThread
 {
   DN_Str8x64       name;
@@ -218,6 +226,7 @@ struct DN_OSThread
   void            *user_context;
   DN_OSThreadFunc *func;
   DN_OSSemaphore   init_semaphore;
+  DN_TCInitArgs    tc_init_args;
 };
 
 // NOTE: DN_OSHttp
@@ -422,14 +431,79 @@ DN_API bool                      DN_OS_ConditionVariableWaitUntil             (D
 DN_API void                      DN_OS_ConditionVariableSignal                (DN_OSConditionVariable *cv);
 DN_API void                      DN_OS_ConditionVariableBroadcast             (DN_OSConditionVariable *cv);
 
-DN_API bool                      DN_OS_ThreadInit                             (DN_OSThread *thread, DN_OSThreadFunc *func, DN_OSThreadLane *lane, void *user_context);
+DN_API bool                      DN_OS_ThreadInit                             (DN_OSThread *thread, DN_OSThreadFunc *func, DN_OSThreadLane *lane, DN_TCInitArgs tc_init_args, void *user_context);
 DN_API bool                      DN_OS_ThreadJoin                             (DN_OSThread *thread, DN_TCDeinitArenas deinit_arenas);
 DN_API DN_U32                    DN_OS_ThreadID                               ();
 DN_API void                      DN_OS_ThreadSetNameFmt                       (char const *fmt, ...);
 
+// NOTE: Thread lanes provide an abstraction to represent the concept of programming a CPU like a
+// GPU, e.g. SIMT (Single Instruction Multiple Threads). The lane terminology is popularised by Ryan
+// Fleury. SIMT is formally defined as
+//
+//  Threads are grouped into warps/wavefronts (typically 32 or 64 threads) that execute the same
+//  instruction in lockstep, but each thread operates on different data and maintains its own state
+//
+// The individual threads in a wavefront on the CPU side are colloquially dubbed "lanes" and a
+// thread lane here contains the necessary state to facilitate this such as the current index in the
+// wavefront and synchronisation primitives to coordinate the different lanes together.
+//
+// The idea is to write code in a single-threaded manner (linear execution) but across multiple
+// threads so that the default is all execution paths are inherently multi-threaded by default. Opt
+// out of parallelism instead of opt in. This optimises for the trend of core counts increasing
+// whilst clock counts remain static.
+//
+// A laneway is a helper function to initialise the number of requested OS threads/lanes upfront and
+// setup the required synchronisation primitives. It can then be dispatched all the threads which
+// start executing the `entry_point` in parallel.
+//
+// API
+//   DN_OS_ThreadLaneSync
+//     A blocking call to synchronise the program-counter of all other lanes in the laneway to this
+//     function call invocation (using an OS barrier). Optionally pass in the pointer to a pointer
+//     `ptr_to_share` to broadcast the pointer from one lanes to the others. The lane that wishes
+//     to broadcast the pointer must have a non-null pointer, all other lanes must pass in a
+//     non-null pointer. A typical use case might look like:
+/*
+         DN_OSThreadLane *lane = DN_OS_TCThreadLane(); // Get lane from current (t)hread (c)context
+
+         // NOTE: Allocate buffer in lane 0
+         DN_U8 *buffer         = nullptr;
+         if (lane->index == 0)
+           buffer = DN_ArenaNewArray(DN_TCMainArena(), DN_U8, DN_Gigabytes(1), DN_ZMem_No);
+
+         // NOTE: Lane 0 broadcasts the `buffer` pointer to lane 1..N
+         DN_OS_ThreadLaneSync(lane, &buffer);
+
+         // NOTE: We use LaneRange to divide the buffer into equal sized chunks that each lane can
+         // write into without clobbering over each other.
+         DN_V2USize range = DN_OS_ThreadLaneRange(lane, DN_Gigabytes(1));
+         for (DN_USize index = range.begin; index < range.end; index++) { buffer[index] = index; }
+*/
+//     In this example, lane 0 will allocate a 1GiB buffer pass in a `buffer` to
+//     DN_OS_ThreadLaneSync` that is non-null. Lanes 1->N will skip the branch (because their lanes
+//     indexes are 1..N) and invoke `DN_OS_ThreadLaneSync` with a nullptr `buffer`. After the
+//     blocking call is complete, lanes 0->N will now have synchronised the `buffer` pointer and all
+//     lanes point to the 1GiB range allocated in lane 0's allocator.
+//
+//     Additionally we demonstrate `DN_OS_ThreadLaneRange` which does math behind the scenes to
+//     divide the buffer up and assign each lane their own indices in the buffer that they can work
+//     on in parallel without clobbering each others work.
+//
+//   DN_OS_ThreadLaneRange
+//     Calculates the range of values the current lane in the laneway should execute. For example if
+//     you have 128 items and 16 threads each lane will receive the following `DN_V2USize` range:
+//       Lane 0  => [0,   8)
+//       Lane 1  => [8,   16)
+//       ...
+//       Lane 16 => [120, 128)
 DN_API DN_OSThreadLane           DN_OS_ThreadLaneInit                         (DN_USize index, DN_USize thread_count, DN_OSBarrier barrier, DN_UPtr *share_mem);
 DN_API void                      DN_OS_ThreadLaneSync                         (DN_OSThreadLane *lane, void **ptr_to_share);
-DN_API DN_V2USize                DN_OS_ThreadLaneRange                        (DN_OSThreadLane *lane, DN_USize values_count);
+DN_API DN_V2USize                DN_OS_ThreadLaneRange                        (DN_OSThreadLane const *lane, DN_USize values_count);
+
+DN_API DN_OSThreadLaneway        DN_OS_ThreadLanewayFromArgs                  (DN_OSThread* threads, DN_USize threads_count, DN_UPtr* shared_mem);
+DN_API DN_OSThreadLaneway        DN_OS_ThreadLanewayFromArena                 (DN_USize threads_count, DN_Arena* arena);
+DN_API void                      DN_OS_ThreadLanewayDispatch                  (DN_OSThreadLaneway *laneway, DN_OSThreadFunc *entry_point, DN_TCInitArgs tc_init_args, void *user_context);
+DN_API void                      DN_OS_ThreadLanewayJoin                      (DN_OSThreadLaneway *laneway, DN_TCDeinitArenas deinit_arenas);
 
 DN_API DN_OSThreadLane*          DN_OS_TCThreadLane                           ();
 DN_API void                      DN_OS_TCThreadLaneSync                       (void **ptr_to_share);

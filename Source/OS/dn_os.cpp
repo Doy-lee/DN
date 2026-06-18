@@ -738,8 +738,8 @@ DN_API DN_OSExecResult DN_OS_ExecOrAbort(DN_Str8Slice cmd_line, DN_OSExecArgs *a
 // NOTE: DN_OSThread
 static void DN_OS_ThreadExecute_(void *user_context)
 {
-  DN_OSThread *thread    = DN_Cast(DN_OSThread *) user_context;
-  DN_TCInitFromMemFuncs(&thread->context, thread->thread_id, DN_TCInitArgsDefault(), DN_MemFuncsDefault());
+  DN_OSThread *thread = DN_Cast(DN_OSThread *) user_context;
+  DN_TCInitFromMemFuncs(&thread->context, thread->thread_id, thread->tc_init_args, DN_MemFuncsDefault());
   DN_TCEquip(&thread->context);
   if (thread->is_lane_set) {
     DN_OS_TCThreadLaneEquip(thread->lane);
@@ -801,7 +801,7 @@ DN_API void DN_OS_ThreadLaneSync(DN_OSThreadLane *lane, void **ptr_to_share)
     DN_OS_BarrierWait(&lane->barrier); // NOTE: Ensure the reading lanes have completed the read
 }
 
-DN_API DN_V2USize DN_OS_ThreadLaneRange(DN_OSThreadLane *lane, DN_USize values_count)
+DN_API DN_V2USize DN_OS_ThreadLaneRange(DN_OSThreadLane const *lane, DN_USize values_count)
 {
   DN_USize values_per_thread                  = values_count / lane->count;
   DN_USize rem_values                         = values_count % lane->count;
@@ -820,6 +820,44 @@ DN_API DN_V2USize DN_OS_ThreadLaneRange(DN_OSThreadLane *lane, DN_USize values_c
   result.begin      = thread_start_index;
   result.end        = result.begin + thread_values_count;
   return result;
+}
+
+DN_API DN_OSThreadLaneway DN_OS_ThreadLanewayFromArgs(DN_OSThread* threads, DN_USize threads_count, DN_UPtr* shared_mem)
+{
+  DN_OSThreadLaneway result = {};
+  result.threads            = threads;
+  result.threads_count      = threads_count;
+  result.shared_mem         = shared_mem;
+  result.barrier            = DN_OS_BarrierInit(DN_Cast(DN_U32) result.threads_count);
+  return result;
+}
+
+DN_API DN_OSThreadLaneway DN_OS_ThreadLanewayFromArena(DN_USize threads_count, DN_Arena* arena)
+{
+  DN_U64             mem_p      = DN_MemListPos(arena->mem);
+  DN_OSThreadLaneway result     = {};
+  DN_OSThread*       threads    = DN_ArenaNewArray(arena, DN_OSThread, threads_count, DN_ZMem_No);
+  DN_UPtr*           shared_mem = DN_ArenaNewZ(arena, DN_UPtr);
+  if (threads && shared_mem)
+    result = DN_OS_ThreadLanewayFromArgs(threads, threads_count, shared_mem);
+  else
+    DN_MemListPopTo(arena->mem, mem_p);
+  return result;
+}
+
+DN_API void DN_OS_ThreadLanewayDispatch(DN_OSThreadLaneway *laneway, DN_OSThreadFunc *entry_point, DN_TCInitArgs tc_init_args, void *user_context)
+{
+  for (DN_ForItSize(it, DN_OSThread, laneway->threads, laneway->threads_count)) {
+    DN_OSThreadLane lane = DN_OS_ThreadLaneInit(it.index, laneway->threads_count, laneway->barrier, laneway->shared_mem);
+    DN_OS_ThreadInit(it.data, entry_point, &lane, tc_init_args, user_context);
+  }
+}
+
+DN_API void DN_OS_ThreadLanewayJoin(DN_OSThreadLaneway *laneway, DN_TCDeinitArenas deinit_arenas)
+{
+  for (DN_ForItSize(it, DN_OSThread, laneway->threads, laneway->threads_count))
+    DN_OS_ThreadJoin(it.data, deinit_arenas);
+  DN_OS_BarrierDeinit(&laneway->barrier);
 }
 
 DN_API DN_OSThreadLane *DN_OS_TCThreadLane()
@@ -1269,7 +1307,7 @@ DN_API DN_StackTrace DN_StackTraceFromAllocator(DN_Allocator allocator, DN_U16 l
   DN_Memcpy(result.base_addr, raw_frames, raw_frames_count * sizeof(raw_frames[0]));
 #else
   (void)limit;
-  (void)arena;
+  (void)allocator;
 #endif
   return result;
 }

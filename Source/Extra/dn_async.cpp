@@ -53,7 +53,7 @@ DN_API void DN_ASYNC_Init(DN_ASYNCCore *async, char *base, DN_USize base_size, D
   async->threads       = threads;
   for (DN_ForIndexU(index, async->thread_count)) {
     DN_OSThread    *thread = async->threads + index;
-    DN_OS_ThreadInit(thread, DN_ASYNC_ThreadEntryPoint_, nullptr, async);
+    DN_OS_ThreadInit(thread, DN_ASYNC_ThreadEntryPoint_, /*lane=*/ nullptr, DN_TCInitArgsDefault(), async);
   }
 }
 

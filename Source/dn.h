@@ -176,7 +176,7 @@ struct DN_Core
   DN_USize         mem_allocs_frame;
   DN_LeakTracker   leak;
 
-  DN_U32           log_level_to_show_from;
+  DN_LogType       log_level_to_show_from;
   DN_LogPrintFunc* print_func;
   void*            print_func_context;
 
