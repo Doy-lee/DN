@@ -1,24 +1,18 @@
-#if defined(DN_UNIT_TESTS_WITH_CURL)
+#if DN_WITH_NET_CURL
   #define DN_NO_WINDOWS_H_REPLACEMENT_HEADER
 #endif
 
 #define DN_ARENA_TEMP_MEM_UAF_GUARD               1
 #define DN_ARENA_TEMP_MEM_UAF_TRACE_ON_BY_DEFAULT 0
-#define DN_H_WITH_OS                              1
-#define DN_H_WITH_CORE                            1
-#define DN_H_WITH_HASH                            1
-#define DN_H_WITH_HELPERS                         1
-#define DN_H_WITH_ASYNC                           1
-#define DN_H_WITH_NET                             1
+#define DN_WITH_OS                                1
+#define DN_WITH_NET                               1
 #include "../dn.h"
-#include "../dn.cpp"
 
-#if defined(DN_UNIT_TESTS_WITH_CURL)
+#if DN_WITH_NET_CURL
   #define CURL_STATICLIB
   #include <curl/curl.h>
-  #include "../Extra/dn_net_curl.h"
-  #include "../Extra/dn_net_curl.cpp"
 #endif
+#include "../dn.cpp"
 
 #if defined(DN_PLATFORM_EMSCRIPTEN)
   #include <emscripten/emscripten.h>
@@ -36,7 +30,7 @@ DN_MSVC_WARNING_DISABLE(6262) // Function uses '29804' bytes of stack.  Consider
 int main(int, char**)
 {
   DN_Core dn = {};
-  DN_Init(&dn, DN_InitFlags_LogAllFeatures | DN_InitFlags_OS | DN_InitFlags_ThreadContext, DN_TCInitArgsDefault());
+  DN_Init(&dn, DN_InitFlags_LogAllFeatures | DN_InitFlags_OS, DN_TCInitArgsDefault());
   DN_TST_RunSuite(DN_TSTPrint_Yes);
   return 0;
 }

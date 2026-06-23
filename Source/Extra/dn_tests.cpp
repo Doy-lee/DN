@@ -1,8 +1,6 @@
 #if defined(_CLANGD)
-  #define DN_H_WITH_OS 1
-  #include "../dn.h"
-  #include "../Extra/dn_net.h"
-  #include "../Extra/dn_net_curl.h"
+  #define DN_WITH_OS 1
+  #include "dn.h"
   #include "../Standalone/dn_utest.h"
 
   #define DN_UNIT_TESTS_WITH_KECCAK

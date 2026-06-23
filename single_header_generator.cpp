@@ -1,5 +1,4 @@
-#define DN_H_WITH_OS 1
-#define DN_H_WITH_CORE 1
+#define DN_WITH_OS 1
 #if defined(USE_SINGLE_HEADER)
 #include "Single-Header/dn_single_header.h"
 #else
@@ -91,7 +90,7 @@ static void AppendCppFileLineByLine(DN_Str8Builder *dest, DN_Str8 cpp_path)
 int main(int argc, char **argv)
 {
   DN_Core dn = {};
-  DN_Init(&dn, DN_InitFlags_OS | DN_InitFlags_ThreadContext, DN_TCInitArgsDefault());
+  DN_Init(&dn, DN_InitFlags_OS, DN_TCInitArgsDefault());
 
   if (argc != 3) {
     DN_OS_PrintErrF("USAGE: %s <path/to/dn/Source> <output_dir>", argv[0]);

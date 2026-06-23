@@ -34,7 +34,7 @@ pushd %build_dir%
   :: GR-  Disable C RTTI
   :: Oi   Use CPU Intrinsics
   :: Z7   Combine multi-debug files to one debug file
-  set flags=%flags% -D DN_UNIT_TESTS_WITH_KECCAK -D DN_UNIT_TESTS_WITH_NET %script_dir%\Source\Extra\dn_tests_main.cpp
+  set flags=%flags% -D DN_UNIT_TESTS_WITH_KECCAK %script_dir%\Source\Extra\dn_tests_main.cpp
   set msvc_driver_flags=-EHa -GR- -Od -Oi -Z7 -wd4201 -W4 -nologo %flags% -fsanitize=address
 
   where /q emcc && (
@@ -46,7 +46,7 @@ pushd %build_dir%
     echo [BUILD] MSVC cl detected, compiling ...
     set msvc_cmd=cl -MTd %msvc_driver_flags% -analyze -Fe:dn_unit_tests_msvc -Fo:dn_unit_tests_msvc
     if exist %build_dir%/Curl/Install/lib/libcurl-d.lib (
-      set msvc_cmd=!msvc_cmd! -D DN_UNIT_TESTS_WITH_CURL -I %build_dir%/Curl/Install/include %build_dir%/Curl/Install/lib/libcurl-d.lib crypt32.lib ws2_32.lib advapi32.lib wldap32.lib iphlpapi.lib secur32.lib
+      set msvc_cmd=!msvc_cmd! -D DN_WITH_NET_CURL=1 -I %build_dir%/Curl/Install/include %build_dir%/Curl/Install/lib/libcurl-d.lib crypt32.lib ws2_32.lib advapi32.lib wldap32.lib iphlpapi.lib secur32.lib
     )
     set msvc_cmd=!msvc_cmd! -link
 
