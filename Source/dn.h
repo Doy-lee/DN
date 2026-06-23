@@ -2,7 +2,8 @@
 #define DN_H
 
 // NOTE: DN
-//  Getting Started
+
+//  NOTE: Getting Started
 //    Include this mega header `dn.h` and define the following symbols to `1` to conditionally
 //    enable the interfaces for those features. Additionally in the same or different translation
 //    unit, include `dn.cpp` with the same symbols defined to enable the implementation of these
@@ -33,9 +34,10 @@
 //      synchronisation, memory allocation. This layer is OPTIONAL.
 //
 //    - Extra layer provides helper utilities that are opt-in. These layers are OPTIONAL.
-//
-//  Configuration
-//    Platform Target
+
+//  NOTE: Configuration
+
+//    NOTE: Platform Target
 //      Define one of the following directives to configure this library to compile for that
 //      platform. By default, the library will auto-detect the current host platform and select that
 //      as the target platform.
@@ -50,8 +52,8 @@
 //
 //      Will ensure that <Windows.h> is included and the OS layer is implemented using Win32
 //      primitives.
-//
-//    Static functions
+
+//    NOTE: Static functions
 //      All public functions in the DN library are prefixed with the macro '#define DN_API'. By
 //      default 'DN_API' is not defined to anything. Define
 //
@@ -60,8 +62,8 @@
 //      To replace all the functions prefixed with DN_API to be prefixed with 'static' ensuring that
 //      the functions in the library do not export an entry into the linking table.
 //      translation units.
-//
-//    Disabling the in-built <Windows.h> (if #define DN_H_WITH_OS 1)
+
+//    NOTE: Disabling the in-built <Windows.h> (if #define DN_H_WITH_OS 1)
 //      If you are building DN for the Windows platform, <Windows.h> is a large legacy header that
 //      applications have to include to use Windows APIs. By default this library uses a replacement
 //      header for all the Windows functions that it uses in the OS layer removing the need to
@@ -74,16 +76,16 @@
 //      To instead use <Windows.h>. DN automatically detects if <Windows.h> is included in an earlier
 //      translation unit and will automatically disable the in-built replacement header in which case
 //      this does not need to be defined.
-//
-//    Freestanding
+
+//    NOTE: Freestanding
 //      The base layer can be used without an OS implementation by defining DN_FREESTANDING like:
 //
 //        #define DN_FREESTANDING
 //
 //      This means functionality that relies on the OS like printing, memory allocation, stack traces
 //      and so forth are disabled.
-//
-//    ASAN Arena Poisoning
+
+//    NOTE: ASAN Arena Poisoning
 //      When compiled with address sanitizer (.e.g -fsanitize=address) you can optionally enable
 //      memory region poisoning on the inbuilt arena's to catch in certain scenarios, use-after-free
 //
@@ -93,8 +95,8 @@
 //      memory markup that ASAN does and so it is implemented manually by using the ASAN user-level
 //      poisoning APIs. Similarly, since the arena recycles its own memory rather than release back
 //      to the OS, poisoning is not as effective for arenas but every little bit helps.
-//
-//    Scrub Uninitialised Memory
+
+//    NOTE: Scrub Uninitialised Memory
 //      If this macro is defined, temp memory that is returned to an arena, or allocations freed by
 //      a pool are scrubbed to this specified byte, in absence of this bytes returned to the
 //      allocators are left as-is or memset to 0. For example to scrub bytes to 0xCD (MSVC's
@@ -105,8 +107,8 @@
 //      Due to the recycling of memory in arenas and pool, similarly to ASAN poisoning this reduces
 //      the window in which a use-after-free can be detected using this guard, however every little
 //      bit helps.
-//
-//    Arena temp memory use-after-free (UAF) tooling
+
+//    NOTE: Arena temp memory use-after-free (UAF) tooling
 //      UAF Guard
 //        Set the following preprocessor value to 1 to enable UAF protection when using
 //        scratch/temporary memory functionality. Defaults to off, or 0 if not specified
@@ -127,7 +129,7 @@
 //        memory block and additional book-keeping fields on each arena and their temp memory
 //        instances.
 //
-//      UAF Tracing
+//      NOTE: UAF Tracing
 //        Set the following preprocessor value to 1 to enable tracing when the UAF guard triggers.
 //        Defaults to off, or 0 if not specified.
 //
@@ -141,11 +143,57 @@
 //        Tracing incurs an additional much heavier performance penalty than the UAF guard due to
 //        the stacktrace that is stored per region to report to the user when a UAF guard violation
 //        occurs.
+
+//    NOTE: Paranoia Level
+//      Set the `DN_PARANOIA_LEVEL` to an integer value to enable various validation layers and
+//      error checking mechanisms in the codebase and primitives exposed by the library. Defaults to
+//      paranoia level 0 in release builds and level 1 for debug.
 //
-//      Str8 AVX512F variants
-//        We have some AVX512 string functions that can be enabled by defining the following
+//          #define DN_PARANOIA_LEVEL 1
 //
-//          #define DN_STR8_AVX512F 1
+//      Each level activates the following debug mechanisms. Note that any of the following #defines
+//      enabled by a paranoia level can be overridden by defining the preprocessor definition before
+//      the inclusion of this file.
+//
+//        Level 0
+//          `DN_Assert` calls are compiled out
+//
+//          `DN_Verify` calls logs an error and continues
+//
+//          `DN_VerifyWarning` calls logs a warning and continues
+//
+//        Level 1
+//          `DN_Assert` calls are compiled in
+//
+//          `DN_Verify` calls a debug trap rather than just logging and continuing
+//
+//          `DN_Verify` calls dump a stack trace when triggered
+//
+//          `DN_ASAN_POISON` is set. When an arena allocates memory unallocated bytes from the
+//          memory owned by the arena are manually poisoned using ASAN. A fault will be triggered if
+//          the memory is written to (UAF e.g. use-after-free). Address sanitizer must be enabled or
+//          otherwise this is a no-op. This incurs a performance penalty on-top of the overhead of
+//          running ASAN on your binary as recycling memory calls into ASAN to poison the region.
+//
+//          `DN_ARENA_TEMP_MEM_UAF_GUARD` is set. When an arena uses temporary memory it will record
+//          the active temporary memory region and compare them when allocating to ensure that
+//          memory is allocated in the active region otherwise a UAF fault is triggered. This has a
+//          small runtime performance penalty.
+//
+//          `DN_SCRUB_UNINIT_MEM_BYTE` is set to `0xCD`. When memory is cleared in an arena or a
+//          pool backed by an arena upon deallocation if the `DN_ZMem_Yes` flag is passed then the
+//          bytes are scrubbed to this byte to make UAF more salient.
+//
+//        Level 2
+//          `DN_ARENA_TEMP_MEM_UAF_TRACE_ON_BY_DEFAULT` is set. When an arena uses temporary memory
+//          regions that region's a stack trace of the call site is recorded. This is very expensive
+//          but when a temporary memory region is used after it has been deallocated, a full stack
+//          trace diagnostic is available of where the various regions where created and freed.
+//
+//    NOTE: Str8 AVX512F variants
+//      We have some AVX512 string functions that can be enabled by defining the following
+//
+//        #define DN_STR8_AVX512F 1
 
 #include "Base/dn_base.h"
 

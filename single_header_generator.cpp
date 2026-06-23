@@ -1,14 +1,12 @@
-#define USE_SINGLE_HEADER 1
-
 #define DN_H_WITH_OS 1
 #define DN_H_WITH_CORE 1
-#if USE_SINGLE_HEADER
+#if defined(USE_SINGLE_HEADER)
 #include "Single-Header/dn_single_header.h"
 #else
 #include "Source/dn.h"
 #endif
 
-#if USE_SINGLE_HEADER
+#if defined(USE_SINGLE_HEADER)
 #include "Single-Header/dn_single_header.cpp"
 #else
 #include "Source/dn.cpp"

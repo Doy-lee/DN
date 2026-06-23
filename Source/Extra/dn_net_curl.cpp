@@ -211,7 +211,7 @@ static int32_t DN_NET_CurlThreadEntryPoint_(DN_OSThread *thread)
     int       running_handles = 0;
     CURLMcode perform_result  = curl_multi_perform(curl->thread_curlm, &running_handles);
     if (perform_result != CURLM_OK)
-      DN_InvalidCodePath;
+      DN_AssertInvalidCodePath;
 
     // NOTE: Check pump result
     for (;;) {
@@ -498,7 +498,7 @@ static DN_NETRequestHandle DN_NET_CurlDoRequest_(DN_NETCore *net, DN_Str8 url, D
 
     // NOTE: Setup handle for protocol
     switch (req->type) {
-      case DN_NETRequestType_Nil: DN_InvalidCodePath; break;
+      case DN_NETRequestType_Nil: DN_AssertInvalidCodePath; break;
 
       case DN_NETRequestType_WS: {
         curl_easy_setopt(curl, CURLOPT_CONNECT_ONLY, 2L);
@@ -518,7 +518,7 @@ static DN_NETRequestHandle DN_NET_CurlDoRequest_(DN_NETCore *net, DN_Str8 url, D
             curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, req->args.payload.size);
           curl_easy_setopt(curl, CURLOPT_COPYPOSTFIELDS, req->args.payload.data);
         } else {
-          DN_InvalidCodePathF("Unimplemented");
+          DN_AssertInvalidCodePathF("Unimplemented");
         }
       } break;
     }

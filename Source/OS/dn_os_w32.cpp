@@ -100,7 +100,7 @@ DN_API int DN_OS_MemProtect(void *ptr, DN_USize size, DN_U32 page_flags)
 DN_API void *DN_OS_MemAlloc(DN_USize size, DN_ZMem z_mem)
 {
   DN_Core *dn = DN_Get();
-  DN_RawAssert(dn->init_flags & DN_InitFlags_OS && "DN must be initialised with the OS flag");
+  DN_AssertRaw(dn->init_flags & DN_InitFlags_OS && "DN must be initialised with the OS flag");
   DN_U32 flags = z_mem == DN_ZMem_Yes ? HEAP_ZERO_MEMORY : 0;
   DN_Assert(size <= DN_Cast(DWORD)(-1));
   void *result = HeapAlloc(GetProcessHeap(), flags, DN_Cast(DWORD) size);
@@ -340,7 +340,7 @@ DN_API DN_OSFile DN_OS_FileOpen(DN_Str8 path, DN_OSFileOpen open_mode, DN_OSFile
     return result;
 
   if ((access & ~DN_OSFileAccess_All) || ((access & DN_OSFileAccess_All) == 0)) {
-    DN_InvalidCodePath;
+    DN_AssertInvalidCodePath;
     return result;
   }
 
@@ -348,8 +348,8 @@ DN_API DN_OSFile DN_OS_FileOpen(DN_Str8 path, DN_OSFileOpen open_mode, DN_OSFile
   switch (open_mode) {
     case DN_OSFileOpen_CreateAlways: create_flag = CREATE_ALWAYS; break;
     case DN_OSFileOpen_OpenIfExist:  create_flag = OPEN_EXISTING; break;
-    case DN_OSFileOpen_OpenAlways:   create_flag = OPEN_ALWAYS; break;
-    default: DN_InvalidCodePath;     return result;
+    case DN_OSFileOpen_OpenAlways:   create_flag = OPEN_ALWAYS;   break;
+    default:                         DN_AssertInvalidCodePath;    return result;
   }
 
   unsigned long access_mode = 0;
@@ -499,7 +499,7 @@ DN_API DN_OSPathInfo DN_OS_PathInfo(DN_Str8 path)
   }
 
   result.exists                = true;
-result.create_time_in_s      = DN_OS_W32FileTimeToSeconds_(&attrib_data.ftCreationTime);
+  result.create_time_in_s      = DN_OS_W32FileTimeToSeconds_(&attrib_data.ftCreationTime);
   result.last_access_time_in_s = DN_OS_W32FileTimeToSeconds_(&attrib_data.ftLastAccessTime);
   result.last_write_time_in_s  = DN_OS_W32FileTimeToSeconds_(&attrib_data.ftLastWriteTime);
 

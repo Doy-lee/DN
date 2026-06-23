@@ -281,14 +281,13 @@ void DN_NET_EmcDoWSSend(DN_NETRequestHandle handle, DN_Str8 data, DN_NETWSSend s
 {
   DN_AssertF(send == DN_NETWSSend_Binary || send == DN_NETWSSend_Text || send == DN_NETWSSend_Close,
              "Unimplemented, Emscripten only supports some of the available operations");
-
-  int                    result      = 0;
+  int            result      = 0;
   DN_NETRequest *request_ptr = DN_Cast(DN_NETRequest *) handle.handle;
   if (request_ptr && request_ptr->gen == handle.gen) {
     DN_Assert(request_ptr->type == DN_NETRequestType_WS);
     DN_NETEmcRequest *emc_request = DN_Cast(DN_NETEmcRequest *) request_ptr->context[1];
     switch (send) {
-      default: DN_InvalidCodePath; break;
+      default: DN_AssertInvalidCodePath; break;
       case DN_NETWSSend_Text: {
         DN_U64  pos                  = DN_MemListPos(request_ptr->start_response_arena.mem);
         DN_Str8 data_null_terminated = DN_Str8FromStr8Arena(data, &request_ptr->start_response_arena);

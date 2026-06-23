@@ -31,7 +31,7 @@ static DN_U32 DN_OS_MemConvertPageToOSFlags_(DN_U32 protect)
 DN_API void *DN_OS_MemReserve(DN_USize size, DN_MemCommit commit, DN_U32 page_flags)
 {
   #if defined(DN_PLATFORM_EMSCRIPTEN)
-  DN_InvalidCodePathF("Emscripten does not support virtual memory, you should use DN_OS_MemAlloc");
+  DN_AssertInvalidCodePathF("Emscripten does not support virtual memory, you should use DN_OS_MemAlloc");
   #endif
 
   unsigned long os_page_flags = DN_OS_MemConvertPageToOSFlags_(page_flags);
@@ -50,7 +50,7 @@ DN_API void *DN_OS_MemReserve(DN_USize size, DN_MemCommit commit, DN_U32 page_fl
 DN_API bool DN_OS_MemCommit(void *ptr, DN_USize size, DN_U32 page_flags)
 {
   #if defined(DN_PLATFORM_EMSCRIPTEN)
-  DN_InvalidCodePathF("Emscripten does not support virtual memory");
+  DN_AssertInvalidCodePathF("Emscripten does not support virtual memory");
   #endif
   bool result = false;
   if (!ptr || size == 0)
@@ -66,7 +66,7 @@ DN_API bool DN_OS_MemCommit(void *ptr, DN_USize size, DN_U32 page_flags)
 DN_API void DN_OS_MemDecommit(void *ptr, DN_USize size)
 {
   #if defined(DN_PLATFORM_EMSCRIPTEN)
-  DN_InvalidCodePathF("Emscripten does not support virtual memory");
+  DN_AssertInvalidCodePathF("Emscripten does not support virtual memory");
   #endif
   mprotect(ptr, size, PROT_NONE);
   madvise(ptr, size, MADV_FREE);
@@ -75,7 +75,7 @@ DN_API void DN_OS_MemDecommit(void *ptr, DN_USize size)
 DN_API void DN_OS_MemRelease(void *ptr, DN_USize size)
 {
   #if defined(DN_PLATFORM_EMSCRIPTEN)
-  DN_InvalidCodePathF("Emscripten does not support virtual memory");
+  DN_AssertInvalidCodePathF("Emscripten does not support virtual memory");
   #endif
   munmap(ptr, size);
 }
@@ -83,7 +83,7 @@ DN_API void DN_OS_MemRelease(void *ptr, DN_USize size)
 DN_API int DN_OS_MemProtect(void *ptr, DN_USize size, DN_U32 page_flags)
 {
   #if defined(DN_PLATFORM_EMSCRIPTEN)
-  DN_InvalidCodePathF("Emscripten does not support virtual memory");
+  DN_AssertInvalidCodePathF("Emscripten does not support virtual memory");
   #endif
   if (!ptr || size == 0)
     return 0;
@@ -199,7 +199,7 @@ DN_API DN_Date DN_OS_DateUnixTimeSToDate(DN_U64 time)
 DN_API void DN_OS_GenBytesSecure(void *buffer, DN_U32 size)
 {
 #if defined(DN_PLATFORM_EMSCRIPTEN)
-  DN_InvalidCodePath;
+  DN_AssertInvalidCodePath;
   (void)buffer;
   (void)size;
 #else
@@ -219,7 +219,7 @@ DN_API void DN_OS_GenBytesSecure(void *buffer, DN_U32 size)
 
 DN_API bool DN_OS_SetEnvVar(DN_Str8 name, DN_Str8 value)
 {
-  DN_AssertFOnce(false, "Unimplemented");
+  DN_VerifyWarning(false, "Unimplemented function");
   (void)name;
   (void)value;
   bool result = false;
@@ -445,18 +445,14 @@ DN_API DN_OSFile DN_OS_FileOpen(DN_Str8         path,
     return result;
 
   if ((access & ~(DN_OSFileAccess_All) || ((access & DN_OSFileAccess_All) == 0))) {
-    DN_InvalidCodePath;
+    DN_AssertInvalidCodePath;
     return result;
   }
 
   if (access & DN_OSFileAccess_Execute) {
     result.error = true;
-    DN_ErrSinkAppendF(
-        error,
-        1,
-        "Failed to open file '%.*s': File access flag 'execute' is not supported",
-        DN_Str8PrintFmt(path));
-    DN_InvalidCodePath; // TODO: Not supported via fopen
+    DN_ErrSinkAppendF(error, 1, "Failed to open file '%.*s': File access flag 'execute' is not supported", DN_Str8PrintFmt(path));
+    DN_AssertInvalidCodePath; // TODO: Not supported via fopen
     return result;
   }
 
@@ -470,7 +466,7 @@ DN_API DN_OSFile DN_OS_FileOpen(DN_Str8         path,
       case     DN_OSFileOpen_CreateAlways: handle = fopen(path.data, "w"); break;
       case     DN_OSFileOpen_OpenIfExist:  handle = fopen(path.data, "r"); break;
       case     DN_OSFileOpen_OpenAlways:   handle = fopen(path.data, "a"); break;
-      default: DN_InvalidCodePath;         break;
+      default: DN_AssertInvalidCodePath;         break;
     }
 
     if (!handle) { // TODO(doyle): FileOpen flag to string
@@ -747,7 +743,7 @@ DN_API DN_OSExecResult DN_OS_ExecWait(DN_OSExecAsyncHandle handle,
   }
 
 #if defined(DN_PLATFORM_EMSCRIPTEN)
-  DN_InvalidCodePathF("Unsupported operation");
+  DN_AssertInvalidCodePathF("Unsupported operation");
 #endif
 
   static_assert(sizeof(pid_t) <= sizeof(handle.process),
@@ -834,10 +830,9 @@ DN_API DN_OSExecAsyncHandle DN_OS_ExecAsync(DN_Str8Slice   cmd_line,
                                             DN_ErrSink    *error)
 {
 #if defined(DN_PLATFORM_EMSCRIPTEN)
-  DN_InvalidCodePathF("Unsupported operation");
+  DN_AssertInvalidCodePathF("Unsupported operation");
 #endif
-  DN_AssertFOnce(args->environment.count == 0, "Unimplemented in POSIX");
-
+  DN_VerifyWarningF(args->environment.count == 0, "Environment variables are unimplemented in POSIX");
   DN_OSExecAsyncHandle result = {};
   if (cmd_line.count == 0)
     return result;
@@ -1025,7 +1020,7 @@ DN_API DN_OSExecResult DN_OS_ExecPump(DN_OSExecAsyncHandle handle,
                                       DN_U32             timeout_ms,
                                       DN_ErrSink          *err)
 {
-  DN_InvalidCodePath;
+  DN_AssertInvalidCodePath;
   DN_OSExecResult result = {};
   return result;
 }

@@ -16,6 +16,54 @@ enum DN_ArenaUAFCheckReportType_
   DN_ArenaUAFCheckReportType_TempEndOutOfOrder,
 };
 
+DN_API bool DN_VerifyArgsF(DN_VerifyType type, bool expr, DN_CallSite call_site, DN_Str8 expr_str8, char const *fmt, ...)
+{
+  bool result = expr;
+  if (result)
+    return result;
+
+  DN_TCScratch scratch = DN_TCScratchBeginArena(nullptr, 0);
+  {
+    DN_Str8Builder builder = DN_Str8BuilderFromArena(&scratch.arena);
+
+    // NOTE: Log message prefix
+    DN_Str8BuilderAppendF(&builder, "Verify [%.*s] failed%s", DN_Str8PrintFmt(expr_str8), fmt ? ". " : "");
+
+    // NOTE: Log user message
+    if (fmt) {
+      va_list args;
+      va_start(args, fmt);
+      DN_Str8BuilderAppendFV(&builder, fmt, args);
+      va_end(args);
+    }
+
+    // NOTE: Log stack trace
+    if (DN_PARANOIA_LEVEL) {
+      if (type == DN_VerifyType_Nil) {
+        DN_Str8 trace = DN_Str8FromStackTraceNowArena(&scratch.arena, 128 /*limit*/, 4 /*skip*/);
+        DN_Str8BuilderAppendF(&builder, "\nTrace:\n  ");
+        DN_Str8BuilderAppendRef(&builder, DN_Str8PadNewLinesArena(trace, DN_Str8Lit("  "), &scratch.arena));
+      }
+    }
+
+    DN_Str8         log            = DN_Str8FromStr8BuilderArena(&builder, &scratch.arena);
+    DN_LogType      log_type       = type == DN_VerifyType_Nil ? DN_LogType_Error : DN_LogType_Warning;
+    DN_LogTypeParam log_type_param = DN_LogTypeParamFromType(log_type);
+    DN_LogPrintF(log_type_param, call_site, DN_LogFlags_Nil, "%.*s", DN_Str8PrintFmt(log));
+  }
+  DN_TCScratchEnd(&scratch);
+
+  if (type == DN_VerifyType_Nil && DN_PARANOIA_LEVEL) {
+    DN_DebugBreak;
+  }
+  return result;
+}
+
+DN_API bool DN_VerifyArgs(DN_VerifyType type, bool expr, DN_CallSite call_site, DN_Str8 expr_str8) {
+  bool result = DN_VerifyArgsF(type, expr, call_site, expr_str8, /*fmt=*/ 0);
+  return result;
+}
+
 DN_API bool DN_MemStartsWith(void const *lhs, DN_USize lhs_size, void const *rhs, DN_USize rhs_size)
 {
   bool result = false;
@@ -159,7 +207,7 @@ DN_API DN_CPUReport DN_CPUGetReport()
   int const      EXTENDED_FUNC_BASE_EAX = 0x8000'0000;
   int const      REGISTER_SIZE          = sizeof(fn_0000_[0].reg.eax);
 
-  // NOTE: Query standard/extended numbers ///////////////////////////////////////////////////////
+  // NOTE: Query standard/extended numbers
   {
     DN_CPUIDArgs args = {};
 
@@ -173,11 +221,11 @@ DN_API DN_CPUReport DN_CPUGetReport()
     fn_8000_[0] = DN_CPUID(args);
   }
 
-  // NOTE: Extract function count ////////////////////////////////////////////////////////////////
+  // NOTE: Extract function count
   int const STANDARD_FUNC_MAX_EAX = fn_0000_[0x0000].reg.eax;
   int const EXTENDED_FUNC_MAX_EAX = fn_8000_[0x0000].reg.eax;
 
-  // NOTE: Enumerate all CPUID results for the known function counts /////////////////////////////
+  // NOTE: Enumerate all CPUID results for the known function counts
   {
     DN_AssertF((STANDARD_FUNC_MAX_EAX + 1) <= DN_ArrayCountI(fn_0000_),
                "Max standard count is %d",
@@ -199,14 +247,14 @@ DN_API DN_CPUReport DN_CPUGetReport()
     }
   }
 
-  // NOTE: Query CPU vendor //////////////////////////////////////////////////////////////////////
+  // NOTE: Query CPU vendor
   {
     DN_Memcpy(result.vendor + 0, &fn_8000_[0x0000].reg.ebx, REGISTER_SIZE);
     DN_Memcpy(result.vendor + 4, &fn_8000_[0x0000].reg.edx, REGISTER_SIZE);
     DN_Memcpy(result.vendor + 8, &fn_8000_[0x0000].reg.ecx, REGISTER_SIZE);
   }
 
-  // NOTE: Query CPU brand ///////////////////////////////////////////////////////////////////////
+  // NOTE: Query CPU brand
   if (EXTENDED_FUNC_MAX_EAX >= (EXTENDED_FUNC_BASE_EAX + 4)) {
     DN_Memcpy(result.brand + 0, &fn_8000_[0x0002].reg.eax, REGISTER_SIZE);
     DN_Memcpy(result.brand + 4, &fn_8000_[0x0002].reg.ebx, REGISTER_SIZE);
@@ -226,7 +274,7 @@ DN_API DN_CPUReport DN_CPUGetReport()
     DN_Assert(result.brand[sizeof(result.brand) - 1] == 0);
   }
 
-  // NOTE: Query CPU features //////////////////////////////////////////////////////////////////
+  // NOTE: Query CPU features
   for (DN_USize ext_index = 0; ext_index < DN_CPUFeature_Count; ext_index++) {
     bool available = false;
 
@@ -288,7 +336,7 @@ DN_API DN_CPUReport DN_CPUGetReport()
       case DN_CPUFeature_TscInvariant:       available = (fn_8000_[0x0007].reg.edx & (1 << 8)); break;
       case DN_CPUFeature_VAES:               available = (fn_0000_[0x0007].reg.ecx & (1 << 9)); break;
       case DN_CPUFeature_VPCMULQDQ:          available = (fn_0000_[0x0007].reg.ecx & (1 << 10)); break;
-      case DN_CPUFeature_Count:              DN_InvalidCodePath; break;
+      case DN_CPUFeature_Count:              DN_AssertInvalidCodePath; break;
     }
 
     if (available)
@@ -298,7 +346,6 @@ DN_API DN_CPUReport DN_CPUGetReport()
   return result;
 }
 
-// NOTE: DN_TicketMutex ////////////////////////////////////////////////////////////////////////////
 DN_API void DN_TicketMutex_Begin(DN_TicketMutex *mutex)
 {
   DN_UInt ticket = DN_AtomicAddU32(&mutex->ticket, 1);
@@ -341,7 +388,7 @@ DN_API bool DN_TicketMutex_CanLock(DN_TicketMutex const *mutex, DN_UInt ticket)
   #endif
 #endif
 
-// NOTE: DN_Bit ////////////////////////////////////////////////////////////////////////////////////
+// NOTE: DN_Bit
 DN_API void DN_BitUnsetInplace(DN_USize *flags, DN_USize bitfield)
 {
   *flags = (*flags & ~bitfield);
@@ -354,7 +401,13 @@ DN_API void DN_BitSetInplace(DN_USize *flags, DN_USize bitfield)
 
 DN_API bool DN_BitIsSet(DN_USize bits, DN_USize bits_to_set)
 {
-  auto result = DN_Cast(bool)((bits & bits_to_set) == bits_to_set);
+  bool result = DN_Cast(bool)((bits & bits_to_set) == bits_to_set);
+  return result;
+}
+
+DN_API bool DN_BitIsAny(DN_USize bits, DN_USize bits_to_check)
+{
+  bool result = DN_Cast(bool)(bits & bits_to_check);
   return result;
 }
 
@@ -780,8 +833,8 @@ DN_API void DN_ASanPoisonMemoryRegion(void const volatile *ptr, DN_USize size)
 
   __asan_poison_memory_region(ptr, size);
   if (DN_ASAN_VET_POISON) {
-    DN_HardAssert(__asan_address_is_poisoned(ptr));
-    DN_HardAssert(__asan_address_is_poisoned((char *)ptr + (size - 1)));
+    DN_AssertAlways(__asan_address_is_poisoned(ptr));
+    DN_AssertAlways(__asan_address_is_poisoned((char *)ptr + (size - 1)));
   }
 #else
   (void)ptr;
@@ -797,7 +850,7 @@ DN_API void DN_ASanUnpoisonMemoryRegion(void const volatile *ptr, DN_USize size)
 #if DN_HAS_FEATURE(address_sanitizer) || defined(__SANITIZE_ADDRESS__)
   __asan_unpoison_memory_region(ptr, size);
   if (DN_ASAN_VET_POISON)
-    DN_HardAssert(__asan_region_is_poisoned((void *)ptr, size) == 0);
+    DN_AssertAlways(__asan_region_is_poisoned((void *)ptr, size) == 0);
 #else
   (void)ptr;
   (void)size;
@@ -873,8 +926,8 @@ static bool DN_ArenaHasPoison_(DN_MemFlags flags)
 
 static DN_MemBlock *DN_MemBlockFromMemFuncsFlags_(DN_U64 reserve, DN_U64 commit, DN_MemFlags flags, DN_MemFuncs mem_funcs)
 {
-  bool           track_alloc    = (flags & DN_MemFlags_NoAllocTrack) == 0;
-  bool           alloc_can_leak = flags & DN_MemFlags_AllocCanLeak;
+  bool         track_alloc    = (flags & DN_MemFlags_NoAllocTrack) == 0;
+  bool         alloc_can_leak = flags & DN_MemFlags_AllocCanLeak;
   DN_MemBlock *result         = DN_ArenaBlockFromMemFuncs_(reserve, commit, track_alloc, alloc_can_leak, mem_funcs);
   if (result && DN_ArenaHasPoison_(flags))
     DN_ASanPoisonMemoryRegion(DN_Cast(char *) result + DN_ARENA_HEADER_SIZE, result->commit - DN_ARENA_HEADER_SIZE);
@@ -1054,21 +1107,21 @@ DN_API void *DN_MemListAlloc(DN_MemList *mem, DN_U64 size, DN_U8 align, DN_ZMem 
     return nullptr;
 
   try_alloc_again:
-    DN_MemBlock *curr       = mem->curr;
-    bool         poison     = DN_ArenaHasPoison_(mem->flags);
-    DN_U8      real_align = poison ? DN_Max(align, DN_ASAN_POISON_ALIGNMENT) : align;
-    DN_U64       offset_pos = DN_AlignUpPowerOfTwo(curr->used, real_align) + (poison ? DN_ASAN_POISON_GUARD_SIZE : 0);
-    DN_U64       end_pos    = offset_pos + size;
-    DN_U64       alloc_size = end_pos - curr->used;
+  DN_MemBlock *curr       = mem->curr;
+  bool         poison     = DN_ArenaHasPoison_(mem->flags);
+  DN_U8        real_align = poison ? DN_Max(align, DN_ASAN_POISON_ALIGNMENT) : align;
+  DN_U64       offset_pos = DN_AlignUpPowerOfTwo(curr->used, real_align) + (poison ? DN_ASAN_POISON_GUARD_SIZE : 0);
+  DN_U64       end_pos    = offset_pos + size;
+  DN_U64       alloc_size = end_pos - curr->used;
 
-    if (end_pos > curr->reserve) {
-      if (mem->flags & (DN_MemFlags_NoGrow | DN_MemFlags_UserBuffer))
-        return nullptr;
-      DN_USize new_reserve = DN_Max(DN_ARENA_HEADER_SIZE + alloc_size, DN_ARENA_RESERVE_SIZE);
-      DN_USize new_commit  = DN_Max(DN_ARENA_HEADER_SIZE + alloc_size, DN_ARENA_COMMIT_SIZE);
-      if (!DN_MemListGrow(mem, new_reserve, new_commit))
-        return nullptr;
-      goto try_alloc_again;
+  if (end_pos > curr->reserve) {
+    if (mem->flags & (DN_MemFlags_NoGrow | DN_MemFlags_UserBuffer))
+      return nullptr;
+    DN_USize new_reserve = DN_Max(DN_ARENA_HEADER_SIZE + alloc_size, DN_ARENA_RESERVE_SIZE);
+    DN_USize new_commit  = DN_Max(DN_ARENA_HEADER_SIZE + alloc_size, DN_ARENA_COMMIT_SIZE);
+    if (!DN_MemListGrow(mem, new_reserve, new_commit))
+      return nullptr;
+    goto try_alloc_again;
   }
 
   DN_USize prev_arena_commit = curr->commit;
@@ -1088,8 +1141,8 @@ DN_API void *DN_MemListAlloc(DN_MemList *mem, DN_U64 size, DN_U8 align, DN_ZMem 
     mem->stats.hwm.commit   = DN_Max(mem->stats.hwm.commit, mem->stats.info.commit);
   }
 
-  void *result                     = DN_Cast(char *) curr + offset_pos;
-  curr->used                      += alloc_size;
+  void *result          = DN_Cast(char *) curr + offset_pos;
+  curr->used           += alloc_size;
   mem->stats.info.used += alloc_size;
   mem->stats.hwm.used   = DN_Max(mem->stats.hwm.used, mem->stats.info.used);
 
@@ -1159,7 +1212,19 @@ DN_API void DN_MemListPopTo(DN_MemList *mem, DN_U64 init_used)
   if (DN_SCRUB_UNINIT_MEM_BYTE) {
     if (old_used > curr->used) {
       char *discarded = (char *)curr + curr->used;
-      DN_Memset(discarded, DN_SCRUB_UNINIT_MEM_BYTE, old_used - curr->used);
+      DN_USize scrub_size = old_used - curr->used;
+
+      // NOTE: If we allocated memory unaligned then the pointer given to the user was aligned up
+      // and unpoisoned. If the user snapped a memory list position before that allocation then
+      // attempts to revert it, scrubbing from the memory position (which is before alignment was
+      // applied!) will cause this code to accidentally scrub the our poison guard bytes. So we
+      // unpoison the region unconditionally to ensure that is cleaned up before scrubbing. Since
+      // scrubbing is a debug feature and, you have it turned on _with_ ASAN then we let that
+      // performance penalty slide.
+      if (DN_ArenaHasPoison_(mem->flags))
+        DN_ASanUnpoisonMemoryRegion(discarded, scrub_size);
+
+      DN_Memset(discarded, DN_SCRUB_UNINIT_MEM_BYTE, scrub_size);
     }
   }
   DN_MSVC_WARNING_POP
@@ -1310,7 +1375,7 @@ static void DN_ArenaUAFCheck_(DN_Arena *arena, DN_ArenaUAFCheckReportType_ type)
 
         DN_AssertF(mem->uaf_guard_active_id == arena->uaf_guard_id,
                    "%.*s\n\nThe originating temporary memory region (id: %'u) was created at:"
-                   "\n\n  %.*s\n\nThe active temporary memory region (id: %'u) was created at:\n\n  %.*s",
+                   "\n\n  %.*s\n\nThe active temporary memory region (id: %'u) was created at:\n\n  %.*s\n",
                    DN_Str8PrintFmt(prefix),
                    arena->uaf_guard_id,
                    DN_Str8PrintFmt(curr_stack_trace),
@@ -1697,7 +1762,7 @@ DN_API bool DN_ErrSinkEndLogError_(DN_ErrSink *err, DN_CallSite call_site, DN_St
 
     // NOTE: Log the error
     DN_Str8 log = DN_Str8FromStr8BuilderArena(&builder, err->arena);
-    DN_LogPrint(DN_LogTypeParamFromType(DN_LogType_Error), call_site, DN_LogFlags_Nil, "%.*s", DN_Str8PrintFmt(log));
+    DN_LogPrintF(DN_LogTypeParamFromType(DN_LogType_Error), call_site, DN_LogFlags_Nil, "%.*s", DN_Str8PrintFmt(log));
 
     if (node->mode == DN_ErrSinkMode_DebugBreakOnErrorLog)
       DN_DebugBreak;
@@ -1827,7 +1892,7 @@ DN_API void DN_TCEquip(DN_TCCore *tc)
 
 DN_API DN_TCCore *DN_TCGet()
 {
-  DN_RawAssert(g_dn_thread_context &&
+  DN_AssertRaw(g_dn_thread_context &&
                "This thread's thread context has not been equipped yet. Ensure that DN_TCInit(...) "
                "has been called to create a thread context and call DN_TCEquip(...) in the current "
                "thread to make it retrievable via this function");
@@ -5797,22 +5862,25 @@ DN_API void DN_LogSetPrintFunc(DN_LogPrintFunc *print_func, void *user_data)
   dn->print_func_context = user_data;
 }
 
-DN_API void DN_LogPrint(DN_LogTypeParam type, DN_CallSite call_site, DN_LogFlags flags, DN_FMT_ATTRIB char const *fmt, ...)
+DN_API void DN_LogPrintFV(DN_LogTypeParam type, DN_CallSite call_site, DN_LogFlags flags, DN_FMT_ATTRIB char const *fmt, va_list args)
 {
   DN_Core *dn = DN_Get();
   if (type.is_u32_enum) {
     DN_Assert(dn->log_level_to_show_from >= 0);
-    if (type.u32 < DN_Cast(DN_U32)dn->log_level_to_show_from)
+    if (type.u32 < DN_Cast(DN_U32) dn->log_level_to_show_from)
       return;
   }
-
   DN_LogPrintFunc *func = dn->print_func;
-  if (func) {
-    va_list args;
-    va_start(args, fmt);
+  if (func)
     func(type, dn->print_func_context, call_site, flags, fmt, args);
-    va_end(args);
-  }
+}
+
+DN_API void DN_LogPrintF(DN_LogTypeParam type, DN_CallSite call_site, DN_LogFlags flags, DN_FMT_ATTRIB char const *fmt, ...)
+{
+  va_list args;
+  va_start(args, fmt);
+  DN_LogPrintFV(type, call_site, flags, fmt, args);
+  va_end(args);
 }
 
 DN_API DN_LogTypeParam DN_LogTypeParamFromType(DN_LogType type)
@@ -7743,7 +7811,7 @@ DN_API void *DN_ArrayMakeArray(void *data, DN_USize *size, DN_USize max, DN_USiz
 DN_API void *DN_ArrayMakeArrayAssert(void *data, DN_USize *size, DN_USize max, DN_USize elem_size, DN_USize make_count, DN_ZMem z_mem, DN_CallSite call_site)
 {
   void *result = DN_ArrayMakeArray(data, size, max, elem_size, make_count, z_mem);
-  DN_AssertArgsF(result, call_site, "array=%p size=%zu max=%zu", data, *size, max);
+  DN_AssertCallSiteF(result, call_site, "Array out of space, failed to add %zu items: array=%p size=%zu max=%zu", make_count, data, *size, max);
   return result;
 }
 
@@ -7766,7 +7834,7 @@ DN_API void *DN_ArrayAddArray(void *data, DN_USize *size, DN_USize max, DN_USize
 DN_API void *DN_ArrayAddArrayAssert(void *data, DN_USize *size, DN_USize max, DN_USize elem_size, void const *elems, DN_USize elems_count, DN_ArrayAdd add, DN_CallSite call_site)
 {
   void *result = DN_ArrayAddArray(data, size, max, elem_size, elems, elems_count, add);
-  DN_AssertArgsF(result, call_site, "array=%p size=%zu max=%zu", data, *size, max);
+  DN_AssertCallSiteF(result, call_site, "Array out of space, failed to add %zu items: array=%p size=%zu max=%zu", elems_count, data, *size, max);
   return result;
 }
 
@@ -8002,7 +8070,7 @@ DN_U32 DN_DSMapHash(DN_DSMap<T> const *map, DN_DSMapKey key)
     DN_U32      h       = seed;
     switch (key.type) {
       case DN_DSMapKeyType_BufferAsU64NoHash: /*FALLTHRU*/
-      case DN_DSMapKeyType_U64NoHash:         DN_InvalidCodePath; /*FALLTHRU*/
+      case DN_DSMapKeyType_U64NoHash:         DN_AssertInvalidCodePath; /*FALLTHRU*/
       case DN_DSMapKeyType_Invalid:           break;
 
       case DN_DSMapKeyType_Buffer:
@@ -8894,7 +8962,7 @@ DN_API void DN_LeakTrackAlloc_(DN_LeakTracker *leak, void *ptr, DN_USize size, b
     if ((alloc->flags & DN_LeakAllocFlag_Freed) == 0) {
       DN_Str8x32 alloc_size     = DN_Str8x32FromByteCountU64Auto(alloc->size);
       DN_Str8x32 new_alloc_size = DN_Str8x32FromByteCountU64Auto(size);
-      DN_HardAssertF(
+      DN_AssertAlwaysF(
           alloc->flags & DN_LeakAllocFlag_Freed,
           "This pointer is already in the leak tracker, however it has not been freed yet. This "
           "same pointer is being ask to be tracked twice in the allocation table, e.g. one if its "
@@ -8942,7 +9010,7 @@ DN_API void DN_LeakTrackDealloc_(DN_LeakTracker *leak, void *ptr)
   DN_Str8                      stack_trace = DN_Str8FromStackTraceNowHeap(128, 3 /*skip*/);
   DN_DSMap<DN_LeakAlloc>      *alloc_table = &leak->alloc_table;
   DN_DSMapResult<DN_LeakAlloc> alloc_entry = DN_DSMapFindKeyU64(alloc_table, DN_Cast(uintptr_t) ptr);
-  DN_HardAssertF(alloc_entry.found,
+  DN_AssertAlwaysF(alloc_entry.found,
                  "Allocated pointer can not be removed as it does not exist in the "
                  "allocation table. When this memory was allocated, the pointer was "
                  "not added to the allocation table [ptr=%p]",
@@ -8951,7 +9019,7 @@ DN_API void DN_LeakTrackDealloc_(DN_LeakTracker *leak, void *ptr)
   DN_LeakAlloc *alloc = alloc_entry.value;
   if (alloc->flags & DN_LeakAllocFlag_Freed) {
     DN_Str8x32 freed_size = DN_Str8x32FromByteCountU64Auto(alloc->freed_size);
-    DN_HardAssertF((alloc->flags & DN_LeakAllocFlag_Freed) == 0,
+    DN_AssertAlwaysF((alloc->flags & DN_LeakAllocFlag_Freed) == 0,
                    "Double free detected, pointer to free was already marked "
                    "as freed. Either the pointer was reallocated but not "
                    "traced, or, the pointer was freed twice.\n"

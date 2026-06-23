@@ -50,10 +50,15 @@ pushd %build_dir%
     )
     set msvc_cmd=!msvc_cmd! -link
 
+    REM Build the single header
     powershell -Command "$time = Measure-Command { !msvc_cmd! | Out-Default }; Write-Host '[BUILD] msvc:'$time.TotalSeconds's'; exit $LASTEXITCODE" || echo MSVC build failed&& exit /b 1
     echo [BUILD] Single header generator ...
     call cl %script_dir%\single_header_generator.cpp -Z7 -nologo -link || echo Single header generator build failed&& exit /b 1
     call %build_dir%\single_header_generator.exe %script_dir%\Source %script_dir%\Single-Header || echo Single header generation failed&& exit /b 1
+
+    REM Build the single header using the single header (to test that the generated single header)
+    call cl %script_dir%\single_header_generator.cpp -Z7 -nologo -link -D USE_SINGLE_HEADER  || echo Single header generator build failed&& exit /b 1
+    call %build_dir%\single_header_generator.exe %script_dir%\Source %script_dir%\Single-Header -D USE_SINGLE_HEADER || echo Single header generation failed&& exit /b 1
   )
 
   where /q clang-cl && (
