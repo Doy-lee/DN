@@ -4,39 +4,26 @@
 // NOTE: DN
 
 //  NOTE: Getting Started
-//    Include this mega header `dn.h` and define the following symbols to `1` to conditionally
-//    enable the interfaces for those features. Additionally in the same or different translation
-//    unit, include `dn.cpp` with the same symbols defined to enable the implementation of these
-//    features.
-//
-//    See the configuration section for more information on other symbols that can be defined.
-//
-//    The following is a single translation unit example:
+//    - Copy the entire DN folder to your project and include `dn.h` alongside your headers and
+//      include `dn.cpp` in one of your implementation files that has `dn.h` included in its scope,
+//      an example. There are #defines to selectively enable features of the library (see the
+//      configuration section for more info), example:
 /*
-      #define DN_WITH_OS             1
-      #define DN_WITH_NET            0
-      #define DN_WITH_NET_CURL       0
-      #define DN_WITH_NET_EMSCRIPTEN 0
-      #include "dn.h"
+          #define DN_WITH_OS 1 // Enable OS features (like virtual mem, TLS, file system, threads)
+          #include "dn.h"
 
-      #define DN_CPP_WITH_TESTS 1
-      #include "dn.cpp"
+          #define DN_CPP_WITH_TESTS 1
+          #include "dn.cpp"
 
-      int main()
-      {
-        DN_Core core = {};
-        DN_Init(&core, DN_InitFlags_Nil, DN_TCInitArgsDefault());
-        return 0;
-      }
+          int main()
+          {
+            DN_Core core = {};
+            DN_Init(&core, DN_InitFlags_Nil, DN_TCInitArgsDefault());
+            return 0;
+          }
 */
-//    - The base layer (dn_base.h) which provides primitives that do not require a host operating
-//      system (e.g. freestanding) such as string manipulation, compiler intrinsics and containers.
-//      This layer is unconditionallly always available by compiling with this library.
-//
-//    - The OS layer (dn_os.h) which provides primitives that use the OS such as file IO, threading
-//      synchronisation, memory allocation. This layer is OPTIONAL.
-//
-//    - Extra layer provides helper utilities that are opt-in. These layers are OPTIONAL.
+//    - `DN/Standalone` contains utilities that are self-contained and can be used without `dn.h` in
+//      a similar manner, typically a single header and single implementation file.
 
 //  NOTE: Configuration
 
@@ -2431,10 +2418,12 @@ DN_API DN_F32                   DN_EpsilonClampF32                              
 DN_API DN_MemStats              DN_MemStatsSum                                         (DN_MemStats lhs, DN_MemStats rhs);
 DN_API DN_MemStats              DN_MemStatsSumArray                                    (DN_MemStats const *array, DN_USize size);
 
-// NOTE: `MemList` is an implementation of a classical `Arena` (e.g. bump allocator, can dynamically
-// grow, frees by bumping pointer back, sub-divides a block of memory). The term `Arena` is reserved
-// as a thin-layer over the functionality here to provide some use-after-free protection. See
-// `Arena` for more info.
+// NOTE: MemList
+// Overview
+//   `MemList` is an implementation of a classical `Arena` (e.g. bump allocator, can dynamically
+//   grow, frees by bumping pointer back, sub-divides a block of memory). The term `Arena` is
+//   reserved as a thin-layer over the functionality here to provide some use-after-free protection.
+//   See `Arena` for more info.
 DN_API DN_MemList               DN_MemListFromBuffer                                   (void *buffer, DN_USize size, DN_MemFlags flags);
 DN_API DN_MemList               DN_MemListFromMemFuncs                                 (DN_U64 reserve, DN_U64 commit, DN_MemFlags flags, DN_MemFuncs mem_funcs);
 DN_API void                     DN_MemListDeinit                                       (DN_MemList *mem);

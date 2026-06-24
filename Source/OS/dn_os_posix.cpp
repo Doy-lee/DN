@@ -219,7 +219,7 @@ DN_API void DN_OS_GenBytesSecure(void *buffer, DN_U32 size)
 
 DN_API bool DN_OS_SetEnvVar(DN_Str8 name, DN_Str8 value)
 {
-  DN_VerifyWarning(false, "Unimplemented function");
+  DN_VerifyWarningF(false, "Unimplemented function");
   (void)name;
   (void)value;
   bool result = false;

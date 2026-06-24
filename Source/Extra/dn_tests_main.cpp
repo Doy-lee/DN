@@ -6,6 +6,9 @@
 #define DN_ARENA_TEMP_MEM_UAF_TRACE_ON_BY_DEFAULT 0
 #define DN_WITH_OS                                1
 #define DN_WITH_NET                               1
+#if defined(DN_PLATFORM_EMSCRIPTEN)
+  #define DN_WITH_NET_EMSCRIPTEN 1
+#endif
 #include "../dn.h"
 
 #if DN_WITH_NET_CURL
@@ -13,13 +16,6 @@
   #include <curl/curl.h>
 #endif
 #include "../dn.cpp"
-
-#if defined(DN_PLATFORM_EMSCRIPTEN)
-  #include <emscripten/emscripten.h>
-  #include <emscripten/fetch.h>
-  #include "../Extra/dn_net_emscripten.h"
-  #include "../Extra/dn_net_emscripten.cpp"
-#endif
 
 #define DN_UT_IMPLEMENTATION
 #include "../Standalone/dn_utest.h"
