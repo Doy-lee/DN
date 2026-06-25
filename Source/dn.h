@@ -760,7 +760,7 @@ enum DN_ZMem
 struct DN_Str8
 {
   char    *data; // The bytes of the string
-  DN_USize size; // The number of bytes in the string
+  DN_USize count; // The number of bytes in the string
 };
 
 struct DN_Str8Slice
@@ -769,18 +769,18 @@ struct DN_Str8Slice
   DN_USize count;
 };
 
-struct DN_Str8x16   { char data[16];  DN_USize size; };
-struct DN_Str8x32   { char data[32];  DN_USize size; };
-struct DN_Str8x64   { char data[64];  DN_USize size; };
-struct DN_Str8x128  { char data[128]; DN_USize size; };
-struct DN_Str8x256  { char data[256]; DN_USize size; };
-struct DN_Str8x512  { char data[512]; DN_USize size; };
-struct DN_Str8x1024 { char data[1024]; DN_USize size; };
+struct DN_Str8x16   { char data[16];  DN_USize count; };
+struct DN_Str8x32   { char data[32];  DN_USize count; };
+struct DN_Str8x64   { char data[64];  DN_USize count; };
+struct DN_Str8x128  { char data[128]; DN_USize count; };
+struct DN_Str8x256  { char data[256]; DN_USize count; };
+struct DN_Str8x512  { char data[512]; DN_USize count; };
+struct DN_Str8x1024 { char data[1024]; DN_USize count; };
 
 struct DN_Str16 // A pointer and length style string that holds slices to UTF16 bytes.
 {
-  wchar_t *data; // The UTF16 bytes of the string
-  DN_USize size; // The number of characters in the string
+  wchar_t *data;  // The UTF16 bytes of the string
+  DN_USize count; // The number of characters in the string
 };
 
 struct DN_Str16Slice
@@ -895,14 +895,14 @@ struct DN_TicketMutex
 };
 
 
-struct DN_Hex32    { char data[32 + 1];  DN_USize size; };
-struct DN_Hex64    { char data[64 + 1];  DN_USize size; };
-struct DN_Hex128   { char data[128 + 1]; DN_USize size; };
+struct DN_Hex32    { char data[32 + 1];  DN_USize count; };
+struct DN_Hex64    { char data[64 + 1];  DN_USize count; };
+struct DN_Hex128   { char data[128 + 1]; DN_USize count; };
 
 struct DN_HexU64
 {
   char  data[(sizeof(DN_U64) * 2) + 1 /*null-terminator*/];
-  DN_U8 size;
+  DN_U8 count;
 };
 
 enum DN_HexFromU64Type
@@ -1095,11 +1095,11 @@ enum DN_MemFuncsType
   DN_MemFuncsType_Virtual,
 };
 
-typedef void *(DN_MemHeapAllocFunc)(DN_USize size);
+typedef void *(DN_MemHeapAllocFunc)(DN_USize count);
 typedef void  (DN_MemHeapDeallocFunc)(void *ptr);
-typedef void *(DN_MemVirtualReserveFunc)(DN_USize size, DN_MemCommit commit, DN_MemPage page_flags);
-typedef bool  (DN_MemVirtualCommitFunc)(void *ptr, DN_USize size, DN_U32 page_flags);
-typedef void  (DN_MemVirtualReleaseFunc)(void *ptr, DN_USize size);
+typedef void *(DN_MemVirtualReserveFunc)(DN_USize count, DN_MemCommit commit, DN_MemPage page_flags);
+typedef bool  (DN_MemVirtualCommitFunc)(void *ptr, DN_USize count, DN_U32 page_flags);
+typedef void  (DN_MemVirtualReleaseFunc)(void *ptr, DN_USize count);
 struct DN_MemFuncs
 {
   DN_MemFuncsType        type;
@@ -1372,7 +1372,7 @@ struct DN_Str8TruncResult
 {
   bool     truncated;
   DN_Str8  str8;
-  DN_USize size_req; // Not including null-terminator
+  DN_USize count_req; // Not including null-terminator
 };
 
 struct DN_Str8SplitResult
@@ -1654,7 +1654,7 @@ struct DN_LogDate
 
 struct DN_LogPrefixSize
 {
-  DN_USize size;
+  DN_USize count;
   DN_USize padding;
 };
 
@@ -1817,7 +1817,7 @@ struct DN_ArrayEraseResult
   // The next index your for-index should be set to such that you can continue
   // to iterate the remainder of the array, e.g:
   //
-  // for (DN_USize index = 0; index < array.size; index++) {
+  // for (DN_USize index = 0; index < array.count; index++) {
   //     if (erase)
   //          index = DN_FArray_EraseRange(&array, index, -3, DN_ArrayErase_Unstable);
   // }
@@ -2281,9 +2281,9 @@ DN_API bool                     DN_VerifyArgs                                   
 #define                         DN_VSPrintF(...)                                       STB_SPRINTF_DECORATE(vsprintf)(__VA_ARGS__)
 #define                         DN_VSNPrintF(...)                                      STB_SPRINTF_DECORATE(vsnprintf)(__VA_ARGS__)
 
-DN_API bool                     DN_MemStartsWith                                       (void const *lhs, DN_USize lhs_size, void const *rhs, DN_USize rhs_size);
-DN_API bool                     DN_MemEq                                               (void const *lhs, DN_USize lhs_size, void const *rhs, DN_USize rhs_size);
-DN_API bool                     DN_MemEqUnsafe                                         (void const *lhs, void const *rhs, DN_USize size);
+DN_API bool                     DN_MemStartsWith                                       (void const *lhs, DN_USize lhs_count, void const *rhs, DN_USize rhs_count);
+DN_API bool                     DN_MemEq                                               (void const *lhs, DN_USize lhs_count, void const *rhs, DN_USize rhs_count);
+DN_API bool                     DN_MemEqUnsafe                                         (void const *lhs, void const *rhs, DN_USize count);
 #if defined(__cplusplus)
 template <typename T> T*        DN_MemCopyObjT                                         (T *dest, T const *src, DN_USize count);
 #define                         DN_MemCopyObj(dest, src, count)                        DN_MemCopyObjT(dest, src, count)
@@ -2416,7 +2416,7 @@ DN_API void                     DN_ASanUnpoisonMemoryRegion                     
 DN_API DN_F32                   DN_EpsilonClampF32                                     (DN_F32 value, DN_F32 target, DN_F32 epsilon);
 
 DN_API DN_MemStats              DN_MemStatsSum                                         (DN_MemStats lhs, DN_MemStats rhs);
-DN_API DN_MemStats              DN_MemStatsSumArray                                    (DN_MemStats const *array, DN_USize size);
+DN_API DN_MemStats              DN_MemStatsSumArray                                    (DN_MemStats const *array, DN_USize count);
 
 // NOTE: MemList
 // Overview
@@ -2588,7 +2588,7 @@ DN_API DN_I64FromResult         DN_I64FromPtr                                   
 DN_API DN_I64                   DN_I64FromPtrUnsafe                                    (void const *data, DN_USize size, char separator);
 
 DN_API bool                     DN_U8x32Eq                                             (DN_U8x32 const *lhs, DN_U8x32 const *rhs);
-DN_API DN_U8x32                 DN_U8x32FromBytesLeftPadZ                              (DN_U8 const *ptr, DN_USize count);
+DN_API DN_U8x32                 DN_U8x32FromBytesLeftPadZ                              (DN_U8 const *ptr, DN_USize size);
 DN_API DN_U8x32                 DN_U8x32FromHexUnsafe                                  (DN_Str8 hex_32b);
 DN_API DN_U8x32FromResult       DN_U8x32FromHex                                        (DN_Str8 hex_32b);
 DN_API DN_U8x32FromResult       DN_U8x32FromDecimalStr8                                (DN_Str8 decimal); // Write decimal string (e.g. "12345") as big-endian 256-bit value
@@ -2596,33 +2596,33 @@ DN_API DN_U8x32FromResult       DN_U8x32FromDecimalStr8                         
 DN_API DN_Allocator             DN_AllocatorFromMemList                                (DN_MemList *mem);
 DN_API DN_Allocator             DN_AllocatorFromArena                                  (DN_Arena *arena);
 DN_API DN_Allocator             DN_AllocatorFromPool                                   (DN_Pool *pool);
-DN_API void*                    DN_AllocatorAlloc                                      (DN_Allocator allocator, DN_USize size, DN_U8 align, DN_ZMem z_mem);
+DN_API void*                    DN_AllocatorAlloc                                      (DN_Allocator allocator, DN_USize count, DN_U8 align, DN_ZMem z_mem);
 
-DN_API DN_USize                 DN_FmtVSize                                            (DN_FMT_ATTRIB char const *fmt, va_list args);
-DN_API DN_USize                 DN_FmtSize                                             (DN_FMT_ATTRIB char const *fmt, ...);
+DN_API DN_USize                 DN_FmtVCount                                           (DN_FMT_ATTRIB char const *fmt, va_list args);
+DN_API DN_USize                 DN_FmtCount                                            (DN_FMT_ATTRIB char const *fmt, ...);
 DN_API DN_FmtAppendResult       DN_FmtVAppend                                          (char *buf, DN_USize *buf_size, DN_USize buf_max, char const *fmt, va_list args);
 DN_API DN_FmtAppendResult       DN_FmtAppend                                           (char *buf, DN_USize *buf_size, DN_USize buf_max, char const *fmt, ...);
 DN_API DN_FmtAppendResult       DN_FmtAppendTruncate                                   (char *buf, DN_USize *buf_size, DN_USize buf_max, DN_Str8 truncator, char const *fmt, ...);
-DN_API DN_USize                 DN_CStr8Size                                           (char const *src);
-DN_API DN_USize                 DN_CStr16Size                                          (wchar_t const *src);
+DN_API DN_USize                 DN_CStr8Count                                          (char const *src);
+DN_API DN_USize                 DN_CStr16Count                                         (wchar_t const *src);
 
 #define                         DN_Str16Lit(string)                                    DN_Str16{(wchar_t *)(string), sizeof(string)/sizeof(string[0]) - 1}
-#define                         DN_Str16FromPtr(data, size)                            DN_Literal(DN_Str16){(wchar_t *)(data), (DN_USize)(size)}
+#define                         DN_Str16FromPtr(data, count)                           DN_Literal(DN_Str16){(wchar_t *)(data), (DN_USize)(count)}
 
 #define                         DN_Str8Lit(c_str)                                      DN_Literal(DN_Str8){(char *)(c_str), sizeof(c_str) - 1}
-#define                         DN_Str8PrintFmt(string)                                (int)((string).size), (string).data
+#define                         DN_Str8PrintFmt(string)                                (int)((string).count), (string).data
 
-#define                         DN_Str8FromPtr(data, size)                             DN_Literal(DN_Str8){(char *)(data), (DN_USize)(size)}
-#define                         DN_Str8FromStruct(ptr)                                 DN_Str8FromPtr((ptr)->data, (ptr)->size)
+#define                         DN_Str8FromPtr(data, count)                            DN_Literal(DN_Str8){(char *)(data), (DN_USize)(count)}
+#define                         DN_Str8FromStruct(ptr)                                 DN_Str8FromPtr((ptr)->data, (ptr)->count)
 #define                         DN_Str8FromLitArray(c_array)                           DN_Str8FromPtr(c_array, DN_ArrayCountU(c_array))
-DN_API DN_Str8                  DN_Str8AllocAllocator                                  (DN_USize size, DN_ZMem z_mem, DN_Allocator allocator);
-DN_API DN_Str8                  DN_Str8AllocArena                                      (DN_USize size, DN_ZMem z_mem, DN_Arena *arena);
-DN_API DN_Str8                  DN_Str8AllocPool                                       (DN_USize size, DN_Pool *pool);
+DN_API DN_Str8                  DN_Str8AllocAllocator                                  (DN_USize count, DN_ZMem z_mem, DN_Allocator allocator);
+DN_API DN_Str8                  DN_Str8AllocArena                                      (DN_USize count, DN_ZMem z_mem, DN_Arena *arena);
+DN_API DN_Str8                  DN_Str8AllocPool                                       (DN_USize count, DN_Pool *pool);
 
 DN_API DN_Str8                  DN_Str8FromCStr8                                       (char const *src);
 DN_API DN_Str8                  DN_Str8FromCStr8Arena                                  (char const *src, DN_Arena *arena);
-DN_API DN_Str8                  DN_Str8FromPtrArena                                    (void const *data, DN_USize size, DN_Arena *arena);
-DN_API DN_Str8                  DN_Str8FromPtrPool                                     (void const *data, DN_USize size, DN_Pool *pool);
+DN_API DN_Str8                  DN_Str8FromPtrArena                                    (void const *data, DN_USize count, DN_Arena *arena);
+DN_API DN_Str8                  DN_Str8FromPtrPool                                     (void const *data, DN_USize count, DN_Pool *pool);
 DN_API DN_Str8                  DN_Str8FromStr8Allocator                               (DN_Str8 string, DN_Allocator allocator);
 DN_API DN_Str8                  DN_Str8FromStr8Arena                                   (DN_Str8 string, DN_Arena *arena);
 DN_API DN_Str8                  DN_Str8FromStr8Pool                                    (DN_Str8 string, DN_Pool *pool);
@@ -2665,7 +2665,7 @@ DN_API void                     DN_Str8x1024AppendFmtV                          
 DN_API DN_Str8x32               DN_Str8x32FromU64                                      (DN_U64 val, char separator);
 DN_API bool                     DN_Str8IsAll                                           (DN_Str8 string, DN_Str8IsAllType is_all);
 DN_API char *                   DN_Str8End                                             (DN_Str8 string);
-DN_API DN_Str8                  DN_Str8Subset                                          (DN_Str8 string, DN_USize offset, DN_USize size);
+DN_API DN_Str8                  DN_Str8Subset                                          (DN_Str8 string, DN_USize offset, DN_USize count);
 DN_API DN_Str8                  DN_Str8Advance                                         (DN_Str8 string, DN_USize amount);
 DN_API DN_Str8                  DN_Str8NextLine                                        (DN_Str8 string);
 DN_API DN_Str8BSplitResult      DN_Str8BSplitArray                                     (DN_Str8 string, DN_Str8 const *find, DN_USize find_size);
@@ -2705,7 +2705,7 @@ DN_API DN_Str8                  DN_Str8AppendF                                  
 DN_API DN_Str8                  DN_Str8AppendFV                                        (DN_Arena *arena, DN_Str8 string, char const *fmt, va_list args);
 DN_API DN_Str8                  DN_Str8FillF                                           (DN_Arena *arena, DN_USize count, char const *fmt, ...);
 DN_API DN_Str8                  DN_Str8FillFV                                          (DN_Arena *arena, DN_USize count, char const *fmt, va_list args);
-DN_API void                     DN_Str8Remove                                          (DN_Str8 *string, DN_USize offset, DN_USize size);
+DN_API void                     DN_Str8Remove                                          (DN_Str8 *string, DN_USize offset, DN_USize count);
 DN_API DN_Str8TruncResult       DN_Str8TruncMiddlePtr                                  (DN_Str8 str8, DN_USize side_size, DN_Str8 truncator, char *dest, DN_USize dest_max);
 DN_API DN_Str8TruncResult       DN_Str8TruncMiddle                                     (DN_Str8 str8, DN_USize side_size, DN_Str8 truncator, DN_Arena *arena);
 DN_API DN_Str8                  DN_Str8Lower                                           (DN_Str8 string, DN_Arena *arena);
@@ -2738,28 +2738,28 @@ DN_API DN_Str16                 DN_Str16SliceRender                             
 DN_API DN_Str16                 DN_Str16RenderSpaceSep                                 (DN_Str16Slice array, DN_Arena *arena);
 
 DN_API DN_Str8Builder           DN_Str8BuilderFromArena                                (DN_Arena *arena);
-DN_API DN_Str8Builder           DN_Str8BuilderFromStr8PtrRef                           (DN_Arena *arena, DN_Str8 const *strings, DN_USize size);
-DN_API DN_Str8Builder           DN_Str8BuilderFromStr8PtrCopy                          (DN_Arena *arena, DN_Str8 const *strings, DN_USize size);
+DN_API DN_Str8Builder           DN_Str8BuilderFromStr8PtrRef                           (DN_Arena *arena, DN_Str8 const *strings, DN_USize count);
+DN_API DN_Str8Builder           DN_Str8BuilderFromStr8PtrCopy                          (DN_Arena *arena, DN_Str8 const *strings, DN_USize count);
 DN_API DN_Str8Builder           DN_Str8BuilderFromBuilder                              (DN_Arena *arena, DN_Str8Builder const *builder);
-DN_API bool                     DN_Str8BuilderAddArrayRef                              (DN_Str8Builder *builder, DN_Str8 const *strings, DN_USize size, DN_Str8BuilderAdd add);
-DN_API bool                     DN_Str8BuilderAddArrayCopy                             (DN_Str8Builder *builder, DN_Str8 const *strings, DN_USize size, DN_Str8BuilderAdd add);
+DN_API bool                     DN_Str8BuilderAddArrayRef                              (DN_Str8Builder *builder, DN_Str8 const *strings, DN_USize count, DN_Str8BuilderAdd add);
+DN_API bool                     DN_Str8BuilderAddArrayCopy                             (DN_Str8Builder *builder, DN_Str8 const *strings, DN_USize count, DN_Str8BuilderAdd add);
 DN_API bool                     DN_Str8BuilderAddFV                                    (DN_Str8Builder *builder, DN_Str8BuilderAdd add, DN_FMT_ATTRIB char const *fmt, va_list args);
 #define                         DN_Str8BuilderAppendArrayRef(builder, strings, size)   DN_Str8BuilderAddArrayRef(builder, strings, size, DN_Str8BuilderAdd_Append)
 #define                         DN_Str8BuilderAppendArrayCopy(builder, strings, size)  DN_Str8BuilderAddArrayCopy(builder, strings, size, DN_Str8BuilderAdd_Append)
-#define                         DN_Str8BuilderAppendSliceRef(builder, slice)           DN_Str8BuilderAddArrayRef(builder, slice.data, slice.size, DN_Str8BuilderAdd_Append)
-#define                         DN_Str8BuilderAppendSliceCopy(builder, slice)          DN_Str8BuilderAddArrayCopy(builder, slice.data, slice.size, DN_Str8BuilderAdd_Append)
+#define                         DN_Str8BuilderAppendSliceRef(builder, slice)           DN_Str8BuilderAddArrayRef(builder, slice.data, slice.count, DN_Str8BuilderAdd_Append)
+#define                         DN_Str8BuilderAppendSliceCopy(builder, slice)          DN_Str8BuilderAddArrayCopy(builder, slice.data, slice.count, DN_Str8BuilderAdd_Append)
 DN_API bool                     DN_Str8BuilderAppendRef                                (DN_Str8Builder *builder, DN_Str8 string);
 DN_API bool                     DN_Str8BuilderAppendCopy                               (DN_Str8Builder *builder, DN_Str8 string);
 #define                         DN_Str8BuilderAppendFV(builder, fmt, args)             DN_Str8BuilderAddFV(builder, DN_Str8BuilderAdd_Append, fmt, args)
 DN_API bool                     DN_Str8BuilderAppendF                                  (DN_Str8Builder *builder, DN_FMT_ATTRIB char const *fmt, ...);
-DN_API bool                     DN_Str8BuilderAppendBytesRef                           (DN_Str8Builder *builder, void const *ptr, DN_USize size);
-DN_API bool                     DN_Str8BuilderAppendBytesCopy                          (DN_Str8Builder *builder, void const *ptr, DN_USize size);
+DN_API bool                     DN_Str8BuilderAppendBytesRef                           (DN_Str8Builder *builder, void const *ptr, DN_USize count);
+DN_API bool                     DN_Str8BuilderAppendBytesCopy                          (DN_Str8Builder *builder, void const *ptr, DN_USize count);
 DN_API bool                     DN_Str8BuilderAppendBuilderRef                         (DN_Str8Builder *dest, DN_Str8Builder const *src);
 DN_API bool                     DN_Str8BuilderAppendBuilderCopy                        (DN_Str8Builder *dest, DN_Str8Builder const *src);
 #define                         DN_Str8BuilderPrependArrayRef(builder, strings, size)  DN_Str8BuilderAddArrayRef(builder, strings, size, DN_Str8BuilderAdd_Prepend)
 #define                         DN_Str8BuilderPrependArrayCopy(builder, strings, size) DN_Str8BuilderAddArrayCopy(builder, strings, size, DN_Str8BuilderAdd_Prepend)
-#define                         DN_Str8BuilderPrependSliceRef(builder, slice)          DN_Str8BuilderAddArrayRef(builder, slice.data, slice.size, DN_Str8BuilderAdd_Prepend)
-#define                         DN_Str8BuilderPrependSliceCopy(builder, slice)         DN_Str8BuilderAddArrayCopy(builder, slice.data, slice.size, DN_Str8BuilderAdd_Prepend)
+#define                         DN_Str8BuilderPrependSliceRef(builder, slice)          DN_Str8BuilderAddArrayRef(builder, slice.data, slice.count, DN_Str8BuilderAdd_Prepend)
+#define                         DN_Str8BuilderPrependSliceCopy(builder, slice)         DN_Str8BuilderAddArrayCopy(builder, slice.data, slice.count, DN_Str8BuilderAdd_Prepend)
 DN_API bool                     DN_Str8BuilderPrependRef                               (DN_Str8Builder *builder, DN_Str8 string);
 DN_API bool                     DN_Str8BuilderPrependCopy                              (DN_Str8Builder *builder, DN_Str8 string);
 #define                         DN_Str8BuilderPrependFV(builder, fmt, args)            DN_Str8BuilderAddFV(builder, DN_Str8BuilderAdd_Prepend, fmt, args)
@@ -2902,8 +2902,8 @@ DN_API void                     DN_PCG32Advance                                 
   #define DN_FNV1A64_SEED 14695981039346656037ULL
 #endif
 
-DN_API DN_U32                   DN_FNV1AHashU32FromBytes                               (void const *bytes, DN_USize size, DN_U32 seed);
-DN_API DN_U64                   DN_FNV1AHashU64FromBytes                               (void const *bytes, DN_USize size, DN_U64 seed);
+DN_API DN_U32                   DN_FNV1AHashU32FromBytes                               (void const *bytes, DN_USize count, DN_U32 seed);
+DN_API DN_U64                   DN_FNV1AHashU64FromBytes                               (void const *bytes, DN_USize count, DN_U64 seed);
 
 DN_API DN_U32                   DN_MurmurHash3HashU32FromBytesX86                      (void const *bytes, int len, DN_U32 seed);
 DN_API DN_MurmurHash3           DN_MurmurHash3HashU128FromBytesX64                     (void const *bytes, int len, DN_U32 seed);
@@ -3461,7 +3461,7 @@ DN_API DN_RaycastV2            DN_RaycastLineIntersectV2                        
 //   API
 //     ResizeFrom:   Resizes the array to `new_max` erase elements if resizing to a smaller size
 //     GrowFrom:     Expands the capacity of the array if `new_max > array.max` otherwise no-op
-//     GrowIfNeeded: Expands the capacity of the array if `array.size + add_count > array.max` otherwise no-op
+//     GrowIfNeeded: Expands the capacity of the array if `array.count + add_count > array.max` otherwise no-op
 //
 //   Variants
 //     PArray => Pointer (to) Array
@@ -3471,7 +3471,7 @@ DN_API DN_RaycastV2            DN_RaycastLineIntersectV2                        
 //       automatically using DN_ArrayCountU(l_array).
 //
 //         MyStruct buffer[TB_ASType_Count] = {};
-//         DN_USize size                    = 0;
+//         DN_USize count                    = 0;
 //         MyStruct *item_0                 = DN_PArrayMake(buffer, &size, DN_ArrayCountU(buffer), DN_ZMem_No);
 //         MyStruct *item_1                 = DN_LArrayMake(buffer, &size, DN_ZMem_No);
 //
@@ -3649,44 +3649,44 @@ DN_API DN_RaycastV2            DN_RaycastLineIntersectV2                        
 #define                                   DN_ISliceAllocArena(slice_ptr, count_, zmem, arena)                  (DN_CppDeclType(&((slice_ptr)->data[0])))DN_SliceAllocArena((void **)&((slice_ptr)->data), &((slice_ptr)->count), count_, sizeof((slice_ptr)->data[0]), alignof(DN_CppDeclType((slice_ptr)->data[0])), zmem, arena)
 
 
-DN_API void*                              DN_SliceAllocArena             (void **data, DN_USize *slice_size_field, DN_USize size, DN_USize elem_size, DN_U8 align, DN_ZMem zmem, DN_Arena *arena);
+DN_API void*                              DN_SliceAllocArena             (void **data, DN_USize *slice_size_field, DN_USize count, DN_USize elem_size, DN_U8 align, DN_ZMem zmem, DN_Arena *arena);
 
-DN_API DN_ArrayFindResult                 DN_ArrayFind                   (void *data, DN_USize size, DN_USize elem_size, void const *find, DN_ArrayFindEqFunc *eq_func);
-DN_API DN_ArrayFindResult                 DN_ArrayFindMemEq              (void *data, DN_USize size, DN_USize elem_size, void const *find);
-DN_API void*                              DN_ArrayInsertArray            (void *data, DN_USize *size, DN_USize max, DN_USize elem_size, DN_USize index, void const *items, DN_USize count);
-DN_API void*                              DN_ArrayPopFront               (void *data, DN_USize *size, DN_USize elem_size, DN_USize count);
-DN_API void*                              DN_ArrayPopBack                (void *data, DN_USize *size, DN_USize elem_size, DN_USize count);
-DN_API DN_ArrayEraseResult                DN_ArrayEraseRange             (void *data, DN_USize *size, DN_USize elem_size, DN_USize begin_index, DN_ISize count, DN_ArrayErase erase);
-DN_API void*                              DN_ArrayMakeArray              (void *data, DN_USize *size, DN_USize max, DN_USize elem_size, DN_USize make_count, DN_ZMem z_mem);
-DN_API void*                              DN_ArrayMakeArrayAssert        (void *data, DN_USize *size, DN_USize max, DN_USize elem_size, DN_USize make_count, DN_ZMem z_mem, DN_CallSite call_site);
-DN_API void*                              DN_ArrayAddArray               (void *data, DN_USize *size, DN_USize max, DN_USize elem_size, void const *elems, DN_USize elems_count, DN_ArrayAdd add);
-DN_API void*                              DN_ArrayAddArrayAssert         (void *data, DN_USize *size, DN_USize max, DN_USize elem_size, void const *elems, DN_USize elems_count, DN_ArrayAdd add, DN_CallSite call_site);
-DN_API bool                               DN_ArrayResizeFromPool         (void **data, DN_USize *size, DN_USize *max, DN_USize elem_size, DN_Pool *pool, DN_USize new_max);
-DN_API bool                               DN_ArrayResizeFromArena        (void **data, DN_USize *size, DN_USize *max, DN_USize elem_size, DN_Arena *arena, DN_USize new_max);
-DN_API bool                               DN_ArrayGrowFromPool           (void **data, DN_USize size, DN_USize *max, DN_USize elem_size, DN_Pool *pool, DN_USize new_max);
-DN_API bool                               DN_ArrayGrowFromArena          (void **data, DN_USize size, DN_USize *max, DN_USize elem_size, DN_Arena *arena, DN_USize new_max);
-DN_API bool                               DN_ArrayGrowIfNeededFromPool   (void **data, DN_USize size, DN_USize *max, DN_USize elem_size, DN_Pool *pool, DN_USize add_count);
-DN_API bool                               DN_ArrayGrowIfNeededFromArena  (void **data, DN_USize size, DN_USize *max, DN_USize elem_size, DN_Arena *arena, DN_USize add_count);
+DN_API DN_ArrayFindResult                 DN_ArrayFind                   (void *data, DN_USize count, DN_USize elem_size, void const *find, DN_ArrayFindEqFunc *eq_func);
+DN_API DN_ArrayFindResult                 DN_ArrayFindMemEq              (void *data, DN_USize count, DN_USize elem_size, void const *find);
+DN_API void*                              DN_ArrayInsertArray            (void *data, DN_USize *count, DN_USize max, DN_USize elem_size, DN_USize index, void const *items, DN_USize items_count);
+DN_API void*                              DN_ArrayPopFront               (void *data, DN_USize *count, DN_USize elem_size, DN_USize pop_count);
+DN_API void*                              DN_ArrayPopBack                (void *data, DN_USize *count, DN_USize elem_size, DN_USize pop_count);
+DN_API DN_ArrayEraseResult                DN_ArrayEraseRange             (void *data, DN_USize *count, DN_USize elem_size, DN_USize begin_index, DN_ISize erase_count, DN_ArrayErase erase);
+DN_API void*                              DN_ArrayMakeArray              (void *data, DN_USize *count, DN_USize max, DN_USize elem_size, DN_USize make_count, DN_ZMem z_mem);
+DN_API void*                              DN_ArrayMakeArrayAssert        (void *data, DN_USize *count, DN_USize max, DN_USize elem_size, DN_USize make_count, DN_ZMem z_mem, DN_CallSite call_site);
+DN_API void*                              DN_ArrayAddArray               (void *data, DN_USize *count, DN_USize max, DN_USize elem_size, void const *elems, DN_USize elems_count, DN_ArrayAdd add);
+DN_API void*                              DN_ArrayAddArrayAssert         (void *data, DN_USize *count, DN_USize max, DN_USize elem_size, void const *elems, DN_USize elems_count, DN_ArrayAdd add, DN_CallSite call_site);
+DN_API bool                               DN_ArrayResizeFromPool         (void **data, DN_USize *count, DN_USize *max, DN_USize elem_size, DN_Pool *pool, DN_USize new_max);
+DN_API bool                               DN_ArrayResizeFromArena        (void **data, DN_USize *count, DN_USize *max, DN_USize elem_size, DN_Arena *arena, DN_USize new_max);
+DN_API bool                               DN_ArrayGrowFromPool           (void **data, DN_USize count, DN_USize *max, DN_USize elem_size, DN_Pool *pool, DN_USize new_max);
+DN_API bool                               DN_ArrayGrowFromArena          (void **data, DN_USize count, DN_USize *max, DN_USize elem_size, DN_Arena *arena, DN_USize new_max);
+DN_API bool                               DN_ArrayGrowIfNeededFromPool   (void **data, DN_USize count, DN_USize *max, DN_USize elem_size, DN_Pool *pool, DN_USize add_count);
+DN_API bool                               DN_ArrayGrowIfNeededFromArena  (void **data, DN_USize count, DN_USize *max, DN_USize elem_size, DN_Arena *arena, DN_USize add_count);
 
 #if defined (__cplusplus)
-template <typename T> DN_ArrayFindResult  DN_TArrayFind                  (T *data, DN_USize size, void const *find, DN_ArrayFindEqFunc *eq_func);
-template <typename T> DN_ArrayFindResult  DN_TArrayFindMemEq             (T *data, DN_USize size, void const *find, DN_ArrayFindEqFunc *eq_func);
-template <typename T> T*                  DN_TArrayInsertArray           (T *data, DN_USize *size, DN_USize max, DN_USize index, void const *items, DN_USize count);
-template <typename T> T*                  DN_TArrayPopFront              (T *data, DN_USize *size, DN_USize count);
-template <typename T> T*                  DN_TArrayPopBack               (T *data, DN_USize *size, DN_USize count);
-template <typename T> DN_ArrayEraseResult DN_TArrayEraseRange            (T *data, DN_USize *size, DN_USize begin_index, DN_ISize count, DN_ArrayErase erase);
-template <typename T> T*                  DN_TArrayMakeArray             (T *data, DN_USize *size, DN_USize max, DN_USize make_count, DN_ZMem z_mem);
-template <typename T> T*                  DN_TArrayMakeArrayAssert       (T *data, DN_USize *size, DN_USize max, DN_USize make_count, DN_ZMem z_mem, DN_CallSite call_site);
-template <typename T> T*                  DN_TArrayMakeArrayAssertZ      (T *data, DN_USize *size, DN_USize max, DN_USize make_count, DN_CallSite call_site);
-template <typename T> T*                  DN_TArrayMakeArrayAssertNoZ    (T *data, DN_USize *size, DN_USize max, DN_USize make_count, DN_CallSite call_site);
-template <typename T> T*                  DN_TArrayAddArray              (T *data, DN_USize *size, DN_USize max, T const *elems, DN_USize elems_count, DN_ArrayAdd add);
-template <typename T> T*                  DN_TArrayAddArrayAssert        (T *data, DN_USize *size, DN_USize max, T const *elems, DN_USize elems_count, DN_ArrayAdd add, DN_CallSite call_site);
-template <typename T> bool                DN_TArrayResizeFromPool        (T **data, DN_USize *size, DN_USize *max, DN_Pool *pool, DN_USize new_max);
-template <typename T> bool                DN_TArrayResizeFromArena       (T **data, DN_USize *size, DN_USize *max, DN_Arena *arena, DN_USize new_max);
-template <typename T> bool                DN_TArrayGrowFromPool          (T **data, DN_USize size, DN_USize *max, DN_Pool *pool, DN_USize new_max);
-template <typename T> bool                DN_TArrayGrowFromArena         (T **data, DN_USize size, DN_USize *max, DN_Pool *pool, DN_USize new_max);
-template <typename T> bool                DN_TArrayGrowIfNeededFromPool  (T **data, DN_USize size, DN_USize *max, DN_Pool *pool, DN_USize add_count);
-template <typename T> bool                DN_TArrayGrowIfNeededFromArena (T **data, DN_USize size, DN_USize *max, DN_Arena *pool, DN_USize add_count);
+template <typename T> DN_ArrayFindResult  DN_TArrayFind                  (T *data, DN_USize count, void const *find, DN_ArrayFindEqFunc *eq_func);
+template <typename T> DN_ArrayFindResult  DN_TArrayFindMemEq             (T *data, DN_USize count, void const *find, DN_ArrayFindEqFunc *eq_func);
+template <typename T> T*                  DN_TArrayInsertArray           (T *data, DN_USize *count, DN_USize max, DN_USize index, void const *items, DN_USize pop_count);
+template <typename T> T*                  DN_TArrayPopFront              (T *data, DN_USize *count, DN_USize pop_count);
+template <typename T> T*                  DN_TArrayPopBack               (T *data, DN_USize *count, DN_USize pop_count);
+template <typename T> DN_ArrayEraseResult DN_TArrayEraseRange            (T *data, DN_USize *count, DN_USize begin_index, DN_ISize erase_count, DN_ArrayErase erase);
+template <typename T> T*                  DN_TArrayMakeArray             (T *data, DN_USize *count, DN_USize max, DN_USize make_count, DN_ZMem z_mem);
+template <typename T> T*                  DN_TArrayMakeArrayAssert       (T *data, DN_USize *count, DN_USize max, DN_USize make_count, DN_ZMem z_mem, DN_CallSite call_site);
+template <typename T> T*                  DN_TArrayMakeArrayAssertZ      (T *data, DN_USize *count, DN_USize max, DN_USize make_count, DN_CallSite call_site);
+template <typename T> T*                  DN_TArrayMakeArrayAssertNoZ    (T *data, DN_USize *count, DN_USize max, DN_USize make_count, DN_CallSite call_site);
+template <typename T> T*                  DN_TArrayAddArray              (T *data, DN_USize *count, DN_USize max, T const *elems, DN_USize elems_count, DN_ArrayAdd add);
+template <typename T> T*                  DN_TArrayAddArrayAssert        (T *data, DN_USize *count, DN_USize max, T const *elems, DN_USize elems_count, DN_ArrayAdd add, DN_CallSite call_site);
+template <typename T> bool                DN_TArrayResizeFromPool        (T **data, DN_USize *count, DN_USize *max, DN_Pool *pool, DN_USize new_max);
+template <typename T> bool                DN_TArrayResizeFromArena       (T **data, DN_USize *count, DN_USize *max, DN_Arena *arena, DN_USize new_max);
+template <typename T> bool                DN_TArrayGrowFromPool          (T **data, DN_USize count, DN_USize *max, DN_Pool *pool, DN_USize new_max);
+template <typename T> bool                DN_TArrayGrowFromArena         (T **data, DN_USize count, DN_USize *max, DN_Pool *pool, DN_USize new_max);
+template <typename T> bool                DN_TArrayGrowIfNeededFromPool  (T **data, DN_USize count, DN_USize *max, DN_Pool *pool, DN_USize add_count);
+template <typename T> bool                DN_TArrayGrowIfNeededFromArena (T **data, DN_USize count, DN_USize *max, DN_Arena *pool, DN_USize add_count);
 #endif
 
 DN_API void*                              DN_SinglyLLDetach              (void **link, void **next);
@@ -3719,8 +3719,8 @@ template <typename T> bool               DN_DSMapResize                (DN_DSMap
 template <typename T> bool               DN_DSMapErase                 (DN_DSMap<T> *map, DN_DSMapKey key);
 template <typename T> bool               DN_DSMapEraseKeyU64           (DN_DSMap<T> *map, DN_U64 key);
 template <typename T> bool               DN_DSMapEraseKeyStr8          (DN_DSMap<T> *map, DN_Str8 key);
-template <typename T> DN_DSMapKey        DN_DSMapKeyBuffer             (DN_DSMap<T> const *map, void const *data, DN_USize size);
-template <typename T> DN_DSMapKey        DN_DSMapKeyBufferAsU64NoHash  (DN_DSMap<T> const *map, void const *data, DN_USize size);
+template <typename T> DN_DSMapKey        DN_DSMapKeyBuffer             (DN_DSMap<T> const *map, void const *data, DN_USize count);
+template <typename T> DN_DSMapKey        DN_DSMapKeyBufferAsU64NoHash  (DN_DSMap<T> const *map, void const *data, DN_USize count);
 template <typename T> DN_DSMapKey        DN_DSMapKeyU64                (DN_DSMap<T> const *map, DN_U64 u64);
 template <typename T> DN_DSMapKey        DN_DSMapKeyStr8               (DN_DSMap<T> const *map, DN_Str8 string);
 #define                                  DN_DSMapKeyCStr8(map, string) DN_DSMapKeyBuffer(map, string, sizeof((string))/sizeof((string)[0]) - 1)
@@ -3940,19 +3940,19 @@ DN_API DN_Arena                  DN_ArenaFromHeap                             (D
 DN_API DN_Arena                  DN_ArenaFromVMem                             (DN_U64 reserve, DN_U64 commit, DN_MemFlags flags);
 
 DN_API DN_Str8                   DN_Str8FromHeapF                             (DN_FMT_ATTRIB char const *fmt, ...);
-DN_API DN_Str8                   DN_Str8FromHeap                              (DN_USize size, DN_ZMem z_mem);
+DN_API DN_Str8                   DN_Str8FromHeap                              (DN_USize count, DN_ZMem z_mem);
 DN_API DN_Str8                   DN_Str8BuilderBuildFromHeap                  (DN_Str8Builder const *builder);
 
 DN_API void                      DN_OS_LogPrint                               (DN_LogTypeParam type, void *user_data, DN_CallSite call_site, DN_FMT_ATTRIB char const *fmt, va_list args);
 DN_API void                      DN_OS_SetLogPrintFuncToOS                    ();
 
-DN_API void *                    DN_OS_MemReserve                             (DN_USize size, DN_MemCommit commit, DN_MemPage page_flags);
-DN_API bool                      DN_OS_MemCommit                              (void *ptr, DN_USize size, DN_U32 page_flags);
-DN_API void                      DN_OS_MemDecommit                            (void *ptr, DN_USize size);
-DN_API void                      DN_OS_MemRelease                             (void *ptr, DN_USize size);
-DN_API int                       DN_OS_MemProtect                             (void *ptr, DN_USize size, DN_U32 page_flags);
+DN_API void *                    DN_OS_MemReserve                             (DN_USize count, DN_MemCommit commit, DN_MemPage page_flags);
+DN_API bool                      DN_OS_MemCommit                              (void *ptr, DN_USize count, DN_U32 page_flags);
+DN_API void                      DN_OS_MemDecommit                            (void *ptr, DN_USize count);
+DN_API void                      DN_OS_MemRelease                             (void *ptr, DN_USize count);
+DN_API int                       DN_OS_MemProtect                             (void *ptr, DN_USize count, DN_U32 page_flags);
 
-DN_API void *                    DN_OS_MemAlloc                               (DN_USize size, DN_ZMem z_mem);
+DN_API void *                    DN_OS_MemAlloc                               (DN_USize count, DN_ZMem z_mem);
 DN_API void                      DN_OS_MemDealloc                             (void *ptr);
 
 DN_API DN_Date                   DN_OS_DateLocalTimeNow                       ();
@@ -3990,8 +3990,8 @@ DN_API bool                      DN_OS_FileCopy                               (D
 DN_API bool                      DN_OS_FileMove                               (DN_Str8 src, DN_Str8 dest, bool overwrite, DN_ErrSink *err);
 
 DN_API DN_OSFile                 DN_OS_FileOpen                               (DN_Str8 path, DN_OSFileOpen open_mode, DN_OSFileAccess access, DN_ErrSink *err);
-DN_API DN_OSFileRead             DN_OS_FileRead                               (DN_OSFile *file, void *buffer, DN_USize size, DN_ErrSink *err);
-DN_API bool                      DN_OS_FileWritePtr                           (DN_OSFile *file, void const *data, DN_USize size, DN_ErrSink *err);
+DN_API DN_OSFileRead             DN_OS_FileRead                               (DN_OSFile *file, void *buffer, DN_USize count, DN_ErrSink *err);
+DN_API bool                      DN_OS_FileWritePtr                           (DN_OSFile *file, void const *data, DN_USize count, DN_ErrSink *err);
 DN_API bool                      DN_OS_FileWrite                              (DN_OSFile *file, DN_Str8 buffer, DN_ErrSink *err);
 DN_API bool                      DN_OS_FileWriteFV                            (DN_OSFile *file, DN_ErrSink *err, DN_FMT_ATTRIB char const *fmt, va_list args);
 DN_API bool                      DN_OS_FileWriteF                             (DN_OSFile *file, DN_ErrSink *err, DN_FMT_ATTRIB char const *fmt, ...);
@@ -4214,128 +4214,128 @@ template <typename T> T *DN_MemCopyObjT(T *dest, T const *src, DN_USize count)
 }
 
 template <typename T>
-DN_ArrayFindResult DN_TArrayFind(T *data, DN_USize size, void const *find, DN_ArrayFindEqFunc *eq_func)
+DN_ArrayFindResult DN_TArrayFind(T *data, DN_USize count, void const *find, DN_ArrayFindEqFunc *eq_func)
 {
-  DN_ArrayFindResult result = DN_ArrayFind(data, size, sizeof(*data), find, eq_func);
+  DN_ArrayFindResult result = DN_ArrayFind(data, count, sizeof(*data), find, eq_func);
   return result;
 }
 
 template <typename T>
-DN_ArrayFindResult DN_TArrayFindMemEq(T *data, DN_USize size, void const *find)
+DN_ArrayFindResult DN_TArrayFindMemEq(T *data, DN_USize count, void const *find)
 {
-  DN_ArrayFindResult result = DN_ArrayFindMemEq(data, size, sizeof(*data), find);
+  DN_ArrayFindResult result = DN_ArrayFindMemEq(data, count, sizeof(*data), find);
   return result;
 }
 
 template <typename T>
-T *DN_TArrayInsertArray(T *data, DN_USize *size, DN_USize max, DN_USize index, T const *items, DN_USize count)
+T *DN_TArrayInsertArray(T *data, DN_USize *count, DN_USize max, DN_USize index, T const *items, DN_USize items_count)
 {
-  T *result = DN_Cast(T *)DN_ArrayInsertArray(data, size, max, sizeof(*data), index, items, count);
+  T *result = DN_Cast(T *)DN_ArrayInsertArray(data, count, max, sizeof(*data), index, items, items_count);
   return result;
 }
 
 template <typename T>
-T *DN_TArrayPopFront(T *data, DN_USize *size, DN_USize count)
+T *DN_TArrayPopFront(T *data, DN_USize *count, DN_USize pop_count)
 {
-  T *result = DN_Cast(T *)DN_ArrayPopFront(data, size, sizeof(*data), count);
+  T *result = DN_Cast(T *)DN_ArrayPopFront(data, count, sizeof(*data), pop_count);
   return result;
 }
 
 template <typename T>
-T *DN_TArrayPopBack(T *data, DN_USize *size, DN_USize count)
+T *DN_TArrayPopBack(T *data, DN_USize *count, DN_USize pop_count)
 {
-  T *result = DN_Cast(T *)DN_ArrayPopBack(data, size, sizeof(*data), count);
+  T *result = DN_Cast(T *)DN_ArrayPopBack(data, count, sizeof(*data), pop_count);
   return result;
 }
 
 template <typename T>
-DN_ArrayEraseResult DN_TArrayEraseRange(T *data, DN_USize *size, DN_USize begin_index, DN_ISize count, DN_ArrayErase erase)
+DN_ArrayEraseResult DN_TArrayEraseRange(T *data, DN_USize *count, DN_USize begin_index, DN_ISize erase_count, DN_ArrayErase erase)
 {
-  DN_ArrayEraseResult result = DN_ArrayEraseRange(data, size, sizeof(*data), begin_index, count, erase);
+  DN_ArrayEraseResult result = DN_ArrayEraseRange(data, count, sizeof(*data), begin_index, erase_count, erase);
   return result;
 }
 
 template <typename T>
-T *DN_TArrayMakeArray(T *data, DN_USize *size, DN_USize max, DN_USize make_count, DN_ZMem z_mem)
+T *DN_TArrayMakeArray(T *data, DN_USize *count, DN_USize max, DN_USize make_count, DN_ZMem z_mem)
 {
-  T *result = DN_Cast(T *)DN_ArrayMakeArray(data, size, max, sizeof(*data), make_count, z_mem);
+  T *result = DN_Cast(T *)DN_ArrayMakeArray(data, count, max, sizeof(*data), make_count, z_mem);
   return result;
 }
 
 template <typename T>
-T *DN_TArrayMakeArrayAssert(T *data, DN_USize *size, DN_USize max, DN_USize make_count, DN_ZMem z_mem, DN_CallSite call_site)
+T *DN_TArrayMakeArrayAssert(T *data, DN_USize *count, DN_USize max, DN_USize make_count, DN_ZMem z_mem, DN_CallSite call_site)
 {
-  T *result = DN_Cast(T *)DN_ArrayMakeArrayAssert(data, size, max, sizeof(*data), make_count, z_mem, call_site);
+  T *result = DN_Cast(T *)DN_ArrayMakeArrayAssert(data, count, max, sizeof(*data), make_count, z_mem, call_site);
   return result;
 }
 
 template <typename T>
-T *DN_TArrayMakeArrayAssertZ(T *data, DN_USize *size, DN_USize max, DN_USize make_count, DN_CallSite call_site)
+T *DN_TArrayMakeArrayAssertZ(T *data, DN_USize *count, DN_USize max, DN_USize make_count, DN_CallSite call_site)
 {
-  T* result = DN_TArrayMakeArrayAssert(data, size, max, make_count, DN_ZMem_Yes, call_site);
+  T* result = DN_TArrayMakeArrayAssert(data, count, max, make_count, DN_ZMem_Yes, call_site);
   return result;
 }
 
 template <typename T>
-T *DN_TArrayMakeArrayAssertNoZ(T *data, DN_USize *size, DN_USize max, DN_USize make_count, DN_CallSite call_site)
+T *DN_TArrayMakeArrayAssertNoZ(T *data, DN_USize *count, DN_USize max, DN_USize make_count, DN_CallSite call_site)
 {
-  T* result = DN_TArrayMakeArrayAssert(data, size, max, make_count, DN_ZMem_No, call_site);
+  T* result = DN_TArrayMakeArrayAssert(data, count, max, make_count, DN_ZMem_No, call_site);
   return result;
 }
 
 template <typename T>
-T *DN_TArrayAddArray(T *data, DN_USize *size, DN_USize max, T const *elems, DN_USize elems_count, DN_ArrayAdd add)
+T *DN_TArrayAddArray(T *data, DN_USize *count, DN_USize max, T const *elems, DN_USize elems_count, DN_ArrayAdd add)
 {
-  T* result = DN_Cast(T *)DN_ArrayAddArray(data, size, max, sizeof(*elems), elems, elems_count, add);
+  T* result = DN_Cast(T *)DN_ArrayAddArray(data, count, max, sizeof(*elems), elems, elems_count, add);
   return result;
 }
 
 template <typename T>
-T *DN_TArrayAddArrayAssert(T *data, DN_USize *size, DN_USize max, T const *elems, DN_USize elems_count, DN_ArrayAdd add, DN_CallSite call_site)
+T *DN_TArrayAddArrayAssert(T *data, DN_USize *count, DN_USize max, T const *elems, DN_USize elems_count, DN_ArrayAdd add, DN_CallSite call_site)
 {
-  T* result = DN_Cast(T *)DN_ArrayAddArrayAssert(data, size, max, sizeof(*elems), elems, elems_count, add, call_site);
+  T* result = DN_Cast(T *)DN_ArrayAddArrayAssert(data, count, max, sizeof(*elems), elems, elems_count, add, call_site);
   return result;
 }
 
 template <typename T>
-bool DN_TArrayResizeFromPool(T **data, DN_USize *size, DN_USize *max, DN_Pool *pool, DN_USize new_max)
+bool DN_TArrayResizeFromPool(T **data, DN_USize *count, DN_USize *max, DN_Pool *pool, DN_USize new_max)
 {
-  bool result = DN_ArrayResizeFromPool(DN_Cast(void **)data, size, max, sizeof(**data), pool, new_max);
+  bool result = DN_ArrayResizeFromPool(DN_Cast(void **)data, count, max, sizeof(**data), pool, new_max);
   return result;
 }
 
 template <typename T>
-bool DN_TArrayResizeFromArena(T **data, DN_USize *size, DN_USize *max, DN_Arena *arena, DN_USize new_max)
+bool DN_TArrayResizeFromArena(T **data, DN_USize *count, DN_USize *max, DN_Arena *arena, DN_USize new_max)
 {
-  bool result = DN_ArrayResizeFromArena(DN_Cast(void **)data, size, max, sizeof(**data), arena, new_max);
+  bool result = DN_ArrayResizeFromArena(DN_Cast(void **)data, count, max, sizeof(**data), arena, new_max);
   return result;
 }
 
 template <typename T>
-bool DN_TArrayGrowFromPool(T **data, DN_USize size, DN_USize *max, DN_Pool *pool, DN_USize new_max)
+bool DN_TArrayGrowFromPool(T **data, DN_USize count, DN_USize *max, DN_Pool *pool, DN_USize new_max)
 {
-  bool result = DN_ArrayGrowFromPool(DN_Cast(void **)data, size, max, sizeof(**data), pool, new_max);
+  bool result = DN_ArrayGrowFromPool(DN_Cast(void **)data, count, max, sizeof(**data), pool, new_max);
   return result;
 }
 
 template <typename T>
-bool DN_TArrayGrowFromArena(T **data, DN_USize size, DN_USize *max, DN_Arena *arena, DN_USize new_max)
+bool DN_TArrayGrowFromArena(T **data, DN_USize count, DN_USize *max, DN_Arena *arena, DN_USize new_max)
 {
-  bool result = DN_ArrayGrowFromArena(DN_Cast(void **)data, size, max, sizeof(**data), arena, new_max);
+  bool result = DN_ArrayGrowFromArena(DN_Cast(void **)data, count, max, sizeof(**data), arena, new_max);
   return result;
 }
 
 template <typename T>
-bool DN_TArrayGrowIfNeededFromPool(T **data, DN_USize size, DN_USize *max, DN_Pool *pool, DN_USize add_count)
+bool DN_TArrayGrowIfNeededFromPool(T **data, DN_USize count, DN_USize *max, DN_Pool *pool, DN_USize add_count)
 {
-  bool result = DN_ArrayGrowIfNeededFromPool(DN_Cast(void **)data, size, max, sizeof(**data), pool, add_count);
+  bool result = DN_ArrayGrowIfNeededFromPool(DN_Cast(void **)data, count, max, sizeof(**data), pool, add_count);
   return result;
 }
 
 template <typename T>
-bool DN_TArrayGrowIfNeededFromArena(T **data, DN_USize size, DN_USize *max, DN_Arena *arena, DN_USize add_count)
+bool DN_TArrayGrowIfNeededFromArena(T **data, DN_USize count, DN_USize *max, DN_Arena *arena, DN_USize add_count)
 {
-  bool result = DN_ArrayGrowIfNeededFromArena(DN_Cast(void **)data, size, max, sizeof(**data), arena, add_count);
+  bool result = DN_ArrayGrowIfNeededFromArena(DN_Cast(void **)data, count, max, sizeof(**data), arena, add_count);
   return result;
 }
 #endif // defined(__cplusplus)
@@ -4370,10 +4370,12 @@ enum DN_NETWSSend
   DN_NETWSSend_Pong,
 };
 
-enum DN_NETDoHTTPFlags
+typedef DN_U32 DN_NETDoHTTPFlags;
+enum DN_NETDoHTTPFlags_
 {
-  DN_NETDoHTTPFlags_Nil       = 0,
-  DN_NETDoHTTPFlags_BasicAuth = 1 << 0,
+  DN_NETDoHTTPFlags_Nil              = 0,
+  DN_NETDoHTTPFlags_BasicAuth        = 1 << 0,
+  DN_NETDoHTTPFlags_DisableSSLVerify = 1 << 1,
 };
 
 struct DN_NETDoHTTPArgs
@@ -4397,6 +4399,8 @@ struct DN_NETRequestHandle
 
 struct DN_NETResponse
 {
+  // NOTE: When filling these fields, all their values are copied internally in the library so the
+  // values do not need to persist past the initial invocation of the HTTP/WS request.
   // NOTE: Common to WS and HTTP responses
   DN_NETRequestType   type;
   DN_NETResponseState state;
@@ -4455,10 +4459,24 @@ struct DN_NETCore
   DN_NETInterface api;
 };
 
+// NOTE: NET
+// Overview
+//   Defines a multi-threaded interface for doing network requests (via the `DN_NETInterface`
+//   object) in the core struct. On top of this is a asynchronous API provided to the caller along
+//   the lines of, do http/ws followed to dispatch a request followed by a blocking wait for
+//   response function.
+//
+// API
+//   DN_NET_ResponseHasFailed
+//     After a response has been dispatched via do http/ws the returned handle's status can be
+//     queried using this function. A request has failed if the `state` has returned
+//     `DN_NETResponseState_Error`, or the returned HTTP status code was `>= 400`.
 DN_Str8             DN_NET_Str8FromResponseState     (DN_NETResponseState state);
 DN_NETRequest *     DN_NET_RequestFromHandle         (DN_NETRequestHandle handle);
 DN_NETRequestHandle DN_NET_HandleFromRequest         (DN_NETRequest *request);
 bool                DN_NET_ResponseHasFailed         (DN_NETResponse const* resp);
+bool                DN_NET_ResponseHasSucceeded      (DN_NETResponse const* resp);
+bool                DN_NET_ResponseIsReady           (DN_NETResponse const* resp);
 DN_Str8             DN_NET_Str8DiagnosticFromResponse(DN_NETResponse const* resp, DN_Arena *arena);
 
 // NOTE: Internal functions for different networking implementations to use
@@ -4468,6 +4486,15 @@ void                DN_NET_EndFinishedRequest   (DN_NETRequest *request);
 #endif
 
 #if DN_WITH_NET_CURL
+#if defined(DN_COMPILER_MSVC) || defined(DN_COMPILER_CLANG_CL)
+#pragma comment(lib, "advapi32")
+#pragma comment(lib, "ws2_32")
+#pragma comment(lib, "wldap32")
+#pragma comment(lib, "crypt32")
+#pragma comment(lib, "secur32")
+#pragma comment(lib, "Iphlpapi")
+#endif
+
 #if !DN_WITH_OS || !DN_WITH_NET
   #error "NET API with CURL requires #define DN_WITH_NET 1 and #define DN_WITH_OS 1"
 #endif

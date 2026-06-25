@@ -41,7 +41,7 @@ DN_INIStr8 DN_INI_Str8FromPtr(char const *data, size_t count)
 {
   DN_INIStr8 result = {};
   result.data       = (char *)data;
-  result.size       = count;
+  result.count       = count;
   return result;
 }
 
@@ -82,20 +82,20 @@ DN_INIStr8FromResult DN_INI_Str8FromINI(DN_INICore const *ini, char *buffer, siz
     if (it != &ini->first_section) {
       DN_INI_Str8BuilderAppend_(&builder, "[");
       for (DN_INISection *parent = it->parent; parent; parent = parent->parent)
-        if (parent->name.size)
+        if (parent->name.count)
           parent_stack[parent_stack_count++] = parent;
       for (size_t index = parent_stack_count - 1; index < parent_stack_count; index--) {
         DN_INISection *parent = parent_stack[index];
-        DN_INI_Str8BuilderAppend_(&builder, "%.*s.", (int)parent->name.size, parent->name.data);
+        DN_INI_Str8BuilderAppend_(&builder, "%.*s.", (int)parent->name.count, parent->name.data);
       }
       parent_stack_count = 0;
-      DN_INI_Str8BuilderAppend_(&builder, "%.*s]\n", (int)it->name.size, it->name.data);
+      DN_INI_Str8BuilderAppend_(&builder, "%.*s]\n", (int)it->name.count, it->name.data);
     }
 
     for (DN_INIField *field = it->first_field; field; field = field->next) {
-      DN_INI_Str8BuilderAppend_(&builder, "%.*s = ", (int)field->key.size, field->key.data);
+      DN_INI_Str8BuilderAppend_(&builder, "%.*s = ", (int)field->key.count, field->key.data);
       switch (field->value_type) {
-        case DN_INIFieldType_String: DN_INI_Str8BuilderAppend_(&builder, "%.*s\n", (int)field->value.size, field->value.data); break;
+        case DN_INIFieldType_String: DN_INI_Str8BuilderAppend_(&builder, "%.*s\n", (int)field->value.count, field->value.data); break;
         case DN_INIFieldType_Bool:   DN_INI_Str8BuilderAppend_(&builder, "%d\n", field->value_bool); break;
         case DN_INIFieldType_USize:  DN_INI_Str8BuilderAppend_(&builder, "%zu\n", field->value_usize); break;
       }
@@ -113,7 +113,7 @@ DN_INIStr8FromResult DN_INI_Str8FromINI(DN_INICore const *ini, char *buffer, siz
   result.size_req = builder.size_req;
   if (buffer) {
     result.str8.data = builder.data;
-    result.str8.size = builder.used;
+    result.str8.count = builder.used;
     result.success   = true;
   } else {
     result.success = true;
@@ -124,7 +124,7 @@ DN_INIStr8FromResult DN_INI_Str8FromINI(DN_INICore const *ini, char *buffer, siz
 
 static bool DN_INI_Str8Eq(DN_INIStr8 lhs, DN_INIStr8 rhs)
 {
-  bool result = lhs.size == rhs.size && DN_INI_Memcmp(lhs.data, rhs.data, lhs.size) == 0;
+  bool result = lhs.count == rhs.count && DN_INI_Memcmp(lhs.data, rhs.data, lhs.count) == 0;
   return result;
 }
 
@@ -132,11 +132,11 @@ static DN_INIStr8 DN_INI_Str8Slice(DN_INIStr8 slice, size_t offset, size_t size)
 {
   DN_INIStr8 result = {};
   if (slice.data) {
-    size_t max_offset   = slice.size;
+    size_t max_offset   = slice.count;
     size_t final_offset = offset <= max_offset ? offset : max_offset;
-    size_t max_size     = slice.size - final_offset;
+    size_t max_size     = slice.count - final_offset;
     result.data           = slice.data + final_offset;
-    result.size           = size <= max_size ? size : max_size;
+    result.count           = size <= max_size ? size : max_size;
   }
   return result;
 }
@@ -144,15 +144,15 @@ static DN_INIStr8 DN_INI_Str8Slice(DN_INIStr8 slice, size_t offset, size_t size)
 static DN_INIStr8BSplit DN_INI_Str8BSplit(DN_INIStr8 str8, DN_INIStr8 find)
 {
   DN_INIStr8BSplit result = {};
-  if (find.size > str8.size)
+  if (find.count > str8.count)
     return result;
 
-  for (size_t index = 0; index < (str8.size - find.size) + 1; index++) {
-    DN_INIStr8 slice = DN_INI_Str8FromPtr(str8.data + index, find.size);
+  for (size_t index = 0; index < (str8.count - find.count) + 1; index++) {
+    DN_INIStr8 slice = DN_INI_Str8FromPtr(str8.data + index, find.count);
     if (DN_INI_Str8Eq(slice, find)) {
       result.lhs        = DN_INI_Str8FromPtr(str8.data, (size_t)index);
-      size_t rhs_size = (size_t)(str8.size - (index + 1));
-      DN_INI_Assert(rhs_size < str8.size);
+      size_t rhs_size = (size_t)(str8.count - (index + 1));
+      DN_INI_Assert(rhs_size < str8.count);
       result.rhs = DN_INI_Str8FromPtr(str8.data + index + 1, rhs_size);
       break;
     }
@@ -166,16 +166,16 @@ static DN_INIStr8BSplit DN_INI_Str8BSplit(DN_INIStr8 str8, DN_INIStr8 find)
 static DN_INIStr8BSplit DN_INI_Str8BSplitReverse(DN_INIStr8 str8, DN_INIStr8 find)
 {
   DN_INIStr8BSplit result = {};
-  if (find.size > str8.size)
+  if (find.count > str8.count)
     return result;
 
-  for (size_t index = str8.size - find.size; index > 0; index--) {
-    DN_INIStr8 slice = DN_INI_Str8FromPtr(str8.data + index, find.size);
+  for (size_t index = str8.count - find.count; index > 0; index--) {
+    DN_INIStr8 slice = DN_INI_Str8FromPtr(str8.data + index, find.count);
     if (DN_INI_Str8Eq(slice, find)) {
       result.lhs        = DN_INI_Str8FromPtr(str8.data, (size_t)index);
-      size_t rhs_size = (size_t)(str8.size - index - find.size);
-      DN_INI_Assert(rhs_size < str8.size);
-      result.rhs = DN_INI_Str8FromPtr(str8.data + index + find.size, rhs_size);
+      size_t rhs_size = (size_t)(str8.count - index - find.count);
+      DN_INI_Assert(rhs_size < str8.count);
+      result.rhs = DN_INI_Str8FromPtr(str8.data + index + find.count, rhs_size);
       break;
     }
   }
@@ -399,7 +399,7 @@ DN_INISection *DN_INI_ChildSectionFromStr8(DN_INISection *section, DN_INIStr8 st
   DN_INISection *curr         = section;
   while (result) {
     DN_INIStr8BSplit split = DN_INI_Str8BSplit(section_name, DN_INIStr8Lit("."));
-    if (split.lhs.size == 0)
+    if (split.lhs.count == 0)
       break;
 
     result = 0;
@@ -426,8 +426,8 @@ DN_INIField *DN_INI_FieldFromSectionStr8(DN_INISection *section, DN_INIStr8 str8
     DN_INIStr8BSplit split        = DN_INI_Str8BSplitReverse(str8, DN_INIStr8Lit("."));
     DN_INIStr8       find_key     = str8;
     DN_INISection   *find_section = section;
-    if (split.rhs.size) {
-      find_section = DN_INI_ChildSectionFromCStr(section, split.lhs.data, split.lhs.size);
+    if (split.rhs.count) {
+      find_section = DN_INI_ChildSectionFromCStr(section, split.lhs.data, split.lhs.count);
       find_key     = split.rhs;
     }
 
@@ -458,20 +458,20 @@ DN_INIFieldUSize DN_INI_FieldUSizeFromSectionStr8(DN_INISection *section, DN_INI
       // NOTE: Try parse string as USize
       // NOTE: Sanitize input/output
       DN_INIStr8 value = result.field->value;
-      while (value.size && DN_INI_CharIsWhitespace_(value.data[0])) {
+      while (value.count && DN_INI_CharIsWhitespace_(value.data[0])) {
         value.data++;
-        value.size--;
+        value.count--;
       }
 
       // NOTE: Handle prefix '+'
-      if (value.size && value.data[0] == '+') {
+      if (value.count && value.data[0] == '+') {
         value.data++;
-        value.size--;
+        value.count--;
       }
 
       // NOTE: Convert the string number to the binary number
       size_t value_usize = 0;
-      for (size_t index = 0; index < value.size; index++) {
+      for (size_t index = 0; index < value.count; index++) {
         char     ch    = value.data[index];
         uint64_t digit = ch - '0';
         if (!(ch >= '0' && ch <= '9'))
@@ -556,10 +556,10 @@ DN_INICore DN_INI_ParseFromPtr(char const *buf, size_t count, char *base, size_t
         curr_section                = &result.first_section;
         for (;;) {
           DN_INIStr8BSplit split = DN_INI_Str8BSplit(section_name, DN_INIStr8Lit("."));
-          if (split.lhs.size == 0)
+          if (split.lhs.count == 0)
             break;
 
-          DN_INISection *next_section = DN_INI_ChildSectionFromCStr(parent, split.lhs.data, split.lhs.size);
+          DN_INISection *next_section = DN_INI_ChildSectionFromCStr(parent, split.lhs.data, split.lhs.count);
           if (!next_section) {
             result.total_sections_count++;
             next_section = (DN_INISection *)DN_INI_ArenaAlloc(&arena, sizeof(*parent));
@@ -598,7 +598,7 @@ DN_INICore DN_INI_ParseFromPtr(char const *buf, size_t count, char *base, size_t
 
           if (field) {
             field->key.data = token.data;
-            field->key.size = token.count;
+            field->key.count = token.count;
           }
 
           if (curr_section) {
@@ -623,7 +623,7 @@ DN_INICore DN_INI_ParseFromPtr(char const *buf, size_t count, char *base, size_t
         result.memory_required += bytes_req;
         if (curr_section && field) {
           DN_INI_Assert(curr_section->fields_count);
-          DN_INI_Assert(field->key.size);
+          DN_INI_Assert(field->key.count);
 
           char *string = (char *)DN_INI_ArenaAlloc(&arena, bytes_req);
           if (!string) {
@@ -634,16 +634,16 @@ DN_INICore DN_INI_ParseFromPtr(char const *buf, size_t count, char *base, size_t
           if (tokeniser.prev_token.type == DN_INITokenType_Value) {
 
             field->value.data = string;
-            field->value.size = 0;
+            field->value.count = 0;
 
             for (size_t index = 0; index < tokeniser.prev_token.count; index++) {
               char ch   = tokeniser.prev_token.data[index];
               char next = index + 1 < tokeniser.prev_token.count ? tokeniser.prev_token.data[index + 1] : 0;
               if (ch == '\\' && next == 'n') {
-                field->value.data[field->value.size++] = '\n';
+                field->value.data[field->value.count++] = '\n';
                 index++;
               } else {
-                field->value.data[field->value.size++] = ch;
+                field->value.data[field->value.count++] = ch;
               }
             }
           } else {
@@ -657,10 +657,10 @@ DN_INICore DN_INI_ParseFromPtr(char const *buf, size_t count, char *base, size_t
             char ch   = token.data[index];
             char next = index + 1 < token.count ? token.data[index + 1] : 0;
             if (ch == '\\' && next == 'n') {
-              field->value.data[field->value.size++] = '\n';
+              field->value.data[field->value.count++] = '\n';
               index++;
             } else {
-              field->value.data[field->value.size++] = ch;
+              field->value.data[field->value.count++] = ch;
             }
           }
         }
@@ -682,7 +682,7 @@ DN_INICore DN_INI_ParseFromPtr(char const *buf, size_t count, char *base, size_t
         result.memory_required += bytes_req;
         if (curr_section && field) {
           DN_INI_Assert(curr_section->fields_count);
-          DN_INI_Assert(field->key.size);
+          DN_INI_Assert(field->key.count);
           if (bytes_req) {
             field->value.data = (char *)DN_INI_ArenaAlloc(&arena, bytes_req);
             if (!field->value.data) {
@@ -694,16 +694,16 @@ DN_INICore DN_INI_ParseFromPtr(char const *buf, size_t count, char *base, size_t
               char ch   = token.data[index];
               char next = index + 1 < token.count ? token.data[index + 1] : 0;
               if (ch == '\\' && next == 'n') {
-                field->value.data[field->value.size++] = '\n';
+                field->value.data[field->value.count++] = '\n';
                 index++;
               } else {
-                field->value.data[field->value.size++] = ch;
+                field->value.data[field->value.count++] = ch;
               }
             }
-            DN_INI_Assert(field->value.size <= bytes_req);
+            DN_INI_Assert(field->value.count <= bytes_req);
           } else {
             field->value.data = token.data;
-            field->value.size = token.count;
+            field->value.count = token.count;
           }
         }
       } break;
@@ -738,8 +738,8 @@ DN_INISection *DN_INI_AppendSectionF(DN_INICore *ini, DN_INIArena *arena, DN_INI
   if (arena && arena->used + mem_req <= arena->max) {
     result            = (DN_INISection *)DN_INI_ArenaAlloc(arena, sizeof(*result));
     result->name.data = (char *)DN_INI_ArenaAlloc(arena, size_req + 1);
-    result->name.size = size_req;
-    vsnprintf(result->name.data, result->name.size + 1, fmt, args_copy);
+    result->name.count = size_req;
+    vsnprintf(result->name.data, result->name.count + 1, fmt, args_copy);
     if (!section)
       section = &ini->first_section;
 
@@ -766,13 +766,13 @@ DN_INISection *DN_INI_AppendSectionF(DN_INICore *ini, DN_INIArena *arena, DN_INI
 static DN_INIField *DN_INI_AllocFieldInternal(DN_INIStr8 key, DN_INIArena *arena)
 {
   DN_INIField *result = 0;
-  size_t mem_req         = sizeof(*result) + (key.size + 1);
+  size_t mem_req         = sizeof(*result) + (key.count + 1);
   if (arena->used + mem_req <= arena->max) {
     result             = (DN_INIField *)DN_INI_ArenaAlloc(arena, sizeof(*result));
-    result->key.data   = (char *)DN_INI_ArenaAlloc(arena, key.size + 1);
-    result->key.size   = key.size;
-    DN_INI_Memcpy(result->key.data, key.data, key.size);
-    result->key.data[result->key.size] = 0;
+    result->key.data   = (char *)DN_INI_ArenaAlloc(arena, key.count + 1);
+    result->key.count   = key.count;
+    DN_INI_Memcpy(result->key.data, key.data, key.count);
+    result->key.data[result->key.count] = 0;
   }
   return result;
 }
@@ -780,13 +780,13 @@ static DN_INIField *DN_INI_AllocFieldInternal(DN_INIStr8 key, DN_INIArena *arena
 DN_INIField *DN_INI_AppendKeyBool(DN_INICore *ini, DN_INIArena *arena, DN_INISection *section, DN_INIStr8 key, bool value)
 {
   DN_INIField *result   = 0;
-  size_t          mem_req  = sizeof(*result) + key.size + sizeof(value);
+  size_t          mem_req  = sizeof(*result) + key.count + sizeof(value);
   ini->memory_required    += mem_req;
   if (arena && arena->used + mem_req <= arena->max) {
     result             = DN_INI_AllocFieldInternal(key, arena);
     result->value_bool = value;
     result->value_type = DN_INIFieldType_Bool;
-    DN_INI_Memcpy(result->key.data, key.data, key.size);
+    DN_INI_Memcpy(result->key.data, key.data, key.count);
     DN_INI_AppendValue(section, result);
   }
   return result;
@@ -802,13 +802,13 @@ DN_INIField *DN_INI_AppendKeyPtrBool(DN_INICore *ini, DN_INIArena *arena, DN_INI
 DN_INIField *DN_INI_AppendKeyUSize(DN_INICore *ini, DN_INIArena *arena, DN_INISection *section, DN_INIStr8 key, size_t value)
 {
   DN_INIField *result   = 0;
-  size_t          mem_req  = sizeof(*result) + key.size + sizeof(value);
+  size_t          mem_req  = sizeof(*result) + key.count + sizeof(value);
   ini->memory_required    += mem_req;
   if (arena && arena->used + mem_req <= arena->max) {
     result              = DN_INI_AllocFieldInternal(key, arena);
     result->value_usize = value;
     result->value_type = DN_INIFieldType_USize;
-    DN_INI_Memcpy(result->key.data, key.data, key.size);
+    DN_INI_Memcpy(result->key.data, key.data, key.count);
     DN_INI_AppendValue(section, result);
   }
   return result;
@@ -824,12 +824,12 @@ DN_INIField *DN_INI_AppendKeyPtrUSize(DN_INICore *ini, DN_INIArena *arena, DN_IN
 DN_INIField *DN_INI_AppendKeyCStr8(DN_INICore *ini, DN_INIArena *arena, DN_INISection *section, DN_INIStr8 key, char const *value, size_t value_size)
 {
   DN_INIField *result   = 0;
-  size_t          mem_req  = sizeof(*result) + (key.size + 1) + value_size;
+  size_t          mem_req  = sizeof(*result) + (key.count + 1) + value_size;
   ini->memory_required    += mem_req;
   if (arena && arena->used + mem_req <= arena->max) {
     result             = DN_INI_AllocFieldInternal(key, arena);
     result->value.data = (char *)DN_INI_ArenaAlloc(arena, value_size);
-    result->value.size = value_size;
+    result->value.count = value_size;
     result->value_type = DN_INIFieldType_String;
     DN_INI_Memcpy(result->value.data, value, value_size);
     DN_INI_AppendValue(section, result);
@@ -846,14 +846,14 @@ DN_INIField *DN_INI_AppendKeyF(DN_INICore *ini, DN_INIArena *arena, DN_INISectio
   va_end(args);
 
   DN_INIField *result  = 0;
-  size_t          mem_req = sizeof(*result) + (key.size + 1) + (size_req + 1);
+  size_t          mem_req = sizeof(*result) + (key.count + 1) + (size_req + 1);
   ini->memory_required   += mem_req;
   if (arena && arena->used + mem_req <= arena->max) {
     result             = DN_INI_AllocFieldInternal(key, arena);
     result->value.data = (char *)DN_INI_ArenaAlloc(arena, size_req + 1);
-    result->value.size = size_req;
-    vsnprintf(result->value.data, result->value.size + 1, fmt, args_copy);
-    result->value.data[result->value.size] = 0;
+    result->value.count = size_req;
+    vsnprintf(result->value.data, result->value.count + 1, fmt, args_copy);
+    result->value.data[result->value.count] = 0;
     DN_INI_AppendValue(section, result);
   }
   va_end(args_copy);

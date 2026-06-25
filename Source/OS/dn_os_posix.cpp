@@ -441,7 +441,7 @@ DN_API DN_OSFile DN_OS_FileOpen(DN_Str8         path,
                                 DN_ErrSink     *error)
 {
   DN_OSFile result = {};
-  if (path.size == 0 || path.size <= 0)
+  if (path.count == 0 || path.count <= 0)
     return result;
 
   if ((access & ~(DN_OSFileAccess_All) || ((access & DN_OSFileAccess_All) == 0))) {
@@ -568,7 +568,7 @@ DN_API void DN_OS_FileClose(DN_OSFile *file)
 DN_API DN_OSPathInfo DN_OS_PathInfo(DN_Str8 path)
 {
   DN_OSPathInfo result = {};
-  if (path.size == 0)
+  if (path.count == 0)
     return result;
 
   struct stat file_stat;
@@ -592,7 +592,7 @@ DN_API DN_OSPathInfo DN_OS_PathInfo(DN_Str8 path)
 DN_API bool DN_OS_PathDelete(DN_Str8 path)
 {
   bool result = false;
-  if (path.size)
+  if (path.count)
     result = remove(path.data) == 0;
   return result;
 }
@@ -600,7 +600,7 @@ DN_API bool DN_OS_PathDelete(DN_Str8 path)
 DN_API bool DN_OS_PathIsFile(DN_Str8 path)
 {
   bool result = false;
-  if (path.size == 0)
+  if (path.count == 0)
     return result;
 
   struct stat stat_result;
@@ -612,7 +612,7 @@ DN_API bool DN_OS_PathIsFile(DN_Str8 path)
 DN_API bool DN_OS_PathIsDir(DN_Str8 path)
 {
   bool result = false;
-  if (path.size == 0)
+  if (path.count == 0)
     return result;
 
   struct stat stat_result;
@@ -632,8 +632,8 @@ DN_API bool DN_OS_PathMakeDir(DN_Str8 path)
   uint16_t path_indexes[64]  = {};
 
   DN_Str8 copy = DN_Str8FromStr8Arena(path, &scratch.arena);
-  for (DN_USize index = copy.size - 1; index < copy.size; index--) {
-    bool first_char = index == (copy.size - 1);
+  for (DN_USize index = copy.count - 1; index < copy.count; index--) {
+    bool first_char = index == (copy.count - 1);
     char ch         = copy.data[index];
     if (ch == '/' || first_char) {
       char temp = copy.data[index];
@@ -696,12 +696,12 @@ DN_API bool DN_OS_PathIterateDir(DN_Str8 path, DN_OSDirIterator *it)
     if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
       continue;
 
-    DN_USize name_size    = DN_CStr8Size(entry->d_name);
-    DN_USize clamped_size = DN_Min(sizeof(it->buffer) - 1, name_size);
-    DN_AssertF(name_size == clamped_size, "name: %s, name_size: %zu, clamped_size: %zu", entry->d_name, name_size, clamped_size);
-    DN_Memcpy(it->buffer, entry->d_name, clamped_size);
-    it->buffer[clamped_size] = 0;
-    it->file_name            = DN_Str8FromPtr(it->buffer, clamped_size);
+    DN_USize name_count    = DN_CStr8Count(entry->d_name);
+    DN_USize clamped_count = DN_Min(sizeof(it->buffer) - 1, name_count);
+    DN_AssertF(name_count == clamped_count, "name: %s, name_size: %zu, clamped_size: %zu", entry->d_name, name_count, clamped_count);
+    DN_Memcpy(it->buffer, entry->d_name, clamped_count);
+    it->buffer[clamped_count] = 0;
+    it->file_name             = DN_Str8FromPtr(it->buffer, clamped_count);
     return true;
   }
 
@@ -962,7 +962,7 @@ DN_API DN_OSExecAsyncHandle DN_OS_ExecAsync(DN_Str8Slice   cmd_line,
       free(prev_working_dir);
     };
 
-    if (args->working_dir.size) {
+    if (args->working_dir.count) {
       prev_working_dir    = get_current_dir_name();
       DN_Str8 working_dir = DN_Str8FromStr8Arena(args->working_dir, &scratch.arena);
       if (chdir(working_dir.data) == -1) {
@@ -1410,23 +1410,23 @@ DN_API DN_OSPosixProcSelfStatus DN_OS_PosixProcSelfStatus()
     for (DN_ForItSize(line_it, DN_Str8, lines.data, lines.count)) {
       DN_Str8 line = DN_Str8TrimWhitespaceAround(*line_it.data);
       if (DN_Str8StartsWith(line, NAME, DN_Str8EqCase_Insensitive)) {
-        DN_Str8 str8     = DN_Str8TrimWhitespaceAround(DN_Str8Subset(line, NAME.size, line.size));
-        result.name_size = DN_Min(str8.size, sizeof(result.name));
+        DN_Str8 str8     = DN_Str8TrimWhitespaceAround(DN_Str8Subset(line, NAME.count, line.count));
+        result.name_size = DN_Min(str8.count, sizeof(result.name));
         DN_Memcpy(result.name, str8.data, result.name_size);
       } else if (DN_Str8StartsWith(line, PID, DN_Str8EqCase_Insensitive)) {
-        DN_Str8          str8   = DN_Str8TrimWhitespaceAround(DN_Str8Subset(line, PID.size, line.size));
+        DN_Str8          str8   = DN_Str8TrimWhitespaceAround(DN_Str8Subset(line, PID.count, line.count));
         DN_U64FromResult to_u64 = DN_U64FromStr8(str8, 0);
         result.pid              = to_u64.value;
         DN_Assert(to_u64.success);
       } else if (DN_Str8StartsWith(line, VM_SIZE, DN_Str8EqCase_Insensitive)) {
-        DN_Str8 size_with_kb = DN_Str8TrimWhitespaceAround(DN_Str8Subset(line, VM_SIZE.size, line.size));
+        DN_Str8 size_with_kb = DN_Str8TrimWhitespaceAround(DN_Str8Subset(line, VM_SIZE.count, line.count));
         DN_Assert(DN_Str8EndsWith(size_with_kb, DN_Str8Lit("kB")));
         DN_Str8          vm_size = DN_Str8BSplit(size_with_kb, DN_Str8Lit(" ")).lhs;
         DN_U64FromResult to_u64  = DN_U64FromStr8(vm_size, 0);
         result.vm_size           = DN_Kilobytes(to_u64.value);
         DN_Assert(to_u64.success);
       } else if (DN_Str8StartsWith(line, VM_PEAK, DN_Str8EqCase_Insensitive)) {
-        DN_Str8 size_with_kb = DN_Str8TrimWhitespaceAround(DN_Str8Subset(line, VM_PEAK.size, line.size));
+        DN_Str8 size_with_kb = DN_Str8TrimWhitespaceAround(DN_Str8Subset(line, VM_PEAK.count, line.count));
         DN_Assert(DN_Str8EndsWith(size_with_kb, DN_Str8Lit("kB")));
         DN_Str8          vm_size = DN_Str8BSplit(size_with_kb, DN_Str8Lit(" ")).lhs;
         DN_U64FromResult to_u64  = DN_U64FromStr8(vm_size, 0);

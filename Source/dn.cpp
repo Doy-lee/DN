@@ -1,5 +1,3 @@
-#define DN_BASE_CPP
-
 #if defined(_CLANGD)
   #define DN_ARENA_TEMP_MEM_UAF_GUARD 1
   #define DN_WITH_OS 1
@@ -180,7 +178,7 @@ DN_API void DN_Init(DN_Core *dn, DN_InitFlags flags, DN_TCInitArgs args)
     DN_USize longest_feature_name = 0;
     for (DN_ForIndexU(feature_index, DN_CPUFeature_Count)) {
       DN_CPUFeatureDecl feature_decl = g_dn_cpu_feature_decl[feature_index];
-      longest_feature_name           = DN_Max(longest_feature_name, feature_decl.label.size);
+      longest_feature_name           = DN_Max(longest_feature_name, feature_decl.label.count);
     }
 
     for (DN_ForIndexU(feature_index, DN_CPUFeature_Count)) {
@@ -192,7 +190,7 @@ DN_API void DN_Init(DN_Core *dn, DN_InitFlags flags, DN_TCInitArgs args)
                            DN_Str8Lit("..."),
                            "    %.*s:%*s%s\n",
                            DN_Str8PrintFmt(feature_decl.label),
-                           DN_Cast(int)(longest_feature_name - feature_decl.label.size),
+                           DN_Cast(int)(longest_feature_name - feature_decl.label.count),
                            "",
                            has_feature ? "available" : "not available");
     }
@@ -269,23 +267,23 @@ DN_API bool DN_VerifyArgs(DN_VerifyType type, bool expr, DN_CallSite call_site, 
   return result;
 }
 
-DN_API bool DN_MemStartsWith(void const *lhs, DN_USize lhs_size, void const *rhs, DN_USize rhs_size)
+DN_API bool DN_MemStartsWith(void const *lhs, DN_USize lhs_count, void const *rhs, DN_USize rhs_count)
 {
   bool result = false;
-  if (lhs_size >= rhs_size)
-    result = DN_MemEqUnsafe(lhs, rhs, rhs_size);
+  if (lhs_count >= rhs_count)
+    result = DN_MemEqUnsafe(lhs, rhs, rhs_count);
   return result;
 }
 
-DN_API bool DN_MemEq(void const *lhs, DN_USize lhs_size, void const *rhs, DN_USize rhs_size)
+DN_API bool DN_MemEq(void const *lhs, DN_USize lhs_count, void const *rhs, DN_USize rhs_count)
 {
-  bool result = lhs_size == rhs_size && DN_Memcmp(lhs, rhs, rhs_size) == 0;
+  bool result = lhs_count == rhs_count && DN_Memcmp(lhs, rhs, rhs_count) == 0;
   return result;
 }
 
-DN_API bool DN_MemEqUnsafe(void const *lhs, void const *rhs, DN_USize size)
+DN_API bool DN_MemEqUnsafe(void const *lhs, void const *rhs, DN_USize count)
 {
-  bool result = DN_Memcmp(lhs, rhs, size) == 0;
+  bool result = DN_Memcmp(lhs, rhs, count) == 0;
   return result;
 }
 
@@ -1162,10 +1160,10 @@ DN_API DN_MemStats DN_MemStatsSum(DN_MemStats lhs, DN_MemStats rhs)
   return result;
 }
 
-DN_API DN_MemStats DN_MemStatsSumArray(DN_MemStats const *array, DN_USize size)
+DN_API DN_MemStats DN_MemStatsSumArray(DN_MemStats const *array, DN_USize count)
 {
   DN_MemStats result = {};
-  for (DN_ForItSize(it, DN_MemStats const, array, size)) {
+  for (DN_ForItSize(it, DN_MemStats const, array, count)) {
     DN_MemStats stats    = *it.data;
     result.info.used    += stats.info.used;
     result.info.commit  += stats.info.commit;
@@ -1908,7 +1906,7 @@ static void DN_ErrSinkAddMsgToStr8Builder_(DN_Str8Builder *builder, DN_ErrSinkMs
                              DN_Str8PrintFmt(file_name),
                              it->call_site.line,
                              DN_Str8PrintFmt(it->call_site.function),
-                             it->msg.size ? " " : "",
+                             it->msg.count ? " " : "",
                              DN_Str8PrintFmt(it->msg));
     }
   }
@@ -1954,7 +1952,7 @@ DN_API bool DN_ErrSinkEndLogError_(DN_ErrSink *err, DN_CallSite call_site, DN_St
     // NOTE: Build the error string
     DN_Str8Builder builder = DN_Str8BuilderFromArena(err->arena);
     {
-      if (err_msg.size) {
+      if (err_msg.count) {
         DN_Str8BuilderAppendRef(&builder, err_msg);
         DN_Str8BuilderAppendRef(&builder, DN_Str8Lit(":"));
       } else {
@@ -2319,14 +2317,14 @@ DN_API DN_U64FromResult DN_U64FromStr8(DN_Str8 string, char separator)
 {
   // NOTE: Argument check
   DN_U64FromResult result = {};
-  if (string.size == 0) {
+  if (string.count == 0) {
     result.success = true;
     return result;
   }
 
   // NOTE: Sanitize input/output
   DN_Str8 trim_string = DN_Str8TrimWhitespaceAround(string);
-  if (trim_string.size == 0) {
+  if (trim_string.count == 0) {
     result.success = true;
     return result;
   }
@@ -2340,7 +2338,7 @@ DN_API DN_U64FromResult DN_U64FromStr8(DN_Str8 string, char separator)
   }
 
   // NOTE: Convert the string number to the binary number
-  for (DN_USize index = start_index; index < trim_string.size; index++) {
+  for (DN_USize index = start_index; index < trim_string.count; index++) {
     char ch = trim_string.data[index];
     if (index) {
       if (separator != 0 && ch == separator)
@@ -2407,13 +2405,13 @@ DN_API DN_U64 DN_U64FromHexPtrUnsafe(void const *hex, DN_USize hex_count)
 
 DN_API DN_U64FromResult DN_U64FromHexStr8(DN_Str8 hex)
 {
-  DN_U64FromResult result = DN_U64FromHexPtr(hex.data, hex.size);
+  DN_U64FromResult result = DN_U64FromHexPtr(hex.data, hex.count);
   return result;
 }
 
 DN_API DN_U64 DN_U64FromHexStr8Unsafe(DN_Str8 hex)
 {
-  DN_U64 result = DN_U64FromHexPtrUnsafe(hex.data, hex.size);
+  DN_U64 result = DN_U64FromHexPtrUnsafe(hex.data, hex.count);
   return result;
 }
 
@@ -2476,14 +2474,14 @@ DN_API DN_I64FromResult DN_I64FromStr8(DN_Str8 string, char separator)
 {
   // NOTE: Argument check
   DN_I64FromResult result = {};
-  if (string.size == 0) {
+  if (string.count == 0) {
     result.success = true;
     return result;
   }
 
   // NOTE: Sanitize input/output
   DN_Str8 trim_string = DN_Str8TrimWhitespaceAround(string);
-  if (trim_string.size == 0) {
+  if (trim_string.count == 0) {
     result.success = true;
     return result;
   }
@@ -2498,7 +2496,7 @@ DN_API DN_I64FromResult DN_I64FromStr8(DN_Str8 string, char separator)
   }
 
   // NOTE: Convert the string number to the binary number
-  for (DN_USize index = start_index; index < trim_string.size; index++) {
+  for (DN_USize index = start_index; index < trim_string.count; index++) {
     char ch = trim_string.data[index];
     if (index) {
       if (separator != 0 && ch == separator)
@@ -2541,11 +2539,11 @@ DN_API bool DN_U8x32Eq(DN_U8x32 const *lhs, DN_U8x32 const *rhs)
   return result;
 }
 
-DN_API DN_U8x32 DN_U8x32FromBytesLeftPadZ(DN_U8 const *ptr, DN_USize count)
+DN_API DN_U8x32 DN_U8x32FromBytesLeftPadZ(DN_U8 const *ptr, DN_USize size)
 {
   DN_U8x32 result = {};
-  DN_Assert(count <= sizeof(result.data));
-  DN_Memcpy(result.data + sizeof(result.data) - count, ptr, count);
+  DN_Assert(size <= sizeof(result.data));
+  DN_Memcpy(result.data + sizeof(result.data) - size, ptr, size);
   return result;
 }
 
@@ -2553,15 +2551,15 @@ DN_API DN_U8x32 DN_U8x32FromHexUnsafe(DN_Str8 hex_32b)
 {
   DN_U8x32 result = {};
   hex_32b         = DN_Str8TrimHexPrefix(hex_32b);
-  DN_Assert(hex_32b.size <= sizeof(result.data) * 2);
-  DN_BytesFromHexPtr(hex_32b.data, hex_32b.size, result.data, sizeof(result.data));
+  DN_Assert(hex_32b.count <= sizeof(result.data) * 2);
+  DN_BytesFromHexPtr(hex_32b.data, hex_32b.count, result.data, sizeof(result.data));
   return result;
 }
 
 DN_API DN_U8x32FromResult DN_U8x32FromHex(DN_Str8 hex_32b)
 {
   DN_U8x32FromResult result        = {};
-  DN_USize           bytes_written = DN_BytesFromHexPtr(hex_32b.data, hex_32b.size, result.value.data, sizeof(result.value.data));
+  DN_USize           bytes_written = DN_BytesFromHexPtr(hex_32b.data, hex_32b.count, result.value.data, sizeof(result.value.data));
   if (bytes_written == sizeof(result.value.data))
     result.success = true;
   return result;
@@ -2571,7 +2569,7 @@ DN_API DN_U8x32FromResult DN_U8x32FromDecimalStr8(DN_Str8 decimal)
 {
   DN_U8x32FromResult result = {};
   result.success            = true;
-  for (DN_USize i = 0; i < decimal.size; i++) {
+  for (DN_USize i = 0; i < decimal.count; i++) {
     DN_U8 digit = decimal.data[i];
     if (!DN_CharIsDigit(digit)) {
       result.success = false;
@@ -2648,7 +2646,7 @@ DN_API DN_FmtAppendResult DN_FmtVAppend(char *buf, DN_USize *buf_size, DN_USize 
     *buf_size = buf_max - 1;
   DN_Assert(*buf_size <= (buf_max - 1));
   result.str8      = DN_Str8FromPtr(buf, *buf_size);
-  result.truncated = result.str8.size != (starting_size + result.size_req);
+  result.truncated = result.str8.count != (starting_size + result.size_req);
   return result;
 }
 
@@ -2667,12 +2665,12 @@ DN_API DN_FmtAppendResult DN_FmtAppendTruncate(char *buf, DN_USize *buf_size, DN
   va_start(args, fmt);
   DN_FmtAppendResult result = DN_FmtVAppend(buf, buf_size, buf_max, fmt, args);
   if (result.truncated)
-    DN_Memcpy(result.str8.data + result.str8.size - truncator.size, truncator.data, truncator.size);
+    DN_Memcpy(result.str8.data + result.str8.count - truncator.count, truncator.data, truncator.count);
   va_end(args);
   return result;
 }
 
-DN_API DN_USize DN_FmtSize(DN_FMT_ATTRIB char const *fmt, ...)
+DN_API DN_USize DN_FmtCount(DN_FMT_ATTRIB char const *fmt, ...)
 {
   va_list args;
   va_start(args, fmt);
@@ -2681,7 +2679,7 @@ DN_API DN_USize DN_FmtSize(DN_FMT_ATTRIB char const *fmt, ...)
   return result;
 }
 
-DN_API DN_USize DN_FmtVSize(DN_FMT_ATTRIB char const *fmt, va_list args)
+DN_API DN_USize DN_FmtVCount(DN_FMT_ATTRIB char const *fmt, va_list args)
 {
   va_list args_copy;
   va_copy(args_copy, args);
@@ -2690,7 +2688,7 @@ DN_API DN_USize DN_FmtVSize(DN_FMT_ATTRIB char const *fmt, va_list args)
   return result;
 }
 
-DN_API DN_USize DN_CStr8Size(char const *src)
+DN_API DN_USize DN_CStr8Count(char const *src)
 {
   DN_USize result = 0;
   for (; src && src[0] != 0; src++, result++)
@@ -2698,7 +2696,7 @@ DN_API DN_USize DN_CStr8Size(char const *src)
   return result;
 }
 
-DN_API DN_USize DN_CStr16Size(wchar_t const *src)
+DN_API DN_USize DN_CStr16Count(wchar_t const *src)
 {
   DN_USize result = 0;
   for (; src && src[0] != 0; src++, result++)
@@ -2706,33 +2704,33 @@ DN_API DN_USize DN_CStr16Size(wchar_t const *src)
   return result;
 }
 
-DN_API DN_Str8 DN_Str8AllocAllocator(DN_USize size, DN_ZMem z_mem, DN_Allocator allocator)
+DN_API DN_Str8 DN_Str8AllocAllocator(DN_USize count, DN_ZMem z_mem, DN_Allocator allocator)
 {
   DN_Str8 result = {};
-  result.data    = DN_Cast(char *) DN_AllocatorAlloc(allocator, size + 1, alignof(char), z_mem);
+  result.data    = DN_Cast(char *) DN_AllocatorAlloc(allocator, count + 1, alignof(char), z_mem);
   if (result.data) {
-    result.size              = size;
-    result.data[result.size] = 0;
+    result.count              = count;
+    result.data[result.count] = 0;
   }
   return result;
 }
 
-DN_API DN_Str8 DN_Str8AllocArena(DN_USize size, DN_ZMem z_mem, DN_Arena *arena)
+DN_API DN_Str8 DN_Str8AllocArena(DN_USize count, DN_ZMem z_mem, DN_Arena *arena)
 {
-  DN_Str8 result = DN_Str8AllocAllocator(size, z_mem, DN_AllocatorFromArena(arena));
+  DN_Str8 result = DN_Str8AllocAllocator(count, z_mem, DN_AllocatorFromArena(arena));
   return result;
 }
 
-DN_API DN_Str8 DN_Str8AllocPool(DN_USize size, DN_Pool *pool)
+DN_API DN_Str8 DN_Str8AllocPool(DN_USize count, DN_Pool *pool)
 {
-  DN_Str8 result = DN_Str8AllocAllocator(size, DN_ZMem_No, DN_AllocatorFromPool(pool));
+  DN_Str8 result = DN_Str8AllocAllocator(count, DN_ZMem_No, DN_AllocatorFromPool(pool));
   return result;
 }
 
 DN_API DN_Str8 DN_Str8FromCStr8(char const *src)
 {
-  DN_USize size   = DN_CStr8Size(src);
-  DN_Str8  result = DN_Str8FromPtr(src, size);
+  DN_USize count  = DN_CStr8Count(src);
+  DN_Str8  result = DN_Str8FromPtr(src, count);
   return result;
 }
 
@@ -2743,30 +2741,30 @@ DN_API DN_Str8 DN_Str8FromCStr8Arena(char const *src, DN_Arena *arena)
   return result;
 }
 
-DN_API DN_Str8 DN_Str8FromPtrArena(void const *data, DN_USize size, DN_Arena *arena)
+DN_API DN_Str8 DN_Str8FromPtrArena(void const *data, DN_USize count, DN_Arena *arena)
 {
-  DN_Str8 result = DN_Str8AllocArena(size, DN_ZMem_No, arena);
-  if (result.size)
-    DN_Memcpy(result.data, data, size);
+  DN_Str8 result = DN_Str8AllocArena(count, DN_ZMem_No, arena);
+  if (result.count)
+    DN_Memcpy(result.data, data, count);
   return result;
 }
 
-DN_API DN_Str8 DN_Str8FromPtrPool(void const *data, DN_USize size, DN_Pool *pool)
+DN_API DN_Str8 DN_Str8FromPtrPool(void const *data, DN_USize count, DN_Pool *pool)
 {
-  DN_Str8 result = DN_Str8AllocPool(size, pool);
-  if (result.size)
-    DN_Memcpy(result.data, data, size);
+  DN_Str8 result = DN_Str8AllocPool(count, pool);
+  if (result.count)
+    DN_Memcpy(result.data, data, count);
   return result;
 }
 
 DN_API DN_Str8 DN_Str8FromStr8Allocator(DN_Str8 string, DN_Allocator allocator)
 {
   DN_Str8 result = {};
-  result.data    = DN_Cast(char *) DN_AllocatorAlloc(allocator, string.size + 1, alignof(char), DN_ZMem_No);
+  result.data    = DN_Cast(char *) DN_AllocatorAlloc(allocator, string.count + 1, alignof(char), DN_ZMem_No);
   if (result.data) {
-    DN_Memcpy(result.data, string.data, string.size);
-    result.data[string.size] = 0;
-    result.size              = string.size;
+    DN_Memcpy(result.data, string.data, string.count);
+    result.data[string.count] = 0;
+    result.count              = string.count;
   }
   return result;
 }
@@ -2785,12 +2783,12 @@ DN_API DN_Str8 DN_Str8FromStr8Pool(DN_Str8 string, DN_Pool *pool)
 
 DN_API DN_Str8 DN_Str8FromFmtVAllocator(DN_Allocator allocator, DN_FMT_ATTRIB char const *fmt, va_list args)
 {
-  DN_USize size   = DN_FmtVSize(fmt, args);
-  DN_Str8  result = DN_Str8AllocAllocator(size, DN_ZMem_No, allocator);
+  DN_USize count  = DN_FmtVCount(fmt, args);
+  DN_Str8  result = DN_Str8AllocAllocator(count, DN_ZMem_No, allocator);
   if (result.data) {
     DN_USize written = 0;
-    DN_FmtVAppend(result.data, &written, result.size + 1, fmt, args);
-    DN_Assert(written == result.size);
+    DN_FmtVAppend(result.data, &written, result.count + 1, fmt, args);
+    DN_Assert(written == result.count);
   }
   return result;
 }
@@ -2839,7 +2837,7 @@ DN_API DN_Str8x16 DN_Str8x16FromFmt(DN_FMT_ATTRIB char const *fmt, ...)
   va_list args;
   va_start(args, fmt);
   DN_Str8x16 result = {};
-  DN_FmtVAppend(result.data, &result.size, sizeof(result.data), fmt, args);
+  DN_FmtVAppend(result.data, &result.count, sizeof(result.data), fmt, args);
   va_end(args);
   return result;
 }
@@ -2847,7 +2845,7 @@ DN_API DN_Str8x16 DN_Str8x16FromFmt(DN_FMT_ATTRIB char const *fmt, ...)
 DN_API DN_Str8x16 DN_Str8x16FromFmtVArena(DN_FMT_ATTRIB char const *fmt, va_list args)
 {
   DN_Str8x16 result = {};
-  DN_FmtVAppend(result.data, &result.size, sizeof(result.data), fmt, args);
+  DN_FmtVAppend(result.data, &result.count, sizeof(result.data), fmt, args);
   return result;
 }
 
@@ -2856,7 +2854,7 @@ DN_API DN_Str8x32 DN_Str8x32FromFmt(DN_FMT_ATTRIB char const *fmt, ...)
   va_list args;
   va_start(args, fmt);
   DN_Str8x32 result = {};
-  DN_FmtVAppend(result.data, &result.size, sizeof(result.data), fmt, args);
+  DN_FmtVAppend(result.data, &result.count, sizeof(result.data), fmt, args);
   va_end(args);
   return result;
 }
@@ -2864,7 +2862,7 @@ DN_API DN_Str8x32 DN_Str8x32FromFmt(DN_FMT_ATTRIB char const *fmt, ...)
 DN_API DN_Str8x32 DN_Str8x32FromFmtVArena(DN_FMT_ATTRIB char const *fmt, va_list args)
 {
   DN_Str8x32 result = {};
-  DN_FmtVAppend(result.data, &result.size, sizeof(result.data), fmt, args);
+  DN_FmtVAppend(result.data, &result.count, sizeof(result.data), fmt, args);
   return result;
 }
 
@@ -2873,7 +2871,7 @@ DN_API DN_Str8x64 DN_Str8x64FromFmt(DN_FMT_ATTRIB char const *fmt, ...)
   va_list args;
   va_start(args, fmt);
   DN_Str8x64 result = {};
-  DN_FmtVAppend(result.data, &result.size, sizeof(result.data), fmt, args);
+  DN_FmtVAppend(result.data, &result.count, sizeof(result.data), fmt, args);
   va_end(args);
   return result;
 }
@@ -2881,7 +2879,7 @@ DN_API DN_Str8x64 DN_Str8x64FromFmt(DN_FMT_ATTRIB char const *fmt, ...)
 DN_API DN_Str8x64 DN_Str8x64FromFmtV(DN_FMT_ATTRIB char const *fmt, va_list args)
 {
   DN_Str8x64 result = {};
-  DN_FmtVAppend(result.data, &result.size, sizeof(result.data), fmt, args);
+  DN_FmtVAppend(result.data, &result.count, sizeof(result.data), fmt, args);
   return result;
 }
 
@@ -2890,7 +2888,7 @@ DN_API DN_Str8x128 DN_Str8x128FromFmt(DN_FMT_ATTRIB char const *fmt, ...)
   va_list args;
   va_start(args, fmt);
   DN_Str8x128 result = {};
-  DN_FmtVAppend(result.data, &result.size, sizeof(result.data), fmt, args);
+  DN_FmtVAppend(result.data, &result.count, sizeof(result.data), fmt, args);
   va_end(args);
   return result;
 }
@@ -2898,7 +2896,7 @@ DN_API DN_Str8x128 DN_Str8x128FromFmt(DN_FMT_ATTRIB char const *fmt, ...)
 DN_API DN_Str8x128 DN_Str8x128FromFmtVArena(DN_FMT_ATTRIB char const *fmt, va_list args)
 {
   DN_Str8x128 result = {};
-  DN_FmtVAppend(result.data, &result.size, sizeof(result.data), fmt, args);
+  DN_FmtVAppend(result.data, &result.count, sizeof(result.data), fmt, args);
   return result;
 }
 
@@ -2907,7 +2905,7 @@ DN_API DN_Str8x256 DN_Str8x256FromFmt(DN_FMT_ATTRIB char const *fmt, ...)
   va_list args;
   va_start(args, fmt);
   DN_Str8x256 result = {};
-  DN_FmtVAppend(result.data, &result.size, sizeof(result.data), fmt, args);
+  DN_FmtVAppend(result.data, &result.count, sizeof(result.data), fmt, args);
   va_end(args);
   return result;
 }
@@ -2915,7 +2913,7 @@ DN_API DN_Str8x256 DN_Str8x256FromFmt(DN_FMT_ATTRIB char const *fmt, ...)
 DN_API DN_Str8x256 DN_Str8x256FromFmtVArena(DN_FMT_ATTRIB char const *fmt, va_list args)
 {
   DN_Str8x256 result = {};
-  DN_FmtVAppend(result.data, &result.size, sizeof(result.data), fmt, args);
+  DN_FmtVAppend(result.data, &result.count, sizeof(result.data), fmt, args);
   return result;
 }
 
@@ -2924,7 +2922,7 @@ DN_API DN_Str8x512 DN_Str8x512FromFmt(DN_FMT_ATTRIB char const *fmt, ...)
   va_list args;
   va_start(args, fmt);
   DN_Str8x512 result = {};
-  DN_FmtVAppend(result.data, &result.size, sizeof(result.data), fmt, args);
+  DN_FmtVAppend(result.data, &result.count, sizeof(result.data), fmt, args);
   va_end(args);
   return result;
 }
@@ -2932,7 +2930,7 @@ DN_API DN_Str8x512 DN_Str8x512FromFmt(DN_FMT_ATTRIB char const *fmt, ...)
 DN_API DN_Str8x512 DN_Str8x512FromFmtVArena(DN_FMT_ATTRIB char const *fmt, va_list args)
 {
   DN_Str8x512 result = {};
-  DN_FmtVAppend(result.data, &result.size, sizeof(result.data), fmt, args);
+  DN_FmtVAppend(result.data, &result.count, sizeof(result.data), fmt, args);
   return result;
 }
 
@@ -2941,7 +2939,7 @@ DN_API DN_Str8x1024 DN_Str8x1024FromFmt(DN_FMT_ATTRIB char const *fmt, ...)
   va_list args;
   va_start(args, fmt);
   DN_Str8x1024 result = {};
-  DN_FmtVAppend(result.data, &result.size, sizeof(result.data), fmt, args);
+  DN_FmtVAppend(result.data, &result.count, sizeof(result.data), fmt, args);
   va_end(args);
   return result;
 }
@@ -2949,7 +2947,7 @@ DN_API DN_Str8x1024 DN_Str8x1024FromFmt(DN_FMT_ATTRIB char const *fmt, ...)
 DN_API DN_Str8x1024 DN_Str8x1024FromFmtVArena(DN_FMT_ATTRIB char const *fmt, va_list args)
 {
   DN_Str8x1024 result = {};
-  DN_FmtVAppend(result.data, &result.size, sizeof(result.data), fmt, args);
+  DN_FmtVAppend(result.data, &result.count, sizeof(result.data), fmt, args);
   return result;
 }
 
@@ -2963,7 +2961,7 @@ DN_API void DN_Str8x16AppendFmt(DN_Str8x16 *str, DN_FMT_ATTRIB char const *fmt, 
 
 DN_API void DN_Str8x16AppendFmtV(DN_Str8x16 *str, DN_FMT_ATTRIB char const *fmt, va_list args)
 {
-  DN_FmtVAppend(str->data, &str->size, sizeof(str->data), fmt, args);
+  DN_FmtVAppend(str->data, &str->count, sizeof(str->data), fmt, args);
 }
 
 DN_API void DN_Str8x32AppendFmt(DN_Str8x32 *str, DN_FMT_ATTRIB char const *fmt, ...)
@@ -2976,7 +2974,7 @@ DN_API void DN_Str8x32AppendFmt(DN_Str8x32 *str, DN_FMT_ATTRIB char const *fmt, 
 
 DN_API void DN_Str8x32AppendFmtV(DN_Str8x32 *str, DN_FMT_ATTRIB char const *fmt, va_list args)
 {
-  DN_FmtVAppend(str->data, &str->size, sizeof(str->data), fmt, args);
+  DN_FmtVAppend(str->data, &str->count, sizeof(str->data), fmt, args);
 }
 
 DN_API void DN_Str8x64AppendFmt(DN_Str8x64 *str, DN_FMT_ATTRIB char const *fmt, ...)
@@ -2989,7 +2987,7 @@ DN_API void DN_Str8x64AppendFmt(DN_Str8x64 *str, DN_FMT_ATTRIB char const *fmt, 
 
 DN_API void DN_Str8x64AppendFmtV(DN_Str8x64 *str, DN_FMT_ATTRIB char const *fmt, va_list args)
 {
-  DN_FmtVAppend(str->data, &str->size, sizeof(str->data), fmt, args);
+  DN_FmtVAppend(str->data, &str->count, sizeof(str->data), fmt, args);
 }
 
 DN_API void DN_Str8x128AppendFmt(DN_Str8x128 *str, DN_FMT_ATTRIB char const *fmt, ...)
@@ -3002,7 +3000,7 @@ DN_API void DN_Str8x128AppendFmt(DN_Str8x128 *str, DN_FMT_ATTRIB char const *fmt
 
 DN_API void DN_Str8x128AppendFmtV(DN_Str8x128 *str, DN_FMT_ATTRIB char const *fmt, va_list args)
 {
-  DN_FmtVAppend(str->data, &str->size, sizeof(str->data), fmt, args);
+  DN_FmtVAppend(str->data, &str->count, sizeof(str->data), fmt, args);
 }
 
 DN_API void DN_Str8x256AppendFmt(DN_Str8x256 *str, DN_FMT_ATTRIB char const *fmt, ...)
@@ -3015,7 +3013,7 @@ DN_API void DN_Str8x256AppendFmt(DN_Str8x256 *str, DN_FMT_ATTRIB char const *fmt
 
 DN_API void DN_Str8x256AppendFmtV(DN_Str8x256 *str, DN_FMT_ATTRIB char const *fmt, va_list args)
 {
-  DN_FmtVAppend(str->data, &str->size, sizeof(str->data), fmt, args);
+  DN_FmtVAppend(str->data, &str->count, sizeof(str->data), fmt, args);
 }
 
 DN_API void DN_Str8x512AppendFmt(DN_Str8x512 *str, DN_FMT_ATTRIB char const *fmt, ...)
@@ -3028,7 +3026,7 @@ DN_API void DN_Str8x512AppendFmt(DN_Str8x512 *str, DN_FMT_ATTRIB char const *fmt
 
 DN_API void DN_Str8x512AppendFmtV(DN_Str8x512 *str, DN_FMT_ATTRIB char const *fmt, va_list args)
 {
-  DN_FmtVAppend(str->data, &str->size, sizeof(str->data), fmt, args);
+  DN_FmtVAppend(str->data, &str->count, sizeof(str->data), fmt, args);
 }
 
 DN_API void DN_Str8x1024AppendFmt(DN_Str8x1024 *str, DN_FMT_ATTRIB char const *fmt, ...)
@@ -3041,7 +3039,7 @@ DN_API void DN_Str8x1024AppendFmt(DN_Str8x1024 *str, DN_FMT_ATTRIB char const *f
 
 DN_API void DN_Str8x1024AppendFmtV(DN_Str8x1024 *str, DN_FMT_ATTRIB char const *fmt, va_list args)
 {
-  DN_FmtVAppend(str->data, &str->size, sizeof(str->data), fmt, args);
+  DN_FmtVAppend(str->data, &str->count, sizeof(str->data), fmt, args);
 }
 
 DN_API DN_Str8x32 DN_Str8x32FromU64(DN_U64 val, char separator)
@@ -3051,16 +3049,16 @@ DN_API DN_Str8x32 DN_Str8x32FromU64(DN_U64 val, char separator)
   DN_USize   temp_index = 0;
 
   // NOTE: Write the digits the first, up to [0, 2] digits that do not need a thousandth separator
-  DN_USize   range_without_separator = temp.size % 3;
+  DN_USize   range_without_separator = temp.count % 3;
   for (; temp_index < range_without_separator; temp_index++)
-    result.data[result.size++] = temp.data[temp_index];
+    result.data[result.count++] = temp.data[temp_index];
 
   // NOTE: Write the subsequent digits and every 3rd digit, add the seperator
   DN_USize   digit_counter = 0;
-  for (; temp_index < temp.size; temp_index++, digit_counter++) {
+  for (; temp_index < temp.count; temp_index++, digit_counter++) {
     if (separator && temp_index && (digit_counter % 3 == 0))
-      result.data[result.size++] = separator;
-    result.data[result.size++] = temp.data[temp_index];
+      result.data[result.count++] = separator;
+    result.data[result.count++] = temp.data[temp_index];
   }
   return result;
 }
@@ -3068,19 +3066,19 @@ DN_API DN_Str8x32 DN_Str8x32FromU64(DN_U64 val, char separator)
 
 DN_API bool DN_Str8IsAll(DN_Str8 string, DN_Str8IsAllType is_all)
 {
-  bool result = string.size;
+  bool result = string.count;
   if (!result)
     return result;
 
   switch (is_all) {
     case DN_Str8IsAllType_Digits: {
-      for (DN_USize index = 0; result && index < string.size; index++)
+      for (DN_USize index = 0; result && index < string.count; index++)
         result = string.data[index] >= '0' && string.data[index] <= '9';
     } break;
 
     case DN_Str8IsAllType_Hex: {
       DN_Str8 trimmed = DN_Str8TrimPrefix(string, DN_Str8Lit("0x"), DN_Str8EqCase_Insensitive);
-      for (DN_USize index = 0; result && index < trimmed.size; index++) {
+      for (DN_USize index = 0; result && index < trimmed.count; index++) {
         char ch = trimmed.data[index];
         result  = (ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F');
       }
@@ -3092,19 +3090,19 @@ DN_API bool DN_Str8IsAll(DN_Str8 string, DN_Str8IsAllType is_all)
 
 DN_API char *DN_Str8End(DN_Str8 string)
 {
-  char *result = string.data + string.size;
+  char *result = string.data + string.count;
   return result;
 }
 
-DN_API DN_Str8 DN_Str8Subset(DN_Str8 string, DN_USize offset, DN_USize size)
+DN_API DN_Str8 DN_Str8Subset(DN_Str8 string, DN_USize offset, DN_USize count)
 {
   DN_Str8 result = DN_Str8FromPtr(string.data, 0);
-  if (string.size == 0)
+  if (string.count == 0)
     return result;
 
-  DN_USize capped_offset = DN_Min(offset, string.size);
-  DN_USize max_size      = string.size - capped_offset;
-  DN_USize capped_size   = DN_Min(size, max_size);
+  DN_USize capped_offset = DN_Min(offset, string.count);
+  DN_USize max_size      = string.count - capped_offset;
+  DN_USize capped_size   = DN_Min(count, max_size);
   result                 = DN_Str8FromPtr(string.data + capped_offset, capped_size);
   return result;
 }
@@ -3124,19 +3122,19 @@ DN_API DN_Str8 DN_Str8NextLine(DN_Str8 string)
 DN_API DN_Str8BSplitResult DN_Str8BSplitArray(DN_Str8 string, DN_Str8 const *find, DN_USize find_size)
 {
   DN_Str8BSplitResult result = {};
-  if (string.size == 0 || !find || find_size == 0)
+  if (string.count == 0 || !find || find_size == 0)
     return result;
 
   result.lhs = string;
-  for (DN_USize index = 0; !result.rhs.data && index < string.size; index++) {
+  for (DN_USize index = 0; !result.rhs.data && index < string.count; index++) {
     for (DN_USize find_index = 0; find_index < find_size; find_index++) {
       DN_Str8 find_item    = find[find_index];
-      DN_Str8 string_slice = DN_Str8Subset(string, index, find_item.size);
+      DN_Str8 string_slice = DN_Str8Subset(string, index, find_item.count);
       if (DN_Str8Eq(string_slice, find_item)) {
         result.input_index = find_index;
-        result.lhs.size    = index;
-        result.rhs.data    = string_slice.data + find_item.size;
-        result.rhs.size    = string.size - (index + find_item.size);
+        result.lhs.count   = index;
+        result.rhs.data    = string_slice.data + find_item.count;
+        result.rhs.count   = string.count - (index + find_item.count);
         break;
       }
     }
@@ -3154,18 +3152,18 @@ DN_API DN_Str8BSplitResult DN_Str8BSplit(DN_Str8 string, DN_Str8 find)
 DN_API DN_Str8BSplitResult DN_Str8BSplitLastArray(DN_Str8 string, DN_Str8 const *find, DN_USize find_size)
 {
   DN_Str8BSplitResult result = {};
-  if (string.size == 0 || !find || find_size == 0)
+  if (string.count == 0 || !find || find_size == 0)
     return result;
 
   result.lhs = string;
-  for (DN_USize index = string.size - 1; !result.rhs.data && index < string.size; index--) {
+  for (DN_USize index = string.count - 1; !result.rhs.data && index < string.count; index--) {
     for (DN_USize find_index = 0; find_index < find_size; find_index++) {
       DN_Str8 find_item    = find[find_index];
-      DN_Str8 string_slice = DN_Str8Subset(string, index, find_item.size);
+      DN_Str8 string_slice = DN_Str8Subset(string, index, find_item.count);
       if (DN_Str8Eq(string_slice, find_item)) {
-        result.lhs.size = index;
-        result.rhs.data = string_slice.data + find_item.size;
-        result.rhs.size = string.size - (index + find_item.size);
+        result.lhs.count = index;
+        result.rhs.data = string_slice.data + find_item.count;
+        result.rhs.count = string.count - (index + find_item.count);
         break;
       }
     }
@@ -3183,7 +3181,7 @@ DN_API DN_Str8BSplitResult DN_Str8BSplitLast(DN_Str8 string, DN_Str8 find)
 DN_API DN_USize DN_Str8Split(DN_Str8 string, DN_Str8 delimiter, DN_Str8 *splits, DN_USize splits_count, DN_Str8SplitFlags flags)
 {
   DN_USize result = 0; // The number of splits in the actual string.
-  if (string.size == 0 || delimiter.size == 0 || delimiter.size <= 0)
+  if (string.count == 0 || delimiter.count == 0 || delimiter.count <= 0)
     return result;
 
   DN_Str8 it                  = string;
@@ -3202,12 +3200,12 @@ DN_API DN_USize DN_Str8Split(DN_Str8 string, DN_Str8 delimiter, DN_Str8 *splits,
       it                            = sub_split.rhs;
     }
 
-    if (item.size || allow_empty_strings) {
+    if (item.count || allow_empty_strings) {
       if (splits && result < splits_count)
         splits[result] = item;
       result++;
     }
-  } while (it.size);
+  } while (it.count);
 
   return result;
 }
@@ -3227,17 +3225,17 @@ DN_API DN_Str8SplitResult DN_Str8SplitArena(DN_Str8 string, DN_Str8 delimiter, D
 DN_API DN_Str8FindResult DN_Str8FindStr8Array(DN_Str8 string, DN_Str8 const *find, DN_USize find_size, DN_Str8EqCase eq_case)
 {
   DN_Str8FindResult result = {};
-  for (DN_USize index = 0; !result.found && index < string.size; index++) {
+  for (DN_USize index = 0; !result.found && index < string.count; index++) {
     for (DN_USize find_index = 0; find_index < find_size; find_index++) {
       DN_Str8 find_item    = find[find_index];
-      DN_Str8 string_slice = DN_Str8Subset(string, index, find_item.size);
+      DN_Str8 string_slice = DN_Str8Subset(string, index, find_item.count);
       if (DN_Str8Eq(string_slice, find_item, eq_case)) {
         result.found                        = true;
         result.index                        = index;
         result.start_to_before_match        = DN_Str8FromPtr(string.data, index);
-        result.match                        = DN_Str8FromPtr(string.data + index, find_item.size);
-        result.match_to_end_of_buffer       = DN_Str8FromPtr(result.match.data, string.size - index);
-        result.after_match_to_end_of_buffer = DN_Str8Advance(result.match_to_end_of_buffer, find_item.size);
+        result.match                        = DN_Str8FromPtr(string.data + index, find_item.count);
+        result.match_to_end_of_buffer       = DN_Str8FromPtr(result.match.data, string.count - index);
+        result.after_match_to_end_of_buffer = DN_Str8Advance(result.match_to_end_of_buffer, find_item.count);
         break;
       }
     }
@@ -3254,7 +3252,7 @@ DN_API DN_Str8FindResult DN_Str8FindStr8(DN_Str8 string, DN_Str8 find, DN_Str8Eq
 DN_API DN_Str8FindResult DN_Str8Find(DN_Str8 string, DN_Str8FindFlag flags)
 {
   DN_Str8FindResult result = {};
-  for (DN_USize index = 0; !result.found && index < string.size; index++) {
+  for (DN_USize index = 0; !result.found && index < string.count; index++) {
     result.found |= ((flags & DN_Str8FindFlag_Digit) && DN_CharIsDigit(string.data[index]));
     result.found |= ((flags & DN_Str8FindFlag_Alphabet) && DN_CharIsAlphabet(string.data[index]));
     result.found |= ((flags & DN_Str8FindFlag_Whitespace) && DN_CharIsWhitespace(string.data[index]));
@@ -3263,7 +3261,7 @@ DN_API DN_Str8FindResult DN_Str8Find(DN_Str8 string, DN_Str8FindFlag flags)
     if (result.found) {
       result.index                        = index;
       result.match                        = DN_Str8FromPtr(string.data + index, 1);
-      result.match_to_end_of_buffer       = DN_Str8FromPtr(result.match.data, string.size - index);
+      result.match_to_end_of_buffer       = DN_Str8FromPtr(result.match.data, string.count - index);
       result.after_match_to_end_of_buffer = DN_Str8Advance(result.match_to_end_of_buffer, 1);
     }
   }
@@ -3272,50 +3270,50 @@ DN_API DN_Str8FindResult DN_Str8Find(DN_Str8 string, DN_Str8FindFlag flags)
 
 DN_API DN_Str8 DN_Str8Segment(DN_Arena *arena, DN_Str8 src, DN_USize segment_size, char segment_char)
 {
-  if (!segment_size || src.size == 0) {
+  if (!segment_size || src.count == 0) {
     DN_Str8 result = DN_Str8FromStr8Arena(src, arena);
     return result;
   }
 
-  DN_USize segments = src.size / segment_size;
-  if (src.size % segment_size == 0)
+  DN_USize segments = src.count / segment_size;
+  if (src.count % segment_size == 0)
     segments--;
 
   DN_USize segment_counter = 0;
-  DN_Str8  result          = DN_Str8AllocArena(src.size + segments, DN_ZMem_Yes, arena);
+  DN_Str8  result          = DN_Str8AllocArena(src.count + segments, DN_ZMem_Yes, arena);
   DN_USize write_index     = 0;
-  for (DN_ForIndexU(src_index, src.size)) {
+  for (DN_ForIndexU(src_index, src.count)) {
     result.data[write_index++] = src.data[src_index];
     if ((src_index + 1) % segment_size == 0 && segment_counter < segments) {
       result.data[write_index++] = segment_char;
       segment_counter++;
     }
-    DN_AssertF(write_index <= result.size, "result.size=%zu, write_index=%zu", result.size, write_index);
+    DN_AssertF(write_index <= result.count, "result.count=%zu, write_index=%zu", result.count, write_index);
   }
 
-  DN_AssertF(write_index == result.size, "result.size=%zu, write_index=%zu", result.size, write_index);
+  DN_AssertF(write_index == result.count, "result.count=%zu, write_index=%zu", result.count, write_index);
   return result;
 }
 
 DN_API DN_Str8 DN_Str8ReverseSegment(DN_Arena *arena, DN_Str8 src, DN_USize segment_size, char segment_char)
 {
-  if (!segment_size || src.size == 0) {
+  if (!segment_size || src.count == 0) {
     DN_Str8 result = DN_Str8FromStr8Arena(src, arena);
     return result;
   }
 
-  DN_USize segments = src.size / segment_size;
-  if (src.size % segment_size == 0)
+  DN_USize segments = src.count / segment_size;
+  if (src.count % segment_size == 0)
     segments--;
 
   DN_USize write_counter   = 0;
   DN_USize segment_counter = 0;
-  DN_Str8  result          = DN_Str8AllocArena(src.size + segments, DN_ZMem_Yes, arena);
-  DN_USize write_index     = result.size - 1;
+  DN_Str8  result          = DN_Str8AllocArena(src.count + segments, DN_ZMem_Yes, arena);
+  DN_USize write_index     = result.count - 1;
 
   DN_MSVC_WARNING_PUSH
   DN_MSVC_WARNING_DISABLE(6293) // NOTE: Ill-defined loop
-  for (DN_USize src_index = src.size - 1; src_index < src.size; src_index--) {
+  for (DN_USize src_index = src.count - 1; src_index < src.count; src_index--) {
     DN_MSVC_WARNING_POP
     result.data[write_index--] = src.data[src_index];
     if (++write_counter % segment_size == 0 && segment_counter < segments) {
@@ -3330,16 +3328,16 @@ DN_API DN_Str8 DN_Str8ReverseSegment(DN_Arena *arena, DN_Str8 src, DN_USize segm
 
 DN_API bool DN_Str8Eq(DN_Str8 lhs, DN_Str8 rhs, DN_Str8EqCase eq_case)
 {
-  if (lhs.size != rhs.size)
+  if (lhs.count != rhs.count)
     return false;
   bool result = true;
   switch (eq_case) {
     case DN_Str8EqCase_Sensitive: {
-      result = (DN_Memcmp(lhs.data, rhs.data, lhs.size) == 0);
+      result = (DN_Memcmp(lhs.data, rhs.data, lhs.count) == 0);
     } break;
 
     case DN_Str8EqCase_Insensitive: {
-      for (DN_USize index = 0; index < lhs.size && result; index++)
+      for (DN_USize index = 0; index < lhs.count && result; index++)
         result = (DN_CharToLower(lhs.data[index]) == DN_CharToLower(rhs.data[index]));
     } break;
   }
@@ -3354,7 +3352,7 @@ DN_API bool DN_Str8EqInsensitive(DN_Str8 lhs, DN_Str8 rhs)
 
 DN_API bool DN_Str8StartsWith(DN_Str8 string, DN_Str8 prefix, DN_Str8EqCase eq_case)
 {
-  DN_Str8 substring = {string.data, DN_Min(prefix.size, string.size)};
+  DN_Str8 substring = {string.data, DN_Min(prefix.count, string.count)};
   bool    result    = DN_Str8Eq(substring, prefix, eq_case);
   return result;
 }
@@ -3367,7 +3365,7 @@ DN_API bool DN_Str8StartsWithInsensitive(DN_Str8 string, DN_Str8 prefix)
 
 DN_API bool DN_Str8EndsWith(DN_Str8 string, DN_Str8 suffix, DN_Str8EqCase eq_case)
 {
-  DN_Str8 substring = {string.data + string.size - suffix.size, DN_Min(string.size, suffix.size)};
+  DN_Str8 substring = {string.data + string.count - suffix.count, DN_Min(string.count, suffix.count)};
   bool    result    = DN_Str8Eq(substring, suffix, eq_case);
   return result;
 }
@@ -3381,7 +3379,7 @@ DN_API bool DN_Str8EndsWithInsensitive(DN_Str8 string, DN_Str8 suffix)
 DN_API bool DN_Str8HasChar(DN_Str8 string, char ch)
 {
   bool result = false;
-  for (DN_USize index = 0; !result && index < string.size; index++)
+  for (DN_USize index = 0; !result && index < string.count; index++)
     result = string.data[index] == ch;
   return result;
 }
@@ -3390,8 +3388,8 @@ DN_API DN_Str8 DN_Str8TrimPrefix(DN_Str8 string, DN_Str8 prefix, DN_Str8EqCase e
 {
   DN_Str8 result = string;
   if (DN_Str8StartsWith(string, prefix, eq_case)) {
-    result.data += prefix.size;
-    result.size -= prefix.size;
+    result.data += prefix.count;
+    result.count -= prefix.count;
   }
   return result;
 }
@@ -3406,7 +3404,7 @@ DN_API DN_Str8 DN_Str8TrimSuffix(DN_Str8 string, DN_Str8 suffix, DN_Str8EqCase e
 {
   DN_Str8 result = string;
   if (DN_Str8EndsWith(string, suffix, eq_case))
-    result.size -= suffix.size;
+    result.count -= suffix.count;
   return result;
 }
 
@@ -3420,11 +3418,11 @@ DN_API DN_Str8 DN_Str8TrimAround(DN_Str8 string, DN_Str8 trim_string)
 DN_API DN_Str8 DN_Str8TrimHeadWhitespace(DN_Str8 string)
 {
   DN_Str8 result = string;
-  if (string.size == 0)
+  if (string.count == 0)
     return result;
 
   char const *start = string.data;
-  char const *end   = string.data + string.size;
+  char const *end   = string.data + string.count;
   while (start < end && DN_CharIsWhitespace(start[0]))
     start++;
 
@@ -3435,11 +3433,11 @@ DN_API DN_Str8 DN_Str8TrimHeadWhitespace(DN_Str8 string)
 DN_API DN_Str8 DN_Str8TrimTailWhitespace(DN_Str8 string)
 {
   DN_Str8 result = string;
-  if (string.size == 0)
+  if (string.count == 0)
     return result;
 
   char const *start = string.data;
-  char const *end   = string.data + string.size;
+  char const *end   = string.data + string.count;
   while (end > start && DN_CharIsWhitespace(end[-1]))
     end--;
 
@@ -3457,7 +3455,7 @@ DN_API DN_Str8 DN_Str8TrimWhitespaceAround(DN_Str8 string)
 DN_API DN_Str8 DN_Str8TrimByteOrderMark(DN_Str8 string)
 {
   DN_Str8 result = string;
-  if (result.size == 0)
+  if (result.count == 0)
     return result;
 
   // TODO(dn): This is little endian
@@ -3479,7 +3477,7 @@ DN_API DN_Str8 DN_Str8FileNameFromPath(DN_Str8 path)
 {
   DN_Str8             separators[] = {DN_Str8Lit("/"), DN_Str8Lit("\\")};
   DN_Str8BSplitResult split        = DN_Str8BSplitLastArray(path, separators, DN_ArrayCountU(separators));
-  DN_Str8             result       = split.rhs.size ? split.rhs : split.lhs;
+  DN_Str8             result       = split.rhs.count ? split.rhs : split.lhs;
   return result;
 }
 
@@ -3525,9 +3523,9 @@ DN_API DN_Str8 DN_Str8AppendFV(DN_Arena *arena, DN_Str8 string, char const *fmt,
 {
   // TODO: Calculate size and write into one buffer instead of 2 appends
   DN_Str8 append = DN_Str8FromFmtVArena(arena, fmt, args);
-  DN_Str8 result = DN_Str8AllocArena(string.size + append.size, DN_ZMem_No, arena);
-  DN_Memcpy(result.data, string.data, string.size);
-  DN_Memcpy(result.data + string.size, append.data, append.size);
+  DN_Str8 result = DN_Str8AllocArena(string.count + append.count, DN_ZMem_No, arena);
+  DN_Memcpy(result.data, string.data, string.count);
+  DN_Memcpy(result.data + string.count, append.data, append.count);
   return result;
 }
 
@@ -3543,25 +3541,25 @@ DN_API DN_Str8 DN_Str8FillF(DN_Arena *arena, DN_USize count, char const *fmt, ..
 DN_API DN_Str8 DN_Str8FillFV(DN_Arena *arena, DN_USize count, char const *fmt, va_list args)
 {
   DN_Str8 fill = DN_Str8FromFmtVArena(arena, fmt, args);
-  DN_Str8 result = DN_Str8AllocArena(count * fill.size, DN_ZMem_No, arena);
+  DN_Str8 result = DN_Str8AllocArena(count * fill.count, DN_ZMem_No, arena);
   for (DN_USize index = 0; index < count; index++) {
-    void *dest = result.data + (index * fill.size);
-    DN_Memcpy(dest, fill.data, fill.size);
+    void *dest = result.data + (index * fill.count);
+    DN_Memcpy(dest, fill.data, fill.count);
   }
   return result;
 }
 
-DN_API void DN_Str8Remove(DN_Str8 *string, DN_USize offset, DN_USize size)
+DN_API void DN_Str8Remove(DN_Str8 *string, DN_USize offset, DN_USize count)
 {
-  if (!string || string->size)
+  if (!string || string->count)
     return;
 
-  char    *end           = string->data + string->size;
+  char    *end           = string->data + string->count;
   char    *dest          = DN_Min(string->data + offset, end);
-  char    *src           = DN_Min(string->data + offset + size, end);
+  char    *src           = DN_Min(string->data + offset + count, end);
   DN_USize bytes_to_move = end - src;
   DN_Memmove(dest, src, bytes_to_move);
-  string->size -= bytes_to_move;
+  string->count -= bytes_to_move;
 }
 
 DN_API DN_Str8TruncResult DN_Str8TruncMiddlePtr(DN_Str8 str8, DN_USize side_size, DN_Str8 truncator, char *dest, DN_USize dest_max)
@@ -3569,34 +3567,34 @@ DN_API DN_Str8TruncResult DN_Str8TruncMiddlePtr(DN_Str8 str8, DN_USize side_size
   DN_Assert(side_size <= DN_USIZE_MAX / 2);
   if (dest) {
     // NOTE: If the user passes the dest buffer, we expect it to be sized correctly.
-    if ((side_size * 2) >= str8.size) {
-      DN_Assert(dest_max >= str8.size + 1 /*null*/);
+    if ((side_size * 2) >= str8.count) {
+      DN_Assert(dest_max >= str8.count + 1 /*null*/);
     } else {
-      DN_Assert(dest_max >= (2 * side_size + truncator.size) + 1 /*null*/);
+      DN_Assert(dest_max >= (2 * side_size + truncator.count) + 1 /*null*/);
     }
   }
 
   DN_Str8TruncResult result = {};
-  if (str8.size <= (side_size * 2)) {
-    result.size_req = str8.size;
+  if (str8.count <= (side_size * 2)) {
+    result.count_req = str8.count;
     if (dest) {
-      DN_Memcpy(dest, str8.data, str8.size);
-      dest[str8.size] = 0;
-      result.str8     = DN_Str8FromPtr(dest, result.size_req);
+      DN_Memcpy(dest, str8.data, str8.count);
+      dest[str8.count] = 0;
+      result.str8     = DN_Str8FromPtr(dest, result.count_req);
     }
     return result;
   }
 
   DN_Str8            head          = DN_Str8Subset(str8, 0, side_size);
-  DN_Str8            tail          = DN_Str8Subset(str8, str8.size - side_size, side_size);
+  DN_Str8            tail          = DN_Str8Subset(str8, str8.count - side_size, side_size);
   DN_USize           dest_size     = 0;
   if (dest) {
     DN_FmtAppendResult append_result = DN_FmtAppend(dest, &dest_size, dest_max, "%.*s%.*s%.*s", DN_Str8PrintFmt(head), DN_Str8PrintFmt(truncator), DN_Str8PrintFmt(tail));
     result.str8                      = append_result.str8;
     result.truncated                 = true;
-    result.size_req                  = result.str8.size;
+    result.count_req                 = result.str8.count;
   } else {
-    result.size_req  = DN_FmtSize("%.*s%.*s%.*s", DN_Str8PrintFmt(head), DN_Str8PrintFmt(truncator), DN_Str8PrintFmt(tail));
+    result.count_req  = DN_FmtCount("%.*s%.*s%.*s", DN_Str8PrintFmt(head), DN_Str8PrintFmt(truncator), DN_Str8PrintFmt(tail));
     result.truncated = true;
   }
 
@@ -3606,15 +3604,15 @@ DN_API DN_Str8TruncResult DN_Str8TruncMiddlePtr(DN_Str8 str8, DN_USize side_size
 DN_API DN_Str8TruncResult DN_Str8TruncMiddle(DN_Str8 str8, DN_USize side_size, DN_Str8 truncator, DN_Arena *arena)
 {
   DN_Str8TruncResult trunc  = DN_Str8TruncMiddlePtr(str8, side_size, truncator, nullptr, 0);
-  DN_Str8            dest   = DN_Str8AllocArena(trunc.size_req, DN_ZMem_No, arena);
-  DN_Str8TruncResult result = DN_Str8TruncMiddlePtr(str8, side_size, truncator, dest.data, dest.size + 1);
+  DN_Str8            dest   = DN_Str8AllocArena(trunc.count_req, DN_ZMem_No, arena);
+  DN_Str8TruncResult result = DN_Str8TruncMiddlePtr(str8, side_size, truncator, dest.data, dest.count + 1);
   return result;
 }
 
 DN_API DN_Str8 DN_Str8Lower(DN_Str8 string, DN_Arena *arena)
 {
   DN_Str8 result = DN_Str8FromStr8Arena(string, arena);
-  for (DN_ForIndexU(index, result.size))
+  for (DN_ForIndexU(index, result.count))
     result.data[index] = DN_CharToLower(result.data[index]);
   return result;
 }
@@ -3622,7 +3620,7 @@ DN_API DN_Str8 DN_Str8Lower(DN_Str8 string, DN_Arena *arena)
 DN_API DN_Str8 DN_Str8Upper(DN_Str8 string, DN_Arena *arena)
 {
   DN_Str8 result = DN_Str8FromStr8Arena(string, arena);
-  for (DN_ForIndexU(index, result.size))
+  for (DN_ForIndexU(index, result.count))
     result.data[index] = DN_CharToUpper(result.data[index]);
   return result;
 }
@@ -3635,18 +3633,18 @@ DN_API DN_Str8 DN_Str8Replace(DN_Str8       string,
                               DN_Str8EqCase eq_case)
 {
   DN_Str8 result = {};
-  if (string.size == 0 || find.size == 0 || find.size > string.size || find.size == 0 || string.size == 0) {
+  if (string.count == 0 || find.count == 0 || find.count > string.count || find.count == 0 || string.count == 0) {
     result = DN_Str8FromStr8Arena(string, arena);
     return result;
   }
 
   DN_TCScratch   scratch        = DN_TCScratchBeginArena(&arena, 1);
   DN_Str8Builder string_builder = DN_Str8BuilderFromArena(&scratch.arena);
-  DN_USize       max            = string.size - find.size;
+  DN_USize       max            = string.count - find.count;
   DN_USize       head           = start_index;
 
   for (DN_USize tail = head; tail <= max; tail++) {
-    DN_Str8 check = DN_Str8Subset(string, tail, find.size);
+    DN_Str8 check = DN_Str8Subset(string, tail, find.count);
     if (!DN_Str8Eq(check, find, eq_case))
       continue;
 
@@ -3662,15 +3660,15 @@ DN_API DN_Str8 DN_Str8Replace(DN_Str8       string,
     DN_Str8 range = DN_Str8Subset(string, head, (tail - head));
     DN_Str8BuilderAppendRef(&string_builder, range);
     DN_Str8BuilderAppendRef(&string_builder, replace);
-    head = tail + find.size;
-    tail += find.size - 1; // NOTE: -1 since the for loop will post increment us past the end of the find string
+    head = tail + find.count;
+    tail += find.count - 1; // NOTE: -1 since the for loop will post increment us past the end of the find string
   }
 
   if (string_builder.string_size == 0) {
     // NOTE: No replacement possible, so we just do a full-copy
     result = DN_Str8FromStr8Arena(string, arena);
   } else {
-    DN_Str8 remainder = DN_Str8FromPtr(string.data + head, string.size - head);
+    DN_Str8 remainder = DN_Str8FromPtr(string.data + head, string.count - head);
     DN_Str8BuilderAppendRef(&string_builder, remainder);
     result = DN_Str8FromStr8BuilderArena(&string_builder, arena);
   }
@@ -3695,9 +3693,9 @@ DN_API DN_Str8 DN_Str8PadNewLinesAllocator(DN_Str8 string, DN_Str8 pad_string, D
   DN_TCScratch   scratch = DN_TCScratchBeginAllocator(&allocator, 1);
   DN_Str8Builder builder = DN_Str8BuilderFromArena(&scratch.arena);
   DN_Str8        it      = string;
-  while (it.size) {
+  while (it.count) {
     DN_Str8BSplitResult split = DN_Str8BSplit(it, DN_Str8Lit("\n"));
-    DN_Str8BuilderAppendRef(&builder, DN_Str8FromPtr(split.lhs.data, split.lhs.size + 1));
+    DN_Str8BuilderAppendRef(&builder, DN_Str8FromPtr(split.lhs.data, split.lhs.count + 1));
     it = split.rhs;
   }
 
@@ -3762,16 +3760,16 @@ DN_API DN_Str8 DN_Str8LineBreakAllocator(DN_Str8 src, DN_USize desired_width, DN
     char*   start = src.data;
     char*   end   = src.data;
     DN_Str8 it    = src;
-    while (it.size) {
+    while (it.count) {
       DN_Str8             splitters[]      = {DN_Str8Lit(" "), DN_Str8Lit("\n")};
       DN_Str8BSplitResult split            = DN_Str8BSplitArray(it, splitters, DN_ArrayCountU(splitters));
       DN_USize            curr_line_length = end - start;
 
       // Handle explicit newlines in input
       if (split.input_index == 1 /*the newline*/) {
-        if (curr_line_length == 0 && split.lhs.size)
+        if (curr_line_length == 0 && split.lhs.count)
           start = split.lhs.data;
-        if (split.lhs.size)
+        if (split.lhs.count)
           end = DN_Str8End(split.lhs);
         DN_Str8BuilderAppendRef(&builder, DN_Str8FromPtr(start, end - start));
         start = split.rhs.data;
@@ -3781,7 +3779,7 @@ DN_API DN_Str8 DN_Str8LineBreakAllocator(DN_Str8 src, DN_USize desired_width, DN
       }
 
       // Skip empty segments (multiple spaces, leading/trailing spaces)
-      if (split.lhs.size == 0) {
+      if (split.lhs.count == 0) {
         it = split.rhs;
         continue;
       }
@@ -3795,7 +3793,7 @@ DN_API DN_Str8 DN_Str8LineBreakAllocator(DN_Str8 src, DN_USize desired_width, DN
       }
 
       // Check if adding this word (plus separator space) would overflow
-      DN_USize combined_length = curr_line_length + 1 + split.lhs.size;
+      DN_USize combined_length = curr_line_length + 1 + split.lhs.count;
       if (combined_length > desired_width) {
         // Commit current line, start new line with current word
         DN_Str8BuilderAppendRef(&builder, DN_Str8FromPtr(start, end - start));
@@ -3814,7 +3812,7 @@ DN_API DN_Str8 DN_Str8LineBreakAllocator(DN_Str8 src, DN_USize desired_width, DN
       DN_Str8BuilderAppendRef(&builder, DN_Str8FromPtr(start, end - start));
   } else {
     DN_Str8 it = src;
-    while (it.size) {
+    while (it.count) {
       DN_Str8 chunk = DN_Str8Subset(it, 0, desired_width);
       DN_Str8BuilderAppendRef(&builder, chunk);
       it = DN_Str8Advance(it, desired_width);
@@ -3897,19 +3895,19 @@ DN_API DN_Str8FindResult DN_Str8FindStr8AVX512F(DN_Str8 string, DN_Str8 find)
 {
   // NOTE: Algorithm as described in http://0x80.pl/articles/simd-strfind.html
   DN_Str8FindResult result = {};
-  if (string.size == 0 || find.size == 0 || find.size > string.size)
+  if (string.count == 0 || find.count == 0 || find.count > string.count)
     return result;
 
   __m512i const find_first_ch = _mm512_set1_epi8(find.data[0]);
-  __m512i const find_last_ch  = _mm512_set1_epi8(find.data[find.size - 1]);
+  __m512i const find_last_ch  = _mm512_set1_epi8(find.data[find.count - 1]);
 
-  DN_USize const search_size     = string.size - find.size;
+  DN_USize const search_size     = string.count - find.count;
   DN_USize       simd_iterations = search_size / sizeof(__m512i);
   char const    *ptr             = string.data;
 
   while (simd_iterations--) {
     __m512i find_first_ch_block = _mm512_loadu_si512(ptr);
-    __m512i find_last_ch_block  = _mm512_loadu_si512(ptr + find.size - 1);
+    __m512i find_last_ch_block  = _mm512_loadu_si512(ptr + find.count - 1);
 
     // NOTE: AVX512F does not have a cmpeq so we use XOR to place a 0 bit
     // where matches are found.
@@ -3953,25 +3951,25 @@ DN_API DN_Str8FindResult DN_Str8FindStr8AVX512F(DN_Str8 string, DN_Str8 find)
       uint64_t const lsb_zero_pos = _tzcnt_u64(zero_byte_mask);
       char const    *base_ptr     = ptr + (4 * lsb_zero_pos);
 
-      if (DN_Memcmp(base_ptr + 0, find.data, find.size) == 0) {
+      if (DN_Memcmp(base_ptr + 0, find.data, find.count) == 0) {
         result.found = true;
         result.index = base_ptr - string.data;
-      } else if (DN_Memcmp(base_ptr + 1, find.data, find.size) == 0) {
+      } else if (DN_Memcmp(base_ptr + 1, find.data, find.count) == 0) {
         result.found = true;
         result.index = base_ptr - string.data + 1;
-      } else if (DN_Memcmp(base_ptr + 2, find.data, find.size) == 0) {
+      } else if (DN_Memcmp(base_ptr + 2, find.data, find.count) == 0) {
         result.found = true;
         result.index = base_ptr - string.data + 2;
-      } else if (DN_Memcmp(base_ptr + 3, find.data, find.size) == 0) {
+      } else if (DN_Memcmp(base_ptr + 3, find.data, find.count) == 0) {
         result.found = true;
         result.index = base_ptr - string.data + 3;
       }
 
       if (result.found) {
         result.start_to_before_match        = DN_Str8FromPtr(string.data, result.index);
-        result.match                        = DN_Str8FromPtr(string.data + result.index, find.size);
-        result.match_to_end_of_buffer       = DN_Str8FromPtr(result.match.data, string.size - result.index);
-        result.after_match_to_end_of_buffer = DN_Str8Advance(result.match_to_end_of_buffer, find.size);
+        result.match                        = DN_Str8FromPtr(string.data + result.index, find.count);
+        result.match_to_end_of_buffer       = DN_Str8FromPtr(result.match.data, string.count - result.index);
+        result.after_match_to_end_of_buffer = DN_Str8Advance(result.match_to_end_of_buffer, find.count);
         return result;
       }
 
@@ -3981,15 +3979,15 @@ DN_API DN_Str8FindResult DN_Str8FindStr8AVX512F(DN_Str8 string, DN_Str8 find)
     ptr += sizeof(__m512i);
   }
 
-  for (DN_USize index = ptr - string.data; index < string.size; index++) {
-    DN_Str8 string_slice = DN_Str8Subset(string, index, find.size);
+  for (DN_USize index = ptr - string.data; index < string.count; index++) {
+    DN_Str8 string_slice = DN_Str8Subset(string, index, find.count);
     if (DN_Str8Eq(string_slice, find)) {
       result.found                        = true;
       result.index                        = index;
       result.start_to_before_match        = DN_Str8FromPtr(string.data, index);
-      result.match                        = DN_Str8FromPtr(string.data + index, find.size);
-      result.match_to_end_of_buffer       = DN_Str8FromPtr(result.match.data, string.size - index);
-      result.after_match_to_end_of_buffer = DN_Str8Advance(result.match_to_end_of_buffer, find.size);
+      result.match                        = DN_Str8FromPtr(string.data + index, find.count);
+      result.match_to_end_of_buffer       = DN_Str8FromPtr(result.match.data, string.count - index);
+      result.after_match_to_end_of_buffer = DN_Str8Advance(result.match_to_end_of_buffer, find.count);
       return result;
     }
   }
@@ -4001,20 +3999,20 @@ DN_API DN_Str8FindResult DN_Str8FindLastStr8AVX512F(DN_Str8 string, DN_Str8 find
 {
   // NOTE: Algorithm as described in http://0x80.pl/articles/simd-strfind.html
   DN_Str8FindResult result = {};
-  if (string.size == 0 || find.size == 0 || find.size > string.size)
+  if (string.count == 0 || find.count == 0 || find.count > string.count)
     return result;
 
   __m512i const find_first_ch = _mm512_set1_epi8(find.data[0]);
-  __m512i const find_last_ch  = _mm512_set1_epi8(find.data[find.size - 1]);
+  __m512i const find_last_ch  = _mm512_set1_epi8(find.data[find.count - 1]);
 
-  DN_USize const search_size     = string.size - find.size;
+  DN_USize const search_size     = string.count - find.count;
   DN_USize       simd_iterations = search_size / sizeof(__m512i);
   char const    *ptr             = string.data + search_size + 1;
 
   while (simd_iterations--) {
     ptr -= sizeof(__m512i);
     __m512i find_first_ch_block = _mm512_loadu_si512(ptr);
-    __m512i find_last_ch_block  = _mm512_loadu_si512(ptr + find.size - 1);
+    __m512i find_last_ch_block  = _mm512_loadu_si512(ptr + find.count - 1);
 
     // NOTE: AVX512F does not have a cmpeq so we use XOR to place a 0 bit
     // where matches are found.
@@ -4058,24 +4056,24 @@ DN_API DN_Str8FindResult DN_Str8FindLastStr8AVX512F(DN_Str8 string, DN_Str8 find
       uint64_t const lsb_zero_pos = _tzcnt_u64(zero_byte_mask);
       char const    *base_ptr     = ptr + (4 * lsb_zero_pos);
 
-      if (DN_Memcmp(base_ptr + 0, find.data, find.size) == 0) {
+      if (DN_Memcmp(base_ptr + 0, find.data, find.count) == 0) {
         result.found = true;
         result.index = base_ptr - string.data;
-      } else if (DN_Memcmp(base_ptr + 1, find.data, find.size) == 0) {
+      } else if (DN_Memcmp(base_ptr + 1, find.data, find.count) == 0) {
         result.found = true;
         result.index = base_ptr - string.data + 1;
-      } else if (DN_Memcmp(base_ptr + 2, find.data, find.size) == 0) {
+      } else if (DN_Memcmp(base_ptr + 2, find.data, find.count) == 0) {
         result.found = true;
         result.index = base_ptr - string.data + 2;
-      } else if (DN_Memcmp(base_ptr + 3, find.data, find.size) == 0) {
+      } else if (DN_Memcmp(base_ptr + 3, find.data, find.count) == 0) {
         result.found = true;
         result.index = base_ptr - string.data + 3;
       }
 
       if (result.found) {
         result.start_to_before_match  = DN_Str8FromPtr(string.data, result.index);
-        result.match                  = DN_Str8FromPtr(string.data + result.index, find.size);
-        result.match_to_end_of_buffer = DN_Str8FromPtr(result.match.data, string.size - result.index);
+        result.match                  = DN_Str8FromPtr(string.data + result.index, find.count);
+        result.match_to_end_of_buffer = DN_Str8FromPtr(result.match.data, string.count - result.index);
         return result;
       }
 
@@ -4083,14 +4081,14 @@ DN_API DN_Str8FindResult DN_Str8FindLastStr8AVX512F(DN_Str8 string, DN_Str8 find
     }
   }
 
-  for (DN_USize index = ptr - string.data - 1; index < string.size; index--) {
-    DN_Str8 string_slice = DN_Str8Subset(string, index, find.size);
+  for (DN_USize index = ptr - string.data - 1; index < string.count; index--) {
+    DN_Str8 string_slice = DN_Str8Subset(string, index, find.count);
     if (DN_Str8Eq(string_slice, find)) {
       result.found                  = true;
       result.index                  = index;
       result.start_to_before_match  = DN_Str8FromPtr(string.data, index);
-      result.match                  = DN_Str8FromPtr(string.data + index, find.size);
-      result.match_to_end_of_buffer = DN_Str8FromPtr(result.match.data, string.size - index);
+      result.match                  = DN_Str8FromPtr(string.data + index, find.count);
+      result.match_to_end_of_buffer = DN_Str8FromPtr(result.match.data, string.count - index);
       return result;
     }
   }
@@ -4104,8 +4102,8 @@ DN_API DN_Str8BSplitResult DN_Str8BSplitAVX512F(DN_Str8 string, DN_Str8 find)
   DN_Str8FindResult        find_result = DN_Str8FindAVX512F(string, find);
   if (find_result.found) {
     result.lhs.data = string.data;
-    result.lhs.size = find_result.index;
-    result.rhs      = DN_Str8Advance(find_result.match_to_end_of_buffer, find.size);
+    result.lhs.count = find_result.index;
+    result.rhs      = DN_Str8Advance(find_result.match_to_end_of_buffer, find.count);
   } else {
     result.lhs = string;
   }
@@ -4119,8 +4117,8 @@ DN_API DN_Str8BSplitResult DN_Str8BSplitLastAVX512F(DN_Str8 string, DN_Str8 find
   DN_Str8FindResult   find_result = DN_Str8FindLastAVX512F(string, find);
   if (find_result.found) {
     result.lhs.data = string.data;
-    result.lhs.size = find_result.index;
-    result.rhs      = DN_Str8Advance(find_result.match_to_end_of_buffer, find.size);
+    result.lhs.count = find_result.index;
+    result.rhs      = DN_Str8Advance(find_result.match_to_end_of_buffer, find.count);
   } else {
     result.lhs = string;
   }
@@ -4131,20 +4129,20 @@ DN_API DN_Str8BSplitResult DN_Str8BSplitLastAVX512F(DN_Str8 string, DN_Str8 find
 DN_API DN_USize DN_Str8SplitAVX512F(DN_Str8 string, DN_Str8 delimiter, DN_Str8 *splits, DN_USize splits_count, DN_Str8SplitFlags flags)
 {
   DN_USize result = 0; // The number of splits in the actual string.
-  if (string.size == 0 || delimiter.size == 0 || delimiter.size <= 0)
+  if (string.count == 0 || delimiter.count == 0 || delimiter.count <= 0)
     return result;
 
   DN_Str8BSplitResult split = {};
   DN_Str8             first = string;
   do {
     split = DN_Str8BSplitAVX512F(first, delimiter);
-    if (split.lhs.size || DN_BitIsNotSet(flags, DN_Str8SplitFlags_ExcludeEmptyStrings)) {
+    if (split.lhs.count || DN_BitIsNotSet(flags, DN_Str8SplitFlags_ExcludeEmptyStrings)) {
       if (splits && result < splits_count)
         splits[result] = split.lhs;
       result++;
     }
     first = split.rhs;
-  } while (first.size);
+  } while (first.count);
 
   return result;
 }
@@ -4171,9 +4169,9 @@ DN_API DN_Str8 DN_Str8SliceRender(DN_Str8Slice slice, DN_Str8 separator, DN_Aren
   DN_USize total_size = 0;
   for (DN_USize index = 0; index < slice.count; index++) {
     if (index)
-      total_size += separator.size;
+      total_size += separator.count;
     DN_Str8 item = slice.data[index];
-    total_size += item.size;
+    total_size += item.count;
   }
 
   result = DN_Str8AllocArena(total_size, DN_ZMem_No, arena);
@@ -4181,12 +4179,12 @@ DN_API DN_Str8 DN_Str8SliceRender(DN_Str8Slice slice, DN_Str8 separator, DN_Aren
     DN_USize write_index = 0;
     for (DN_USize index = 0; index < slice.count; index++) {
       if (index) {
-        DN_Memcpy(result.data + write_index, separator.data, separator.size);
-        write_index += separator.size;
+        DN_Memcpy(result.data + write_index, separator.data, separator.count);
+        write_index += separator.count;
       }
       DN_Str8 item = slice.data[index];
-      DN_Memcpy(result.data + write_index, item.data, item.size);
-      write_index += item.size;
+      DN_Memcpy(result.data + write_index, item.data, item.count);
+      write_index += item.count;
     }
   }
 
@@ -4203,8 +4201,8 @@ DN_API int DN_Str8CompareNatural(DN_Str8 lhs, DN_Str8 rhs, DN_Str8EqCase eq_case
 {
   const char *lhs_it = lhs.data;
   const char *rhs_it = rhs.data;
-  const char *lhs_end = lhs.data + lhs.size;
-  const char *rhs_end = rhs.data + rhs.size;
+  const char *lhs_end = lhs.data + lhs.count;
+  const char *rhs_end = rhs.data + rhs.count;
 
   while (lhs_it < lhs_end && rhs_it < rhs_end) {
     // NOTE: Skip leading spaces
@@ -4265,8 +4263,8 @@ DN_API int DN_Str8CompareLexicographic(DN_Str8 lhs, DN_Str8 rhs, DN_Str8EqCase e
 {
   const char *lhs_it  = lhs.data;
   const char *rhs_it  = rhs.data;
-  const char *lhs_end = lhs.data + lhs.size;
-  const char *rhs_end = rhs.data + rhs.size;
+  const char *lhs_end = lhs.data + lhs.count;
+  const char *rhs_end = rhs.data + rhs.count;
 
   while (lhs_it < lhs_end && rhs_it < rhs_end) {
       char lhs_ch = *lhs_it;
@@ -4284,9 +4282,9 @@ DN_API int DN_Str8CompareLexicographic(DN_Str8 lhs, DN_Str8 rhs, DN_Str8EqCase e
   }
 
   // NOTE: One string is prefix of other; shorter comes first
-  if (lhs.size < rhs.size)
+  if (lhs.count < rhs.count)
     return -1;
-  if (rhs.size < lhs.size)
+  if (rhs.count < lhs.count)
     return 1;
   return 0;
 }
@@ -4294,9 +4292,9 @@ DN_API int DN_Str8CompareLexicographic(DN_Str8 lhs, DN_Str8 rhs, DN_Str8EqCase e
 
 DN_API bool DN_Str16Eq(DN_Str16 lhs, DN_Str16 rhs)
 {
-  if (lhs.size != rhs.size)
+  if (lhs.count != rhs.count)
       return false;
-  bool result = (DN_Memcmp(lhs.data, rhs.data, lhs.size) == 0);
+  bool result = (DN_Memcmp(lhs.data, rhs.data, lhs.count) == 0);
   return result;
 }
 
@@ -4310,9 +4308,9 @@ DN_API DN_Str16 DN_Str16SliceRender(DN_Str16Slice slice, DN_Str16 separator, DN_
   DN_USize total_size = 0;
   for (DN_USize index = 0; index < slice.count; index++) {
     if (index)
-      total_size += separator.size;
+      total_size += separator.count;
     DN_Str16 item = slice.data[index];
-    total_size += item.size;
+    total_size += item.count;
   }
 
   result = {DN_ArenaNewArray(arena, wchar_t, total_size + 1, DN_ZMem_No), total_size};
@@ -4320,12 +4318,12 @@ DN_API DN_Str16 DN_Str16SliceRender(DN_Str16Slice slice, DN_Str16 separator, DN_
     DN_USize write_index = 0;
     for (DN_USize index = 0; index < slice.count; index++) {
       if (index) {
-        DN_Memcpy(result.data + write_index, separator.data, separator.size * sizeof(result.data[0]));
-        write_index += separator.size;
+        DN_Memcpy(result.data + write_index, separator.data, separator.count * sizeof(result.data[0]));
+        write_index += separator.count;
       }
       DN_Str16 item = slice.data[index];
-      DN_Memcpy(result.data + write_index, item.data, item.size * sizeof(result.data[0]));
-      write_index += item.size;
+      DN_Memcpy(result.data + write_index, item.data, item.count * sizeof(result.data[0]));
+      write_index += item.count;
     }
   }
 
@@ -4346,17 +4344,17 @@ DN_API DN_Str8Builder DN_Str8BuilderFromArena(DN_Arena *arena)
   return result;
 }
 
-DN_API DN_Str8Builder DN_Str8BuilderFromStr8PtrRef(DN_Arena *arena, DN_Str8 const *strings, DN_USize size)
+DN_API DN_Str8Builder DN_Str8BuilderFromStr8PtrRef(DN_Arena *arena, DN_Str8 const *strings, DN_USize count)
 {
   DN_Str8Builder result = DN_Str8BuilderFromArena(arena);
-  DN_Str8BuilderAppendArrayRef(&result, strings, size);
+  DN_Str8BuilderAppendArrayRef(&result, strings, count);
   return result;
 }
 
-DN_API DN_Str8Builder DN_Str8BuilderFromStr8PtrCopy(DN_Arena *arena, DN_Str8 const *strings, DN_USize size)
+DN_API DN_Str8Builder DN_Str8BuilderFromStr8PtrCopy(DN_Arena *arena, DN_Str8 const *strings, DN_USize count)
 {
   DN_Str8Builder result = DN_Str8BuilderFromArena(arena);
-  DN_Str8BuilderAppendArrayCopy(&result, strings, size);
+  DN_Str8BuilderAppendArrayCopy(&result, strings, count);
   return result;
 }
 
@@ -4367,21 +4365,21 @@ DN_API DN_Str8Builder DN_Str8BuilderFromBuilder(DN_Arena *arena, DN_Str8Builder 
   return result;
 }
 
-DN_API bool DN_Str8BuilderAddArrayRef(DN_Str8Builder *builder, DN_Str8 const *strings, DN_USize size, DN_Str8BuilderAdd add)
+DN_API bool DN_Str8BuilderAddArrayRef(DN_Str8Builder *builder, DN_Str8 const *strings, DN_USize count, DN_Str8BuilderAdd add)
 {
   if (!builder)
     return false;
 
-  if (!strings || size <= 0)
+  if (!strings || count <= 0)
     return true;
 
   // NOTE: Allocate the links
-  DN_Str8Link *links = DN_ArenaNewArrayNoZ(builder->arena, DN_Str8Link, size);
+  DN_Str8Link *links = DN_ArenaNewArrayNoZ(builder->arena, DN_Str8Link, count);
   if (!links)
     return false;
 
   if (add == DN_Str8BuilderAdd_Append) {
-    for (DN_ForIndexU(index, size)) {
+    for (DN_ForIndexU(index, count)) {
       DN_Str8      string = strings[index];
       DN_Str8Link *link   = links + index;
       link->string = string;
@@ -4392,13 +4390,13 @@ DN_API bool DN_Str8BuilderAddArrayRef(DN_Str8Builder *builder, DN_Str8 const *st
         builder->head = link;
       builder->tail = link;
       builder->count++;
-      builder->string_size += string.size;
+      builder->string_size += string.count;
     }
   } else {
     DN_Assert(add == DN_Str8BuilderAdd_Prepend);
     DN_MSVC_WARNING_PUSH
     DN_MSVC_WARNING_DISABLE(6293) // NOTE: Ill-defined loop
-    for (DN_USize index = size - 1; index < size; index--) {
+    for (DN_USize index = count - 1; index < count; index--) {
       DN_MSVC_WARNING_POP
       DN_Str8      string = strings[index];
       DN_Str8Link *link   = links + index;
@@ -4408,33 +4406,33 @@ DN_API bool DN_Str8BuilderAddArrayRef(DN_Str8Builder *builder, DN_Str8 const *st
       if (!builder->tail)
         builder->tail = link;
       builder->count++;
-      builder->string_size += string.size;
+      builder->string_size += string.count;
     }
   }
   return true;
 }
 
-DN_API bool DN_Str8BuilderAddArrayCopy(DN_Str8Builder *builder, DN_Str8 const *strings, DN_USize size, DN_Str8BuilderAdd add)
+DN_API bool DN_Str8BuilderAddArrayCopy(DN_Str8Builder *builder, DN_Str8 const *strings, DN_USize count, DN_Str8BuilderAdd add)
 {
   if (!builder)
     return false;
 
-  if (!strings || size <= 0)
+  if (!strings || count <= 0)
     return true;
 
   bool     result       = true;
   DN_U64   arena_p      = DN_MemListPos(builder->arena->mem);
-  DN_Str8 *strings_copy = DN_ArenaNewArrayNoZ(builder->arena, DN_Str8, size);
-  for (DN_ForIndexU(index, size)) {
+  DN_Str8 *strings_copy = DN_ArenaNewArrayNoZ(builder->arena, DN_Str8, count);
+  for (DN_ForIndexU(index, count)) {
     strings_copy[index] = DN_Str8FromStr8Arena(strings[index], builder->arena);
-    if (strings_copy[index].size != strings[index].size) {
+    if (strings_copy[index].count != strings[index].count) {
       result = false;
       break;
     }
   }
 
   if (result)
-    result = DN_Str8BuilderAddArrayRef(builder, strings_copy, size, add);
+    result = DN_Str8BuilderAddArrayRef(builder, strings_copy, count, add);
   else
     DN_MemListPopTo(builder->arena->mem, arena_p);
   return result;
@@ -4471,16 +4469,16 @@ DN_API bool DN_Str8BuilderAppendF(DN_Str8Builder *builder, DN_FMT_ATTRIB char co
   return result;
 }
 
-DN_API bool DN_Str8BuilderAppendBytesRef(DN_Str8Builder *builder, void const *ptr, DN_USize size)
+DN_API bool DN_Str8BuilderAppendBytesRef(DN_Str8Builder *builder, void const *ptr, DN_USize count)
 {
-  DN_Str8 input  = DN_Str8FromPtr(ptr, size);
+  DN_Str8 input  = DN_Str8FromPtr(ptr, count);
   bool    result = DN_Str8BuilderAppendRef(builder, input);
   return result;
 }
 
-DN_API bool DN_Str8BuilderAppendBytesCopy(DN_Str8Builder *builder, void const *ptr, DN_USize size)
+DN_API bool DN_Str8BuilderAppendBytesCopy(DN_Str8Builder *builder, void const *ptr, DN_USize count)
 {
-  DN_Str8 input  = DN_Str8FromPtr(ptr, size);
+  DN_Str8 input  = DN_Str8FromPtr(ptr, count);
   bool    result = DN_Str8BuilderAppendCopy(builder, input);
   return result;
 }
@@ -4506,7 +4504,7 @@ static bool DN_Str8BuilderAppendBuilder_(DN_Str8Builder *dest, DN_Str8Builder co
 
       if (copy) {
         link->string = DN_Str8FromStr8Arena(it->string, &arena);
-        if (link->string.size != it->string.size) {
+        if (link->string.count != it->string.count) {
           result = false;
           break;
         }
@@ -4571,7 +4569,7 @@ DN_API bool DN_Str8BuilderErase(DN_Str8Builder *builder, DN_Str8 string)
   for (DN_Str8Link **it = &builder->head; *it; it = &((*it)->next)) {
     if (DN_Str8Eq((*it)->string, string)) {
       *it = (*it)->next;
-      builder->string_size -= string.size;
+      builder->string_size -= string.count;
       builder->count -= 1;
       return true;
     }
@@ -4597,23 +4595,23 @@ DN_API DN_Str8 DN_Str8FromStr8BuilderDelimitAllocator(DN_Str8Builder const *buil
   if (!builder || builder->string_size <= 0 || builder->count <= 0)
     return result;
 
-  DN_USize size_for_delimiter = delimiter.size ? ((builder->count - 1) * delimiter.size) : 0;
-  result                      = DN_Str8AllocAllocator(builder->string_size + size_for_delimiter, DN_ZMem_No, allocator);
+  DN_USize count_for_delimiter = delimiter.count ? ((builder->count - 1) * delimiter.count) : 0;
+  result                      = DN_Str8AllocAllocator(builder->string_size + count_for_delimiter, DN_ZMem_No, allocator);
   if (!result.data)
     return result;
 
   DN_USize write_count = 0;
   for (DN_Str8Link *link = builder->head; link; link = link->next) {
-    DN_Memcpy(result.data + write_count, link->string.data, link->string.size);
-    write_count += link->string.size;
-    if (link->next && delimiter.size) {
-      DN_Memcpy(result.data + write_count, delimiter.data, delimiter.size);
-      write_count += delimiter.size;
+    DN_Memcpy(result.data + write_count, link->string.data, link->string.count);
+    write_count += link->string.count;
+    if (link->next && delimiter.count) {
+      DN_Memcpy(result.data + write_count, delimiter.data, delimiter.count);
+      write_count += delimiter.count;
     }
   }
 
   result.data[write_count] = 0;
-  DN_Assert(write_count == builder->string_size + size_for_delimiter);
+  DN_Assert(write_count == builder->string_size + count_for_delimiter);
   return result;
 }
 
@@ -4669,23 +4667,23 @@ DN_API DN_UTF8DecodeResult DN_UTF8Decode(DN_Str8 stream)
 {
   DN_UTF8DecodeResult result = {};
   result.remaining           = stream;
-  if (stream.size <= 0)
+  if (stream.count <= 0)
     return result;
 
   DN_U8 b0 = DN_Cast(DN_U8)stream.data[0];
-  DN_U8 b1 = DN_Cast(DN_U8)(stream.size >= 2 ? stream.data[1] : 0);
-  DN_U8 b2 = DN_Cast(DN_U8)(stream.size >= 3 ? stream.data[2] : 0);
-  DN_U8 b3 = DN_Cast(DN_U8)(stream.size >= 4 ? stream.data[3] : 0);
+  DN_U8 b1 = DN_Cast(DN_U8)(stream.count >= 2 ? stream.data[1] : 0);
+  DN_U8 b2 = DN_Cast(DN_U8)(stream.count >= 3 ? stream.data[2] : 0);
+  DN_U8 b3 = DN_Cast(DN_U8)(stream.count >= 4 ? stream.data[3] : 0);
 
   if ((b0 & 0b1000'0000) == 0) {
     result.codepoint = b0;
     result.success   = true;
-    result.remaining = DN_Str8FromPtr(stream.data + 1, stream.size - 1);
+    result.remaining = DN_Str8FromPtr(stream.data + 1, stream.count - 1);
     return result;
   }
 
   if ((b0 & 0b1110'0000) == 0b1100'0000) {
-    if (stream.size < 2)
+    if (stream.count < 2)
       return result;
     if ((b1 & 0b1100'0000) != 0b1000'0000)
       return result;
@@ -4694,12 +4692,12 @@ DN_API DN_UTF8DecodeResult DN_UTF8Decode(DN_Str8 stream)
       return result;
     result.codepoint  = cp;
     result.success   = true;
-    result.remaining = DN_Str8FromPtr(stream.data + 2, stream.size - 2);
+    result.remaining = DN_Str8FromPtr(stream.data + 2, stream.count - 2);
     return result;
   }
 
   if ((b0 & 0b1111'0000) == 0b1110'0000) {
-    if (stream.size < 3)
+    if (stream.count < 3)
       return result;
     if ((b1 & 0b1100'0000) != 0b1000'0000)
       return result;
@@ -4710,12 +4708,12 @@ DN_API DN_UTF8DecodeResult DN_UTF8Decode(DN_Str8 stream)
       return result;
     result.codepoint  = cp;
     result.success   = true;
-    result.remaining = DN_Str8FromPtr(stream.data + 3, stream.size - 3);
+    result.remaining = DN_Str8FromPtr(stream.data + 3, stream.count - 3);
     return result;
   }
 
   if ((b0 & 0b1111'1000) == 0b1111'0000) {
-    if (stream.size < 4)
+    if (stream.count < 4)
       return result;
     if ((b1 & 0b1100'0000) != 0b1000'0000)
       return result;
@@ -4731,7 +4729,7 @@ DN_API DN_UTF8DecodeResult DN_UTF8Decode(DN_Str8 stream)
       return result;
     result.codepoint = cp;
     result.success   = true;
-    result.remaining = DN_Str8FromPtr(stream.data + 4, stream.size - 4);
+    result.remaining = DN_Str8FromPtr(stream.data + 4, stream.count - 4);
     return result;
   }
 
@@ -4810,7 +4808,7 @@ DN_API DN_USize DN_BytesFromHex(DN_Str8 hex, void *dest, DN_USize dest_count)
 {
   DN_Str8 hex_trimmed = DN_Str8TrimHexPrefix(hex);
   DN_USize result = 0;
-  if (hex_trimmed.size > (dest_count * 2))
+  if (hex_trimmed.count > (dest_count * 2))
     return result;
 
   DN_U8   *ptr   = DN_Cast(DN_U8 *) dest;
@@ -4818,7 +4816,7 @@ DN_API DN_USize DN_BytesFromHex(DN_Str8 hex, void *dest, DN_USize dest_count)
 
   // NOTE: We are given an odd-sized hex string e.g.: 'F' instead of '0F', we 'left-pad' the parser
   // and support reading the single nibble as 'F'
-  if (hex_trimmed.size % 2 != 0) {
+  if (hex_trimmed.count % 2 != 0) {
     DN_U8 nibble0 = 0;
     DN_U8 nibble1 = DN_U8FromHexNibble(hex_trimmed.data[index++]);
     if (nibble1 == 0xFF)
@@ -4828,7 +4826,7 @@ DN_API DN_USize DN_BytesFromHex(DN_Str8 hex, void *dest, DN_USize dest_count)
   }
 
   // NOTE: Parse the rest of the hex which is in byte pairs
-  for (; index < hex_trimmed.size; index += 2) {
+  for (; index < hex_trimmed.count; index += 2) {
     DN_U8 nibble0 = DN_U8FromHexNibble(hex_trimmed.data[index + 0]);
     DN_U8 nibble1 = DN_U8FromHexNibble(hex_trimmed.data[index + 1]);
     if (nibble0 == 0xFF || nibble1 == 0xFF)
@@ -4841,7 +4839,7 @@ DN_API DN_USize DN_BytesFromHex(DN_Str8 hex, void *dest, DN_USize dest_count)
 
 DN_API DN_Str8 DN_BytesFromHexArena(DN_Str8 hex, DN_Arena *arena)
 {
-  DN_Str8 result = DN_BytesFromHexPtrArena(hex.data, hex.size, arena);
+  DN_Str8 result = DN_BytesFromHexPtrArena(hex.data, hex.count, arena);
   return result;
 }
 
@@ -4854,22 +4852,22 @@ DN_API DN_USize DN_BytesFromHexPtr(char const *hex, DN_USize hex_count, void *de
 DN_API DN_Str8 DN_BytesFromHexPtrArena(char const *hex, DN_USize hex_count, DN_Arena *arena)
 {
   DN_Str8 hex_trimmed = DN_Str8TrimHexPrefix(DN_Str8FromPtr(hex, hex_count));
-  DN_Assert(hex_trimmed.size % 2 == 0);
+  DN_Assert(hex_trimmed.count % 2 == 0);
   DN_Str8 result = {};
-  result.data    = DN_ArenaNewArray(arena, char, hex_trimmed.size / 2, DN_ZMem_No);
+  result.data    = DN_ArenaNewArray(arena, char, hex_trimmed.count / 2, DN_ZMem_No);
   if (result.data)
-    result.size = DN_BytesFromHex(hex_trimmed, result.data, hex_trimmed.size / 2);
+    result.count = DN_BytesFromHex(hex_trimmed, result.data, hex_trimmed.count / 2);
   return result;
 }
 
 DN_API DN_Str8 DN_BytesFromHexPtrPool(char const *hex, DN_USize hex_count, DN_Pool *pool)
 {
   DN_Str8 hex_trimmed = DN_Str8TrimHexPrefix(DN_Str8FromPtr(hex, hex_count));
-  DN_Assert(hex_trimmed.size % 2 == 0);
+  DN_Assert(hex_trimmed.count % 2 == 0);
   DN_Str8 result = {};
-  result.data    = DN_PoolNewArray(pool, char, hex_trimmed.size / 2);
+  result.data    = DN_PoolNewArray(pool, char, hex_trimmed.count / 2);
   if (result.data)
-    result.size = DN_BytesFromHex(hex_trimmed, result.data, hex_trimmed.size / 2);
+    result.count = DN_BytesFromHex(hex_trimmed, result.data, hex_trimmed.count / 2);
   return result;
 }
 
@@ -4878,7 +4876,7 @@ DN_API DN_U8x16 DN_BytesFromHex32Ptr(char const *hex, DN_USize hex_count)
 {
   DN_U8x16 result      = {};
   DN_Str8  hex_trimmed = DN_Str8TrimHexPrefix(DN_Str8FromPtr(hex, hex_count));
-  DN_Assert(hex_trimmed.size / 2 == sizeof result.data);
+  DN_Assert(hex_trimmed.count / 2 == sizeof result.data);
   DN_USize bytes_written = DN_BytesFromHex(hex_trimmed, result.data, sizeof result.data);
   DN_Assert(bytes_written == sizeof result.data);
   return result;
@@ -4888,7 +4886,7 @@ DN_API DN_U8x32 DN_BytesFromHex64Ptr(char const *hex, DN_USize hex_count)
 {
   DN_U8x32 result      = {};
   DN_Str8  hex_trimmed = DN_Str8TrimHexPrefix(DN_Str8FromPtr(hex, hex_count));
-  DN_Assert(hex_trimmed.size / 2 == sizeof result.data);
+  DN_Assert(hex_trimmed.count / 2 == sizeof result.data);
   DN_USize bytes_written = DN_BytesFromHex(hex_trimmed, result.data, sizeof result.data);
   DN_Assert(bytes_written == sizeof result.data);
   return result;
@@ -4897,10 +4895,10 @@ DN_API DN_U8x32 DN_BytesFromHex64Ptr(char const *hex, DN_USize hex_count)
 DN_API DN_HexU64 DN_HexFromU64(DN_U64 value, DN_HexFromU64Type type)
 {
   DN_HexU64 result = {};
-  DN_USize  size   = DN_HexFromPtrBytes(&value, sizeof(value), result.data, sizeof(result.data), DN_TrimLeadingZero_No);
-  result.size      = DN_SaturateCastUSizeToU8(size);
+  DN_USize  count  = DN_HexFromPtrBytes(&value, sizeof(value), result.data, sizeof(result.data), DN_TrimLeadingZero_No);
+  result.count     = DN_SaturateCastUSizeToU8(count);
   if (type == DN_HexFromU64Type_Uppercase) {
-    for (DN_USize index = 0; index < result.size; index++)
+    for (DN_USize index = 0; index < result.count; index++)
       result.data[index] = DN_CharToUpper(result.data[index]);
   }
   return result;
@@ -4944,24 +4942,24 @@ DN_API DN_Str8 DN_HexFromPtrBytesArena(void const *bytes, DN_USize bytes_count, 
   if (bytes_count) {
     result.data = DN_ArenaNewArray(arena, char, bytes_count * 2, DN_ZMem_No);
     if (result.data)
-      result.size = DN_HexFromPtrBytes(bytes, bytes_count, result.data, bytes_count * 2, trim_leading_z);
+      result.count = DN_HexFromPtrBytes(bytes, bytes_count, result.data, bytes_count * 2, trim_leading_z);
   }
   return result;
 }
 
 DN_API DN_USize DN_HexFromStr8Bytes(DN_Str8 bytes, void *hex, DN_USize hex_count, DN_TrimLeadingZero trim_leading_z)
 {
-  DN_USize result = DN_HexFromPtrBytes(bytes.data, bytes.size, hex, hex_count, trim_leading_z);
+  DN_USize result = DN_HexFromPtrBytes(bytes.data, bytes.count, hex, hex_count, trim_leading_z);
   return result;
 }
 
 DN_API DN_Str8 DN_HexFromStr8BytesArena(DN_Str8 bytes, DN_Arena *arena, DN_TrimLeadingZero trim_leading_z)
 {
   DN_Str8 result = {};
-  if (bytes.size) {
-    result.data = DN_ArenaNewArray(arena, char, bytes.size * 2, DN_ZMem_No);
+  if (bytes.count) {
+    result.data = DN_ArenaNewArray(arena, char, bytes.count * 2, DN_ZMem_No);
     if (result.data)
-      result.size = DN_HexFromStr8Bytes(bytes, result.data, bytes.size * 2, trim_leading_z);
+      result.count = DN_HexFromStr8Bytes(bytes, result.data, bytes.count * 2, trim_leading_z);
   }
   return result;
 }
@@ -4970,8 +4968,8 @@ DN_API DN_Hex32 DN_Hex32FromPtr16b(void const *bytes, DN_USize bytes_count, DN_T
 {
   DN_Hex32 result = {};
   DN_Assert(bytes_count * 2 == sizeof result.data - 1);
-  result.size = DN_HexFromPtrBytes(bytes, bytes_count, result.data, sizeof result.data, trim_leading_z);
-  DN_Assert(result.size <= sizeof result.data - 1);
+  result.count = DN_HexFromPtrBytes(bytes, bytes_count, result.data, sizeof result.data, trim_leading_z);
+  DN_Assert(result.count <= sizeof result.data - 1);
   return result;
 }
 
@@ -4979,8 +4977,8 @@ DN_API DN_Hex64 DN_Hex64FromPtr32b(void const *bytes, DN_USize bytes_count, DN_T
 {
   DN_Hex64 result = {};
   DN_Assert(bytes_count * 2 == sizeof result.data - 1);
-  result.size = DN_HexFromPtrBytes(bytes, bytes_count, result.data, sizeof result.data, trim_leading_z);
-  DN_Assert(result.size <= sizeof result.data - 1);
+  result.count = DN_HexFromPtrBytes(bytes, bytes_count, result.data, sizeof result.data, trim_leading_z);
+  DN_Assert(result.count <= sizeof result.data - 1);
   return result;
 }
 
@@ -4988,8 +4986,8 @@ DN_API DN_Hex128 DN_Hex128FromPtr64b(void const *bytes, DN_USize bytes_count, DN
 {
   DN_Hex128 result = {};
   DN_Assert(bytes_count * 2 == sizeof result.data - 1);
-  result.size = DN_HexFromPtrBytes(bytes, bytes_count, result.data, sizeof result.data, trim_leading_z);
-  DN_Assert(result.size <= sizeof result.data - 1);
+  result.count = DN_HexFromPtrBytes(bytes, bytes_count, result.data, sizeof result.data, trim_leading_z);
+  DN_Assert(result.count <= sizeof result.data - 1);
   return result;
 }
 
@@ -5008,7 +5006,7 @@ DN_API DN_Str8x128 DN_AgeStr8FromMsU64(DN_U64 duration_ms, DN_AgeUnit units)
     DN_USize   value_usize  = remainder_ms / (DN_SecFromYears(1) * 1000);
     remainder_ms           -= DN_SecFromYears(value_usize) * 1000;
     if (value_usize)
-      DN_FmtAppend(result.data, &result.size, sizeof(result.data), "%s%zu%.*s", result.size ? " " : "", value_usize, DN_Str8PrintFmt(unit_suffix));
+      DN_FmtAppend(result.data, &result.count, sizeof(result.data), "%s%zu%.*s", result.count ? " " : "", value_usize, DN_Str8PrintFmt(unit_suffix));
   }
 
   if (units & DN_AgeUnit_Week) {
@@ -5016,7 +5014,7 @@ DN_API DN_Str8x128 DN_AgeStr8FromMsU64(DN_U64 duration_ms, DN_AgeUnit units)
     DN_USize value_usize    = remainder_ms / (DN_SecFromWeeks(1) * 1000);
     remainder_ms           -= DN_SecFromWeeks(value_usize) * 1000;
     if (value_usize)
-      DN_FmtAppend(result.data, &result.size, sizeof(result.data), "%s%zu%.*s", result.size ? " " : "", value_usize, DN_Str8PrintFmt(unit_suffix));
+      DN_FmtAppend(result.data, &result.count, sizeof(result.data), "%s%zu%.*s", result.count ? " " : "", value_usize, DN_Str8PrintFmt(unit_suffix));
   }
 
   if (units & DN_AgeUnit_Day) {
@@ -5024,7 +5022,7 @@ DN_API DN_Str8x128 DN_AgeStr8FromMsU64(DN_U64 duration_ms, DN_AgeUnit units)
     DN_USize value_usize    = remainder_ms / (DN_SecFromDays(1) * 1000);
     remainder_ms           -= DN_SecFromDays(value_usize) * 1000;
     if (value_usize)
-      DN_FmtAppend(result.data, &result.size, sizeof(result.data), "%s%zu%.*s", result.size ? " " : "", value_usize, DN_Str8PrintFmt(unit_suffix));
+      DN_FmtAppend(result.data, &result.count, sizeof(result.data), "%s%zu%.*s", result.count ? " " : "", value_usize, DN_Str8PrintFmt(unit_suffix));
   }
 
   if (units & DN_AgeUnit_Hr) {
@@ -5032,7 +5030,7 @@ DN_API DN_Str8x128 DN_AgeStr8FromMsU64(DN_U64 duration_ms, DN_AgeUnit units)
     DN_USize value_usize    = remainder_ms / (DN_SecFromHours(1) * 1000);
     remainder_ms           -= DN_SecFromHours(value_usize) * 1000;
     if (value_usize)
-      DN_FmtAppend(result.data, &result.size, sizeof(result.data), "%s%zu%.*s", result.size ? " " : "", value_usize, DN_Str8PrintFmt(unit_suffix));
+      DN_FmtAppend(result.data, &result.count, sizeof(result.data), "%s%zu%.*s", result.count ? " " : "", value_usize, DN_Str8PrintFmt(unit_suffix));
   }
 
   if (units & DN_AgeUnit_Min) {
@@ -5040,20 +5038,20 @@ DN_API DN_Str8x128 DN_AgeStr8FromMsU64(DN_U64 duration_ms, DN_AgeUnit units)
     DN_USize value_usize    = remainder_ms / (DN_SecFromMins(1) * 1000);
     remainder_ms           -= DN_SecFromMins(value_usize) * 1000;
     if (value_usize)
-      DN_FmtAppend(result.data, &result.size, sizeof(result.data), "%s%zu%.*s", result.size ? " " : "", value_usize, DN_Str8PrintFmt(unit_suffix));
+      DN_FmtAppend(result.data, &result.count, sizeof(result.data), "%s%zu%.*s", result.count ? " " : "", value_usize, DN_Str8PrintFmt(unit_suffix));
   }
 
   if (units & DN_AgeUnit_Sec) {
     unit_suffix = DN_Str8Lit("s");
     if (units & DN_AgeUnit_FractionalSec) {
       DN_F64 remainder_s = remainder_ms / 1000.0;
-      DN_FmtAppend(result.data, &result.size, sizeof(result.data), "%s%.3f%.*s", result.size ? " " : "", remainder_s, DN_Str8PrintFmt(unit_suffix));
+      DN_FmtAppend(result.data, &result.count, sizeof(result.data), "%s%.3f%.*s", result.count ? " " : "", remainder_s, DN_Str8PrintFmt(unit_suffix));
       remainder_ms = 0;
     } else {
       DN_USize value_usize  = remainder_ms / 1000;
       remainder_ms         -= DN_Cast(DN_USize)(value_usize * 1000);
       if (value_usize)
-        DN_FmtAppend(result.data, &result.size, sizeof(result.data), "%s%zu%.*s", result.size ? " " : "", value_usize, DN_Str8PrintFmt(unit_suffix));
+        DN_FmtAppend(result.data, &result.count, sizeof(result.data), "%s%zu%.*s", result.count ? " " : "", value_usize, DN_Str8PrintFmt(unit_suffix));
     }
   }
 
@@ -5062,12 +5060,12 @@ DN_API DN_Str8x128 DN_AgeStr8FromMsU64(DN_U64 duration_ms, DN_AgeUnit units)
     DN_Assert((units & DN_AgeUnit_FractionalSec) == 0);
     DN_USize value_usize  = remainder_ms;
     remainder_ms         -= value_usize;
-    if (value_usize || result.size == 0)
-      DN_FmtAppend(result.data, &result.size, sizeof(result.data), "%s%zu%.*s", result.size ? " " : "", value_usize, DN_Str8PrintFmt(unit_suffix));
+    if (value_usize || result.count == 0)
+      DN_FmtAppend(result.data, &result.count, sizeof(result.data), "%s%zu%.*s", result.count ? " " : "", value_usize, DN_Str8PrintFmt(unit_suffix));
   }
 
-  if (result.size == 0)
-    DN_FmtAppend(result.data, &result.size, sizeof(result.data), "0%.*s", DN_Str8PrintFmt(unit_suffix));
+  if (result.count == 0)
+    DN_FmtAppend(result.data, &result.count, sizeof(result.data), "0%.*s", DN_Str8PrintFmt(unit_suffix));
   return result;
 }
 
@@ -5289,7 +5287,7 @@ DN_API DN_ProfilerZone DN_ProfilerBeginZone(DN_Profiler *profiler, DN_Str8 name,
   // TODO: We need per-thread-local-storage profiler so that we can use these apis
   // across threads. For now, we let them overwrite each other but this is not tenable.
   #if 0
-    if (anchor->name.size && anchor->name != name)
+    if (anchor->name.count && anchor->name != name)
         DN_AssertF(name == anchor->name, "Potentially overwriting a zone by accident? Anchor is '%.*s', name is '%.*s'", DN_Str8PrintFmt(anchor->name), DN_Str8PrintFmt(name));
   #endif
 
@@ -5376,10 +5374,10 @@ DN_API DN_USize DN_ProfilerFmtAnchor(DN_ProfilerAnchor anchor, DN_U64 tsc_freque
 DN_API DN_Str8 DN_ProfilerFmtAnchorStr8(DN_ProfilerAnchor anchor, DN_U64 tsc_frequency, DN_Arena *arena)
 {
   DN_Str8  result   = {};
-  DN_USize size_req = DN_ProfilerFmtAnchor(anchor, tsc_frequency, nullptr, 0);
-  if (size_req) {
-    result = DN_Str8AllocArena(size_req, DN_ZMem_No, arena);
-    DN_ProfilerFmtAnchor(anchor, tsc_frequency, result.data, result.size + 1);
+  DN_USize count_req = DN_ProfilerFmtAnchor(anchor, tsc_frequency, nullptr, 0);
+  if (count_req) {
+    result = DN_Str8AllocArena(count_req, DN_ZMem_No, arena);
+    DN_ProfilerFmtAnchor(anchor, tsc_frequency, result.data, result.count + 1);
   }
   return result;
 }
@@ -5686,18 +5684,18 @@ DN_API void DN_PCG32Advance(DN_PCG32 *rng, DN_U64 delta)
 }
 
 // Default values recommended by: http://isthe.com/chongo/tech/comp/fnv/
-DN_API DN_U32 DN_FNV1AHashU32FromBytes(void const *bytes, DN_USize size, DN_U32 hash)
+DN_API DN_U32 DN_FNV1AHashU32FromBytes(void const *bytes, DN_USize count, DN_U32 hash)
 {
-    auto buffer = DN_Cast(DN_U8 const *)bytes;
-    for (DN_USize i = 0; i < size; i++)
-        hash = (buffer[i] ^ hash) * 16777619 /*FNV Prime*/;
-    return hash;
+  auto buffer = DN_Cast(DN_U8 const *)bytes;
+  for (DN_USize i = 0; i < count; i++)
+    hash = (buffer[i] ^ hash) * 16777619 /*FNV Prime*/;
+  return hash;
 }
 
-DN_API DN_U64 DN_FNV1AHashU64FromBytes(void const *bytes, DN_USize size, DN_U64 hash)
+DN_API DN_U64 DN_FNV1AHashU64FromBytes(void const *bytes, DN_USize count, DN_U64 hash)
 {
     auto buffer = DN_Cast(DN_U8 const *)bytes;
-    for (DN_USize i = 0; i < size; i++)
+    for (DN_USize i = 0; i < count; i++)
         hash = (buffer[i] ^ hash) * 1099511628211 /*FNV Prime*/;
     return hash;
 }
@@ -6010,8 +6008,8 @@ DN_API DN_LogPrefixSize DN_LogMakePrefix(DN_LogStyle style, DN_LogTypeParam type
   }
 
   static DN_USize max_type_length = 0;
-  max_type_length                 = DN_Max(max_type_length, type_str8.size);
-  int type_padding                = DN_Cast(int)(max_type_length - type_str8.size);
+  max_type_length                 = DN_Max(max_type_length, type_str8.count);
+  int type_padding                = DN_Cast(int)(max_type_length - type_str8.count);
 
   DN_Str8x32 colour_esc = {};
   DN_Str8    bold_esc   = {};
@@ -6050,12 +6048,12 @@ DN_API DN_LogPrefixSize DN_LogMakePrefix(DN_LogStyle style, DN_LogTypeParam type
                          call_site.line); // line number
 
   static DN_USize max_header_length  = 0;
-  DN_USize        size_no_ansi_codes = size - colour_esc.size - reset_esc.size - bold_esc.size;
+  DN_USize        size_no_ansi_codes = size - colour_esc.count - reset_esc.count - bold_esc.count;
   max_header_length                  = DN_Max(max_header_length, size_no_ansi_codes);
   DN_USize header_padding            = max_header_length - size_no_ansi_codes;
 
   DN_LogPrefixSize result = {};
-  result.size             = size;
+  result.count             = size;
   result.padding          = header_padding;
   return result;
 }
@@ -7397,12 +7395,12 @@ DN_API DN_Str8x256 DN_M4ColumnMajorString(DN_M4 mat)
   for (int row = 0; row < 4; row++) {
     for (int it = 0; it < 4; it++) {
       if (it == 0)
-        DN_FmtAppend(result.data, &result.size, sizeof(result.data), "|");
-      DN_FmtAppend(result.data, &result.size, sizeof(result.data), "%.5f", mat.columns[it][row]);
+        DN_FmtAppend(result.data, &result.count, sizeof(result.data), "|");
+      DN_FmtAppend(result.data, &result.count, sizeof(result.data), "%.5f", mat.columns[it][row]);
       if (it != 3)
-        DN_FmtAppend(result.data, &result.size, sizeof(result.data), ", ");
+        DN_FmtAppend(result.data, &result.count, sizeof(result.data), ", ");
       else
-        DN_FmtAppend(result.data, &result.size, sizeof(result.data), "|\n");
+        DN_FmtAppend(result.data, &result.count, sizeof(result.data), "|\n");
     }
   }
   return result;
@@ -7851,22 +7849,22 @@ struct DN_ArrayFindEqMemcmpContext_
   void const *find;
 };
 
-DN_API void *DN_SliceAllocArena(void **data, DN_USize *slice_size_field, DN_USize size, DN_USize elem_size, DN_U8 align, DN_ZMem zmem, DN_Arena *arena)
+DN_API void *DN_SliceAllocArena(void **data, DN_USize *slice_size_field, DN_USize count, DN_USize elem_size, DN_U8 align, DN_ZMem zmem, DN_Arena *arena)
 {
   void *result = *data;
-  *data        = DN_ArenaAlloc(arena, size * elem_size, align, zmem);
+  *data        = DN_ArenaAlloc(arena, count * elem_size, align, zmem);
   if (*data)
-    *slice_size_field = size;
+    *slice_size_field = count;
   return result;
 }
 
-DN_API DN_ArrayFindResult DN_ArrayFind(void *data, DN_USize size, DN_USize elem_size, void const *find, DN_ArrayFindEqFunc *eq_func)
+DN_API DN_ArrayFindResult DN_ArrayFind(void *data, DN_USize count, DN_USize elem_size, void const *find, DN_ArrayFindEqFunc *eq_func)
 {
   DN_ArrayFindResult result = {};
   DN_Assert(data);
   DN_Assert(elem_size);
   if (find) {
-    for (DN_ForIndexU(index, size)) {
+    for (DN_ForIndexU(index, count)) {
       DN_U8 *it = DN_Cast(DN_U8 *) data + (index * elem_size);
       if (eq_func(it, find)) {
         result.index   = index;
@@ -7886,12 +7884,12 @@ static bool DN_ArrayFindEqMemEqUnsafe_(void const *lhs, void const *find)
   return result;
 }
 
-DN_API DN_ArrayFindResult DN_ArrayFindMemEq(void *data, DN_USize size, DN_USize elem_size, void const *find)
+DN_API DN_ArrayFindResult DN_ArrayFindMemEq(void *data, DN_USize count, DN_USize elem_size, void const *find)
 {
   DN_ArrayFindEqMemcmpContext_ context = {};
   context.elem_size                    = elem_size;
   context.find                         = find;
-  DN_ArrayFindResult result            = DN_ArrayFind(data, size, elem_size, &context, DN_ArrayFindEqMemEqUnsafe_);
+  DN_ArrayFindResult result            = DN_ArrayFind(data, count, elem_size, &context, DN_ArrayFindEqMemEqUnsafe_);
   return result;
 }
 
@@ -7946,116 +7944,116 @@ DN_API void *DN_ArrayPopBack(void *data, DN_USize *size, DN_USize elem_size, DN_
   return DN_Cast(char *)data + (*size * elem_size);
 }
 
-DN_API DN_ArrayEraseResult DN_ArrayEraseRange(void *data, DN_USize *size, DN_USize elem_size, DN_USize begin_index, DN_ISize count, DN_ArrayErase erase)
+DN_API DN_ArrayEraseResult DN_ArrayEraseRange(void *data, DN_USize *count, DN_USize elem_size, DN_USize begin_index, DN_ISize erase_count, DN_ArrayErase erase)
 {
   DN_ArrayEraseResult result = {};
   result.it_index            = begin_index;
-  if (!data || !size || *size == 0 || count == 0)
+  if (!data || !count || *count == 0 || erase_count == 0)
     return result;
 
   // Compute the range to erase
   DN_USize start = 0, end = 0;
-  if (count < 0) {
+  if (erase_count < 0) {
     // Erase backwards from begin_index, not inclusive of begin_index
     // Range: [begin_index + count, begin_index)
     // Which is: [begin_index - abs(count), begin_index)
-    DN_USize abs_count = DN_Abs(count);
-    start = (begin_index > abs_count) ? (begin_index - abs_count) : 0;
+    DN_USize abs_erase_count = DN_Abs(erase_count);
+    start = (begin_index > abs_erase_count) ? (begin_index - abs_erase_count) : 0;
     end   = begin_index;
   } else {
     start = begin_index;
-    end   = begin_index + count;
+    end   = begin_index + erase_count;
   }
 
   // Clamp indices to valid bounds
-  start = DN_Min(start, *size);
-  end   = DN_Min(end,   *size);
+  start = DN_Min(start, *count);
+  end   = DN_Min(end,   *count);
 
   // Erase the range [start, end)
-  DN_USize erase_count = end > start ? end - start : 0;
-  if (erase_count) {
+  DN_USize real_erase_count = end > start ? end - start : 0;
+  if (real_erase_count) {
     char    *dest      = (char *)data + (elem_size * start);
-    char    *array_end = (char *)data + (elem_size * *size);
-    char    *src       = dest + (elem_size * erase_count);
+    char    *array_end = (char *)data + (elem_size * *count);
+    char    *src       = dest + (elem_size * real_erase_count);
     if (erase == DN_ArrayErase_Stable) {
       DN_USize move_size = array_end - src;
       DN_Memmove(dest, src, move_size);
     } else {
-      char    *unstable_src = array_end - (elem_size * erase_count);
+      char    *unstable_src = array_end - (elem_size * real_erase_count);
       DN_USize move_size    = array_end - unstable_src;
       DN_Memcpy(dest, unstable_src, move_size);
     }
-    *size -= erase_count;
+    *count -= real_erase_count;
   }
 
   result.items_erased = erase_count;
   // NOTE: If we are erasing from the current index of the iterator to the end of the array then
   // there's no more elements in the array to iterate. So the returned index should b
   // one-past-last index
-  if (begin_index == start && end >= *size) {
-    result.it_index = *size;
+  if (begin_index == start && end >= *count) {
+    result.it_index = *count;
   } else {
     result.it_index = start ? start - 1 : 0;
   }
   return result;
 }
 
-DN_API void *DN_ArrayMakeArray(void *data, DN_USize *size, DN_USize max, DN_USize elem_size, DN_USize make_count, DN_ZMem z_mem)
+DN_API void *DN_ArrayMakeArray(void *data, DN_USize *count, DN_USize max, DN_USize elem_size, DN_USize make_count, DN_ZMem z_mem)
 {
   void    *result   = nullptr;
-  DN_USize new_size = *size + make_count;
-  if (new_size <= max) {
-    result = DN_Cast(char *) data + (elem_size * size[0]);
-    *size  = new_size;
+  DN_USize new_count = *count + make_count;
+  if (new_count <= max) {
+    result = DN_Cast(char *) data + (elem_size * count[0]);
+    *count  = new_count;
     if (z_mem == DN_ZMem_Yes)
       DN_Memset(result, 0, elem_size * make_count);
   }
   return result;
 }
 
-DN_API void *DN_ArrayMakeArrayAssert(void *data, DN_USize *size, DN_USize max, DN_USize elem_size, DN_USize make_count, DN_ZMem z_mem, DN_CallSite call_site)
+DN_API void *DN_ArrayMakeArrayAssert(void *data, DN_USize *count, DN_USize max, DN_USize elem_size, DN_USize make_count, DN_ZMem z_mem, DN_CallSite call_site)
 {
-  void *result = DN_ArrayMakeArray(data, size, max, elem_size, make_count, z_mem);
-  DN_AssertCallSiteF(result, call_site, "Array out of space, failed to add %zu items: array=%p size=%zu max=%zu", make_count, data, *size, max);
+  void *result = DN_ArrayMakeArray(data, count, max, elem_size, make_count, z_mem);
+  DN_AssertCallSiteF(result, call_site, "Array out of space, failed to add %zu items: array=%p size=%zu max=%zu", make_count, data, *count, max);
   return result;
 }
 
-DN_API void *DN_ArrayAddArray(void *data, DN_USize *size, DN_USize max, DN_USize elem_size, void const *elems, DN_USize elems_count, DN_ArrayAdd add)
+DN_API void *DN_ArrayAddArray(void *data, DN_USize *count, DN_USize max, DN_USize elem_size, void const *elems, DN_USize elems_count, DN_ArrayAdd add)
 {
-  void *result = DN_ArrayMakeArray(data, size, max, elem_size, elems_count, DN_ZMem_No);
+  void *result = DN_ArrayMakeArray(data, count, max, elem_size, elems_count, DN_ZMem_No);
   if (result) {
     if (add == DN_ArrayAdd_Append) {
       DN_Memcpy(result, elems, elems_count * elem_size);
     } else {
       char *move_dest = DN_Cast(char *)data + (elems_count * elem_size); // Shift elements forward
       char *move_src  = DN_Cast(char *)data;
-      DN_Memmove(move_dest, move_src, elem_size * size[0]);
+      DN_Memmove(move_dest, move_src, elem_size * count[0]);
       DN_Memcpy(data, elems, elem_size * elems_count);
     }
   }
   return result;
 }
 
-DN_API void *DN_ArrayAddArrayAssert(void *data, DN_USize *size, DN_USize max, DN_USize elem_size, void const *elems, DN_USize elems_count, DN_ArrayAdd add, DN_CallSite call_site)
+DN_API void *DN_ArrayAddArrayAssert(void *data, DN_USize *count, DN_USize max, DN_USize elem_size, void const *elems, DN_USize elems_count, DN_ArrayAdd add, DN_CallSite call_site)
 {
-  void *result = DN_ArrayAddArray(data, size, max, elem_size, elems, elems_count, add);
-  DN_AssertCallSiteF(result, call_site, "Array out of space, failed to add %zu items: array=%p size=%zu max=%zu", elems_count, data, *size, max);
+  void *result = DN_ArrayAddArray(data, count, max, elem_size, elems, elems_count, add);
+  DN_AssertCallSiteF(result, call_site, "Array out of space, failed to add %zu items: array=%p size=%zu max=%zu", elems_count, data, *count, max);
   return result;
 }
 
-DN_API bool DN_ArrayResizeFromArena(void **data, DN_USize *size, DN_USize *max, DN_USize elem_size, DN_Pool *pool, DN_USize new_max)
+DN_API bool DN_ArrayResizeFromArena(void **data, DN_USize *count, DN_USize *max, DN_USize elem_size, DN_Pool *pool, DN_USize new_max)
 {
   bool result = true;
   if (new_max != *max) {
     DN_USize bytes_to_alloc = elem_size * new_max;
     void    *buffer         = DN_PoolNewArray(pool, DN_U8, bytes_to_alloc);
     if (buffer) {
-      DN_USize bytes_to_copy = elem_size * DN_Min(*size, new_max);
+      DN_USize bytes_to_copy = elem_size * DN_Min(*count, new_max);
       DN_Memcpy(buffer, *data, bytes_to_copy);
       DN_PoolDealloc(pool, *data);
-      *data = buffer;
-      *max  = new_max;
-      *size = DN_Min(*size, new_max);
+      *data  = buffer;
+      *max   = new_max;
+      *count = DN_Min(*count, new_max);
     } else {
       result = false;
     }
@@ -8064,19 +8062,19 @@ DN_API bool DN_ArrayResizeFromArena(void **data, DN_USize *size, DN_USize *max, 
   return result;
 }
 
-DN_API bool DN_ArrayResizeFromPool(void **data, DN_USize *size, DN_USize *max, DN_USize elem_size, DN_Pool *pool, DN_USize new_max)
+DN_API bool DN_ArrayResizeFromPool(void **data, DN_USize *count, DN_USize *max, DN_USize elem_size, DN_Pool *pool, DN_USize new_max)
 {
   bool result = true;
   if (new_max != *max) {
     DN_USize bytes_to_alloc = elem_size * new_max;
     void    *buffer         = DN_PoolNewArray(pool, DN_U8, bytes_to_alloc);
     if (buffer) {
-      DN_USize bytes_to_copy = elem_size * DN_Min(*size, new_max);
+      DN_USize bytes_to_copy = elem_size * DN_Min(*count, new_max);
       DN_Memcpy(buffer, *data, bytes_to_copy);
       DN_PoolDealloc(pool, *data);
-      *data = buffer;
-      *max  = new_max;
-      *size = DN_Min(*size, new_max);
+      *data  = buffer;
+      *max   = new_max;
+      *count = DN_Min(*count, new_max);
     } else {
       result = false;
     }
@@ -8085,18 +8083,18 @@ DN_API bool DN_ArrayResizeFromPool(void **data, DN_USize *size, DN_USize *max, D
   return result;
 }
 
-DN_API bool DN_ArrayResizeFromArena(void **data, DN_USize *size, DN_USize *max, DN_USize elem_size, DN_Arena *arena, DN_USize new_max)
+DN_API bool DN_ArrayResizeFromArena(void **data, DN_USize *count, DN_USize *max, DN_USize elem_size, DN_Arena *arena, DN_USize new_max)
 {
   bool result = true;
   if (new_max != *max) {
     DN_USize bytes_to_alloc = elem_size * new_max;
     void    *buffer         = DN_ArenaNewArray(arena, DN_U8, bytes_to_alloc, DN_ZMem_No);
     if (buffer) {
-      DN_USize bytes_to_copy = elem_size * DN_Min(*size, new_max);
+      DN_USize bytes_to_copy = elem_size * DN_Min(*count, new_max);
       DN_Memcpy(buffer, *data, bytes_to_copy);
-      *data = buffer;
-      *max  = new_max;
-      *size = DN_Min(*size, new_max);
+      *data  = buffer;
+      *max   = new_max;
+      *count = DN_Min(*count, new_max);
     } else {
       result = false;
     }
@@ -8105,41 +8103,41 @@ DN_API bool DN_ArrayResizeFromArena(void **data, DN_USize *size, DN_USize *max, 
   return result;
 }
 
-DN_API bool DN_ArrayGrowFromPool(void **data, DN_USize size, DN_USize *max, DN_USize elem_size, DN_Pool *pool, DN_USize new_max)
+DN_API bool DN_ArrayGrowFromPool(void **data, DN_USize count, DN_USize *max, DN_USize elem_size, DN_Pool *pool, DN_USize new_max)
 {
   bool result = true;
   if (new_max > *max)
-    result = DN_ArrayResizeFromPool(data, &size, max, elem_size, pool, new_max);
+    result = DN_ArrayResizeFromPool(data, &count, max, elem_size, pool, new_max);
   return result;
 }
 
-DN_API bool DN_ArrayGrowFromArena(void **data, DN_USize size, DN_USize *max, DN_USize elem_size, DN_Arena *arena, DN_USize new_max)
+DN_API bool DN_ArrayGrowFromArena(void **data, DN_USize count, DN_USize *max, DN_USize elem_size, DN_Arena *arena, DN_USize new_max)
 {
   bool result = true;
   if (new_max > *max)
-    result = DN_ArrayResizeFromArena(data, &size, max, elem_size, arena, new_max);
+    result = DN_ArrayResizeFromArena(data, &count, max, elem_size, arena, new_max);
   return result;
 }
 
 
-DN_API bool DN_ArrayGrowIfNeededFromPool(void **data, DN_USize size, DN_USize *max, DN_USize elem_size, DN_Pool *pool, DN_USize add_count)
+DN_API bool DN_ArrayGrowIfNeededFromPool(void **data, DN_USize count, DN_USize *max, DN_USize elem_size, DN_Pool *pool, DN_USize add_count)
 {
   bool     result   = true;
-  DN_USize new_size = size + add_count;
-  if (new_size > *max) {
-    DN_USize new_max = DN_Max(DN_Max(*max * 2, new_size), 8);
-    result           = DN_ArrayResizeFromPool(data, &size, max, elem_size, pool, new_max);
+  DN_USize new_count = count + add_count;
+  if (new_count > *max) {
+    DN_USize new_max = DN_Max(DN_Max(*max * 2, new_count), 8);
+    result           = DN_ArrayResizeFromPool(data, &count, max, elem_size, pool, new_max);
   }
   return result;
 }
 
-DN_API bool DN_ArrayGrowIfNeededFromArena(void **data, DN_USize size, DN_USize *max, DN_USize elem_size, DN_Arena *arena, DN_USize add_count)
+DN_API bool DN_ArrayGrowIfNeededFromArena(void **data, DN_USize count, DN_USize *max, DN_USize elem_size, DN_Arena *arena, DN_USize add_count)
 {
   bool     result   = true;
-  DN_USize new_size = size + add_count;
-  if (new_size > *max) {
-    DN_USize new_max = DN_Max(DN_Max(*max * 2, new_size), 8);
-    result           = DN_ArrayResizeFromArena(data, &size, max, elem_size, arena, new_max);
+  DN_USize new_count = count + add_count;
+  if (new_count > *max) {
+    DN_USize new_max = DN_Max(DN_Max(*max * 2, new_count), 8);
+    result           = DN_ArrayResizeFromArena(data, &count, max, elem_size, arena, new_max);
   }
   return result;
 }
@@ -8590,25 +8588,25 @@ bool DN_DSMapEraseKeyStr8(DN_DSMap<T> *map, DN_Str8 key)
 }
 
 template <typename T>
-DN_DSMapKey DN_DSMapKeyBuffer(DN_DSMap<T> const *map, void const *data, DN_USize size)
+DN_DSMapKey DN_DSMapKeyBuffer(DN_DSMap<T> const *map, void const *data, DN_USize count)
 {
-  DN_Assert(size > 0 && size <= UINT32_MAX);
+  DN_Assert(count > 0 && count <= UINT32_MAX);
   DN_DSMapKey result = {};
   result.type        = DN_DSMapKeyType_Buffer;
   result.buffer_data = data;
-  result.buffer_size = DN_Cast(DN_U32) size;
+  result.buffer_size = DN_Cast(DN_U32) count;
   result.hash        = DN_DSMapHash(map, result);
   return result;
 }
 
 template <typename T>
-DN_DSMapKey DN_DSMapKeyBufferAsU64NoHash(DN_DSMap<T> const *map, void const *data, DN_USize size)
+DN_DSMapKey DN_DSMapKeyBufferAsU64NoHash(DN_DSMap<T> const *map, void const *data, DN_USize count)
 {
   DN_DSMapKey result = {};
   result.type        = DN_DSMapKeyType_BufferAsU64NoHash;
   result.buffer_data = data;
-  result.buffer_size = DN_Cast(DN_U32) size;
-  DN_Assert(size >= sizeof(result.hash));
+  result.buffer_size = DN_Cast(DN_U32) count;
+  DN_Assert(count >= sizeof(result.hash));
   DN_Memcpy(&result.hash, data, sizeof(result.hash));
   return result;
 }
@@ -8626,7 +8624,7 @@ DN_DSMapKey DN_DSMapKeyU64(DN_DSMap<T> const *map, DN_U64 u64)
 template <typename T>
 DN_DSMapKey DN_DSMapKeyStr8(DN_DSMap<T> const *map, DN_Str8 string)
 {
-  DN_DSMapKey result = DN_DSMapKeyBuffer(map, string.data, string.size);
+  DN_DSMapKey result = DN_DSMapKeyBuffer(map, string.data, string.count);
   return result;
 }
 
@@ -8691,25 +8689,25 @@ DN_API void DN_BinPackU64(DN_BinPack *pack, DN_BinPackMode mode, DN_U64 *item)
   }
 }
 
-DN_API void DN_BinPackVarInt_(DN_BinPack *pack, DN_BinPackMode mode, void *item, DN_USize size)
+DN_API void DN_BinPackVarInt_(DN_BinPack *pack, DN_BinPackMode mode, void *item, DN_USize count)
 {
   DN_U64 value = 0;
-  DN_AssertF(size <= sizeof(value),
+  DN_AssertF(count <= sizeof(value),
              "An item larger than 64 bits (%zu) is trying to be packed as a variable integer which is not supported",
-             size * 8);
+             count * 8);
 
   if (mode == DN_BinPackMode_Serialise) // Read `item` into U64 `value`
-    DN_Memcpy(&value, item, size);
+    DN_Memcpy(&value, item, count);
 
   DN_BinPackU64(pack, mode, &value);
 
   if (mode == DN_BinPackMode_Deserialise) // Write U64 `value` into `item`
-    DN_Memcpy(item, &value, size);
+    DN_Memcpy(item, &value, count);
 }
 
 DN_API bool DN_BinPackIsEndOfReadStream(DN_BinPack const *pack)
 {
-  bool result = pack->read_index == pack->read.size;
+  bool result = pack->read_index == pack->read.count;
   return result;
 }
 
@@ -8784,25 +8782,25 @@ DN_API void DN_BinPackBool(DN_BinPack *pack, DN_BinPackMode mode, bool *item)
 
 DN_API void DN_BinPackStr8FromArena(DN_BinPack *pack, DN_Arena *arena, DN_BinPackMode mode, DN_Str8 *string)
 {
-  DN_BinPackVarInt_(pack, mode, &string->size, sizeof(string->size));
+  DN_BinPackVarInt_(pack, mode, &string->count, sizeof(string->count));
   if (mode == DN_BinPackMode_Serialise) {
-    DN_Str8BuilderAppendBytesCopy(&pack->writer, string->data, string->size);
+    DN_Str8BuilderAppendBytesCopy(&pack->writer, string->data, string->count);
   } else {
-    DN_Str8 src = DN_Str8Subset(pack->read, pack->read_index, string->size);
-    *string     = DN_Str8FromStr8Arena(src, arena);
-    pack->read_index += src.size;
+    DN_Str8 src       = DN_Str8Subset(pack->read, pack->read_index, string->count);
+    *string           = DN_Str8FromStr8Arena(src, arena);
+    pack->read_index += src.count;
   }
 }
 
 DN_API void DN_BinPackStr8FromPool(DN_BinPack *pack, DN_Pool *pool, DN_BinPackMode mode, DN_Str8 *string)
 {
-  DN_BinPackVarInt_(pack, mode, &string->size, sizeof(string->size));
+  DN_BinPackVarInt_(pack, mode, &string->count, sizeof(string->count));
   if (mode == DN_BinPackMode_Serialise) {
-    DN_Str8BuilderAppendBytesCopy(&pack->writer, string->data, string->size);
+    DN_Str8BuilderAppendBytesCopy(&pack->writer, string->data, string->count);
   } else {
-    DN_Str8 src = DN_Str8Subset(pack->read, pack->read_index, string->size);
-    *string     = DN_Str8FromStr8Pool(src, pool);
-    pack->read_index += src.size;
+    DN_Str8 src       = DN_Str8Subset(pack->read, pack->read_index, string->count);
+    *string           = DN_Str8FromStr8Pool(src, pool);
+    pack->read_index += src.count;
   }
 }
 
@@ -8818,7 +8816,7 @@ DN_API void DN_BinPackBytesFromArena(DN_BinPack *pack, DN_Arena *arena, DN_BinPa
   DN_Str8 string = DN_Str8FromPtr(*ptr, *size);
   DN_BinPackStr8FromArena(pack, arena, mode, &string);
   *ptr  = string.data;
-  *size = string.size;
+  *size = string.count;
 }
 
 DN_API void DN_BinPackBytesFromPool(DN_BinPack *pack, DN_Pool *pool, DN_BinPackMode mode, void **ptr, DN_USize *size)
@@ -8826,7 +8824,7 @@ DN_API void DN_BinPackBytesFromPool(DN_BinPack *pack, DN_Pool *pool, DN_BinPackM
   DN_Str8 string = DN_Str8FromPtr(*ptr, *size);
   DN_BinPackStr8FromPool(pack, pool, mode, &string);
   *ptr  = string.data;
-  *size = string.size;
+  *size = string.count;
 }
 
 DN_API void DN_BinPackCArray(DN_BinPack *pack, DN_BinPackMode mode, void *ptr, DN_USize size)
@@ -8836,9 +8834,9 @@ DN_API void DN_BinPackCArray(DN_BinPack *pack, DN_BinPackMode mode, void *ptr, D
     DN_Str8BuilderAppendBytesCopy(&pack->writer, ptr, size);
   } else {
     DN_Str8 src = DN_Str8Subset(pack->read, pack->read_index, size);
-    DN_Assert(src.size == size);
-    DN_Memcpy(ptr, src.data, DN_Min(src.size, size));
-    pack->read_index += src.size;
+    DN_Assert(src.count == size);
+    DN_Memcpy(ptr, src.data, DN_Min(src.count, size));
+    pack->read_index += src.count;
   }
 }
 
@@ -8881,7 +8879,7 @@ DN_API bool DN_CSVTokeniserValid(DN_CSVTokeniser *tokeniser)
 
 static void DN_CSVTokeniserEatNewLines_(DN_CSVTokeniser *tokeniser)
 {
-  char const *end = tokeniser->string.data + tokeniser->string.size;
+  char const *end = tokeniser->string.data + tokeniser->string.count;
   while (tokeniser->it[0] == '\n' || tokeniser->it[0] == '\r')
     if (++tokeniser->it == end)
       break;
@@ -8890,12 +8888,12 @@ static void DN_CSVTokeniserEatNewLines_(DN_CSVTokeniser *tokeniser)
 DN_API bool DN_CSVTokeniserNextRow(DN_CSVTokeniser *tokeniser)
 {
   bool result = false;
-  if (DN_CSVTokeniserValid(tokeniser) && tokeniser->string.size) {
+  if (DN_CSVTokeniserValid(tokeniser) && tokeniser->string.count) {
     // NOTE: First time querying row iterator is nil, let tokeniser advance
     if (tokeniser->it) {
       // NOTE: Only advance the tokeniser if we're at the end of the line and
       // there's more to tokenise.
-      char const *end = tokeniser->string.data + tokeniser->string.size;
+      char const *end = tokeniser->string.data + tokeniser->string.count;
       if (tokeniser->it != end && tokeniser->end_of_line) {
         tokeniser->end_of_line = false;
         result                 = true;
@@ -8912,13 +8910,13 @@ DN_API DN_Str8 DN_CSVTokeniserNextField(DN_CSVTokeniser *tokeniser)
   if (!DN_CSVTokeniserValid(tokeniser))
     return result;
 
-  if (tokeniser->string.size == 0) {
+  if (tokeniser->string.count == 0) {
     tokeniser->bad = true;
     return result;
   }
 
   // NOTE: First time tokeniser is invoked with a string, set up initial state.
-  char const *string_end = tokeniser->string.data + tokeniser->string.size;
+  char const *string_end = tokeniser->string.data + tokeniser->string.count;
   if (!tokeniser->it) {
     tokeniser->it = tokeniser->string.data;
     DN_CSVTokeniserEatNewLines_(tokeniser); // NOTE: Skip any leading new lines
@@ -8981,7 +8979,7 @@ DN_API DN_Str8 DN_CSVTokeniserNextField(DN_CSVTokeniser *tokeniser)
 
   // NOTE: Generate the record
   result.data = DN_Cast(char *) begin;
-  result.size = DN_Cast(int)(end - begin);
+  result.count = DN_Cast(int)(end - begin);
   return result;
 }
 
@@ -9126,7 +9124,7 @@ DN_API void DN_CSVPackBuffer(DN_CSVPack *pack, DN_CSVSerialise serialise, void *
 {
   if (serialise == DN_CSVSerialise_Read) {
     DN_Str8 csv_value = DN_CSVTokeniserNextColumn(&pack->read_tokeniser);
-    *size             = DN_Min(*size, csv_value.size);
+    *size             = DN_Min(*size, csv_value.count);
     DN_Memcpy(dest, csv_value.data, *size);
   } else {
     DN_Str8BuilderAppendF(&pack->write_builder, "%s%.*s", pack->write_column++ ? "," : "", DN_Cast(int)(*size), DN_Cast(char *)dest);
@@ -9189,8 +9187,8 @@ DN_API void DN_LeakTrackAlloc_(DN_LeakTracker *leak, void *ptr, DN_USize size, b
     }
 
     // NOTE: Pointer was reused, clean up the prior entry
-    leak->alloc_table_bytes_allocated_for_stack_traces -= alloc->stack_trace.size;
-    leak->alloc_table_bytes_allocated_for_stack_traces -= alloc->freed_stack_trace.size;
+    leak->alloc_table_bytes_allocated_for_stack_traces -= alloc->stack_trace.count;
+    leak->alloc_table_bytes_allocated_for_stack_traces -= alloc->freed_stack_trace.count;
 
     DN_OS_MemDealloc(alloc->stack_trace.data);
     DN_OS_MemDealloc(alloc->freed_stack_trace.data);
@@ -9201,7 +9199,7 @@ DN_API void DN_LeakTrackAlloc_(DN_LeakTracker *leak, void *ptr, DN_USize size, b
   alloc->size        = size;
   alloc->stack_trace = stack_trace;
   alloc->flags |= leak_permitted ? DN_LeakAllocFlag_LeakPermitted : 0;
-  leak->alloc_table_bytes_allocated_for_stack_traces += alloc->stack_trace.size;
+  leak->alloc_table_bytes_allocated_for_stack_traces += alloc->stack_trace.count;
   DN_TicketMutex_End(&leak->alloc_table_mutex);
 }
 
@@ -9247,10 +9245,10 @@ DN_API void DN_LeakTrackDealloc_(DN_LeakTracker *leak, void *ptr)
                    DN_Str8PrintFmt(stack_trace));
   }
 
-  DN_Assert(alloc->freed_stack_trace.size == 0);
+  DN_Assert(alloc->freed_stack_trace.count == 0);
   alloc->flags |= DN_LeakAllocFlag_Freed;
   alloc->freed_stack_trace = stack_trace;
-  leak->alloc_table_bytes_allocated_for_stack_traces += alloc->freed_stack_trace.size;
+  leak->alloc_table_bytes_allocated_for_stack_traces += alloc->freed_stack_trace.count;
   DN_TicketMutex_End(&leak->alloc_table_mutex);
 }
 
@@ -9372,20 +9370,20 @@ DN_API DN_Str8 DN_Str8FromHeapF(DN_FMT_ATTRIB char const *fmt, ...)
 {
   va_list args;
   va_start(args, fmt);
-  DN_USize size   = DN_FmtVSize(fmt, args);
-  DN_Str8  result = DN_Str8FromHeap(size, DN_ZMem_No);
-  DN_VSNPrintF(result.data, DN_Cast(int)(result.size + 1), fmt, args);
+  DN_USize count  = DN_FmtVCount(fmt, args);
+  DN_Str8  result = DN_Str8FromHeap(count, DN_ZMem_No);
+  DN_VSNPrintF(result.data, DN_Cast(int)(result.count + 1), fmt, args);
   va_end(args);
   return result;
 }
 
-DN_API DN_Str8 DN_Str8FromHeap(DN_USize size, DN_ZMem z_mem)
+DN_API DN_Str8 DN_Str8FromHeap(DN_USize count, DN_ZMem z_mem)
 {
   DN_Str8 result = {};
-  result.data    = DN_Cast(char *)DN_OS_MemAlloc(size + 1, z_mem);
+  result.data    = DN_Cast(char *)DN_OS_MemAlloc(count + 1, z_mem);
   if (result.data) {
-    result.size              = size;
-    result.data[result.size] = 0;
+    result.count              = count;
+    result.data[result.count] = 0;
   }
   return result;
 }
@@ -9396,11 +9394,11 @@ DN_API DN_Str8 DN_Str8PadNewLines(DN_Arena *arena, DN_Str8 src, DN_Str8 pad)
   DN_TCScratch        scratch = DN_TCScratchBeginArena(&arena, 1);
   DN_Str8Builder      builder = DN_Str8BuilderFromArena(&scratch.arena);
   DN_Str8BSplitResult split   = DN_Str8BSplit(src, DN_Str8Lit("\n"));
-  while (split.lhs.size) {
+  while (split.lhs.count) {
     DN_Str8BuilderAppendRef(&builder, pad);
     DN_Str8BuilderAppendRef(&builder, split.lhs);
     split = DN_Str8BSplit(split.rhs, DN_Str8Lit("\n"));
-    if (split.lhs.size)
+    if (split.lhs.count)
       DN_Str8BuilderAppendRef(&builder, DN_Str8Lit("\n"));
   }
   DN_Str8 result = DN_Str8FromStr8BuilderArena(&builder, arena);
@@ -9419,12 +9417,12 @@ DN_API DN_Str8 DN_Str8BuilderBuildFromHeap(DN_Str8Builder const *builder)
     return result;
 
   for (DN_Str8Link *link = builder->head; link; link = link->next) {
-    DN_Memcpy(result.data + result.size, link->string.data, link->string.size);
-    result.size += link->string.size;
+    DN_Memcpy(result.data + result.count, link->string.data, link->string.count);
+    result.count += link->string.count;
   }
 
-  result.data[result.size] = 0;
-  DN_Assert(result.size == builder->string_size);
+  result.data[result.count] = 0;
+  DN_Assert(result.count == builder->string_size);
   return result;
 }
 
@@ -9492,7 +9490,7 @@ DN_API void DN_OS_LogPrint(DN_LogTypeParam type, void *user_data, DN_CallSite ca
   DN_TicketMutex_Begin(&os->log_file_mutex);
   {
     if (print_prefix) {
-      DN_OS_FileWrite(&os->log_file, DN_Str8FromPtr(prefix_buffer, prefix_size.size), nullptr);
+      DN_OS_FileWrite(&os->log_file, DN_Str8FromPtr(prefix_buffer, prefix_size.count), nullptr);
       DN_OS_FileWriteF(&os->log_file, nullptr, "%*s ", DN_Cast(int) prefix_size.padding, "");
     }
     DN_OS_FileWriteFV(&os->log_file, nullptr, fmt, args_copy);
@@ -9505,7 +9503,7 @@ DN_API void DN_OS_LogPrint(DN_LogTypeParam type, void *user_data, DN_CallSite ca
   DN_TicketMutex_Begin(&os->log_mutex);
   {
     if (print_prefix)
-      DN_OS_PrintF(DN_OSPrintDest_Err, "%.*s%*s ", DN_Cast(int) prefix_size.size, prefix_buffer, DN_Cast(int) prefix_size.padding, "");
+      DN_OS_PrintF(DN_OSPrintDest_Err, "%.*s%*s ", DN_Cast(int) prefix_size.count, prefix_buffer, DN_Cast(int) prefix_size.padding, "");
 
     if (DN_BitIsSet(flags, DN_LogFlags_NoNewLine))
       DN_OS_PrintFV(DN_OSPrintDest_Err, fmt, args);
@@ -9656,7 +9654,7 @@ DN_API bool DN_OS_PathIsOlderThan(DN_Str8 path, DN_Str8 check_against)
 
 DN_API bool DN_OS_FileWrite(DN_OSFile *file, DN_Str8 buffer, DN_ErrSink *error)
 {
-  bool result = DN_OS_FileWritePtr(file, buffer.data, buffer.size, error);
+  bool result = DN_OS_FileWritePtr(file, buffer.data, buffer.count, error);
   return result;
 }
 
@@ -9729,7 +9727,7 @@ DN_API DN_Str8 DN_OS_FileReadAll(DN_Allocator allocator, DN_Str8 path, DN_ErrSin
 
   // NOTE: Read all
   DN_OSFile     file   = DN_OS_FileOpen(path, DN_OSFileOpen_OpenIfExist, DN_OSFileAccess_Read, err);
-  DN_OSFileRead read   = DN_OS_FileRead(&file, result.data, result.size, err);
+  DN_OSFileRead read   = DN_OS_FileRead(&file, result.data, result.count, err);
   bool          failed = file.error || !read.success;
 
   if (allocator.type == DN_AllocatorType_Arena) {
@@ -9842,10 +9840,10 @@ DN_API DN_Str8 DN_OS_Str8FromPathInfoType(DN_OSPathInfoType type)
 
 DN_API bool DN_OS_PathAddRef(DN_Arena *arena, DN_OSPath *fs_path, DN_Str8 path)
 {
-  if (!arena || !fs_path || path.size == 0)
+  if (!arena || !fs_path || path.count == 0)
     return false;
 
-  if (path.size <= 0)
+  if (path.count <= 0)
     return true;
 
   DN_Str8 const delimiter_array[] = {
@@ -9858,7 +9856,7 @@ DN_API bool DN_OS_PathAddRef(DN_Arena *arena, DN_OSPath *fs_path, DN_Str8 path)
   for (;;) {
     DN_Str8BSplitResult delimiter = DN_Str8BSplitArray(path, delimiter_array, DN_ArrayCountU(delimiter_array));
     for (; delimiter.lhs.data; delimiter = DN_Str8BSplitArray(delimiter.rhs, delimiter_array, DN_ArrayCountU(delimiter_array))) {
-      if (delimiter.lhs.size <= 0)
+      if (delimiter.lhs.count <= 0)
         continue;
 
       DN_OSPathLink *link = DN_ArenaNew(arena, DN_OSPathLink, DN_ZMem_Yes);
@@ -9873,7 +9871,7 @@ DN_API bool DN_OS_PathAddRef(DN_Arena *arena, DN_OSPath *fs_path, DN_Str8 path)
         fs_path->head = link;
       fs_path->tail = link;
       fs_path->links_size += 1;
-      fs_path->string_size += delimiter.lhs.size;
+      fs_path->string_size += delimiter.lhs.count;
     }
 
     if (!delimiter.lhs.data)
@@ -9886,7 +9884,7 @@ DN_API bool DN_OS_PathAddRef(DN_Arena *arena, DN_OSPath *fs_path, DN_Str8 path)
 DN_API bool DN_OS_PathAdd(DN_Arena *arena, DN_OSPath *fs_path, DN_Str8 path)
 {
   DN_Str8 copy   = DN_Str8FromStr8Arena(path, arena);
-  bool    result = copy.size ? true : DN_OS_PathAddRef(arena, fs_path, copy);
+  bool    result = copy.count ? true : DN_OS_PathAddRef(arena, fs_path, copy);
   return result;
 }
 
@@ -9908,7 +9906,7 @@ DN_API bool DN_OS_PathPop(DN_OSPath *fs_path)
   if (fs_path->tail) {
     DN_Assert(fs_path->head);
     fs_path->links_size -= 1;
-    fs_path->string_size -= fs_path->tail->string.size;
+    fs_path->string_size -= fs_path->tail->string.count;
     fs_path->tail = fs_path->tail->prev;
     if (fs_path->tail)
       fs_path->tail->next = nullptr;
@@ -9966,23 +9964,23 @@ DN_API DN_Str8 DN_OS_PathBuildWithSeparator(DN_Arena *arena, DN_OSPath const *fs
     return result;
 
   // NOTE: Each link except the last one needs the path separator appended to it, '/' or '\\'
-  DN_USize string_size = (fs_path->has_prefix_path_separator ? path_separator.size : 0) + fs_path->string_size + ((fs_path->links_size - 1) * path_separator.size);
+  DN_USize string_size = (fs_path->has_prefix_path_separator ? path_separator.count : 0) + fs_path->string_size + ((fs_path->links_size - 1) * path_separator.count);
   result               = DN_Str8AllocArena(string_size, DN_ZMem_No, arena);
   if (result.data) {
     char *dest = result.data;
     if (fs_path->has_prefix_path_separator) {
-      DN_Memcpy(dest, path_separator.data, path_separator.size);
-      dest += path_separator.size;
+      DN_Memcpy(dest, path_separator.data, path_separator.count);
+      dest += path_separator.count;
     }
 
     for (DN_OSPathLink *link = fs_path->head; link; link = link->next) {
       DN_Str8 string = link->string;
-      DN_Memcpy(dest, string.data, string.size);
-      dest += string.size;
+      DN_Memcpy(dest, string.data, string.count);
+      dest += string.count;
 
       if (link != fs_path->tail) {
-        DN_Memcpy(dest, path_separator.data, path_separator.size);
-        dest += path_separator.size;
+        DN_Memcpy(dest, path_separator.data, path_separator.count);
+        dest += path_separator.count;
       }
     }
   }
@@ -10036,7 +10034,7 @@ DN_API void DN_OS_ThreadSetNameFmt(char const *fmt, ...)
   tls->name = DN_Str8x64FromFmtV(fmt, args);
   va_end(args);
 
-  DN_Str8 name = DN_Str8FromPtr(tls->name.data, tls->name.size);
+  DN_Str8 name = DN_Str8FromPtr(tls->name.data, tls->name.count);
 #if defined(DN_PLATFORM_WIN32)
   DN_OS_W32ThreadSetName(name);
 #else
@@ -10333,13 +10331,13 @@ DN_API void DN_OS_Print(DN_OSPrintDest dest, DN_Str8 string)
   }
 
   // NOTE: Write the string
-  DN_Assert(string.size < DN_Cast(unsigned long) - 1);
+  DN_Assert(string.count < DN_Cast(unsigned long) - 1);
   unsigned long bytes_written = 0;
   (void)bytes_written;
   if (print_to_console)
-    WriteConsoleA(print_handle, string.data, DN_Cast(unsigned long) string.size, &bytes_written, nullptr);
+    WriteConsoleA(print_handle, string.data, DN_Cast(unsigned long) string.count, &bytes_written, nullptr);
   else
-    WriteFile(print_handle, string.data, DN_Cast(unsigned long) string.size, &bytes_written, nullptr);
+    WriteFile(print_handle, string.data, DN_Cast(unsigned long) string.count, &bytes_written, nullptr);
 #else
   fprintf(dest == DN_OSPrintDest_Out ? stdout : stderr, "%.*s", DN_Str8PrintFmt(string));
 #endif
@@ -10363,7 +10361,7 @@ DN_API void DN_OS_PrintFStyle(DN_OSPrintDest dest, DN_LogStyle style, DN_FMT_ATT
 
 DN_API void DN_OS_PrintStyle(DN_OSPrintDest dest, DN_LogStyle style, DN_Str8 string)
 {
-  if (string.data && string.size) {
+  if (string.data && string.count) {
     if (style.colour) {
       DN_Str8x32 colour = DN_Str8x32FromANSIColourCodeU8RGB(DN_ANSIColourMode_Fg, style.r, style.g, style.b);
       DN_OS_Print(dest, DN_Str8FromStruct(&colour));
@@ -10380,7 +10378,7 @@ static char *DN_OS_PrintVSPrintfChunker_(const char *buf, void *user, int len)
 {
   DN_Str8 string = {};
   string.data    = DN_Cast(char *) buf;
-  string.size    = len;
+  string.count   = len;
 
   DN_OSPrintDest dest = DN_Cast(DN_OSPrintDest) DN_Cast(uintptr_t) user;
   DN_OS_Print(dest, string);
@@ -10652,7 +10650,7 @@ DN_API DN_StackTraceFrame DN_StackTraceRawFrameToFrame(DN_Arena *arena, DN_Stack
 
   // NOTE: Construct result
 
-  DN_Str16 file_name16     = DN_Str16FromPtr(line.FileName, DN_CStr16Size(line.FileName));
+  DN_Str16 file_name16     = DN_Str16FromPtr(line.FileName, DN_CStr16Count(line.FileName));
   DN_Str16 function_name16 = DN_Str16FromPtr(symbol->Name, symbol->NameLen);
 
   DN_StackTraceFrame result = {};
@@ -10661,9 +10659,9 @@ DN_API DN_StackTraceFrame DN_StackTraceRawFrameToFrame(DN_Arena *arena, DN_Stack
   result.file_name          = DN_OS_W32Str16ToStr8(arena, file_name16);
   result.function_name      = DN_OS_W32Str16ToStr8(arena, function_name16);
 
-  if (result.function_name.size == 0)
+  if (result.function_name.count == 0)
     result.function_name = DN_Str8Lit("<unknown function>");
-  if (result.file_name.size == 0)
+  if (result.file_name.count == 0)
     result.file_name = DN_Str8Lit("<unknown file>");
 #else
   DN_StackTraceFrame result = {};
@@ -10750,6 +10748,18 @@ bool DN_NET_ResponseHasFailed(DN_NETResponse const* resp)
   return result;
 }
 
+bool DN_NET_ResponseHasSucceeded(DN_NETResponse const* resp)
+{
+  bool result = !DN_NET_ResponseHasFailed(resp);
+  return result;
+}
+
+bool DN_NET_ResponseIsReady(DN_NETResponse const* resp)
+{
+  bool result = resp && resp->state != DN_NETResponseState_Nil;
+  return result;
+}
+
 DN_Str8 DN_NET_Str8DiagnosticFromResponse(DN_NETResponse const* resp, DN_Arena *arena)
 {
   DN_TCScratch   scratch     = DN_TCScratchBeginArena(&arena, 1);
@@ -10761,12 +10771,12 @@ DN_Str8 DN_NET_Str8DiagnosticFromResponse(DN_NETResponse const* resp, DN_Arena *
       DN_Str8BuilderAppendF(&builder, " %u", resp->http_status);
   }
   DN_Str8BuilderAppendF(&builder, ")");
-  if (resp->body.size || resp->error_str8.size) {
+  if (resp->body.count || resp->error_str8.count) {
     DN_Str8BuilderAppendRef(&builder, DN_Str8Lit(" with "));
-    if (resp->body.size)
+    if (resp->body.count)
       DN_Str8BuilderAppendF(&builder, "%.*s", DN_Str8PrintFmt(resp->body));
-    if (resp->error_str8.size)
-    DN_Str8BuilderAppendF(&builder, "%s%.*s", resp->body.size ? ". " : "", DN_Str8PrintFmt(resp->error_str8));
+    if (resp->error_str8.count)
+      DN_Str8BuilderAppendF(&builder, "%s%.*s", resp->body.count ? ". " : "", DN_Str8PrintFmt(resp->error_str8));
   }
   DN_Str8 result = DN_Str8FromStr8BuilderArena(&builder, arena);
   DN_TCScratchEnd(&scratch);
@@ -10847,7 +10857,7 @@ enum DN_NETCurlRingEventType
   DN_NETCurlRingEventType_DeinitRequest,
 };
 
-struct DN_NETCurlRingEvent
+struct DN_NETCurlRingEvent_
 {
   DN_NETCurlRingEventType type;
   DN_NETRequestHandle     request;
@@ -10919,18 +10929,18 @@ static int32_t DN_NET_CurlThreadEntryPoint_(DN_OSThread *thread)
 
     // NOTE: Handle events sitting in the ring queue
     for (bool dequeue_ring = true; dequeue_ring;) {
-      DN_NETCurlRingEvent event = {};
+      DN_NETCurlRingEvent_ event = {};
       for (DN_OS_MutexScope(&curl->ring_mutex)) {
         if (DN_RingHasData(&curl->ring, sizeof(event)))
             DN_RingRead(&curl->ring, &event, sizeof(event));
       }
 
-      DN_NETRequest     *req      = DN_NET_RequestFromHandle(event.request);
-      DN_NETCurlRequest *curl_req = DN_NET_CurlRequestFromRequest_(req);
       switch (event.type) {
         case DN_NETCurlRingEventType_Nil: dequeue_ring = false; break;
 
         case DN_NETCurlRingEventType_DoRequest: {
+          DN_NETRequest     *req      = DN_NET_RequestFromHandle(event.request);
+          DN_NETCurlRequest *curl_req = DN_NET_CurlRequestFromRequest_(req);
           DN_Assert(req->response.state == DN_NETResponseState_Nil);
           DN_Assert(req->type           != DN_NETRequestType_Nil);
 
@@ -10948,11 +10958,13 @@ static int32_t DN_NET_CurlThreadEntryPoint_(DN_OSThread *thread)
         } break;
 
         case DN_NETCurlRingEventType_SendWS: {
+          DN_NETRequest     *req      = DN_NET_RequestFromHandle(event.request);
+          DN_NETCurlRequest *curl_req = DN_NET_CurlRequestFromRequest_(req);
           DN_Str8 payload = {};
           for (DN_OS_MutexScope(&curl->ring_mutex)) {
             DN_Assert(DN_RingHasData(&curl->ring, event.ws_send_size));
             payload = DN_Str8AllocArena(event.ws_send_size, DN_ZMem_No, &tmem.arena);
-            DN_RingRead(&curl->ring, payload.data, payload.size);
+            DN_RingRead(&curl->ring, payload.data, payload.count);
           }
 
           DN_U32 curlws_flag = 0;
@@ -10968,12 +10980,14 @@ static int32_t DN_NET_CurlThreadEntryPoint_(DN_OSThread *thread)
           DN_Assert(req->response.state >= DN_NETResponseState_WSOpen && req->response.state <= DN_NETResponseState_WSPong);
 
           DN_USize sent           = 0;
-          CURLcode send_result    = curl_ws_send(curl_req->handle, payload.data, payload.size, &sent, 0, curlws_flag);
+          CURLcode send_result    = curl_ws_send(curl_req->handle, payload.data, payload.count, &sent, 0, curlws_flag);
           DN_AssertF(send_result == CURLE_OK, "Failed to send: %s", curl_easy_strerror(send_result));
-          DN_AssertF(sent        == payload.size, "Failed to send all bytes (%zu vs %zu)", sent, payload.size);
+          DN_AssertF(sent        == payload.count, "Failed to send all bytes (%zu vs %zu)", sent, payload.count);
         } break;
 
         case DN_NETCurlRingEventType_ReceivedWSReceipt: {
+          DN_NETRequest     *req      = DN_NET_RequestFromHandle(event.request);
+          DN_NETCurlRequest *curl_req = DN_NET_CurlRequestFromRequest_(req);
           DN_Assert(req->type == DN_NETRequestType_WS);
           DN_Assert(req->response.state >= DN_NETResponseState_WSOpen && req->response.state <= DN_NETResponseState_WSPong);
           req->response.state = DN_NETResponseState_WSOpen;
@@ -10993,6 +11007,9 @@ static int32_t DN_NET_CurlThreadEntryPoint_(DN_OSThread *thread)
         } break;
 
         case DN_NETCurlRingEventType_DeinitRequest: {
+          DN_NETRequest     *req      = DN_NET_RequestFromHandle(event.request);
+          DN_NETCurlRequest *curl_req = DN_NET_CurlRequestFromRequest_(req);
+
           DN_Assert(event.request.handle != 0);
           DN_NETRequest *request = DN_Cast(DN_NETRequest *) event.request.handle;
 
@@ -11018,7 +11035,7 @@ static int32_t DN_NET_CurlThreadEntryPoint_(DN_OSThread *thread)
           // NOTE: Zero the struct preserving just the data we need to retain
           DN_NETRequest resetter = {};
           resetter.arena         = request->arena;
-          resetter.gen           = request->gen;
+          resetter.gen           = request->gen + 1;
           DN_Memcpy(resetter.context, request->context, sizeof(resetter.context));
           *request               = resetter;
 
@@ -11064,7 +11081,7 @@ static int32_t DN_NET_CurlThreadEntryPoint_(DN_OSThread *thread)
             req->response.state      = DN_NETResponseState_Error;
           }
         } else {
-          DN_USize curl_extended_error_size = DN_CStr8Size(curl_req->error);
+          DN_USize curl_extended_error_size = DN_CStr8Count(curl_req->error);
           req->response.state               = DN_NETResponseState_Error;
           req->response.error_str8          = DN_Str8FromFmtArena(&req->start_response_arena,
                                                          "HTTP request '%.*s' failed (CURL %d): %s%s%s%s",
@@ -11140,9 +11157,9 @@ static int32_t DN_NET_CurlThreadEntryPoint_(DN_OSThread *thread)
         // NOTE: Allocate and read (we use meta->bytesleft as per comment from initial recv)
         if (meta->bytesleft) {
           DN_Str8 buffer  = DN_Str8AllocArena(meta->bytesleft, DN_ZMem_No, &req->start_response_arena);
-          DN_Assert(buffer.size == DN_Cast(DN_USize)meta->bytesleft);
-          receive_result  = curl_ws_recv(curl_req->handle, buffer.data, buffer.size, &buffer.size, &meta);
-          DN_Assert(buffer.size == DN_Cast(DN_USize)meta->len);
+          DN_Assert(buffer.count == DN_Cast(DN_USize)meta->bytesleft);
+          receive_result  = curl_ws_recv(curl_req->handle, buffer.data, buffer.count, &buffer.count, &meta);
+          DN_Assert(buffer.count == DN_Cast(DN_USize)meta->len);
           DN_Str8BuilderAppendRef(&curl_req->str8_builder, buffer);
         }
 
@@ -11187,7 +11204,7 @@ static int32_t DN_NET_CurlThreadEntryPoint_(DN_OSThread *thread)
         if (receive_result == CURLE_GOT_NOTHING) {
           req->response.state = DN_NETResponseState_WSClose;
         } else if (receive_result != CURLE_OK) {
-          DN_USize curl_extended_error_size = DN_CStr8Size(curl_req->error);
+          DN_USize curl_extended_error_size = DN_CStr8Count(curl_req->error);
           req->response.state           = DN_NETResponseState_Error;
           req->response.error_str8      = DN_Str8FromFmtArena(&req->start_response_arena,
                                                                   "Websocket receive '%.*s' failed (CURL %d): %s%s%s%s",
@@ -11244,7 +11261,7 @@ void DN_NET_CurlInit(DN_NETCore *net, char *base, DN_U64 base_size)
   curl->list_mutex   = DN_OS_MutexInit();
   curl->thread_curlm = DN_Cast(CURLM *) curl_multi_init();
 
-  DN_FmtAppend(curl->thread.name.data, &curl->thread.name.size, sizeof(curl->thread.name.data), "NET (CURL)");
+  DN_FmtAppend(curl->thread.name.data, &curl->thread.name.count, sizeof(curl->thread.name.data), "NET (CURL)");
   DN_OS_ThreadInit(&curl->thread, DN_NET_CurlThreadEntryPoint_, nullptr, DN_TCInitArgsDefault(), net);
 }
 
@@ -11313,7 +11330,7 @@ static DN_NETRequestHandle DN_NET_CurlDoRequest_(DN_NETCore *net, DN_Str8 url, D
 
     // NOTE: Assign HTTP headers
     for (DN_ForItSize(it, DN_Str8, req->args.headers, req->args.headers_size)) {
-      DN_Assert(it.data->data[it.data->size] == 0);
+      DN_Assert(it.data->data[it.data->count] == 0);
       curl_req->slist = curl_slist_append(curl_req->slist, it.data->data);
     }
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, curl_req->slist);
@@ -11334,10 +11351,10 @@ static DN_NETRequestHandle DN_NET_CurlDoRequest_(DN_NETCore *net, DN_Str8 url, D
           curl_easy_setopt(curl, CURLOPT_HTTPGET, 1);
         } else if (DN_Str8EqInsensitive(req->method, POST)) {
           curl_easy_setopt(curl, CURLOPT_POST, 1);
-          if (req->args.payload.size > DN_Gigabytes(2))
-            curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE_LARGE, req->args.payload.size);
+          if (req->args.payload.count > DN_Gigabytes(2))
+            curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE_LARGE, req->args.payload.count);
           else
-            curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, req->args.payload.size);
+            curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, req->args.payload.count);
           curl_easy_setopt(curl, CURLOPT_COPYPOSTFIELDS, req->args.payload.data);
         } else {
           DN_AssertInvalidCodePathF("Unimplemented");
@@ -11347,12 +11364,19 @@ static DN_NETRequestHandle DN_NET_CurlDoRequest_(DN_NETCore *net, DN_Str8 url, D
 
     // NOTE: Handle basic auth
     if (req->args.flags & DN_NETDoHTTPFlags_BasicAuth) {
-      if (req->args.username.size && req->args.password.size) {
-        DN_Assert(req->args.username.data[req->args.username.size] == 0);
-        DN_Assert(req->args.password.data[req->args.password.size] == 0);
+      if (req->args.username.count && req->args.password.count) {
+        DN_Assert(req->args.username.data[req->args.username.count] == 0);
+        DN_Assert(req->args.password.data[req->args.password.count] == 0);
         curl_easy_setopt(curl, CURLOPT_USERNAME, req->args.username.data);
         curl_easy_setopt(curl, CURLOPT_PASSWORD, req->args.password.data);
       }
+    }
+
+    if (req->args.flags & DN_NETDoHTTPFlags_DisableSSLVerify) {
+      // NOTE: Disable peer verification (checks if cert is signed by trusted CA)
+      // NOTE: Disable host verification (checks if cert matches hostname)
+      curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
+      curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
     }
   }
 
@@ -11367,9 +11391,9 @@ static DN_NETRequestHandle DN_NET_CurlDoRequest_(DN_NETCore *net, DN_Str8 url, D
     // NOTE: Enqueue request to go into CURL's ring queue. The CURL thread will sleep and wait for
     // bytes to come in for the request and then dump the response into the done list to be consumed
     // via wait for response
-    DN_NETCurlRingEvent event = {};
-    event.type                = DN_NETCurlRingEventType_DoRequest;
-    event.request             = result;
+    DN_NETCurlRingEvent_ event = {};
+    event.type                 = DN_NETCurlRingEventType_DoRequest;
+    event.request              = result;
     for (DN_OS_MutexScope(&curl_core->ring_mutex))
       DN_RingWriteStruct(&curl_core->ring, &event);
 
@@ -11407,16 +11431,16 @@ void DN_NET_CurlDoWSSend(DN_NETRequestHandle handle, DN_Str8 payload, DN_NETWSSe
   DN_NETCurlCore *curl = DN_Cast(DN_NETCurlCore *) net->context;
   DN_Assert(curl);
 
-  DN_NETCurlRingEvent event = {};
+  DN_NETCurlRingEvent_ event = {};
   event.type                 = DN_NETCurlRingEventType_SendWS;
   event.request              = handle;
-  event.ws_send_size         = payload.size;
+  event.ws_send_size         = payload.count;
   event.ws_send              = send;
 
   for (DN_OS_MutexScope(&curl->ring_mutex)) {
-    DN_Assert(DN_RingHasSpace(&curl->ring, payload.size));
+    DN_Assert(DN_RingHasSpace(&curl->ring, payload.count));
     DN_RingWriteStruct(&curl->ring, &event);
-    DN_RingWrite(&curl->ring, payload.data, payload.size);
+    DN_RingWrite(&curl->ring, payload.data, payload.count);
   }
   curl_multi_wakeup(curl->thread_curlm);
 }
@@ -11428,7 +11452,7 @@ static DN_NETResponse DN_NET_CurlHandleFinishedRequest_(DN_NETCurlCore *curl, DN
   DN_NETCurlRequest *curl_req = DN_NET_CurlRequestFromRequest_(req);
   {
     result.body = DN_Str8FromStr8BuilderArena(&curl_req->str8_builder, arena);
-    if (result.error_str8.size)
+    if (result.error_str8.count)
       result.error_str8 = DN_Str8FromStr8Arena(result.error_str8, arena);
   }
 
@@ -11457,10 +11481,9 @@ static DN_NETResponse DN_NET_CurlHandleFinishedRequest_(DN_NETCurlCore *curl, DN
       DN_DoublyLLAppend(curl->deinit_list, req);
   }
 
-
   // NOTE: Submit the post-request event to the CURL thread
-  DN_NETCurlRingEvent event = {};
-  event.request             = DN_NET_HandleFromRequest(req);
+  DN_NETCurlRingEvent_ event = {};
+  event.request              = DN_NET_HandleFromRequest(req);
   if (continue_ws_request) {
     event.type = DN_NETCurlRingEventType_ReceivedWSReceipt;
   } else {
@@ -11737,7 +11760,7 @@ DN_NETRequestHandle DN_NET_EmcDoHTTP(DN_NETCore *net, DN_Str8 url, DN_Str8 metho
     if (req->args.headers_size) {
       char **headers = DN_ArenaNewArray(&req->start_response_arena, char *, req->args.headers_size + 1, DN_ZMem_Yes);
       for (DN_ForItSize(it, DN_Str8, req->args.headers, req->args.headers_size)) {
-        DN_Assert(it.data->data[it.data->size] == 0);
+      DN_Assert(it.data->data[it.data->count] == 0);
         headers[it.index] = it.data->data;
       }
       fetch_attribs.requestHeaders = headers;
@@ -11906,6 +11929,7 @@ static DN_NETResponse DN_NET_EmcHandleFinishedRequest_(DN_NETCore *net, DN_NETEm
     DN_NETEmcCore *emc = DN_Cast(DN_NETEmcCore *) net->context;
     request->next      = emc->free_list;
     request->prev      = nullptr;
+    request->gen++;
     emc->free_list     = request;
   }
 

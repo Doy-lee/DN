@@ -614,7 +614,7 @@ STBSP__PUBLICDEF int STB_SPRINTF_DECORATE(vsprintfcb)(STBSP_SPRINTFCB *callback,
       {
         DN_Str8 str8 = va_arg(va, DN_Str8);
         s = (char *)str8.data;
-        l = (uint32_t)str8.size;
+        l = (uint32_t)str8.count;
         lead[0] = 0;
         tail[0] = 0;
         pr = 0;

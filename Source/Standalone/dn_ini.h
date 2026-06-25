@@ -48,13 +48,13 @@
 
      // NOTE: Calculate the number of bytes required to parse the buffer and make one single
      // allocation
-     DN_INICore ini               = DN_INI_ParseFromPtr(ini_buffer.data, ini_buffer.size, NULL, 0);
+      DN_INICore ini               = DN_INI_ParseFromPtr(ini_buffer.data, ini_buffer.count, NULL, 0);
      size_t     parse_buffer_size = ini.memory_required;
      char*      parse_buffer      = calloc(1, parse_buffer_size);
 
      // NOTE: Parse the buffer into the `ini` object from the single allocation. No additional
      // allocations are made
-     ini                          = DN_INI_ParseFromPtr(ini_buffer.data, ini_buffer.size, parse_buffer, parse_buffer_size);
+      ini                          = DN_INI_ParseFromPtr(ini_buffer.data, ini_buffer.count, parse_buffer, parse_buffer_size);
 
      // NOTE: Process the ini file
      // The .INI file parsed into a tree, resembling
@@ -75,7 +75,7 @@
 
      printf("My Section Foo XYZ: %zu fields\n", my_section_foo_xyz->fields_count);
      for (DN_INIField *field = my_section_foo->first_field; field; field = field->next)
-       printf("  %.*s: %.*s\n", (int)field->key.size, field->key.data, (int)field->value.size, field->value.data);
+        printf("  %.*s: %.*s\n", (int)field->key.count, field->key.data, (int)field->value.count, field->value.data);
 
      // Alternatively you can access the section directly by specifying the fully qualified path from
      // the section, e.g.:
@@ -87,7 +87,7 @@
      // You may also lookup the field directly by specifying the fully qualified path
      DN_INIField *my_section_item = DN_INI_FieldFromSectionStr8(&ini.first_section, DN_INIStr8Lit("my_section.item"));
      if (my_section_item)
-       printf("  %.*s: %.*s\n", (int)my_section_item->key.size, my_section_item->key.data, (int)my_section_item->value.size, my_section_item->value.data);
+        printf("  %.*s: %.*s\n", (int)my_section_item->key.count, my_section_item->key.data, (int)my_section_item->value.count, my_section_item->value.data);
 
      // NOTE: Release memory, `ini` and its contents are invalidated and should not be used
      free(parse_buffer);
@@ -137,7 +137,7 @@ typedef enum DN_INITokenType {
 
 typedef struct DN_INIStr8 {
   char    *data;
-  size_t size;
+  size_t count;
 } DN_INIStr8;
 
 #if defined(__cplusplus)

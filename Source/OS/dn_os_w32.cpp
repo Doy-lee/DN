@@ -336,7 +336,7 @@ DN_API bool DN_OS_FileMove(DN_Str8 src, DN_Str8 dest, bool overwrite, DN_ErrSink
 DN_API DN_OSFile DN_OS_FileOpen(DN_Str8 path, DN_OSFileOpen open_mode, DN_OSFileAccess access, DN_ErrSink *err)
 {
   DN_OSFile result = {};
-  if (path.size == 0 || path.size <= 0)
+  if (path.count == 0 || path.count <= 0)
     return result;
 
   if ((access & ~DN_OSFileAccess_All) || ((access & DN_OSFileAccess_All) == 0)) {
@@ -486,7 +486,7 @@ DN_API void DN_OS_FileClose(DN_OSFile *file)
 DN_API DN_OSPathInfo DN_OS_PathInfo(DN_Str8 path)
 {
   DN_OSPathInfo result = {};
-  if (path.size == 0)
+  if (path.count == 0)
     return result;
 
   DN_TCScratch scratch = DN_TCScratchBeginArena(nullptr, 0);
@@ -522,12 +522,12 @@ DN_API DN_OSPathInfo DN_OS_PathInfo(DN_Str8 path)
 DN_API bool DN_OS_PathDelete(DN_Str8 path)
 {
   bool result = false;
-  if (path.size == 0)
+  if (path.count == 0)
     return result;
 
   DN_TCScratch scratch = DN_TCScratchBeginArena(nullptr, 0);
   DN_Str16     path16  = DN_OS_W32Str8ToStr16(&scratch.arena, path);
-  if (path16.size) {
+  if (path16.count) {
     result = DeleteFileW(path16.data);
     if (!result)
       result = RemoveDirectoryW(path16.data);
@@ -539,12 +539,12 @@ DN_API bool DN_OS_PathDelete(DN_Str8 path)
 DN_API bool DN_OS_PathIsFile(DN_Str8 path)
 {
   bool result = false;
-  if (path.size == 0)
+  if (path.count == 0)
     return result;
 
   DN_TCScratch scratch = DN_TCScratchBeginArena(nullptr, 0);
   DN_Str16     path16  = DN_OS_W32Str8ToStr16(&scratch.arena, path);
-  if (path16.size) {
+  if (path16.count) {
     WIN32_FILE_ATTRIBUTE_DATA attrib_data = {};
     if (GetFileAttributesExW(path16.data, GetFileExInfoStandard, &attrib_data))
       result = (attrib_data.dwFileAttributes != INVALID_FILE_ATTRIBUTES) &&
@@ -557,12 +557,12 @@ DN_API bool DN_OS_PathIsFile(DN_Str8 path)
 DN_API bool DN_OS_PathIsDir(DN_Str8 path)
 {
   bool result = false;
-  if (path.size == 0)
+  if (path.count == 0)
     return result;
 
   DN_TCScratch scratch = DN_TCScratchBeginArena(nullptr, 0);
   DN_Str16     path16  = DN_OS_W32Str8ToStr16(&scratch.arena, path);
-  if (path16.size) {
+  if (path16.count) {
     WIN32_FILE_ATTRIBUTE_DATA attrib_data = {};
     if (GetFileAttributesExW(path16.data, GetFileExInfoStandard, &attrib_data))
       result = (attrib_data.dwFileAttributes != INVALID_FILE_ATTRIBUTES) &&
@@ -591,8 +591,8 @@ DN_API bool DN_OS_PathMakeDir(DN_Str8 path)
   // If we find a file at some point in the path we fail out because the
   // series of directories can not be made if a file exists with the same
   // name.
-  for (DN_USize index = 0; index < path16.size; index++) {
-    bool    first_char = index == (path16.size - 1);
+  for (DN_USize index = 0; index < path16.count; index++) {
+    bool    first_char = index == (path16.count - 1);
     wchar_t ch         = path16.data[index];
     if (ch == '/' || ch == '\\' || first_char) {
       wchar_t temp = path16.data[index];
@@ -628,7 +628,7 @@ DN_API bool DN_OS_PathMakeDir(DN_Str8 path)
 
 DN_API bool DN_OS_PathIterateDir(DN_Str8 path, DN_OSDirIterator *it)
 {
-  if (path.size == 0 || !it || path.size <= 0)
+  if (path.count == 0 || !it || path.count <= 0)
     return false;
 
   DN_TCScratch             scratch    = DN_TCScratchBeginArena(nullptr, 0);
@@ -654,7 +654,7 @@ DN_API bool DN_OS_PathIterateDir(DN_Str8 path, DN_OSDirIterator *it)
     }
 
     path16 = DN_OS_W32Str8ToStr16(&scratch.arena, adjusted_path);
-    if (path16.size <= 0) { // Conversion error
+    if (path16.count <= 0) { // Conversion error
       DN_TCScratchEnd(&scratch);
       return false;
     }
@@ -836,7 +836,7 @@ DN_API DN_OSExecResult DN_OS_ExecWait(DN_OSExecAsyncHandle handle, DN_Arena *are
     result               = DN_OS_ExecPump(handle, stdout_buffer, &stdout_size, stderr_buffer, &stderr_size, wait_ms, err);
     DN_Str8BuilderAppendCopy(&stdout_builder, result.stdout_text);
     DN_Str8BuilderAppendCopy(&stderr_builder, result.stderr_text);
-    wait_ms = (result.stdout_text.size || result.stderr_text.size) ? FAST_WAIT_TIME_MS : SLOW_WAIT_TIME_MS;
+    wait_ms = (result.stdout_text.count || result.stderr_text.count) ? FAST_WAIT_TIME_MS : SLOW_WAIT_TIME_MS;
   }
 
   // NOTE: Get stdout/stderr. If no arena is passed this is a no-op
@@ -865,7 +865,7 @@ DN_API DN_OSExecAsyncHandle DN_OS_ExecAsync(DN_Str8Slice cmd_line, DN_OSExecArgs
 
   DN_Str8  env_block8  = DN_Str8FromStr8BuilderDelimitArena(&env_builder, DN_Str8Lit("\0"), &scratch.arena);
   DN_Str16 env_block16 = {};
-  if (env_block8.size)
+  if (env_block8.count)
     env_block16 = DN_OS_W32Str8ToStr16(&scratch.arena, env_block8);
 
   // NOTE: Stdout/err security attributes
@@ -1346,17 +1346,17 @@ DN_API DN_Str16 DN_OS_W32ErrorCodeToMsg16Alloc(DN_U32 error_code)
   }
 
   wchar_t *result16 = nullptr;
-  DWORD    size     = FormatMessageW(/*DWORD    dwFlags     */ flags | FORMAT_MESSAGE_ALLOCATE_BUFFER,
-                              /*LPCVOID  lpSource    */ module_to_get_errors_from,
-                              /*DWORD    dwMessageId */ error_code,
-                              /*DWORD    dwLanguageId*/ 0,
-                              /*LPWSTR   lpBuffer    */ (LPWSTR)&result16,
-                              /*DWORD    nSize       */ 0,
-                              /*va_list *Arguments   */ nullptr);
+  DWORD    count    = FormatMessageW(/*DWORD    dwFlags     */ flags | FORMAT_MESSAGE_ALLOCATE_BUFFER,
+                                     /*LPCVOID  lpSource    */ module_to_get_errors_from,
+                                     /*DWORD    dwMessageId */ error_code,
+                                     /*DWORD    dwLanguageId*/ 0,
+                                     /*LPWSTR   lpBuffer    */ (LPWSTR)&result16,
+                                     /*DWORD    nSize       */ 0,
+                                     /*va_list *Arguments   */ nullptr);
 
   DN_Str16 result = {};
   result.data     = result16;
-  result.size     = size;
+  result.count    = count;
   return result;
 }
 
@@ -1365,7 +1365,7 @@ DN_API DN_OSW32Error DN_OS_W32ErrorCodeToMsgAlloc(DN_U32 error_code)
   DN_OSW32Error result = {};
   result.code        = error_code;
   DN_Str16 error16   = DN_OS_W32ErrorCodeToMsg16Alloc(error_code);
-  if (error16.size)
+  if (error16.count)
     result.msg = DN_OS_W32Str16ToStr8FromHeap(error16);
   if (error16.data)
     LocalFree(error16.data);
@@ -1378,7 +1378,7 @@ DN_API DN_OSW32Error DN_OS_W32ErrorCodeToMsg(DN_Arena *arena, DN_U32 error_code)
   result.code        = error_code;
   if (arena) {
     DN_Str16 error16 = DN_OS_W32ErrorCodeToMsg16Alloc(error_code);
-    if (error16.size)
+    if (error16.count)
       result.msg = DN_OS_W32Str16ToStr8(arena, error16);
     if (error16.data)
       LocalFree(error16.data);
@@ -1423,10 +1423,10 @@ DN_API void DN_OS_W32MakeProcessDPIAware()
 DN_API DN_Str16 DN_OS_W32Str8ToStr16(DN_Arena *arena, DN_Str8 src)
 {
   DN_Str16 result = {};
-  if (!arena || src.size == 0)
+  if (!arena || src.count == 0)
     return result;
 
-  int required_size = MultiByteToWideChar(CP_UTF8, 0 /*dwFlags*/, src.data, DN_Cast(int) src.size, nullptr /*dest*/, 0 /*dest size*/);
+  int required_size = MultiByteToWideChar(CP_UTF8, 0 /*dwFlags*/, src.data, DN_Cast(int) src.count, nullptr /*dest*/, 0 /*dest size*/);
   if (required_size <= 0)
     return result;
 
@@ -1434,12 +1434,12 @@ DN_API DN_Str16 DN_OS_W32Str8ToStr16(DN_Arena *arena, DN_Str8 src)
   if (!buffer)
     return result;
 
-  int chars_written = MultiByteToWideChar(CP_UTF8, 0 /*dwFlags*/, src.data, DN_Cast(int) src.size, buffer, required_size);
+  int chars_written = MultiByteToWideChar(CP_UTF8, 0 /*dwFlags*/, src.data, DN_Cast(int) src.count, buffer, required_size);
   DN_Assert(chars_written == required_size);
   if (chars_written == required_size) {
-    result.data              = buffer;
-    result.size              = chars_written;
-    result.data[result.size] = 0;
+    result.data               = buffer;
+    result.count              = chars_written;
+    result.data[result.count] = 0;
   }
   return result;
 }
@@ -1447,14 +1447,14 @@ DN_API DN_Str16 DN_OS_W32Str8ToStr16(DN_Arena *arena, DN_Str8 src)
 DN_API int DN_OS_W32Str8ToStr16Buffer(DN_Str8 src, wchar_t *dest, int dest_size)
 {
   int result = 0;
-  if (src.size == 0)
+  if (src.count == 0)
     return result;
 
-  result = MultiByteToWideChar(CP_UTF8, 0 /*dwFlags*/, src.data, DN_Cast(int) src.size, nullptr /*dest*/, 0 /*dest size*/);
+  result = MultiByteToWideChar(CP_UTF8, 0 /*dwFlags*/, src.data, DN_Cast(int) src.count, nullptr /*dest*/, 0 /*dest size*/);
   if (result <= 0 || result > dest_size || !dest)
     return result;
 
-  result = MultiByteToWideChar(CP_UTF8, 0 /*dwFlags*/, src.data, DN_Cast(int) src.size, dest, DN_Cast(int) dest_size);
+  result = MultiByteToWideChar(CP_UTF8, 0 /*dwFlags*/, src.data, DN_Cast(int) src.count, dest, DN_Cast(int) dest_size);
   dest[DN_Min(result, dest_size - 1)] = 0;
   return result;
 }
@@ -1462,10 +1462,10 @@ DN_API int DN_OS_W32Str8ToStr16Buffer(DN_Str8 src, wchar_t *dest, int dest_size)
 DN_API int DN_OS_W32Str16ToStr8Buffer(DN_Str16 src, char *dest, int dest_size)
 {
   int result = 0;
-  if (src.size == 0)
+  if (src.count == 0)
     return result;
 
-  int src_size = DN_SaturateCastISizeToInt(src.size);
+  int src_size = DN_SaturateCastISizeToInt(src.count);
   if (src_size <= 0)
     return result;
 
@@ -1481,10 +1481,10 @@ DN_API int DN_OS_W32Str16ToStr8Buffer(DN_Str16 src, char *dest, int dest_size)
 DN_API DN_Str8 DN_OS_W32Str16ToStr8(DN_Arena *arena, DN_Str16 src)
 {
   DN_Str8 result = {};
-  if (!arena || src.size == 0)
+  if (!arena || src.count == 0)
     return result;
 
-  int src_size = DN_SaturateCastISizeToInt(src.size);
+  int src_size = DN_SaturateCastISizeToInt(src.count);
   if (src_size <= 0)
     return result;
 
@@ -1496,25 +1496,25 @@ DN_API DN_Str8 DN_OS_W32Str16ToStr8(DN_Arena *arena, DN_Str16 src)
   // null-termination already so no-need to +1 the required size
   DN_Arena temp   = DN_ArenaTempBeginFromArena(arena);
   DN_Str8  buffer = DN_Str8AllocArena(required_size, DN_ZMem_No, &temp);
-  if (buffer.size) {
-    int chars_written = WideCharToMultiByte(CP_UTF8, 0 /*dwFlags*/, src.data, src_size, buffer.data, DN_Cast(int) buffer.size, nullptr, nullptr);
+  if (buffer.count) {
+    int chars_written = WideCharToMultiByte(CP_UTF8, 0 /*dwFlags*/, src.data, src_size, buffer.data, DN_Cast(int) buffer.count, nullptr, nullptr);
     DN_Assert(chars_written == required_size);
     if (chars_written == required_size) {
       result                   = buffer;
-      result.data[result.size] = 0;
+      result.data[result.count] = 0;
     }
   }
-  DN_ArenaTempEnd(&temp, result.size == DN_Cast(DN_USize)required_size ? DN_ArenaReset_No : DN_ArenaReset_Yes);
+  DN_ArenaTempEnd(&temp, result.count == DN_Cast(DN_USize)required_size ? DN_ArenaReset_No : DN_ArenaReset_Yes);
   return result;
 }
 
 DN_API DN_Str8 DN_OS_W32Str16ToStr8FromHeap(DN_Str16 src)
 {
   DN_Str8 result = {};
-  if (src.size == 0)
+  if (src.count == 0)
     return result;
 
-  int src_size = DN_SaturateCastISizeToInt(src.size);
+  int src_size = DN_SaturateCastISizeToInt(src.count);
   if (src_size <= 0)
     return result;
 
@@ -1525,14 +1525,14 @@ DN_API DN_Str8 DN_OS_W32Str16ToStr8FromHeap(DN_Str16 src)
   // NOTE: Str8 allocate ensures there's one extra byte for
   // null-termination already so no-need to +1 the required size
   DN_Str8 buffer = DN_Str8FromHeap(required_size, DN_ZMem_No);
-  if (buffer.size == 0)
+  if (buffer.count == 0)
     return result;
 
-  int chars_written = WideCharToMultiByte(CP_UTF8, 0 /*dwFlags*/, src.data, src_size, buffer.data, DN_Cast(int) buffer.size, nullptr, nullptr);
+  int chars_written = WideCharToMultiByte(CP_UTF8, 0 /*dwFlags*/, src.data, src_size, buffer.data, DN_Cast(int) buffer.count, nullptr, nullptr);
   DN_Assert(chars_written == required_size);
   if (chars_written == required_size) {
     result                   = buffer;
-    result.data[result.size] = 0;
+    result.data[result.count] = 0;
   } else {
     DN_OS_MemDealloc(buffer.data);
     buffer = {};
@@ -1563,9 +1563,9 @@ DN_API DN_Str16 DN_OS_W32EXEPathW(DN_Arena *arena)
     index_of_last_slash = module_path[index] == '\\' ? index : 0;
 
   result.data = DN_ArenaNewArray(arena, wchar_t, module_size + 1, DN_ZMem_No);
-  result.size = module_size;
-  DN_Memcpy(result.data, module_path, sizeof(wchar_t) * result.size);
-  result.data[result.size] = 0;
+  result.count = module_size;
+  DN_Memcpy(result.data, module_path, sizeof(wchar_t) * result.count);
+  result.data[result.count] = 0;
   DN_TCScratchEnd(&scratch);
   return result;
 }
@@ -1592,9 +1592,9 @@ DN_API DN_Str16 DN_OS_W32EXEDirW(DN_Arena *arena)
     index_of_last_slash = module_path[index] == '\\' ? index : 0;
 
   result.data = DN_ArenaNewArray(arena, wchar_t, index_of_last_slash + 1, DN_ZMem_No);
-  result.size = index_of_last_slash;
-  DN_Memcpy(result.data, module_path, sizeof(wchar_t) * result.size);
-  result.data[result.size] = 0;
+  result.count = index_of_last_slash;
+  DN_Memcpy(result.data, module_path, sizeof(wchar_t) * result.count);
+  result.data[result.count] = 0;
   DN_TCScratchEnd(&scratch);
   return result;
 }
@@ -1611,13 +1611,13 @@ DN_API DN_Str8 DN_OS_W32WorkingDir(DN_Arena *arena, DN_Str8 suffix)
 
 DN_API DN_Str16 DN_OS_W32WorkingDirW(DN_Arena *arena, DN_Str16 suffix)
 {
-  DN_Assert(suffix.size >= 0);
+  DN_Assert(suffix.count >= 0);
   DN_Str16 result = {};
 
   // NOTE: required_size is the size required *including* the null-terminator
   DN_TCScratch  scratch       = DN_TCScratchBeginArena(&arena, 1);
   unsigned long required_size = GetCurrentDirectoryW(0, nullptr);
-  unsigned long desired_size  = required_size + DN_Cast(unsigned long) suffix.size;
+  unsigned long desired_size  = required_size + DN_Cast(unsigned long) suffix.count;
 
   wchar_t *scratch_w_path = DN_ArenaNewArray(&scratch.arena, wchar_t, desired_size, DN_ZMem_No);
   if (!scratch_w_path) {
@@ -1638,9 +1638,9 @@ DN_API DN_Str16 DN_OS_W32WorkingDirW(DN_Arena *arena, DN_Str16 suffix)
     return result;
   }
 
-  if (suffix.size) {
+  if (suffix.count) {
     DN_Memcpy(w_path, scratch_w_path, sizeof(*scratch_w_path) * bytes_written_wo_null_terminator);
-    DN_Memcpy(w_path + bytes_written_wo_null_terminator, suffix.data, sizeof(suffix.data[0]) * suffix.size);
+    DN_Memcpy(w_path + bytes_written_wo_null_terminator, suffix.data, sizeof(suffix.data[0]) * suffix.count);
     w_path[desired_size] = 0;
   }
 
@@ -1676,14 +1676,14 @@ DN_API bool DN_OS_W32DirWIterate(DN_Str16 path, DN_OSW32FolderIteratorW *it)
     if (find_data.cFileName[0] == '.' || (find_data.cFileName[0] == '.' && find_data.cFileName[1] == '.'))
       continue;
 
-    it->file_name.size = DN_CStr16Size(find_data.cFileName);
-    DN_Assert(it->file_name.size < (DN_ArrayCountU(it->file_name_buf) - 1));
-    DN_Memcpy(it->file_name.data, find_data.cFileName, it->file_name.size * sizeof(wchar_t));
-    it->file_name_buf[it->file_name.size] = 0;
+    it->file_name.count = DN_CStr16Count(find_data.cFileName);
+    DN_Assert(it->file_name.count < (DN_ArrayCountU(it->file_name_buf) - 1));
+    DN_Memcpy(it->file_name.data, find_data.cFileName, it->file_name.count * sizeof(wchar_t));
+    it->file_name_buf[it->file_name.count] = 0;
     break;
   } while (FindNextFileW(it->handle, &find_data) != 0);
 
-  bool result = it->file_name.size > 0;
+  bool result = it->file_name.count > 0;
   if (!result)
     FindClose(it->handle);
   return result;

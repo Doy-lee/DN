@@ -319,13 +319,13 @@ static DN_UTCore DN_TST_Base()
     for (DN_UT_Test(&result, "Age from U64: 1001 converts to 1s 1ms (seconds and ms)")) {
       DN_Str8x128 str8   = DN_AgeStr8FromMsU64(1001, DN_AgeUnit_Sec | DN_AgeUnit_Ms);
       DN_Str8     expect = DN_Str8Lit("1s 1ms");
-      DN_UT_AssertF(&result, DN_MemEq(str8.data, str8.size, expect.data, expect.size), "str8=%.*s, expect=%.*s", DN_Str8PrintFmt(str8), DN_Str8PrintFmt(expect));
+      DN_UT_AssertF(&result, DN_MemEq(str8.data, str8.count, expect.data, expect.count), "str8=%.*s, expect=%.*s", DN_Str8PrintFmt(str8), DN_Str8PrintFmt(expect));
     }
 
     for (DN_UT_Test(&result, "Age from U64: 1001 converts to 1.001s (fractional)")) {
       DN_Str8x128 str8   = DN_AgeStr8FromMsU64(1001, DN_AgeUnit_FractionalSec);
       DN_Str8     expect = DN_Str8Lit("1.001s");
-      DN_UT_AssertF(&result, DN_MemEq(str8.data, str8.size, expect.data, expect.size), "str8=%.*s, expect=%.*s", DN_Str8PrintFmt(str8), DN_Str8PrintFmt(expect));
+      DN_UT_AssertF(&result, DN_MemEq(str8.data, str8.count, expect.data, expect.count), "str8=%.*s, expect=%.*s", DN_Str8PrintFmt(str8), DN_Str8PrintFmt(expect));
     }
 
     for (DN_UT_Test(&result, "FmtAppendTruncate: String truncates with 3 dots")) {
@@ -665,12 +665,12 @@ static DN_UTCore DN_TST_BaseBytesHex()
       DN_UT_AssertF(&test,
                     DN_Str8Eq(bytes, DN_Str8Lit("\xf6\xed\x00")),
                     "number_hex=%.*s",
-                    DN_Str8PrintFmt(DN_HexFromPtrBytesArena(bytes.data, bytes.size, &scratch.arena, DN_TrimLeadingZero_No)));
+                    DN_Str8PrintFmt(DN_HexFromPtrBytesArena(bytes.data, bytes.count, &scratch.arena, DN_TrimLeadingZero_No)));
     }
 
     for (DN_UT_Test(&test, "Convert empty bytes to string", number)) {
       DN_Str8 bytes  = DN_Str8Lit("");
-      DN_Str8 as_hex = DN_HexFromPtrBytesArena(bytes.data, bytes.size, &scratch.arena, DN_TrimLeadingZero_No);
+      DN_Str8 as_hex = DN_HexFromPtrBytesArena(bytes.data, bytes.count, &scratch.arena, DN_TrimLeadingZero_No);
       DN_UT_AssertF(&test, DN_Str8Eq(as_hex, DN_Str8Lit("")), "as_hex=%.*s", DN_Str8PrintFmt(as_hex));
     }
   }
@@ -1541,13 +1541,13 @@ DN_Str8 const DN_UT_HASH_STRING_[] =
 void DN_TST_KeccakDispatch_(DN_UTCore *test, int hash_type, DN_Str8 input)
 {
   DN_TCScratch scratch   = DN_TCScratchBeginArena(nullptr, 0);
-  DN_Str8      input_hex = DN_HexFromPtrBytesArena(input.data, input.size, &scratch.arena, DN_TrimLeadingZero_No);
+  DN_Str8      input_hex = DN_HexFromPtrBytesArena(input.data, input.count, &scratch.arena, DN_TrimLeadingZero_No);
 
   switch (hash_type) {
     case Hash_SHA3_224: {
-      DN_SHA3U8x28 hash = DN_SHA3Hash224b(input.data, input.size);
+      DN_SHA3U8x28 hash = DN_SHA3Hash224b(input.data, input.count);
       DN_SHA3U8x28 expect;
-      DN_RefImpl_FIPS202_SHA3_224_(DN_Cast(uint8_t *) input.data, input.size, (uint8_t *)expect.data);
+      DN_RefImpl_FIPS202_SHA3_224_(DN_Cast(uint8_t *) input.data, input.count, (uint8_t *)expect.data);
 
       DN_Str8 hash_hex   = DN_HexFromPtrBytesArena(hash.data, DN_ArrayCountU(hash.data), &scratch.arena, DN_TrimLeadingZero_No);
       DN_Str8 expect_hex = DN_HexFromPtrBytesArena(expect.data, DN_ArrayCountU(expect.data), &scratch.arena, DN_TrimLeadingZero_No);
@@ -1562,9 +1562,9 @@ void DN_TST_KeccakDispatch_(DN_UTCore *test, int hash_type, DN_Str8 input)
     } break;
 
     case Hash_SHA3_256: {
-      DN_SHA3U8x32 hash = DN_SHA3Hash256b(input.data, input.size);
+      DN_SHA3U8x32 hash = DN_SHA3Hash256b(input.data, input.count);
       DN_SHA3U8x32 expect;
-      DN_RefImpl_FIPS202_SHA3_256_(DN_Cast(uint8_t *) input.data, input.size, (uint8_t *)expect.data);
+      DN_RefImpl_FIPS202_SHA3_256_(DN_Cast(uint8_t *) input.data, input.count, (uint8_t *)expect.data);
 
       DN_Str8 hash_hex   = DN_HexFromPtrBytesArena(hash.data, DN_ArrayCountU(hash.data), &scratch.arena, DN_TrimLeadingZero_No);
       DN_Str8 expect_hex = DN_HexFromPtrBytesArena(expect.data, DN_ArrayCountU(expect.data), &scratch.arena, DN_TrimLeadingZero_No);
@@ -1579,9 +1579,9 @@ void DN_TST_KeccakDispatch_(DN_UTCore *test, int hash_type, DN_Str8 input)
     } break;
 
     case Hash_SHA3_384: {
-      DN_SHA3U8x48 hash = DN_SHA3Hash384b(input.data, input.size);
+      DN_SHA3U8x48 hash = DN_SHA3Hash384b(input.data, input.count);
       DN_SHA3U8x48 expect;
-      DN_RefImpl_FIPS202_SHA3_384_(DN_Cast(uint8_t *) input.data, input.size, (uint8_t *)expect.data);
+      DN_RefImpl_FIPS202_SHA3_384_(DN_Cast(uint8_t *) input.data, input.count, (uint8_t *)expect.data);
 
       DN_Str8 hash_hex   = DN_HexFromPtrBytesArena(hash.data, DN_ArrayCountU(hash.data), &scratch.arena, DN_TrimLeadingZero_No);
       DN_Str8 expect_hex = DN_HexFromPtrBytesArena(expect.data, DN_ArrayCountU(expect.data), &scratch.arena, DN_TrimLeadingZero_No);
@@ -1596,9 +1596,9 @@ void DN_TST_KeccakDispatch_(DN_UTCore *test, int hash_type, DN_Str8 input)
     } break;
 
     case Hash_SHA3_512: {
-      DN_SHA3U8x64 hash = DN_SHA3Hash512b(input.data, input.size);
+      DN_SHA3U8x64 hash = DN_SHA3Hash512b(input.data, input.count);
       DN_SHA3U8x64 expect;
-      DN_RefImpl_FIPS202_SHA3_512_(DN_Cast(uint8_t *) input.data, input.size, (uint8_t *)expect.data);
+      DN_RefImpl_FIPS202_SHA3_512_(DN_Cast(uint8_t *) input.data, input.count, (uint8_t *)expect.data);
 
       DN_Str8 hash_hex   = DN_HexFromPtrBytesArena(hash.data, DN_ArrayCountU(hash.data), &scratch.arena, DN_TrimLeadingZero_No);
       DN_Str8 expect_hex = DN_HexFromPtrBytesArena(expect.data, DN_ArrayCountU(expect.data), &scratch.arena, DN_TrimLeadingZero_No);
@@ -1613,9 +1613,9 @@ void DN_TST_KeccakDispatch_(DN_UTCore *test, int hash_type, DN_Str8 input)
     } break;
 
     case Hash_Keccak_224: {
-      DN_SHA3U8x28 hash = DN_KeccakHash224b(input.data, input.size);
+      DN_SHA3U8x28 hash = DN_KeccakHash224b(input.data, input.count);
       DN_SHA3U8x28 expect;
-      DN_RefImpl_Keccak_(1152, 448, DN_Cast(uint8_t *) input.data, input.size, 0x01, (uint8_t *)expect.data, sizeof(expect));
+      DN_RefImpl_Keccak_(1152, 448, DN_Cast(uint8_t *) input.data, input.count, 0x01, (uint8_t *)expect.data, sizeof(expect));
 
       DN_Str8 hash_hex   = DN_HexFromPtrBytesArena(hash.data, DN_ArrayCountU(hash.data), &scratch.arena, DN_TrimLeadingZero_No);
       DN_Str8 expect_hex = DN_HexFromPtrBytesArena(expect.data, DN_ArrayCountU(expect.data), &scratch.arena, DN_TrimLeadingZero_No);
@@ -1630,9 +1630,9 @@ void DN_TST_KeccakDispatch_(DN_UTCore *test, int hash_type, DN_Str8 input)
     } break;
 
     case Hash_Keccak_256: {
-      DN_SHA3U8x32 hash = DN_KeccakHash256b(input.data, input.size);
+      DN_SHA3U8x32 hash = DN_KeccakHash256b(input.data, input.count);
       DN_SHA3U8x32 expect;
-      DN_RefImpl_Keccak_(1088, 512, DN_Cast(uint8_t *) input.data, input.size, 0x01, (uint8_t *)expect.data, sizeof(expect));
+      DN_RefImpl_Keccak_(1088, 512, DN_Cast(uint8_t *) input.data, input.count, 0x01, (uint8_t *)expect.data, sizeof(expect));
 
       DN_Str8 hash_hex   = DN_HexFromPtrBytesArena(hash.data, DN_ArrayCountU(hash.data), &scratch.arena, DN_TrimLeadingZero_No);
       DN_Str8 expect_hex = DN_HexFromPtrBytesArena(expect.data, DN_ArrayCountU(expect.data), &scratch.arena, DN_TrimLeadingZero_No);
@@ -1647,9 +1647,9 @@ void DN_TST_KeccakDispatch_(DN_UTCore *test, int hash_type, DN_Str8 input)
     } break;
 
     case Hash_Keccak_384: {
-      DN_SHA3U8x48 hash = DN_KeccakHash384b(input.data, input.size);
+      DN_SHA3U8x48 hash = DN_KeccakHash384b(input.data, input.count);
       DN_SHA3U8x48 expect;
-      DN_RefImpl_Keccak_(832, 768, DN_Cast(uint8_t *) input.data, input.size, 0x01, (uint8_t *)expect.data, sizeof(expect));
+      DN_RefImpl_Keccak_(832, 768, DN_Cast(uint8_t *) input.data, input.count, 0x01, (uint8_t *)expect.data, sizeof(expect));
 
       DN_Str8 hash_hex   = DN_HexFromPtrBytesArena(hash.data, DN_ArrayCountU(hash.data), &scratch.arena, DN_TrimLeadingZero_No);
       DN_Str8 expect_hex = DN_HexFromPtrBytesArena(expect.data, DN_ArrayCountU(expect.data), &scratch.arena, DN_TrimLeadingZero_No);
@@ -1664,9 +1664,9 @@ void DN_TST_KeccakDispatch_(DN_UTCore *test, int hash_type, DN_Str8 input)
     } break;
 
     case Hash_Keccak_512: {
-      DN_SHA3U8x64 hash = DN_KeccakHash512b(input.data, input.size);
+      DN_SHA3U8x64 hash = DN_KeccakHash512b(input.data, input.count);
       DN_SHA3U8x64 expect;
-      DN_RefImpl_Keccak_(576, 1024, DN_Cast(uint8_t *) input.data, input.size, 0x01, (uint8_t *)expect.data, sizeof(expect));
+      DN_RefImpl_Keccak_(576, 1024, DN_Cast(uint8_t *) input.data, input.count, 0x01, (uint8_t *)expect.data, sizeof(expect));
 
       DN_Str8 hash_hex   = DN_HexFromPtrBytesArena(hash.data, DN_ArrayCountU(hash.data), &scratch.arena, DN_TrimLeadingZero_No);
       DN_Str8 expect_hex = DN_HexFromPtrBytesArena(expect.data, DN_ArrayCountU(expect.data), &scratch.arena, DN_TrimLeadingZero_No);
@@ -1701,7 +1701,7 @@ DN_UTCore DN_TST_Keccak()
     for (int hash_type = 0; hash_type < Hash_Count; hash_type++) {
       DN_PCG32 rng = DN_PCG32Init(0xd48e'be21'2af8'733d);
       for (DN_Str8 input : INPUTS) {
-        DN_UT_BeginF(&result, "%.*s - Input: %.*s", DN_Str8PrintFmt(DN_UT_HASH_STRING_[hash_type]), DN_Cast(int) DN_Min(input.size, 54), input.data);
+        DN_UT_BeginF(&result, "%.*s - Input: %.*s", DN_Str8PrintFmt(DN_UT_HASH_STRING_[hash_type]), DN_Cast(int) DN_Min(input.count, 54), input.data);
         DN_TST_KeccakDispatch_(&result, hash_type, input);
         DN_UT_End(&result);
       }
@@ -1770,8 +1770,8 @@ static DN_UTCore DN_TST_OS()
     for (DN_UT_Test(&result, "Query executable directory")) {
       DN_TCScratch scratch      = DN_TCScratchBeginArena(nullptr, 0);
       DN_Str8      os_result = DN_OS_EXEDir(&scratch.arena);
-      DN_UT_Assert(&result, os_result.size);
-      DN_UT_AssertF(&result, DN_OS_PathIsDir(os_result), "result(%zu): %.*s", os_result.size, DN_Str8PrintFmt(os_result));
+      DN_UT_Assert(&result, os_result.count);
+      DN_UT_AssertF(&result, DN_OS_PathIsDir(os_result), "result(%zu): %.*s", os_result.count, DN_Str8PrintFmt(os_result));
       DN_TCScratchEnd(&scratch);
     }
 
@@ -1821,9 +1821,9 @@ static DN_UTCore DN_TST_OS()
       // NOTE: Read step
       DN_TCScratch scratch      = DN_TCScratchBeginArena(nullptr, 0);
       DN_Str8      read_file = DN_OS_FileReadAllArena(&scratch.arena, SRC_FILE, nullptr);
-      DN_UT_AssertF(&result, read_file.size, "Failed to load file");
-      DN_UT_AssertF(&result, read_file.size == 4, "File read wrong amount of bytes (%zu)", read_file.size);
-      DN_UT_AssertF(&result, DN_Str8Eq(read_file, DN_Str8Lit("1234")), "Read %zu bytes instead of the expected 4: '%.*s'", read_file.size, DN_Str8PrintFmt(read_file));
+      DN_UT_AssertF(&result, read_file.count, "Failed to load file");
+      DN_UT_AssertF(&result, read_file.count == 4, "File read wrong amount of bytes (%zu)", read_file.count);
+      DN_UT_AssertF(&result, DN_Str8Eq(read_file, DN_Str8Lit("1234")), "Read %zu bytes instead of the expected 4: '%.*s'", read_file.count, DN_Str8PrintFmt(read_file));
 
       // NOTE: Copy step
       DN_Str8 const COPY_FILE   = DN_Str8Lit("dn_result_file_copy");
@@ -2039,13 +2039,13 @@ static DN_UTCore DN_TST_BaseStrings()
   {
     for (DN_UT_Test(&result, "Str8 literal")) {
       DN_Str8 string = DN_Str8Lit("AB");
-      DN_UT_AssertF(&result, string.size == 2, "size: %zu", string.size);
+      DN_UT_AssertF(&result, string.count == 2, "size: %zu", string.count);
       DN_UT_AssertF(&result, string.data[0] == 'A', "string[0]: %c", string.data[0]);
       DN_UT_AssertF(&result, string.data[1] == 'B', "string[1]: %c", string.data[1]);
     }
 
     for (DN_UT_Test(&result, "C-string length")) {
-      DN_USize size = DN_CStr8Size("hello");
+      DN_USize size = DN_CStr8Count("hello");
       DN_UT_AssertF(&result, size == 5, "size=%zu", size);
     }
 
@@ -2076,7 +2076,7 @@ static DN_UTCore DN_TST_BaseStrings()
     for (DN_UT_Test(&result, "Initialise with format string")) {
       DN_TCScratch scratch   = DN_TCScratchBeginArena(nullptr, 0);
       DN_Str8      string = DN_Str8FromFmtArena(&scratch.arena, "%s", "AB");
-      DN_UT_AssertF(&result, string.size == 2, "size: %zu", string.size);
+      DN_UT_AssertF(&result, string.count == 2, "size: %zu", string.count);
       DN_UT_AssertF(&result, string.data[0] == 'A', "string[0]: %c", string.data[0]);
       DN_UT_AssertF(&result, string.data[1] == 'B', "string[1]: %c", string.data[1]);
       DN_UT_AssertF(&result, string.data[2] == 0, "string[2]: %c", string.data[2]);
@@ -2087,7 +2087,7 @@ static DN_UTCore DN_TST_BaseStrings()
       DN_TCScratch scratch   = DN_TCScratchBeginArena(nullptr, 0);
       DN_Str8      string = DN_Str8Lit("AB");
       DN_Str8      copy   = DN_Str8FromStr8Arena(string, &scratch.arena);
-      DN_UT_AssertF(&result, copy.size == 2, "size: %zu", copy.size);
+      DN_UT_AssertF(&result, copy.count == 2, "size: %zu", copy.count);
       DN_UT_AssertF(&result, copy.data[0] == 'A', "copy[0]: %c", copy.data[0]);
       DN_UT_AssertF(&result, copy.data[1] == 'B', "copy[1]: %c", copy.data[1]);
       DN_UT_AssertF(&result, copy.data[2] == 0, "copy[2]: %c", copy.data[2]);
@@ -2102,7 +2102,7 @@ static DN_UTCore DN_TST_BaseStrings()
     for (DN_UT_Test(&result, "Allocate string from arena")) {
       DN_TCScratch scratch = DN_TCScratchBeginArena(nullptr, 0);
       DN_Str8      string  = DN_Str8AllocArena(2, DN_ZMem_No, &scratch.arena);
-      DN_UT_AssertF(&result, string.size == 2, "size: %zu", string.size);
+      DN_UT_AssertF(&result, string.count == 2, "size: %zu", string.count);
       DN_TCScratchEnd(&scratch);
     }
 
@@ -2302,7 +2302,7 @@ static DN_UTCore DN_TST_BaseStrings()
       DN_UT_Assert(&result, !str_result.found);
       DN_UT_Assert(&result, str_result.index == 0);
       DN_UT_Assert(&result, str_result.match.data == nullptr);
-      DN_UT_Assert(&result, str_result.match.size == 0);
+      DN_UT_Assert(&result, str_result.match.count == 0);
     }
 
     for (DN_UT_Test(&result, "Find: String (char) is in buffer")) {
@@ -2343,7 +2343,7 @@ static DN_UTCore DN_TST_BaseStrings()
         char               dest[64] = {};
         DN_Str8TruncResult res      = DN_Str8TruncMiddlePtr(str, 5, trunc, dest, sizeof(dest));
         DN_UT_Assert(&result, !res.truncated);
-        DN_UT_Assert(&result, res.size_req == 5);
+        DN_UT_Assert(&result, res.count_req == 5);
         DN_UT_AssertF(&result, DN_Str8Eq(res.str8, DN_Str8Lit("Hello")), "%.*s", DN_Str8PrintFmt(res.str8));
       }
 
@@ -2353,7 +2353,7 @@ static DN_UTCore DN_TST_BaseStrings()
         char               dest[64] = {};
         DN_Str8TruncResult res      = DN_Str8TruncMiddlePtr(str, 5, trunc, dest, sizeof(dest));
         DN_UT_Assert(&result, !res.truncated);
-        DN_UT_Assert(&result, res.size_req == 10);
+        DN_UT_Assert(&result, res.count_req == 10);
         DN_UT_AssertF(&result, DN_Str8Eq(res.str8, DN_Str8Lit("HelloWorld")), "%.*s", DN_Str8PrintFmt(res.str8));
       }
 
@@ -2363,7 +2363,7 @@ static DN_UTCore DN_TST_BaseStrings()
         char               dest[64] = {};
         DN_Str8TruncResult res      = DN_Str8TruncMiddlePtr(str, 5, trunc, dest, sizeof(dest));
         DN_UT_Assert(&result, res.truncated);
-        DN_UT_Assert(&result, res.size_req == 13); // 5 + 3 + 5
+        DN_UT_Assert(&result, res.count_req == 13); // 5 + 3 + 5
         DN_UT_AssertF(&result, DN_Str8Eq(res.str8, DN_Str8Lit("Hello...World")), "%.*s", DN_Str8PrintFmt(res.str8));
       }
 
@@ -2373,7 +2373,7 @@ static DN_UTCore DN_TST_BaseStrings()
         char               dest[64] = {};
         DN_Str8TruncResult res      = DN_Str8TruncMiddlePtr(str, 5, trunc, dest, sizeof(dest));
         DN_UT_Assert(&result, res.truncated);
-        DN_UT_Assert(&result, res.size_req == 10); // 5 + 0 + 5
+        DN_UT_Assert(&result, res.count_req == 10); // 5 + 0 + 5
         DN_UT_AssertF(&result, DN_Str8Eq(res.str8, DN_Str8Lit("HelloWorld")), "%.*s", DN_Str8PrintFmt(res.str8));
       }
 
@@ -2383,7 +2383,7 @@ static DN_UTCore DN_TST_BaseStrings()
         char               dest[64] = {};
         DN_Str8TruncResult res      = DN_Str8TruncMiddlePtr(str, 0, trunc, dest, sizeof(dest));
         DN_UT_Assert(&result, res.truncated);
-        DN_UT_Assert(&result, res.size_req == 3);
+        DN_UT_Assert(&result, res.count_req == 3);
         DN_UT_AssertF(&result, DN_Str8Eq(res.str8, DN_Str8Lit("...")), "%.*s", DN_Str8PrintFmt(res.str8));
       }
 
@@ -2392,17 +2392,17 @@ static DN_UTCore DN_TST_BaseStrings()
         DN_Str8            trunc = DN_Str8Lit("...");
         DN_Str8TruncResult res   = DN_Str8TruncMiddlePtr(str, 5, trunc, nullptr, 0);
         DN_UT_Assert(&result, res.truncated);
-        DN_UT_Assert(&result, res.size_req == 13);
+        DN_UT_Assert(&result, res.count_req == 13);
         DN_UT_Assert(&result, res.str8.data == nullptr);
       }
 
-      for (DN_UT_Test(&result, "TruncMiddlePtr: size_req is consistent between dry-run and actual")) {
+      for (DN_UT_Test(&result, "TruncMiddlePtr: count_req is consistent between dry-run and actual")) {
         DN_Str8            str      = DN_Str8Lit("HelloBeautifulWorld");
         DN_Str8            trunc    = DN_Str8Lit("...");
         DN_Str8TruncResult dry      = DN_Str8TruncMiddlePtr(str, 5, trunc, nullptr, 0);
         char               dest[64] = {};
         DN_Str8TruncResult actual   = DN_Str8TruncMiddlePtr(str, 5, trunc, dest, sizeof(dest));
-        DN_UT_Assert(&result, dry.size_req == actual.size_req);
+        DN_UT_Assert(&result, dry.count_req == actual.count_req);
         DN_UT_Assert(&result, dry.truncated == actual.truncated);
       }
 
@@ -2412,7 +2412,7 @@ static DN_UTCore DN_TST_BaseStrings()
         char               dest[14] = {}; // Exactly 2*5 + 3 + 1
         DN_Str8TruncResult res      = DN_Str8TruncMiddlePtr(str, 5, trunc, dest, sizeof(dest));
         DN_UT_Assert(&result, res.truncated);
-        DN_UT_Assert(&result, res.size_req == 13);
+        DN_UT_Assert(&result, res.count_req == 13);
         DN_UT_AssertF(&result, DN_Str8Eq(res.str8, DN_Str8Lit("Hello...World")), "%.*s", DN_Str8PrintFmt(res.str8));
       }
 
@@ -2422,7 +2422,7 @@ static DN_UTCore DN_TST_BaseStrings()
         char               dest[64] = {};
         DN_Str8TruncResult res      = DN_Str8TruncMiddlePtr(str, 1, trunc, dest, sizeof(dest));
         DN_UT_Assert(&result, res.truncated);
-        DN_UT_Assert(&result, res.size_req == 5); // 1 + 3 + 1
+        DN_UT_Assert(&result, res.count_req == 5); // 1 + 3 + 1
         DN_UT_AssertF(&result, DN_Str8Eq(res.str8, DN_Str8Lit("H...d")), "%.*s", DN_Str8PrintFmt(res.str8));
       }
 
@@ -2432,7 +2432,7 @@ static DN_UTCore DN_TST_BaseStrings()
         char               dest[64] = {};
         DN_Str8TruncResult res      = DN_Str8TruncMiddlePtr(str, 100, trunc, dest, sizeof(dest));
         DN_UT_Assert(&result, !res.truncated);
-        DN_UT_Assert(&result, res.size_req == 5);
+        DN_UT_Assert(&result, res.count_req == 5);
         DN_UT_AssertF(&result, DN_Str8Eq(res.str8, DN_Str8Lit("Hello")), "%.*s", DN_Str8PrintFmt(res.str8));
       }
 
@@ -2443,9 +2443,9 @@ static DN_UTCore DN_TST_BaseStrings()
         DN_Str8            trunc   = DN_Str8Lit("...");
         DN_Str8TruncResult res     = DN_Str8TruncMiddle(str, 5, trunc, &scratch.arena);
         DN_UT_Assert(&result, res.truncated);
-        DN_UT_Assert(&result, res.size_req == 13);
+        DN_UT_Assert(&result, res.count_req == 13);
         DN_UT_AssertF(&result, DN_Str8Eq(res.str8, DN_Str8Lit("Hello...World")), "%.*s", DN_Str8PrintFmt(res.str8));
-        DN_UT_Assert(&result, res.str8.data[res.str8.size] == '\0');
+        DN_UT_Assert(&result, res.str8.data[res.str8.count] == '\0');
         DN_TCScratchEnd(&scratch);
       }
     }
@@ -2493,8 +2493,8 @@ static DN_UTCore DN_TST_Win()
       int        size_returned = DN_OS_W32Str16ToStr8Buffer(input16, nullptr, 0);
       char const EXPECTED[]    = {'S', 't', 'r', 'i', 'n', 'g', 0};
 
-      DN_UT_AssertF(&result, DN_Cast(int) string8.size == size_returned, "string_size: %d, result: %d", DN_Cast(int) string8.size, size_returned);
-      DN_UT_AssertF(&result, DN_Cast(int) string8.size == DN_ArrayCountU(EXPECTED) - 1, "string_size: %d, expected: %zu", DN_Cast(int) string8.size, DN_ArrayCountU(EXPECTED) - 1);
+      DN_UT_AssertF(&result, DN_Cast(int) string8.count == size_returned, "string_size: %d, result: %d", DN_Cast(int) string8.count, size_returned);
+      DN_UT_AssertF(&result, DN_Cast(int) string8.count == DN_ArrayCountU(EXPECTED) - 1, "string_size: %d, expected: %zu", DN_Cast(int) string8.count, DN_ArrayCountU(EXPECTED) - 1);
       DN_UT_Assert(&result, DN_Memcmp(EXPECTED, string8.data, sizeof(EXPECTED)) == 0);
     }
     DN_TCScratchEnd(&scratch);
@@ -2517,7 +2517,7 @@ static DN_UTCore DN_TST_Net()
   label         = DN_Str8Lit("CURL");
 #endif
 
-  if (label.size) {
+  if (label.count) {
     DN_UT_LogF(&result, "DN_NET\n");
 
     DN_MemList mem                    = DN_MemListFromHeap(DN_Megabytes(4), DN_MemFlags_Nil);
@@ -2536,8 +2536,8 @@ static DN_UTCore DN_TST_Net()
       DN_NETResponse      response = net_interface.wait_for_response(request, &arena, UINT32_MAX);
       DN_UT_AssertF(&result, response.http_status == 200, "http_status=%u", response.http_status);
       DN_UT_AssertF(&result, response.state == DN_NETResponseState_HTTP, "state=%u", response.state);
-      DN_UT_AssertF(&result, response.error_str8.size == 0, "%.*s", DN_Str8PrintFmt(response.error_str8));
-      DN_UT_Assert(&result, response.body.size);
+      DN_UT_AssertF(&result, response.error_str8.count == 0, "%.*s", DN_Str8PrintFmt(response.error_str8));
+      DN_UT_Assert(&result, response.body.count);
     }
 
     for (DN_UT_Test(&result, "%.*s WaitForResponse HTTP POST request", DN_Str8PrintFmt(label))) {
@@ -2545,8 +2545,8 @@ static DN_UTCore DN_TST_Net()
       DN_NETResponse response = net_interface.wait_for_any_response(&net, &arena, UINT32_MAX);
       DN_UT_AssertF(&result, response.http_status == 200, "http_status=%u", response.http_status);
       DN_UT_AssertF(&result, response.state == DN_NETResponseState_HTTP, "state=%u", response.state);
-      DN_UT_AssertF(&result, response.error_str8.size == 0, "error=%.*s", DN_Str8PrintFmt(response.error_str8));
-      DN_UT_Assert(&result, response.body.size);
+      DN_UT_AssertF(&result, response.error_str8.count == 0, "error=%.*s", DN_Str8PrintFmt(response.error_str8));
+      DN_UT_Assert(&result, response.body.count);
     }
 
     for (DN_UT_Test(&result, "%.*s WaitForResponse WS request", DN_Str8PrintFmt(label))) {

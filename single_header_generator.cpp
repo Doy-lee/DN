@@ -32,7 +32,7 @@ static void AppendCppFileLineByLine(DN_Str8Builder *dest, DN_Str8 cpp_path)
   DN_ErrSinkEndExitIfErrorF(err, -1, "Failed to load file from '%S' for appending", cpp_path);
 
   bool inside_clangd_preprocessor_block = false;
-  for (DN_Str8 walker = buffer; walker.size;) {
+  for (DN_Str8 walker = buffer; walker.count;) {
     // NOTE: Trim the whitespace, mainly for windows, the file we read will have \r\n whereas we just want to emit \n
     DN_Str8BSplitResult split = DN_Str8BSplit(walker, DN_Str8Lit("\n"));
     DN_Str8             line  = DN_Str8TrimTailWhitespace(split.lhs);
@@ -81,7 +81,7 @@ static void AppendCppFileLineByLine(DN_Str8Builder *dest, DN_Str8 cpp_path)
     DN_Str8BuilderAppendCopy(dest, line);
     DN_Str8BuilderAppendRef(dest, DN_Str8Lit("\n"));
 
-    if (extra_include_path.size)
+    if (extra_include_path.count)
       AppendCppFileLineByLine(dest, extra_include_path);
   }
   DN_TCScratchEnd(&scratch);
