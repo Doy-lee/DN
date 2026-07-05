@@ -679,10 +679,10 @@ enum DN_SHA3TestHash
   DN_SHA3TestHash_Count,
 };
 
-static void DN_SHA3TestHashDispatch_(DN_TestCore *test, DN_SHA3TestHash hash_type, DN_Str8 input)
+static void DN_SHA3_TestHashDispatch_(DN_TestCore *test, DN_SHA3TestHash hash_type, DN_Str8 input)
 {
   DN_TCScratch scratch   = DN_TCScratchBeginArena(&test->arena, 1);
-  DN_Str8      input_hex = DN_HexFromPtrBytesArena(input.data, input.count, &scratch.arena, DN_TrimLeadingZero_No);
+  DN_Str8      input_hex = DN_Str8HexFromPtrBytesArena(input.data, input.count, &scratch.arena, DN_TrimLeadingZero_No);
   switch (hash_type) {
     case DN_SHA3TestHash_Count: DN_AssertInvalidCodePath; break;
     case DN_SHA3TestHash_224: {
@@ -774,7 +774,7 @@ DN_TestCore DN_SHA3_TestSuite(DN_Arena *arena)
 
         for (DN_ForItCArray(it, DN_Str8 const, INPUTS)) {
           for (DN_TestScopeF(&result, "[%.*s] %.*s", DN_Str8PrintFmt(hash_name), DN_Str8PrintFmt(*it.data)))
-            DN_SHA3TestHashDispatch_(&result, DN_Cast(DN_SHA3TestHash)hash_type, *it.data);
+            DN_SHA3_TestHashDispatch_(&result, DN_Cast(DN_SHA3TestHash)hash_type, *it.data);
         }
       }
 
@@ -790,7 +790,7 @@ DN_TestCore DN_SHA3_TestSuite(DN_Arena *arena)
 
           // NOTE: Do the hashing
           DN_Str8 input = DN_Str8FromPtr(src, src_size);
-          DN_SHA3TestHashDispatch_(&result, DN_Cast(DN_SHA3TestHash)hash_type, input);
+          DN_SHA3_TestHashDispatch_(&result, DN_Cast(DN_SHA3TestHash)hash_type, input);
         }
       }
     }

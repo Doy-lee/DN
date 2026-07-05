@@ -1540,7 +1540,42 @@ struct DN_Profiler
   DN_F64                 frame_avg_tsc;
 };
 
-typedef bool (DN_QSortCompareFunc)(void const *a, void const *b, void *user_context);
+typedef bool (DN_QSortCompareFunc)   (void const *lhs, void const *rhs, void *user_context);
+typedef bool (DN_BSearchLessThanFunc)(void const *lhs, void const *rhs, void *user_context);
+enum DN_BSearchType
+{
+  // NOTE: Index of the match. If no match is found, found is set to false and the
+  // index is set to the index where the match should be inserted/exist, if
+  // it were in the array
+  DN_BSearchType_Match,
+
+  // NOTE: Index of the first element in the array that is `element >= find`. If no such
+  // item is found or the array is empty, then, the index is set to the array
+  // size and found is set to `false`.
+  //
+  // For example:
+  //   int array[] = {0, 1, 2, 3, 4, 5};
+  //   DN_BSearchResult result = DN_BinarySearch(array, DN_ArrayCountU(array), 4, DN_BSearchType_LowerBound);
+  //   printf("%zu\n", result.index); // Prints index '4'
+  DN_BSearchType_LowerBound,
+
+  // NOTE: Index of the first element in the array that is `element > find`. If no such
+  // item is found or the array is empty, then, the index is set to the array
+  // size and found is set to `false`.
+  //
+  // For example:
+  //   int array[] = {0, 1, 2, 3, 4, 5};
+  //   DN_BSearchResult result = DN_BinarySearch(array, DN_ArrayCountU(array), 4, DN_BSearchType_UpperBound);
+  //   printf("%zu\n", result.index); // Prints index '5'
+  DN_BSearchType_UpperBound,
+};
+
+struct DN_BSearchResult
+{
+  bool     found;
+  DN_USize index;
+};
+
 enum DN_ErrSinkMode
 {
   DN_ErrSinkMode_Nil,                  // Default behaviour to accumulate errors into the sink
@@ -3023,22 +3058,22 @@ DN_API DN_USize                 DN_USizeCodepointCountFromUTF8                  
 DN_API DN_U8                    DN_U8FromHexNibble                                     (char hex);
 DN_API DN_NibbleFromU8Result    DN_NibbleFromU8                                        (DN_U8 u8);
 
-DN_API DN_USize                 DN_BytesFromHex                                        (DN_Str8 hex, void *dest, DN_USize dest_count);
-DN_API DN_Str8                  DN_BytesFromHexArena                                   (DN_Str8 hex, DN_Arena *arena);
-DN_API DN_USize                 DN_BytesFromHexPtr                                     (char const *hex, DN_USize hex_count, void *dest, DN_USize dest_count);
-DN_API DN_Str8                  DN_BytesFromHexPtrArena                                (char const *hex, DN_USize hex_count, DN_Arena *arena);
-DN_API DN_Str8                  DN_BytesFromHexPtrPool                                 (char const *hex, DN_USize hex_count, DN_Pool *pool);
-DN_API DN_U8x16                 DN_BytesFromHex32Ptr                                   (char const *hex, DN_USize hex_count);
-DN_API DN_U8x32                 DN_BytesFromHex64Ptr                                   (char const *hex, DN_USize hex_count);
+DN_API DN_USize                 DN_PtrBytesFromStr8Hex                                 (DN_Str8 hex, void *dest, DN_USize dest_count);
+DN_API DN_USize                 DN_PtrBytesFromPtrHex                                  (char const *hex, DN_USize hex_count, void *dest, DN_USize dest_count);
+DN_API DN_Str8                  DN_Str8BytesFromStr8HexArena                           (DN_Str8 hex, DN_Arena *arena);
+DN_API DN_Str8                  DN_Str8BytesFromPtrHexArena                            (char const *hex, DN_USize hex_count, DN_Arena *arena);
+DN_API DN_Str8                  DN_Str8BytesFromPtrHexPool                             (char const *hex, DN_USize hex_count, DN_Pool *pool);
+DN_API DN_U8x16                 DN_U8x16FromPtrHex32                                   (char const *hex, DN_USize hex_count);
+DN_API DN_U8x32                 DN_U8x32FromPtrHex64                                   (char const *hex, DN_USize hex_count);
 
-DN_API DN_HexU64                DN_HexFromU64                                          (DN_U64 value, DN_HexFromU64Type type);
-DN_API DN_USize                 DN_HexFromPtrBytes                                     (void const *bytes, DN_USize bytes_count, void *hex, DN_USize hex_count, DN_TrimLeadingZero trim_leading_z);
-DN_API DN_Str8                  DN_HexFromPtrBytesArena                                (void const *bytes, DN_USize bytes_count, DN_Arena *arena, DN_TrimLeadingZero trim_leading_z);
-DN_API DN_USize                 DN_HexFromStr8Bytes                                    (DN_Str8 bytes, void *hex, DN_USize hex_count, DN_TrimLeadingZero trim_leading_z);
-DN_API DN_Str8                  DN_HexFromStr8BytesArena                               (DN_Str8 bytes, DN_Arena *arena, DN_TrimLeadingZero trim_leading_z);
-DN_API DN_Hex32                 DN_Hex32FromPtr16b                                     (void const *bytes, DN_USize bytes_count, DN_TrimLeadingZero trim_leading_z);
-DN_API DN_Hex64                 DN_Hex64FromPtr32b                                     (void const *bytes, DN_USize bytes_count, DN_TrimLeadingZero trim_leading_z);
-DN_API DN_Hex128                DN_Hex128FromPtr64b                                    (void const *bytes, DN_USize bytes_count, DN_TrimLeadingZero trim_leading_z);
+DN_API DN_HexU64                DN_HexU64FromU64                                       (DN_U64 value, DN_HexFromU64Type type);
+DN_API DN_USize                 DN_PtrHexFromPtrBytes                                  (void const *bytes, DN_USize bytes_count, void *hex, DN_USize hex_count, DN_TrimLeadingZero trim_leading_z);
+DN_API DN_USize                 DN_PtrHexFromStr8Bytes                                 (DN_Str8 bytes, void *hex, DN_USize hex_count, DN_TrimLeadingZero trim_leading_z);
+DN_API DN_Str8                  DN_Str8HexFromPtrBytesArena                            (void const *bytes, DN_USize bytes_count, DN_Arena *arena, DN_TrimLeadingZero trim_leading_z);
+DN_API DN_Str8                  DN_Str8HexFromStr8BytesArena                           (DN_Str8 bytes, DN_Arena *arena, DN_TrimLeadingZero trim_leading_z);
+DN_API DN_Hex32                 DN_Hex32FromPtrBytes16                                 (void const *bytes, DN_USize bytes_count, DN_TrimLeadingZero trim_leading_z);
+DN_API DN_Hex64                 DN_Hex64FromPtrBytes32                                 (void const *bytes, DN_USize bytes_count, DN_TrimLeadingZero trim_leading_z);
+DN_API DN_Hex128                DN_Hex128FromPtrBytes64                                (void const *bytes, DN_USize bytes_count, DN_TrimLeadingZero trim_leading_z);
 
 DN_API DN_Str8x128              DN_AgeStr8FromMsU64                                    (DN_U64 duration_ms, DN_AgeUnit units);
 DN_API DN_Str8x128              DN_AgeStr8FromSecU64                                   (DN_U64 duration_ms, DN_AgeUnit units);
@@ -3129,6 +3164,13 @@ DN_API void                     DN_QSortStr8NaturalAsc                          
 DN_API void                     DN_QSortStr8NaturalDesc                                (DN_Str8 *array, DN_USize array_size, DN_Str8EqCase eq_case);
 DN_API void                     DN_QSortStr8LexicographicAsc                           (DN_Str8 *array, DN_USize array_size, DN_Str8EqCase eq_case);
 DN_API void                     DN_QSortStr8LexicographicDesc                          (DN_Str8 *array, DN_USize array_size, DN_Str8EqCase eq_case);
+
+DN_API bool                     DN_BSearchLessThanBytes                                (void const *lhs, void const *rhs, void *user_context);
+DN_API DN_BSearchResult         DN_BSearch                                             (void const *array, DN_USize count, DN_USize elem_size, void const *find, DN_BSearchType type, void *user_context, DN_BSearchLessThanFunc *less_than);
+DN_API DN_BSearchResult         DN_BSearchBytes                                        (void const *array, DN_USize count, DN_USize elem_size, void const *find, DN_BSearchType type);
+DN_API DN_BSearchResult         DN_BSearchUSize                                        (DN_USize const *array, DN_USize count, DN_USize find, DN_BSearchType type);
+DN_API DN_BSearchResult         DN_BSearchU64                                          (DN_U64 const *array, DN_USize count, DN_U64 find, DN_BSearchType type);
+DN_API DN_BSearchResult         DN_BSearchU32                                          (DN_U32 const *array, DN_USize count, DN_U32 find, DN_BSearchType type);
 
 DN_API DN_PCG32                 DN_PCG32Init                                           (DN_U64 seed);
 DN_API DN_U32                   DN_PCG32Next                                           (DN_PCG32 *rng);
@@ -4143,6 +4185,7 @@ DN_API void                  DN_TestGroupEnd                                    
 DN_API void                  DN_TestBeginF                                                     (DN_TestCore *test, char const *fmt, ...);
 DN_API void                  DN_TestEnd                                                        (DN_TestCore *test);
 #define                      DN_TestScopeF(test_ptr, fmt, ...)                                 bool test_once_  = (DN_TestBeginF(test_ptr, fmt, ##__VA_ARGS__),      false); !test_once_;  DN_TestEnd(test_ptr),      test_once_  = true
+DN_API DN_Str8               DN_Str8FromTestCore                                               (DN_TestCore const *test, DN_Arena *arena, DN_Str8FromTestCoreFlags flags);
 
 DN_API void                  DN_TestVerifyExprF_                                               (DN_TestCore *test, DN_CallSite call_site, DN_Str8 expr, bool expr_result, char const *fmt, ...);
 #define                      DN_TestVerifyExprF(test_ptr, expr, fmt, ...)                      DN_TestVerifyExprF_(test_ptr, DN_CallSiteNow, DN_Str8Lit(#expr), (expr), fmt, ##__VA_ARGS__)
@@ -4202,128 +4245,28 @@ DN_API void                  DN_TestVerifyBytesF                                
 #define                      DN_TestVerifyBytesNotEqF(test_ptr, bytes, expect, fmt, ...)       DN_TestVerifyBytesF(test_ptr, DN_CallSiteNow, DN_Str8Lit(#bytes " != " #expect), (bytes), (expect), /*expect_eq=*/ false, fmt, ##__VA_ARGS__)
 #define                      DN_TestVerifyBytesNotEq(test_ptr, bytes, expect)                  DN_TestVerifyBytesF(test_ptr, DN_CallSiteNow, DN_Str8Lit(#bytes " != " #expect), (bytes), (expect), /*expect_eq=*/ false, "")
 
-DN_API DN_Str8               DN_Str8FromTestCore                                               (DN_TestCore const *test, DN_Arena *arena, DN_Str8FromTestCoreFlags flags);
-
 #if DN_WITH_TESTS
 DN_API DN_TestCore           DN_TestSuite                                                      (DN_Arena *arena_);
 #endif
 
-// TODO: Replace with a C implementation
-template <typename T>
-using DN_BinarySearchLessThanProc = bool(T const &lhs, T const &rhs);
-
-template <typename T>
-bool DN_BinarySearch_DefaultLessThan(T const &lhs, T const &rhs);
-
-enum DN_BinarySearchType
-{
-    // Index of the match. If no match is found, found is set to false and the
-    // index is set to the index where the match should be inserted/exist, if
-    // it were in the array
-    DN_BinarySearchType_Match,
-
-    // Index of the first element in the array that is `element >= find`. If no such
-    // item is found or the array is empty, then, the index is set to the array
-    // size and found is set to `false`.
-    //
-    // For example:
-    //   int array[] = {0, 1, 2, 3, 4, 5};
-    //   DN_BinarySearchResult result = DN_BinarySearch(array, DN_ArrayCountU(array), 4, DN_BinarySearchType_LowerBound);
-    //   printf("%zu\n", result.index); // Prints index '4'
-
-    DN_BinarySearchType_LowerBound,
-
-    // Index of the first element in the array that is `element > find`. If no such
-    // item is found or the array is empty, then, the index is set to the array
-    // size and found is set to `false`.
-    //
-    // For example:
-    //   int array[] = {0, 1, 2, 3, 4, 5};
-    //   DN_BinarySearchResult result = DN_BinarySearch(array, DN_ArrayCountU(array), 4, DN_BinarySearchType_UpperBound);
-    //   printf("%zu\n", result.index); // Prints index '5'
-
-    DN_BinarySearchType_UpperBound,
-};
-
-struct DN_BinarySearchResult
-{
-  bool     found;
-  DN_USize index;
-};
-
-template <typename T> bool                  DN_BinarySearch_DefaultLessThan(T const &lhs, T const &rhs);
-template <typename T> DN_BinarySearchResult DN_BinarySearch                (T const *array, DN_USize array_size, T const &find, DN_BinarySearchType type = DN_BinarySearchType_Match, DN_BinarySearchLessThanProc<T> less_than = DN_BinarySearch_DefaultLessThan);
-
-template <typename T>
-bool DN_BinarySearch_DefaultLessThan(T const &lhs, T const &rhs)
-{
-  bool result = lhs < rhs;
-  return result;
-}
-
-template <typename T>
-DN_BinarySearchResult DN_BinarySearch(T const                         *array,
-                                      DN_USize                        array_size,
-                                      T const                         &find,
-                                      DN_BinarySearchType             type,
-                                      DN_BinarySearchLessThanProc<T>  less_than)
-{
-    DN_BinarySearchResult result = {};
-    if (!array || array_size <= 0 || !less_than)
-        return result;
-
-    T const *end   = array + array_size;
-    T const *first = array;
-    T const *last  = end;
-    while (first != last) {
-        DN_USize count = last - first;
-        T const *it     = first + (count / 2);
-
-        bool advance_first = false;
-        if (type == DN_BinarySearchType_UpperBound)
-            advance_first = !less_than(find, it[0]);
-        else
-            advance_first = less_than(it[0], find);
-
-        if (advance_first)
-            first = it + 1;
-        else
-            last  = it;
-    }
-
-    switch (type) {
-        case DN_BinarySearchType_Match: {
-            result.found = first != end && !less_than(find, *first);
-        } break;
-
-        case DN_BinarySearchType_LowerBound: /*FALLTHRU*/
-        case DN_BinarySearchType_UpperBound: {
-            result.found = first != end;
-        } break;
-    }
-
-    result.index = first - array;
-    return result;
-}
-
-DN_API void                      DN_LeakTrackAlloc_  (DN_LeakTracker *leak, void *ptr, DN_USize size, bool alloc_can_leak);
-DN_API void                      DN_LeakTrackDealloc_(DN_LeakTracker *leak, void *ptr);
-DN_API void                      DN_LeakDump_        (DN_LeakTracker *leak);
+DN_API void                  DN_LeakTrackAlloc_                                                (DN_LeakTracker *leak, void *ptr, DN_USize size, bool alloc_can_leak);
+DN_API void                  DN_LeakTrackDealloc_                                              (DN_LeakTracker *leak, void *ptr);
+DN_API void                  DN_LeakDump_                                                      (DN_LeakTracker *leak);
 
 #if defined(DN_LEAK_TRACKING)
-#define                          DN_LeakTrackAlloc(leak, ptr, size, alloc_can_leak) DN_LeakTrackAlloc_(leak, ptr, size, alloc_can_leak)
-#define                          DN_LeakTrackDealloc(leak, ptr)                     DN_LeakTrackDealloc_(leak, ptr)
-#define                          DN_LeakDump(leak)                                  DN_LeakDump_(leak)
+#define                      DN_LeakTrackAlloc(leak, ptr, size, alloc_can_leak)                DN_LeakTrackAlloc_(leak, ptr, size, alloc_can_leak)
+#define                      DN_LeakTrackDealloc(leak, ptr)                                    DN_LeakTrackDealloc_(leak, ptr)
+#define                      DN_LeakDump(leak)                                                 DN_LeakDump_(leak)
 #else
-#define                          DN_LeakTrackAlloc(leak, ptr, size, alloc_can_leak) do { (void)ptr; (void)size; (void)alloc_can_leak; } while (0)
-#define                          DN_LeakTrackDealloc(leak, ptr)                     do { (void)ptr;                                   } while (0)
-#define                          DN_LeakDump(leak)                                  do {                                              } while (0)
+#define                      DN_LeakTrackAlloc(leak, ptr, size, alloc_can_leak)                do { (void)ptr; (void)size; (void)alloc_can_leak; } while (0)
+#define                      DN_LeakTrackDealloc(leak, ptr)                                    do { (void)ptr;                                   } while (0)
+#define                      DN_LeakDump(leak)                                                 do {                                              } while (0)
 #endif
 
 #if DN_WITH_OS
-DN_API DN_Str8                   DN_OS_Str8FromStr8BuilderHeap                (DN_Str8Builder const *builder);
-DN_API void                      DN_OS_LogPrint                               (DN_LogTypeParam type, void *user_data, DN_CallSite call_site, DN_FMT_ATTRIB char const *fmt, va_list args);
-DN_API void                      DN_OS_SetLogPrintFuncToOS                    ();
+DN_API DN_Str8               DN_OS_Str8FromStr8BuilderHeap                                     (DN_Str8Builder const *builder);
+DN_API void                  DN_OS_LogPrint                                                    (DN_LogTypeParam type, void *user_data, DN_CallSite call_site, DN_FMT_ATTRIB char const *fmt, va_list args);
+DN_API void                  DN_OS_SetLogPrintFuncToOS                                         ();
 
 // NOTE: Heap
 // Overview
