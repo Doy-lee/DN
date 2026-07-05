@@ -2,29 +2,30 @@
 #define DN_INI_H
 
 // NOTE: DN INI Configuration
-//  Getting Started
-//    This is a single header and implementation file library that implements .ini file handling.
-//    It supports the following .ini features:
+
+// Getting Started
+//   This is a single header and implementation file library that implements .ini file handling.
+//   It supports the following .ini features:
 //
-//      - Plain sections: [sections]
-//      - Arbitrarily nested sections delimited by '.': [sections.a] [sections.a.b] [sections.a.b....]
-//      - Repeated section names (the last section takes precedence)
-//      - Comments marked by #: [section] # Comment
-//      - Multi-line values for keys:
-//          [my_section]
-//          the_key = the_value \
-//          another line for the key \
-//          and another one
-//          the_next_key = that's cool
+//     Plain sections: [sections]
+//     Arbitrarily nested sections delimited by '.': [sections.a] [sections.a.b] [sections.a.b....]
+//     Repeated section names (the last section takes precedence)
+//     Comments marked by #: [section] # Comment
+//     Multi-line values for keys:
+//       [my_section]
+//       the_key = the_value \
+//       another line for the key \
+//       and another one
+//       the_next_key = that's cool
 //
-//    Include both .h and .c in your translation unit or compile the .c separately and link against
-//    it to get started. The goals of the library are as follows:
+//   Include both .h and .c in your translation unit or compile the .c separately and link against
+//   it to get started. The goals of the library are as follows:
 //
-//      - Zero allocations to parse, accepts a NULL buffer to determine the amount of bytes required
-//        to parse the .ini buffer
-//      - Compile in C99 and compatible with C++
-//
-//  Example
+//     Zero allocations to parse, accepts a NULL buffer to determine the amount of bytes required
+//     to parse the .ini buffer
+//     Compile in C99 and compatible with C++
+
+// Example
 /*
    #include <stdio.h>
    #include <stdlib.h>
@@ -94,34 +95,34 @@
    }
  */
 
-  #include <stdint.h> // size_t
+#include <stdint.h> // size_t
 
-  #if !defined(DN_INI_Assert)
-    #include <assert.h>
-    #define DN_INI_Assert(expr) assert(expr)
+#if !defined(DN_INI_Assert)
+  #include <assert.h>
+  #define DN_INI_Assert(expr) assert(expr)
+#endif
+
+#include <stdarg.h>
+
+#if !defined(DN_INI_VSNPrintF)
+  #include <stdio.h>
+  #define DN_INI_VSNPrintF(buffer, size, fmt, args) vsnprintf(buffer, size, fmt, args)
+#endif
+
+#if !defined(DN_INI_Memset) || !defined(DN_INI_Memcmp) || !defined(DN_INI_Memcpy)
+  #include <string.h>
+  #if !defined(DN_INI_Memset)
+    #define DN_INI_Memset(ptr, val, size) memset(ptr, val, size)
   #endif
 
-  #include <stdarg.h>
-
-  #if !defined(DN_INI_VSNPrintF)
-    #include <stdio.h>
-    #define DN_INI_VSNPrintF(buffer, size, fmt, args) vsnprintf(buffer, size, fmt, args)
+  #if !defined(DN_INI_Memcmp)
+    #define DN_INI_Memcmp(dest, src, size) memcmp(dest, src, size)
   #endif
 
-  #if !defined(DN_INI_Memset) || !defined(DN_INI_Memcmp) || !defined(DN_INI_Memcpy)
-    #include <string.h>
-    #if !defined(DN_INI_Memset)
-      #define DN_INI_Memset(ptr, val, size) memset(ptr, val, size)
-    #endif
-
-    #if !defined(DN_INI_Memcmp)
-      #define DN_INI_Memcmp(dest, src, size) memcmp(dest, src, size)
-    #endif
-
-    #if !defined(DN_INI_Memcpy)
-      #define DN_INI_Memcpy(dest, src, size) memcpy(dest, src, size)
-    #endif
+  #if !defined(DN_INI_Memcpy)
+    #define DN_INI_Memcpy(dest, src, size) memcpy(dest, src, size)
   #endif
+#endif
 
 typedef enum DN_INITokenType {
   DN_INITokenType_Nil,
@@ -278,7 +279,7 @@ DN_INIField *        DN_INI_AppendKeyCStr8           (DN_INICore *ini,        DN
 DN_INIField *        DN_INI_AppendKeyF               (DN_INICore *ini,        DN_INIArena *arena, DN_INISection *section, DN_INIStr8 key,  char const *fmt, ...);
 void                 DN_INI_AppendField              (DN_INISection *section, DN_INIField *field);
 
-#if defined(DN_INI_WITH_UNIT_TESTS)
-void                DN_INI_UnitTests              ();
+#if defined(DN_INI_WITH_TESTS)
+void                 DN_INI_TestSuite              ();
 #endif
-#endif // !defined(DN_INI_H)
+#endif // #if !defined(DN_INI_H)

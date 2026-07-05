@@ -3,208 +3,232 @@
 
 // NOTE: DN
 
-//  NOTE: Getting Started
-//    - Copy the entire DN folder to your project and include `dn.h` alongside your headers and
-//      include `dn.cpp` in one of your implementation files that has `dn.h` included in its scope,
-//      an example. There are #defines to selectively enable features of the library (see the
-//      configuration section for more info), example:
+// Getting Started
+//   Copy the entire DN folder to your project and include `dn.h` alongside your headers and include
+//   `dn.cpp` in one of your implementation files that has `dn.h` included in its scope.
+//   There are #defines to selectively enable/disable features of the library.
+//
+//   For this example, we enable _every_ feature possible to show all the possibilities upfront.
+//   All the #defines can be omitted and a default value will be set (in general everything defaults
+//   to off/disabled or fairly conservative). For more information see the configuration section.
 /*
-          #define DN_WITH_OS 1 // Enable OS features (like virtual mem, TLS, file system, threads)
-          #include "dn.h"
+       #define DN_WITH_OS 1                                // Enable OS features (e.g.: virtual mem, TLS, file system, threads)
+       #define DN_WITH_STR8_AVX512F 1                      // Enable AVX512F accelerated string functions
+       #define DN_WITH_NET 0                               // Enable NET interface for HTTP/WS requests functionality. Requires CURL or Emscrpten
+       #define DN_WITH_NET_CURL 0                          // Enable NET interface implementation using CURL's       networking APIs (you must link libcurl    to this TU unit)
+       #define DN_WITH_NET_EMSCRIPTEN 0                    // Enable NET interface implementation using Emscripten's networking APIs (you must link emscripten to this TU unit)
+       #define DN_WITH_TESTS 1                             // Enable the unit tests that can be run with `DN_TestSuite(arena)`
+       #define DN_ASAN_POISON 0                            // Poison uncommitted memory in an Arena with Address Sanitizer's poisoning API
+       #define DN_SCRUB_UNINIT_MEM_BYTE 0xCD               // Temporary memory freed by an arena is scrubbed with this value to help catch UAFs
+       #define DN_ARENA_TEMP_MEM_UAF_GUARD 1               // Enable Arenas to detect UAF when using temporary memory regions
+       #define DN_ARENA_TEMP_MEM_UAF_TRACE_ON_BY_DEFAULT 0 // Record stack traces when a UAF guard on an arena is created for better UAF crash diagnostics
+       #define DN_PARANOIA_LEVEL 1                         // Enables various aforementioned debug functionality automatically, supported values [0..2]
+       #include "dn.h"
+       #include "dn.cpp"
 
-          #define DN_CPP_WITH_TESTS 1
-          #include "dn.cpp"
-
-          int main()
-          {
-            DN_Core core = {};
-            DN_Init(&core, DN_InitFlags_Nil, DN_TCInitArgsDefault());
-            return 0;
-          }
+       int main(int argc, char **argv)
+       {
+         DN_Core core = {};
+         DN_Init(&core, DN_InitFlags_Nil, DN_TCInitArgsDefault());
+         return 0;
+       }
 */
-//    - `DN/Standalone` contains utilities that are self-contained and can be used without `dn.h` in
-//      a similar manner, typically a single header and single implementation file.
+//   `DN/Standalone` contains utilities that are self-contained and can be used without `dn.h` in
+//   a similar manner, typically a single header and single implementation file.
 
-//  NOTE: Configuration
+// Configuration
 
-//    NOTE: OS layer
-//      Enable the operating system layer which enables thread context, file system, threads, e.t.c:
+//   OS layer
+//     Enable the operating system layer which enables thread context, file system, threads, e.t.c
+//     (default: 0)
 //
-//        #define DN_WITH_OS 1
+//       #define DN_WITH_OS 1
 
-//    NOTE: Networking layer
-//      Enable the networking layer (pre-requisite that the OS layer is enabled) that allows sending
-//      HTTP/Websocket requests either using CURL or Emscripten's networking APIs.
+//   Str8 AVX512F Layer
+//     AVX512 string functions can be compiled and made available (default: 0)
 //
-//        #define DN_WITH_NET            1
-//        #define DN_WITH_NET_CURL       1
-//        #define DN_WITH_NET_EMSCRIPTEN 1
-//
-//      For CURL, ensure that you the target application links to a libcurl and that the
-//      #include <curl/curl.h> is visible before this translation unit.
-//
-//      For Emscripten ensure that this translation unit is compiled with `emcc` to have it enabled.
+//       #define DN_WITH_STR8_AVX512F 1
 
-//    NOTE: Platform Target
-//      Define one of the following directives to configure this library to compile for that
-//      platform. By default, the library will auto-detect the current host platform and select that
-//      as the target platform.
+//   Unit Tests
+//     Unit tests can be compiled and run using the `DN_TestSuite(...)` function (default: 0)
 //
-//        DN_PLATFORM_EMSCRIPTEN
-//        DN_PLATFORM_POSIX
-//        DN_PLATFORM_WIN32
-//
-//      For example
-//
-//        #define DN_PLATFORM_WIN32
-//
-//      Will ensure that <Windows.h> is included and the OS layer is implemented using Win32
-//      primitives.
+//       #define DN_WITH_TESTS 1
 
-//    NOTE: Static functions
-//      All public functions in the DN library are prefixed with the macro '#define DN_API'. By
-//      default 'DN_API' is not defined to anything. Define
+//   Networking layer
+//     Enable the networking layer (pre-requisite that the OS layer is enabled) that allows sending
+//     HTTP/Websocket requests either using CURL or Emscripten's networking APIs.
 //
-//        DN_STATIC_API
+//       #define DN_WITH_NET            1
+//       #define DN_WITH_NET_CURL       1
+//       #define DN_WITH_NET_EMSCRIPTEN 1
 //
-//      To replace all the functions prefixed with DN_API to be prefixed with 'static' ensuring that
-//      the functions in the library do not export an entry into the linking table.
-//      translation units.
+//     For CURL, ensure that you the target application links to a libcurl and that the
+//     #include <curl/curl.h> is visible before this translation unit.
+//
+//     For Emscripten ensure that this translation unit is compiled with `emcc` to have it enabled.
 
-//    NOTE: Disabling the in-built <Windows.h> (if #define DN_WITH_OS 1)
-//      If you are building DN for the Windows platform, <Windows.h> is a large legacy header that
-//      applications have to include to use Windows APIs. By default this library uses a replacement
-//      header for all the Windows functions that it uses in the OS layer removing the need to
-//      include <Windows.h> to improve compilation times. This mini header will conflict with
-//      <Windows.h> if it needs to be included in your project. The mini header can be disabled by
-//      defining:
+//   Platform Target
+//     Define one of the following directives to configure this library to compile for that
+//     platform. By default, the library will auto-detect the current host platform and select that
+//     as the target platform.
 //
-//        DN_NO_WINDOWS_H_REPLACEMENT_HEADER
+//       DN_PLATFORM_EMSCRIPTEN
+//       DN_PLATFORM_POSIX
+//       DN_PLATFORM_WIN32
 //
-//      To instead use <Windows.h>. DN automatically detects if <Windows.h> is included in an earlier
-//      translation unit and will automatically disable the in-built replacement header in which case
-//      this does not need to be defined.
+//     For example
+//
+//       #define DN_PLATFORM_WIN32
+//
+//     Will ensure that <Windows.h> is included and the OS layer is implemented using Win32
+//     primitives.
 
-//    NOTE: Freestanding
-//      The base layer can be used without an OS implementation by defining DN_FREESTANDING like:
+//   Static functions
+//     All public functions in the DN library are prefixed with the macro '#define DN_API'. By
+//     default 'DN_API' is not defined to anything (default: nil)
 //
-//        #define DN_FREESTANDING
+//       #define DN_API <prefix to put on functions>
 //
-//      This means functionality that relies on the OS like printing, memory allocation, stack traces
-//      and so forth are disabled.
+//     To replace all the functions prefixed with DN_API to be prefixed with 'static' ensuring that
+//     the functions in the library do not export an entry into the linking table.
+//     translation units.
+//
+//        #define DN_API static
 
-//    NOTE: ASAN Arena Poisoning
-//      When compiled with address sanitizer (.e.g -fsanitize=address) you can optionally enable
-//      memory region poisoning on the inbuilt arena's to catch in certain scenarios, use-after-free
+//   Disabling the in-built <Windows.h> (if #define DN_WITH_OS 1)
+//     If you are building DN for the Windows platform, <Windows.h> is a large legacy header that
+//     applications have to include to use Windows APIs. By default this library uses a replacement
+//     header for all the Windows functions that it uses in the OS layer removing the need to
+//     include <Windows.h> to improve compilation times. This mini header will conflict with
+//     <Windows.h> if it needs to be included in your project. The mini header can be disabled by
+//     defining:
 //
-//        #define DN_ASAN_POISON 1
+//       #define DN_NO_WINDOWS_H_REPLACEMENT_HEADER
 //
-//      Since arenas manage their own block of memory it does not automatically benefit from ASAN's
-//      memory markup that ASAN does and so it is implemented manually by using the ASAN user-level
-//      poisoning APIs. Similarly, since the arena recycles its own memory rather than release back
-//      to the OS, poisoning is not as effective for arenas but every little bit helps.
+//     To instead use <Windows.h>. DN automatically detects if <Windows.h> is included in an earlier
+//     translation unit and will automatically disable the in-built replacement header in which case
+//     this does not need to be defined.
 
-//    NOTE: Scrub Uninitialised Memory
-//      If this macro is defined, temp memory that is returned to an arena, or allocations freed by
-//      a pool are scrubbed to this specified byte, in absence of this bytes returned to the
-//      allocators are left as-is or memset to 0. For example to scrub bytes to 0xCD (MSVC's
-//      pattern) define as follows:
+//   Freestanding
+//     TODO: This is not really supported or dealt with properly. Re-review it
+//     The base layer can be used without an OS implementation by defining DN_FREESTANDING like:
 //
-//        #define DN_SCRUB_UNINIT_MEM_BYTE 0xCD
+//       #define DN_FREESTANDING
 //
-//      Due to the recycling of memory in arenas and pool, similarly to ASAN poisoning this reduces
-//      the window in which a use-after-free can be detected using this guard, however every little
-//      bit helps.
+//     This means functionality that relies on the OS like printing, memory allocation, stack traces
+//     and so forth are disabled.
 
-//    NOTE: Arena temp memory use-after-free (UAF) tooling
-//      UAF Guard
-//        Set the following preprocessor value to 1 to enable UAF protection when using
-//        scratch/temporary memory functionality. Defaults to off, or 0 if not specified
+//   ASAN Arena Poisoning
+//     When compiled with address sanitizer (.e.g -fsanitize=address) you can optionally enable
+//     memory region poisoning on the inbuilt arena's to catch in certain scenarios, use-after-free
+//     (default: ON if PARANOIA level is >=1, OFF otherwise)
 //
-//          #define DN_ARENA_TEMP_MEM_UAF_GUARD 1
+//       #define DN_ASAN_POISON 1
 //
-//        This enables arenas to markup itself with the active memory region and subsequent
-//        allocations check if the allocation belongs to the same or different region. Different
-//        regions cause a UAF violation.
-//
-//        More detailed diagnostics can be enabled by setting the flag DN_ArenaFlags_TempMemUAFGuard
-//        on the affected arenas. Note that this incurs a performance penalty as each memory region
-//        will store a stacktrace of its creation. It's recommended in development builds to always
-//        run with temp-memory guarding, if a violation occurs, then enable tracing on the arena to
-//        pinpoint the issue.
-//
-//        Enabling memory guard incurs additional memory requirements from the arena's backing
-//        memory block and additional book-keeping fields on each arena and their temp memory
-//        instances.
-//
-//      NOTE: UAF Tracing
-//        Set the following preprocessor value to 1 to enable tracing when the UAF guard triggers.
-//        Defaults to off, or 0 if not specified.
-//
-//          #define DN_ARENA_TEMP_MEM_UAF_TRACE_ON_BY_DEFAULT 1
-//
-//        This opts in all arenas to tracing functionality by default globally. Arenas can opt out
-//        by setting the flag DN_ArenaFlags_TempMemUAFTraceDisable on the arena. The disable flag
-//        takes precedence over all other settings including the global preprocessor macro and the
-//        enablement flag (DN_ArenaFlags_TempMemUAFTrace).
-//
-//        Tracing incurs an additional much heavier performance penalty than the UAF guard due to
-//        the stacktrace that is stored per region to report to the user when a UAF guard violation
-//        occurs.
+//     Since arenas manage their own block of memory it does not automatically benefit from ASAN's
+//     memory markup that ASAN does and so it is implemented manually by using the ASAN user-level
+//     poisoning APIs. Similarly, since the arena recycles its own memory rather than release back
+//     to the OS, poisoning is not as effective for arenas but every little bit helps.
 
-//    NOTE: Paranoia Level
-//      Set the `DN_PARANOIA_LEVEL` to an integer value to enable various validation layers and
-//      error checking mechanisms in the codebase and primitives exposed by the library. Defaults to
-//      paranoia level 0 in release builds and level 1 for debug.
+//   Scrub Uninitialised Memory
+//     If this macro is defined, temp memory that is returned to an arena, or allocations freed by
+//     a pool are scrubbed to this specified byte, in absence of this bytes returned to the
+//     allocators are left as-is or memset to 0. For example to scrub bytes to 0xCD (MSVC's
+//     pattern) (default: 0xCD if PARANOIA level is >=1, 0x0 otherwise)
 //
-//          #define DN_PARANOIA_LEVEL 1
+//       #define DN_SCRUB_UNINIT_MEM_BYTE 0xCD
 //
-//      Each level activates the following debug mechanisms. Note that any of the following #defines
-//      enabled by a paranoia level can be overridden by defining the preprocessor definition before
-//      the inclusion of this file.
+//     Due to the recycling of memory in arenas and pool, similarly to ASAN poisoning this reduces
+//     the window in which a use-after-free can be detected using this guard, however every little
+//     bit helps.
+
+//   Arena temp memory use-after-free (UAF) tooling
+//     UAF Guard
+//       Set the following preprocessor value to 1 to enable UAF protection when using
+//       scratch/temporary memory functionality (default: 1 if PARANOIA level >=1, 0 otherwise)
 //
-//        Level 0
-//          `DN_Assert` calls are compiled out
+//         #define DN_ARENA_TEMP_MEM_UAF_GUARD 1
 //
-//          `DN_Verify` calls logs an error and continues
+//       This enables arenas to markup itself with the active memory region and subsequent
+//       allocations check if the allocation belongs to the same or different region. Different
+//       regions cause a UAF violation.
 //
-//          `DN_VerifyWarning` calls logs a warning and continues
+//       More detailed diagnostics can be enabled by setting the flag DN_ArenaFlags_TempMemUAFGuard
+//       on the affected arenas. Note that this incurs a performance penalty as each memory region
+//       will store a stacktrace of its creation. It's recommended in development builds to always
+//       run with temp-memory guarding, if a violation occurs, then enable tracing on the arena to
+//       pinpoint the issue.
 //
-//        Level 1
-//          `DN_Assert` calls are compiled in
+//       Enabling memory guard incurs additional memory requirements from the arena's backing
+//       memory block and additional book-keeping fields on each arena and their temp memory
+//       instances.
 //
-//          `DN_Verify` calls a debug trap rather than just logging and continuing
+//     UAF Tracing
+//       Set the following preprocessor value to 1 to enable tracing when the UAF guard triggers
+//       (default: 1 if PARANOIA level >=2, 0 otherwise)
 //
-//          `DN_Verify` calls dump a stack trace when triggered
+//         #define DN_ARENA_TEMP_MEM_UAF_TRACE_ON_BY_DEFAULT 1
 //
-//          `DN_ASAN_POISON` is set. When an arena allocates memory unallocated bytes from the
-//          memory owned by the arena are manually poisoned using ASAN. A fault will be triggered if
-//          the memory is written to (UAF e.g. use-after-free). Address sanitizer must be enabled or
-//          otherwise this is a no-op. This incurs a performance penalty on-top of the overhead of
-//          running ASAN on your binary as recycling memory calls into ASAN to poison the region.
+//       This opts in all arenas to tracing functionality by default globally. Arenas can opt out
+//       by setting the flag DN_ArenaFlags_TempMemUAFTraceDisable on the arena. The disable flag
+//       takes precedence over all other settings including the global preprocessor macro and the
+//       enablement flag (DN_ArenaFlags_TempMemUAFTrace).
 //
-//          `DN_ARENA_TEMP_MEM_UAF_GUARD` is set. When an arena uses temporary memory it will record
-//          the active temporary memory region and compare them when allocating to ensure that
-//          memory is allocated in the active region otherwise a UAF fault is triggered. This has a
-//          small runtime performance penalty.
+//       Tracing incurs an additional much heavier performance penalty than the UAF guard due to
+//       the stacktrace that is stored per region to report to the user when a UAF guard violation
+//       occurs.
+
+//   Paranoia Level
+//     Set the `DN_PARANOIA_LEVEL` to an integer value to enable various validation layers and
+//     error checking mechanisms in the codebase and primitives exposed by the library
+//     (default: PARANOID level 1 in debug builds, 0 otherwise)
+//     paranoia level 0 in release builds and level 1 for debug.
 //
-//          `DN_SCRUB_UNINIT_MEM_BYTE` is set to `0xCD`. When memory is cleared in an arena or a
-//          pool backed by an arena upon deallocation if the `DN_ZMem_Yes` flag is passed then the
-//          bytes are scrubbed to this byte to make UAF more salient.
+//         #define DN_PARANOIA_LEVEL 1
 //
-//        Level 2
-//          `DN_ARENA_TEMP_MEM_UAF_TRACE_ON_BY_DEFAULT` is set. When an arena uses temporary memory
-//          regions that region's a stack trace of the call site is recorded. This is very expensive
-//          but when a temporary memory region is used after it has been deallocated, a full stack
-//          trace diagnostic is available of where the various regions where created and freed.
+//     Each level activates the following debug mechanisms. Note that any of the following #defines
+//     enabled by a paranoia level can be overridden by defining the preprocessor definition before
+//     the inclusion of this file.
 //
-//    NOTE: Str8 AVX512F variants
-//      We have some AVX512 string functions that can be enabled by defining the following
+//       Level 0
+//         `DN_Assert` calls are compiled out
 //
-//        #define DN_STR8_AVX512F 1
+//         `DN_Verify` calls logs an error and continues
+//
+//         `DN_VerifyWarning` calls logs a warning and continues
+//
+//       Level 1
+//         `DN_Assert` calls are compiled in
+//
+//         `DN_Verify` calls a debug trap rather than just logging and continuing
+//
+//         `DN_Verify` calls dump a stack trace when triggered
+//
+//         `DN_ASAN_POISON` is set. When an arena allocates memory unallocated bytes from the
+//         memory owned by the arena are manually poisoned using ASAN. A fault will be triggered if
+//         the memory is written to (UAF e.g. use-after-free). Address sanitizer must be enabled or
+//         otherwise this is a no-op. This incurs a performance penalty on-top of the overhead of
+//         running ASAN on your binary as recycling memory calls into ASAN to poison the region.
+//
+//         `DN_ARENA_TEMP_MEM_UAF_GUARD` is set. When an arena uses temporary memory it will record
+//         the active temporary memory region and compare them when allocating to ensure that
+//         memory is allocated in the active region otherwise a UAF fault is triggered. This has a
+//         small runtime performance penalty.
+//
+//         `DN_SCRUB_UNINIT_MEM_BYTE` is set to `0xCD`. When memory is cleared in an arena or a
+//         pool backed by an arena upon deallocation if the `DN_ZMem_Yes` flag is passed then the
+//         bytes are scrubbed to this byte to make UAF more salient.
+//
+//       Level 2
+//         `DN_ARENA_TEMP_MEM_UAF_TRACE_ON_BY_DEFAULT` is set. When an arena uses temporary memory
+//         regions that region's a stack trace of the call site is recorded. This is very expensive
+//         but when a temporary memory region is used after it has been deallocated, a full stack
+//         trace diagnostic is available of where the various regions where created and freed.
+//
 
 #if defined(_CLANGD)
   #define DN_WITH_OS 1
+  #define DN_WITH_TESTS 1
   #define DN_STR8_AVX512F 1
   #define DN_PARANOIA_LEVEL 1
 #endif
@@ -304,10 +328,8 @@
   #define DN_FORCE_INLINE inline __attribute__((always_inline))
 #endif
 
-// NOTE: Function/Variable Annotations
-#if defined(DN_STATIC_API)
-  #define DN_API static
-#else
+// NOTE: Function Prefix
+#if !defined(DN_API)
   #define DN_API
 #endif
 
@@ -1088,28 +1110,33 @@ enum DN_MemPage_
   #define DN_ARENA_COMMIT_SIZE DN_Kilobytes(64)
 #endif
 
-enum DN_MemFuncsType
+enum DN_HeapType
 {
-  DN_MemFuncsType_Nil,
-  DN_MemFuncsType_Heap,
-  DN_MemFuncsType_Virtual,
+  DN_HeapType_Nil,
+  DN_HeapType_Basic,
+  DN_HeapType_Virtual,
 };
 
-typedef void *(DN_MemHeapAllocFunc)(DN_USize count);
-typedef void  (DN_MemHeapDeallocFunc)(void *ptr);
-typedef void *(DN_MemVirtualReserveFunc)(DN_USize count, DN_MemCommit commit, DN_MemPage page_flags);
-typedef bool  (DN_MemVirtualCommitFunc)(void *ptr, DN_USize count, DN_U32 page_flags);
-typedef void  (DN_MemVirtualReleaseFunc)(void *ptr, DN_USize count);
-struct DN_MemFuncs
+typedef void *(DN_HeapBasicAllocFunc)  (DN_USize count);
+typedef void  (DN_HeapBasicDeallocFunc)(void *ptr);
+
+typedef void *(DN_HeapVirtualReserveFunc)(DN_USize count, DN_MemCommit commit, DN_MemPage page_flags);
+typedef bool  (DN_HeapVirtualCommitFunc)(void *ptr, DN_USize count, DN_U32 page_flags);
+typedef void  (DN_HeapVirtualReleaseFunc)(void *ptr, DN_USize count);
+struct DN_Heap
 {
-  DN_MemFuncsType        type;
-  DN_MemHeapAllocFunc   *heap_alloc;
-  DN_MemHeapDeallocFunc *heap_dealloc;
+  DN_HeapType                type;
+  DN_USize                   bytes_alloc_total;
+  DN_USize                   bytes_alloc;
+  DN_USize                   bytes_freed;
+
+  DN_HeapBasicAllocFunc*     basic_alloc;
+  DN_HeapBasicDeallocFunc*   basic_dealloc;
 
   DN_U32                     virtual_page_size;
-  DN_MemVirtualReserveFunc  *virtual_reserve;
-  DN_MemVirtualCommitFunc   *virtual_commit;
-  DN_MemVirtualReleaseFunc  *virtual_release;
+  DN_HeapVirtualReserveFunc  *virtual_reserve;
+  DN_HeapVirtualCommitFunc   *virtual_commit;
+  DN_HeapVirtualReleaseFunc  *virtual_release;
 };
 
 struct DN_MemBlock
@@ -1165,15 +1192,15 @@ enum DN_MemFlags_
   DN_MemFlags_TempMemUAFTraceDisable = 1 << 6,
 
   // NOTE: Internal flags. Do not use
-  DN_MemFlags_UserBuffer   = 1 << 7,
-  DN_MemFlags_MemFuncs     = 1 << 8,
+  DN_MemFlags_UserBuffer = 1 << 7,
+  DN_MemFlags_Heap       = 1 << 8,
 };
 
 struct DN_MemList
 {
   DN_MemBlock* curr;
   DN_MemFlags  flags;
-  DN_MemFuncs  funcs;
+  DN_Heap      heap;
   DN_MemStats  stats;
   DN_Str8      label;
 
@@ -1833,60 +1860,109 @@ struct DN_ArrayFindResult
 };
 typedef bool (DN_ArrayFindEqFunc)(void const *lhs, void const *find);
 
-enum DN_DSMapKeyType
+enum DN_HTableDeallocPoolOnDeinit
 {
-                                     // Key    | Key Hash         | Map Index
-  DN_DSMapKeyType_Invalid,
-  DN_DSMapKeyType_U64,               // U64    | Hash(U64)        | Hash(U64)        % map_size
-  DN_DSMapKeyType_U64NoHash,         // U64    | U64              | U64              % map_size
-  DN_DSMapKeyType_Buffer,            // Buffer | Hash(buffer)     | Hash(buffer)     % map_size
-  DN_DSMapKeyType_BufferAsU64NoHash, // Buffer | U64(buffer[0:4]) | U64(buffer[0:4]) % map_size
+  DN_HTableDeallocPoolOnDeinit_No,
+  DN_HTableDeallocPoolOnDeinit_Yes,
 };
 
-struct DN_DSMapKey
+enum DN_HTableHashSentinel
 {
-  DN_DSMapKeyType  type;
-  DN_U32           hash; // Hash to lookup in the map. If it equals, we check that the original key payload matches
-  void const      *buffer_data;
-  DN_U32           buffer_size;
-  DN_U64           u64;
-  bool             no_copy_buffer;
+  DN_HTableHashSentinel_Empty = 0,
+  DN_HTableHashSentinel_Tomb,
+  DN_HTableHashSentinel_FirstValid,
 };
 
-template <typename T>
-struct DN_DSMapSlot
+enum DN_HTableFlags_
 {
-  DN_DSMapKey key;   // Hash table lookup key
-  T           value; // Hash table value
+  DN_HTableFlags_DeallocPoolOnDeinit = 1 << 0,
+  DN_HTableFlags_UsingHeap           = 1 << 1,
 };
 
-typedef DN_U32 DN_DSMapFlags;
-enum DN_DSMapFlags_
+typedef DN_U32 DN_HTableHashType;
+typedef DN_U32 DN_HTableFlags;
+
+typedef DN_U32(DN_HTableHashFunc) (void const *key, DN_USize size);
+typedef bool  (DN_HTableKeyEqFunc)(void const *lhs, void const *rhs, DN_USize size);
+struct DN_HTable
 {
-  DN_DSMapFlags_Nil                   = 0,
-  DN_DSMapFlags_DontFreeArenaOnResize = 1 << 0,
+  // NOTE: The total number of slots used by the table is defined as `count` + `tombs_count`
+  DN_USize            count;        // Count of `kvs` that are filled with active values (e.g. hash >= `FirstValid`)
+  DN_USize            tombs_count;  // Count of `kvs` that are tombstoned (e.g. hash == `Tomb`)
+  DN_USize            max;          // Max capacity of `kvs`
+  DN_F32              load_factor01;
+  DN_HTableHashFunc*  hash_func;
+  DN_HTableKeyEqFunc* key_eq_func;
+
+  DN_HTableFlags flags;
+  DN_Heap        heap;
+  DN_Pool        pool;
+
+  // NOTE: Metadata for handling genericism (in C that means type-erasure)
+  void**   kvs;
+  DN_USize offset_of_hash;
+  DN_USize size_of_kv;
+  DN_USize offset_of_key;
+  DN_USize size_of_key;
+  DN_USize offset_of_value;
+  DN_USize size_of_value;
 };
 
-using DN_DSMapHashFunction = DN_U32(DN_DSMapKey key, DN_U32 seed);
-template <typename T> struct DN_DSMap
+struct DN_HTableInitArgs
 {
-  DN_U32               *hash_to_slot;  // Mapping from hash to a index in the slots array
-  DN_DSMapSlot<T>      *slots;         // Values of the array stored contiguously, non-sorted order
-  DN_U32                size;          // Total capacity of the map and is a power of two
-  DN_U32                occupied;      // Number of slots used in the hash table
-  DN_Arena             *arena;         // Backing arena for the hash table
-  DN_Pool               pool;          // Allocator for keys that are variable-sized buffers
-  DN_U32                initial_size;  // Initial map size, map cannot shrink on erase below this size
-  DN_DSMapHashFunction *hash_function; // Custom hashing function to use if field is set
-  DN_U32                hash_seed;     // Seed for the hashing function, when 0, DN_DS_MAP_DEFAULT_HASH_SEED is used
-  DN_DSMapFlags         flags;
+  DN_F32              load_factor;
+  DN_HTableHashFunc*  hash_func;
+  DN_HTableKeyEqFunc* key_eq_func;
+  DN_USize            max;
+  void**              kvs;
+  DN_USize            offset_of_hash;
+  DN_USize            size_of_kv;
+  DN_USize            offset_of_key;
+  DN_USize            size_of_key;
+  DN_USize            offset_of_value;
+  DN_USize            size_of_value;
 };
 
-template <typename T> struct DN_DSMapResult
+struct DN_HTableSlot
 {
-  bool             found;
-  DN_DSMapSlot<T> *slot;
-  T               *value;
+  // NOTE: Type-erased lookup of the {hash, key, value} object in the hash table
+  DN_HTableHashType hash_u32;  // Hash copied out to a U32 for convenience
+  DN_USize          kvs_index; // Index into `kvs` that the following {hash, key, value} pointers are pointing to
+  void*             kv_struct; // Pointer to the matched kv struct
+  void*             hash;      // Pointer to the hash embedded in the user's `kvs` struct
+  void*             key;       // Pointer to the key embedded in the user's `kvs` struct
+  void*             value;     // Pointer to the value embedded in the user's `kvs` struct
+};
+
+struct DN_HTableAddResult
+{
+  bool          success; // Adding fails if adding required a table resize and resizing failed (out-of-memory)
+  bool          existed; // Set if the item you attempted to add, already existed in the table and it was updated instead
+  DN_HTableSlot slot;    // Table slot containing the value you just added, zero initialised struct on failure
+};
+
+struct DN_HTableLookupResult
+{
+  DN_HTableHashType key_hash; // hash(key) that was used to look up `slot`
+  DN_HTableSlot     slot;     // KV object from `kvs`, always set (either empty, tombed, or active slot)
+};
+
+struct DN_HTableResizeResult
+{
+  bool success;
+  bool needed_resize;
+};
+
+struct DN_HTableInitResult
+{
+  DN_HTable table;
+  bool      success; // Fails if the allocator could not allocate memory for the table
+};
+
+enum DN_HTableAllowTombstone
+{
+  DN_HTableAllowTombstone_No,
+  DN_HTableAllowTombstone_Yes,
 };
 
 enum DN_LeakAllocFlag
@@ -1909,13 +1985,19 @@ struct DN_LeakAlloc
 // expensive. Enforce that there is no unexpected padding.
 DN_StaticAssert(sizeof(DN_LeakAlloc) == 64 || sizeof(DN_LeakAlloc) == 32); // NOTE: 64 bit vs 32 bit pointers respectively
 
+struct DN_LeakTrackerKV
+{
+  DN_HTableHashType hash;
+  DN_UPtr           key;
+  DN_LeakAlloc      value;
+};
+
 struct DN_LeakTracker
 {
-  DN_DSMap<DN_LeakAlloc> alloc_table;
-  DN_TicketMutex         alloc_table_mutex;
-  DN_MemList             alloc_table_mem;
-  DN_Arena               alloc_table_arena;
-  DN_U64                 alloc_table_bytes_allocated_for_stack_traces;
+  DN_LeakTrackerKV *alloc_table_kvs;
+  DN_HTable         alloc_table;
+  DN_TicketMutex    alloc_table_mutex;
+  DN_U64            alloc_table_bytes_allocated_for_stack_traces;
 };
 
 typedef DN_USize DN_InitFlags;
@@ -1930,6 +2012,103 @@ enum DN_InitFlags_
   DN_InitFlags_LogLibFeatures = (1 << 2),
   DN_InitFlags_LogCPUFeatures = (1 << 3) | DN_InitFlags_OS,
   DN_InitFlags_LogAllFeatures = DN_InitFlags_LogLibFeatures | DN_InitFlags_LogCPUFeatures,
+};
+
+enum DN_BinPackMode
+{
+  DN_BinPackMode_Serialise,
+  DN_BinPackMode_Deserialise,
+};
+
+struct DN_BinPack
+{
+  DN_Str8Builder writer;
+  DN_Str8        read;
+  DN_USize       read_index;
+};
+
+enum DN_CSVSerialise
+{
+  DN_CSVSerialise_Read,
+  DN_CSVSerialise_Write,
+};
+
+struct DN_CSVTokeniser
+{
+  bool        bad;
+  DN_Str8     string;
+  char        delimiter;
+  char const *it;
+  bool        end_of_line;
+};
+
+struct DN_CSVPack
+{
+  DN_Str8Builder  write_builder;
+  DN_USize        write_column;
+  DN_CSVTokeniser read_tokeniser;
+};
+
+struct DN_TestDiagnosticRow
+{
+  DN_Str8     expr;
+  DN_Str8     invariant;
+  DN_CallSite call_site;
+  DN_Str8     message;
+};
+
+struct DN_TestEntry
+{
+  bool                  failed;
+  DN_Str8               name;
+  DN_TestDiagnosticRow* diagnostics;
+  DN_USize              diagnostics_count;
+  DN_USize              diagnostics_max;
+  DN_U64                ts_begin;
+  DN_U64                ts_end;
+};
+
+struct DN_TestGroup
+{
+  DN_Str8        name;
+  DN_TestEntry*  entries;       // Array of tests cases that have been executed/are being executed
+  DN_USize       entries_count;
+  DN_USize       entries_max;
+  DN_U64         ts_begin;      // Timestamp of when the test started (using DN_OS_PerfCounter)
+  DN_U64         ts_end;        // Timestamp of when the test ended
+  DN_TestEntry*  curr_entry;    // Active test being executed and results should be updated into
+};
+
+struct DN_TestCore
+{
+  DN_Arena*      arena;
+  DN_Pool        pool;
+  DN_USize       total_passed; // Total number of tests (`TestEntry`) across all groups that passed
+  DN_USize       total_failed; // Total number of tests (`TestEntry`) across all groups that failed
+  DN_USize       total_count;  // Total number of tests (`TestEntry`) across all groups
+
+  DN_TestGroup*  groups;
+  DN_USize       groups_count;
+  DN_USize       groups_max;
+
+  DN_TestGroup*  curr_group;   // Active test group being executed and test entries are being added to
+};
+
+enum DN_TestLogic
+{
+  DN_TestLogic_GreaterThan,
+  DN_TestLogic_GreaterThanEq,
+  DN_TestLogic_LessThan,
+  DN_TestLogic_LessThanEq,
+  DN_TestLogic_Eq,
+  DN_TestLogic_NotEq,
+};
+
+typedef DN_U32 DN_Str8FromTestCoreFlags;
+enum DN_Str8FromTestCoreFlags_
+{
+  DN_Str8FromTestCoreFlags_Nil,
+  DN_Str8FromTestCoreFlags_Colour,
 };
 
 #if !defined(DN_STB_SPRINTF_HEADER_ONLY)
@@ -2132,8 +2311,18 @@ struct DN_OSConditionVariable
   DN_U64 handle;
 };
 
-// NOTE: DN_OSThread
 typedef DN_I32(DN_OSThreadFunc)(struct DN_OSThread *);
+struct DN_OSThreadInitArgs
+{
+  // NOTE: Customise much memory the thread's TLS context will be initialised with which contains
+  // persistent/temporary allocators and misc facilities that each thread has exclusive access to.
+   DN_TCInitArgs tc_args;
+
+   // NOTE: Set how much stack space in bytes the thread will have. Leave this value to 0 to defer
+   // to the OS's default stack size.
+   DN_USize      stack_size;
+};
+
 struct DN_OSThreadLane
 {
   DN_USize     index;
@@ -2260,14 +2449,26 @@ struct DN_Core
   #endif
 };
 
-// NOTE: Library initialisation. This must be called before using the library once to setup TLS and
-// query the OS for information (such as page size) for tuning allocations and so forth. The caller
-// should pass in a zero-initialised `DN_Core` that should persist for program lifetime.
+// NOTE: Library initialisation
+// Overview
+//   You must initialise the library to setup pre-requisite data structures that some APIs in the
+//   library take advantage of. The `DN_Core` object must remain valid for the lifetime of the
+//   library.
 //
-// A reference to the core passed in is kept which can be queried with `DN_Get` and may be used
-// internally by the library. If you have an application that has the concept of frames, you may
-// optionally call `DN_BeginFrame` which resets some metrics that are counted for example it tracks
-// the number of memory allocations for the current frame and that counter can be reset.
+// API
+//   DN_Init
+//     This must be called before using the library once to setup TLS and query the OS for
+//     information (such as page size) for tuning allocations and so forth. The
+//     caller should pass in a zero-initialised `DN_Core` that should persist for program lifetime.
+//
+//     A reference to the core passed in is kept which can be queried with `DN_Get` and may be used
+//     internally by the library. If you have an application that has the concept of frames, you may
+//     optionally call `DN_BeginFrame` which resets some metrics that are counted for example it
+//     tracks the number of memory allocations for the current frame and that counter can be reset.
+//
+//     For convenience you can opt into some sane defaults for the `DN_TCInitArgs` which customises
+//     how thread-local storage is setup with `DN_TCInitArgsDefault()` which produces a
+//     `DN_TCInitArgs` object you can pass in by value.
 DN_API void                     DN_Init                                                (DN_Core *dn, DN_InitFlags flags, DN_TCInitArgs args);
 DN_API void                     DN_Set                                                 (DN_Core *dn);
 DN_API DN_Core*                 DN_Get                                                 ();
@@ -2418,20 +2619,48 @@ DN_API DN_F32                   DN_EpsilonClampF32                              
 DN_API DN_MemStats              DN_MemStatsSum                                         (DN_MemStats lhs, DN_MemStats rhs);
 DN_API DN_MemStats              DN_MemStatsSumArray                                    (DN_MemStats const *array, DN_USize count);
 
+// NOTE: Heap
+// Overview
+//   Generic heap allocators that can do arbitrary memory allocations and deallocations. It's a very
+//   thin wrapper that tracks the number of bytes allocated and deallocated and is accepted by some
+//   data structures in the codebase that opt out or have an alternative to arena allocations (of
+//   which arenas are the predominant where it makes sense to).
+//
+//   Basic heap takes an API for routines in the likes of malloc/free (CRT/POSIX) or
+//   HeapAlloc/HeapFree (Win32) which take a size and a pointer to free.
+//
+//   Virtual heap takes an API for routines in the likes of VirtualAlloc (Win32) or mmap (POSIX) and
+//   those family of functions.
+
+// API
+//   DN_HeapAlloc
+//   DN_HeapDealloc
+//     Allocate and deallocate memory. Note that `DN_HeapAlloc` takes reserve and commit even for
+//     the basic allocator. In the basic allocator which does not have a concept of reserving and
+//     committing, the `commit` value is ignored and the `reserve` amount is the amount that will be
+//     allocated.
+DN_API DN_Heap                  DN_HeapInitBasic                                       (DN_HeapBasicAllocFunc *basic_alloc, DN_HeapBasicDeallocFunc *basic_dealloc);
+DN_API DN_Heap                  DN_HeapInitVirtual                                     (DN_U32 page_size, DN_HeapVirtualReserveFunc *virtual_reserve, DN_HeapVirtualCommitFunc *virtual_commit, DN_HeapVirtualReleaseFunc *virtual_release);
+DN_API void*                    DN_HeapAlloc                                           (DN_Heap *heap, DN_USize reserve, DN_USize commit);
+DN_API void                     DN_HeapDealloc                                         (DN_Heap *heap, void *ptr, DN_USize size);
+
 // NOTE: MemList
 // Overview
 //   `MemList` is an implementation of a classical `Arena` (e.g. bump allocator, can dynamically
 //   grow, frees by bumping pointer back, sub-divides a block of memory). The term `Arena` is
 //   reserved as a thin-layer over the functionality here to provide some use-after-free protection.
 //   See `Arena` for more info.
+//
+//   In general for 99% of use-cases you want an `Arena` and if some API is not exposed on the
+//   `Arena` to then use the `MemList` API on the embedded `mem_list` backing the Arena.
 DN_API DN_MemList               DN_MemListFromBuffer                                   (void *buffer, DN_USize size, DN_MemFlags flags);
-DN_API DN_MemList               DN_MemListFromMemFuncs                                 (DN_U64 reserve, DN_U64 commit, DN_MemFlags flags, DN_MemFuncs mem_funcs);
+DN_API DN_MemList               DN_MemListFromHeap                                     (DN_U64 reserve, DN_U64 commit, DN_MemFlags flags, DN_Heap heap);
 DN_API void                     DN_MemListDeinit                                       (DN_MemList *mem);
 DN_API bool                     DN_MemListCommit                                       (DN_MemList *mem, DN_U64 size);
 DN_API bool                     DN_MemListCommitTo                                     (DN_MemList *mem, DN_U64 pos);
 DN_API bool                     DN_MemListGrow                                         (DN_MemList *mem, DN_U64 reserve, DN_U64 commit);
-DN_API void *                   DN_MemListAlloc                                        (DN_MemList *mem, DN_U64 size, uint8_t align, DN_ZMem zmem);
-DN_API void *                   DN_MemListAllocContiguous                              (DN_MemList *mem, DN_U64 size, uint8_t align, DN_ZMem zmem);
+DN_API void *                   DN_MemListAlloc                                        (DN_MemList *mem, DN_U64 size, DN_U8 align, DN_ZMem zmem);
+DN_API void *                   DN_MemListAllocContiguous                              (DN_MemList *mem, DN_U64 size, DN_U8 align, DN_ZMem zmem);
 DN_API void *                   DN_MemListCopy                                         (DN_MemList *mem, void const *data, DN_U64 size, uint8_t align);
 DN_API void                     DN_MemListPopTo                                        (DN_MemList *mem, DN_U64 init_used);
 DN_API void                     DN_MemListPop                                          (DN_MemList *mem, DN_U64 amount);
@@ -2471,10 +2700,10 @@ DN_API void                     DN_MemListTempEnd                               
 //   To get UAF protection, all allocations _must_ go through the `Arena` API, using the `MemList`
 //   field directly in the `Arena` will bypass these checks and lead to unusual behaviour. If you
 //   want to forgo any of this infrastructure store and use the `MemList` directly in your codebase.
-//
+
 // UAF Example
 /*
-   DN_Arena arena = DN_ArenaFromHeap(DN_Megabytes(1), DN_MemFlags_Nil);
+   DN_Arena arena = DN_ArenaFromHeap(DN_Megabytes(1), DN_Kilobytes(64), DN_MemFlags_Nil, DN_OS_HeapInitDefault());
    DN_Arena temp  = DN_ArenaTempBeginFromArena(&arena);
    {
      // NOTE: You can also `TempBegin` with `&temp`, either is valid. They both have pointers to
@@ -2486,8 +2715,9 @@ DN_API void                     DN_MemListTempEnd                               
      // the same underlying memory block sitting in `arena`.
      //
      // But the intent here is that the caller is resetting `nested_temp`'s allocations and not
-     // `temp` hence the UAF protection triggers.
-     DN_U64 *u64          = DN_ArenaNewZ(&temp, DN_U64);
+     // `temp` hence the UAF protection triggers. The only permissible way to allocate in this
+     // region is to allocate from `nested_temp` (the active region).
+     DN_U64 *u64  = DN_ArenaNewZ(&temp, DN_U64);
 
      DN_ArenaTempEnd(&nested_temp);
    }
@@ -2495,12 +2725,13 @@ DN_API void                     DN_MemListTempEnd                               
    DN_ArenaDeinit(&arena); // Frees the memory
  */
 DN_API DN_Arena                 DN_ArenaFromMemList                                    (DN_MemList *mem);
+DN_API DN_Arena                 DN_ArenaFromHeap                                       (DN_U64 reserve, DN_U64 commit, DN_MemFlags flags, DN_Heap heap);
 DN_API DN_Arena                 DN_ArenaTempBeginFromMemList                           (DN_MemList *mem);
 DN_API DN_Arena                 DN_ArenaTempBeginFromArena                             (DN_Arena *arena);
 DN_API void                     DN_ArenaTempEnd                                        (DN_Arena *arena, DN_ArenaReset reset);
-DN_API void*                    DN_ArenaAlloc                                          (DN_Arena *arena, DN_U64 size, uint8_t align, DN_ZMem z_mem);
-DN_API void*                    DN_ArenaAllocContiguous                                (DN_Arena *arena, DN_U64 size, uint8_t align, DN_ZMem z_arena);
-DN_API void*                    DN_ArenaCopy                                           (DN_Arena *arena, void const *data, DN_U64 size, uint8_t align);
+DN_API void*                    DN_ArenaAlloc                                          (DN_Arena *arena, DN_U64 size, DN_U8 align, DN_ZMem z_mem);
+DN_API void*                    DN_ArenaAllocContiguous                                (DN_Arena *arena, DN_U64 size, DN_U8 align, DN_ZMem z_arena);
+DN_API void*                    DN_ArenaCopy                                           (DN_Arena *arena, void const *data, DN_U64 size, DN_U8 align);
 DN_API void                     DN_ArenaDeinit                                         (DN_Arena *arena);
 
 #define                         DN_ArenaNew(arena, T, zmem)                            (T *)DN_ArenaAlloc(arena, sizeof(T), alignof(T), zmem)
@@ -2547,7 +2778,7 @@ DN_API void                     DN_ErrSinkAppendF_                              
 
 DN_API DN_TCInitArgs            DN_TCInitArgsDefault                                   ();
 DN_API void                     DN_TCInit                                              (DN_TCCore *tc, DN_U64 thread_id, DN_Arena *main_arena, DN_Arena *temp_arenas, DN_USize temp_arenas_count, DN_Arena *err_sink_arena);
-DN_API void                     DN_TCInitFromMemFuncs                                  (DN_TCCore *tc, DN_U64 thread_id, DN_TCInitArgs args, DN_MemFuncs mem_funcs);
+DN_API void                     DN_TCInitFromHeap                                      (DN_TCCore *tc, DN_U64 thread_id, DN_TCInitArgs args, DN_Heap heap);
 DN_API void                     DN_TCDeinit                                            (DN_TCCore *tc, DN_TCDeinitArenas deinit_arenas);
 DN_API void                     DN_TCEquip                                             (DN_TCCore *tc);
 DN_API DN_TCCore*               DN_TCGet                                               ();
@@ -2572,9 +2803,13 @@ DN_API bool                     DN_CharIsHex                                    
 DN_API char                     DN_CharToLower                                         (char ch);
 DN_API char                     DN_CharToUpper                                         (char ch);
 
-DN_API DN_U64FromResult         DN_U64FromStr8                                         (DN_Str8 string, char separator);
-DN_API DN_U64FromResult         DN_U64FromPtr                                          (void const *data, DN_USize size, char separator);
-DN_API DN_U64                   DN_U64FromPtrUnsafe                                    (void const *data, DN_USize size, char separator);
+DN_API DN_U64FromResult         DN_U64FromStr8Delimiters                               (DN_Str8 string, DN_Str8 const *delimiters, DN_USize delimiters_count);
+DN_API DN_U64FromResult         DN_U64FromStr8Delimiter                                (DN_Str8 string, DN_Str8 delimiter);
+DN_API DN_U64FromResult         DN_U64FromStr8                                         (DN_Str8 string);
+DN_API DN_U64FromResult         DN_U64FromPtrDelimiter                                 (void const *data, DN_USize size, DN_Str8 delimiter);
+DN_API DN_U64FromResult         DN_U64FromPtr                                          (void const *data, DN_USize size);
+DN_API DN_U64                   DN_U64FromPtrUnsafeDelimiter                           (void const *data, DN_USize size, DN_Str8 delimiter);
+DN_API DN_U64                   DN_U64FromPtrUnsafe                                    (void const *data, DN_USize size);
 DN_API DN_U64FromResult         DN_U64FromHexPtr                                       (void const *hex, DN_USize hex_count);
 DN_API DN_U64                   DN_U64FromHexPtrUnsafe                                 (void const *hex, DN_USize hex_count);
 DN_API DN_U64FromResult         DN_U64FromHexStr8                                      (DN_Str8 hex);
@@ -2679,18 +2914,27 @@ DN_API DN_Str8FindResult        DN_Str8FindStr8                                 
 DN_API DN_Str8FindResult        DN_Str8Find                                            (DN_Str8 string, DN_Str8FindFlag flags);
 DN_API DN_Str8                  DN_Str8Segment                                         (DN_Arena *arena, DN_Str8 src, DN_USize segment_size, char segment_char);
 DN_API DN_Str8                  DN_Str8ReverseSegment                                  (DN_Arena *arena, DN_Str8 src, DN_USize segment_size, char segment_char);
-DN_API bool                     DN_Str8Eq                                              (DN_Str8 lhs, DN_Str8 rhs, DN_Str8EqCase eq_case = DN_Str8EqCase_Sensitive);
+DN_API bool                     DN_Str8Eq                                              (DN_Str8 lhs, DN_Str8 rhs, DN_Str8EqCase eq_case);
+DN_API bool                     DN_Str8EqSensitive                                     (DN_Str8 lhs, DN_Str8 rhs);
 DN_API bool                     DN_Str8EqInsensitive                                   (DN_Str8 lhs, DN_Str8 rhs);
-DN_API bool                     DN_Str8StartsWith                                      (DN_Str8 string, DN_Str8 prefix, DN_Str8EqCase eq_case = DN_Str8EqCase_Sensitive);
+DN_API bool                     DN_Str8StartsWith                                      (DN_Str8 string, DN_Str8 prefix, DN_Str8EqCase eq_case);
+DN_API bool                     DN_Str8StartsWithSensitive                             (DN_Str8 string, DN_Str8 prefix);
 DN_API bool                     DN_Str8StartsWithInsensitive                           (DN_Str8 string, DN_Str8 prefix);
-DN_API bool                     DN_Str8EndsWith                                        (DN_Str8 string, DN_Str8 prefix, DN_Str8EqCase eq_case = DN_Str8EqCase_Sensitive);
+DN_API bool                     DN_Str8EndsWith                                        (DN_Str8 string, DN_Str8 prefix, DN_Str8EqCase eq_case);
+DN_API bool                     DN_Str8EndsWithSensitive                               (DN_Str8 string, DN_Str8 prefix);
 DN_API bool                     DN_Str8EndsWithInsensitive                             (DN_Str8 string, DN_Str8 prefix);
 DN_API bool                     DN_Str8HasChar                                         (DN_Str8 string, char ch);
 
-DN_API DN_Str8                  DN_Str8TrimPrefix                                      (DN_Str8 string, DN_Str8 prefix, DN_Str8EqCase eq_case = DN_Str8EqCase_Sensitive);
+DN_API DN_Str8                  DN_Str8TrimPrefix                                      (DN_Str8 string, DN_Str8 prefix, DN_Str8EqCase eq_case);
+DN_API DN_Str8                  DN_Str8TrimPrefixSensitive                             (DN_Str8 string, DN_Str8 prefix);
+DN_API DN_Str8                  DN_Str8TrimPrefixInsensitive                           (DN_Str8 string, DN_Str8 prefix);
 DN_API DN_Str8                  DN_Str8TrimHexPrefix                                   (DN_Str8 string);
-DN_API DN_Str8                  DN_Str8TrimSuffix                                      (DN_Str8 string, DN_Str8 suffix, DN_Str8EqCase eq_case = DN_Str8EqCase_Sensitive);
-DN_API DN_Str8                  DN_Str8TrimAround                                      (DN_Str8 string, DN_Str8 trim_string);
+DN_API DN_Str8                  DN_Str8TrimSuffix                                      (DN_Str8 string, DN_Str8 suffix, DN_Str8EqCase eq_case);
+DN_API DN_Str8                  DN_Str8TrimSuffixSensitive                             (DN_Str8 string, DN_Str8 suffix);
+DN_API DN_Str8                  DN_Str8TrimSuffixInsensitive                           (DN_Str8 string, DN_Str8 suffix);
+DN_API DN_Str8                  DN_Str8TrimAround                                      (DN_Str8 string, DN_Str8 trim_string, DN_Str8EqCase eq_case);
+DN_API DN_Str8                  DN_Str8TrimAroundSensitive                             (DN_Str8 string, DN_Str8 trim_string);
+DN_API DN_Str8                  DN_Str8TrimAroundInsensitive                           (DN_Str8 string, DN_Str8 trim_string);
 DN_API DN_Str8                  DN_Str8TrimHeadWhitespace                              (DN_Str8 string);
 DN_API DN_Str8                  DN_Str8TrimTailWhitespace                              (DN_Str8 string);
 DN_API DN_Str8                  DN_Str8TrimWhitespaceAround                            (DN_Str8 string);
@@ -2719,7 +2963,7 @@ DN_API DN_Str8                  DN_Str8LineBreakAllocator                       
 DN_API DN_Str8                  DN_Str8LineBreakArena                                  (DN_Str8 src, DN_USize desired_width, DN_Str8 delimiter, DN_Str8LineBreakMode mode, DN_Arena *arena);
 DN_API DN_Str8                  DN_Str8Table                                           (DN_Str8 const* rows, DN_USize num_rows, DN_USize num_cols, DN_Str8TableFlags flags, DN_Arena *arena);
 
-#if DN_STR8_AVX512F
+#if DN_WITH_STR8_AVX512F
 DN_API DN_Str8FindResult        DN_Str8FindStr8AVX512F                                 (DN_Str8 string, DN_Str8 find);
 DN_API DN_Str8FindResult        DN_Str8FindLastStr8AVX512F                             (DN_Str8 string, DN_Str8 find);
 DN_API DN_Str8BSplitResult      DN_Str8BSplitAVX512F                                   (DN_Str8 string, DN_Str8 find);
@@ -3492,10 +3736,14 @@ DN_API DN_RaycastV2            DN_RaycastLineIntersectV2                        
   #define DN_PArrayFindMemEq(ptr, size, ptr_find)                              DN_TArrayFindMemEq(ptr, size, ptr_find)
   #define DN_PArrayResizeFromPool(ptr, ptr_size, ptr_max, pool, new_max)       DN_TArrayResizeFromPool(&(ptr), ptr_size, ptr_max, pool, new_max)
   #define DN_PArrayResizeFromArena(ptr, ptr_size, ptr_max, arena, new_max)     DN_TArrayResizeFromArena(&(ptr), ptr_size, ptr_max, arena, new_max)
-  #define DN_PArrayGrowFromPool(ptr, size, ptr_max, pool, new_max)             DN_TArrayGrowFromPool(&(ptr), size, ptr_max, pool, new_max)
-  #define DN_PArrayGrowFromArena(ptr, size, ptr_max, arena, new_max)           DN_TArrayGrowFromArena(&(ptr), size, ptr_max, arena, new_max)
-  #define DN_PArrayGrowIfNeededFromPool(ptr, size, ptr_max, pool, add_count)   DN_TArrayGrowIfNeededFromPool(ptr, size, ptr_max, pool, add_count)
-  #define DN_PArrayGrowIfNeededFromArena(ptr, size, ptr_max, arena, add_count) DN_TArrayGrowIfNeededFromArena(ptr, size, ptr_max, arena, add_count)
+  #define DN_PArrayGrowFromPool(ptr, ptr_max, pool, new_max)                   DN_TArrayGrowFromPool(&(ptr), ptr_max, pool, new_max)
+  #define DN_PArrayGrowFromArena(ptr, ptr_max, arena, new_max)                 DN_TArrayGrowFromArena(&(ptr), ptr_max, arena, new_max)
+  #define DN_PArrayGrowIfNeededFromPool(ptr, size, ptr_max, pool, add_count)   DN_TArrayGrowIfNeededFromPool(&(ptr), size, ptr_max, pool, add_count)
+  #define DN_PArrayGrowIfNeededFromArena(ptr, size, ptr_max, arena, add_count) DN_TArrayGrowIfNeededFromArena(&(ptr), size, ptr_max, arena, add_count)
+  #define DN_PArrayCopyPtrPool(dest, src, count_, pool)                        DN_TArrayCopyPtrPool(&(dest), src, count_, pool)
+  #define DN_PArrayCopyPtrPoolAssert(dest, src, count_, pool)                  DN_TArrayCopyPtrPoolAssert(&(dest), src, count_, pool, DN_CallSiteNow)
+  #define DN_PArrayCopyPtrArena(dest, src, count_, arena)                      DN_TArrayCopyPtrArena(&(dest), src, count_, arena)
+  #define DN_PArrayCopyPtrArenaAssert(dest, src, count_, arena)                DN_TArrayCopyPtrArenaAssert(&(dest), src, count_, arena, DN_CallSiteNow)
 
   #define DN_PArrayMakeArray(ptr, ptr_size, max, count, z_mem)                 DN_TArrayMakeArray(ptr, ptr_size, max, count, z_mem)
   #define DN_PArrayMakeArrayZ(ptr, ptr_size, max, count)                       DN_TArrayMakeArray(ptr, ptr_size, max, count, DN_ZMem_Yes)
@@ -3530,10 +3778,14 @@ DN_API DN_RaycastV2            DN_RaycastLineIntersectV2                        
   #define DN_PArrayFindMemEq(ptr, size, ptr_find)                              DN_ArrayFindMemEq(ptr, size, sizeof(*(ptr)), ptr_find)
   #define DN_PArrayResizeFromPool(ptr, ptr_size, ptr_max, pool, new_max)       DN_ArrayResizeFromPool((void **)&(ptr), ptr_size, ptr_max, sizeof((ptr)[0]), pool, new_max)
   #define DN_PArrayResizeFromArena(ptr, ptr_size, ptr_max, arena, new_max)     DN_ArrayResizeFromArena((void **)&(ptr), ptr_size, ptr_max, sizeof((ptr)[0]), arena, new_max)
-  #define DN_PArrayGrowFromPool(ptr, size, ptr_max, pool, new_max)             DN_ArrayGrowFromPool((void **)&(ptr), size, ptr_max, sizeof((ptr)[0]), pool, new_max)
-  #define DN_PArrayGrowFromArena(ptr, size, ptr_max, arena, new_max)           DN_ArrayGrowFromArena((void **)&(ptr), size, ptr_max, sizeof((ptr)[0]), arena, new_max)
+  #define DN_PArrayGrowFromPool(ptr, ptr_max, pool, new_max)                   DN_ArrayGrowFromPool((void **)&(ptr), ptr_max, sizeof((ptr)[0]), pool, new_max)
+  #define DN_PArrayGrowFromArena(ptr, ptr_max, arena, new_max)                 DN_ArrayGrowFromArena((void **)&(ptr), ptr_max, sizeof((ptr)[0]), arena, new_max)
   #define DN_PArrayGrowIfNeededFromPool(ptr, size, ptr_max, pool, add_count)   DN_ArrayGrowIfNeededFromPool((void **)(ptr), size, ptr_max, sizeof((*ptr)[0]), pool, add_count)
   #define DN_PArrayGrowIfNeededFromArena(ptr, size, ptr_max, arena, add_count) DN_ArrayGrowIfNeededFromArena((void **)(ptr), size, ptr_max, sizeof((*ptr)[0]), arena, add_count)
+  #define DN_PArrayCopyPtrPool(ptr_array, src, count_, pool)                   DN_ArrayCopyPtrPool(ptr_array, src, count_, sizeof((*ptr)[0]), pool)
+  #define DN_PArrayCopyPtrPoolAssert(ptr_array, src, count_, pool)             DN_ArrayCopyPtrPool(ptr_array, src, count_, sizeof((*ptr)[0]), pool, DN_CallSiteNow)
+  #define DN_PArrayCopyPtrArena(ptr_array, src, count_, arena)                 DN_ArrayCopyPtrArena(ptr_array, src, count_, sizeof((*ptr)[0]), arena)
+  #define DN_PArrayCopyPtrArenaAssert(ptr_array, src, count_, arena)           DN_ArrayCopyPtrArena(ptr_array, src, count_, sizeof((*ptr)[0]), arena, DN_CallSiteNow)
 
   #define DN_PArrayMakeArray(ptr, ptr_size, max, count, z_mem)                 (DN_CppDeclType(&(ptr)[0]))DN_ArrayMakeArray(ptr, ptr_size, max, sizeof((ptr)[0]), count, z_mem)
   #define DN_PArrayMakeArrayZ(ptr, ptr_size, max, count)                       (DN_CppDeclType(&(ptr)[0]))DN_ArrayMakeArray(ptr, ptr_size, max, sizeof((ptr)[0]), count, DN_ZMem_Yes)
@@ -3567,12 +3819,6 @@ DN_API DN_RaycastV2            DN_RaycastLineIntersectV2                        
 
 #define                                   DN_LArrayFind(c_array, size, ptr_find, eq_func)                      DN_PArrayFind(c_array, size, ptr_find, eq_func)
 #define                                   DN_LArrayFindMemEq(c_array, size, ptr_find)                          DN_PArrayFindMemEq(c_array, size, ptr_find)
-#define                                   DN_LArrayResizeFromPool(c_array, size, pool, new_max)                DN_PArrayResizeFromPool(c_array, size, DN_ArrayCountU(c_array), pool, new_max)
-#define                                   DN_LArrayResizeFromArena(c_array, size, arena, new_max)              DN_PArrayResizeFromArena(c_array, size, DN_ArrayCountU(c_array), arena, new_max)
-#define                                   DN_LArrayGrowFromPool(c_array, size, pool, new_max)                  DN_PArrayGrowFromPool(c_array, size, DN_ArrayCountU(c_array), pool, new_max)
-#define                                   DN_LArrayGrowFromArena(c_array, size, arena, new_max)                DN_PArrayGrowFromArena(c_array, size, DN_ArrayCountU(c_array), arena, new_max)
-#define                                   DN_LArrayGrowIfNeededFromPool(c_array, size, pool, add_count)        DN_PArrayGrowIfNeededFromPool(c_array, size, DN_ArrayCountU(c_array), pool, add_count)
-#define                                   DN_LArrayGrowIfNeededFromArena(c_array, size, arena, add_count)      DN_PArrayGrowIfNeededFromArena(c_array, size, DN_ArrayCountU(c_array), arena, add_count)
 
 #define                                   DN_LArrayMakeArray(c_array, ptr_size, count, z_mem)                  DN_PArrayMakeArray(c_array, ptr_size, DN_ArrayCountU(c_array), count, z_mem)
 #define                                   DN_LArrayMakeArrayZ(c_array, ptr_size, count)                        DN_PArrayMakeArrayZ(c_array, ptr_size, DN_ArrayCountU(c_array), count)
@@ -3606,17 +3852,21 @@ DN_API DN_RaycastV2            DN_RaycastLineIntersectV2                        
 #define                                   DN_IArrayFindMemEq(ptr_array, ptr_find)                              DN_PArrayFindMemEq((ptr_array)->data, (ptr_array)->count, ptr_find)
 #define                                   DN_IArrayResizeFromPool(ptr_array, pool, new_max)                    DN_PArrayResizeFromPool((ptr_array)->data, &(ptr_array)->count, &(ptr_array)->max, pool, new_max)
 #define                                   DN_IArrayResizeFromArena(ptr_array, arena, new_max)                  DN_PArrayResizeFromArena((ptr_array)->data, &(ptr_array)->count, &(ptr_array)->max, arena, new_max)
-#define                                   DN_IArrayGrowFromPool(ptr_array, pool, new_max)                      DN_PArrayGrowFromPool((ptr_array)->data, (ptr_array)->count, &(ptr_array)->max, pool, new_max)
-#define                                   DN_IArrayGrowFromArena(ptr_array, arena, new_max)                    DN_PArrayGrowFromArena((ptr_array)->data, (ptr_array)->count, &(ptr_array)->max, arena, new_max)
+#define                                   DN_IArrayGrowFromPool(ptr_array, pool, new_max)                      DN_PArrayGrowFromPool((ptr_array)->data, &(ptr_array)->max, pool, new_max)
+#define                                   DN_IArrayGrowFromArena(ptr_array, arena, new_max)                    DN_PArrayGrowFromArena((ptr_array)->data, &(ptr_array)->max, arena, new_max)
 #define                                   DN_IArrayGrowIfNeededFromPool(ptr_array, pool, add_count)            DN_PArrayGrowIfNeededFromPool(&(ptr_array)->data, (ptr_array)->count, &(ptr_array)->max, pool, add_count)
 #define                                   DN_IArrayGrowIfNeededFromArena(ptr_array, arena, add_count)          DN_PArrayGrowIfNeededFromArena(&(ptr_array)->data, (ptr_array)->count, &(ptr_array)->max, arena, add_count)
+#define                                   DN_IArrayCopyPtrPool(ptr_array, src, count_, pool)                   (ptr_array)->max = (ptr_array)->count = DN_PArrayCopyPtrPool((ptr_array), src, count_, pool)
+#define                                   DN_IArrayCopyPtrPoolAssert(ptr_array, src, count_, pool)             (ptr_array)->max = (ptr_array)->count = DN_PArrayCopyPtrPoolAssert((ptr_array), src, count_, pool)
+#define                                   DN_IArrayCopyPtrArena(ptr_array, src, count_, arena)                 (ptr_array)->max = (ptr_array)->count = DN_PArrayCopyPtrArena((ptr_array), src, count_, arena)
+#define                                   DN_IArrayCopyPtrArenaAssert(ptr_array, src, count_, arena)           (ptr_array)->max = (ptr_array)->count = DN_PArrayCopyPtrArenaAssert((ptr_array), src, count_, arena)
 
-#define                                   DN_IArrayMakeArray(ptr_array, count, z_mem)                          DN_PArrayMakeArray((ptr_array)->data, &(ptr_array)->count, (ptr_array)->max, count, z_mem)
-#define                                   DN_IArrayMakeArrayZ(ptr_array, count)                                DN_PArrayMakeArrayZ((ptr_array)->data, &(ptr_array)->count, (ptr_array)->max, count)
-#define                                   DN_IArrayMakeArrayNoZ(ptr_array, count)                              DN_PArrayMakeArrayNoZ((ptr_array)->data, &(ptr_array)->count, (ptr_array)->max, count)
-#define                                   DN_IArrayMakeArrayAssert(ptr_array, count, z_mem)                    DN_PArrayMakeArrayAssert((ptr_array)->data, &(ptr_array)->count, (ptr_array)->max, count, z_mem)
-#define                                   DN_IArrayMakeArrayAssertZ(ptr_array, count)                          DN_PArrayMakeArrayAssertZ((ptr_array)->data, &(ptr_array)->count, (ptr_array)->max, count)
-#define                                   DN_IArrayMakeArrayAssertNoZ(ptr_array, count)                        DN_PArrayMakeArrayAssertNoZ((ptr_array)->data, &(ptr_array)->count, (ptr_array)->max, count)
+#define                                   DN_IArrayMakeArray(ptr_array, count_, z_mem)                         DN_PArrayMakeArray((ptr_array)->data, &(ptr_array)->count, (ptr_array)->max, count_, z_mem)
+#define                                   DN_IArrayMakeArrayZ(ptr_array, count_)                               DN_PArrayMakeArrayZ((ptr_array)->data, &(ptr_array)->count, (ptr_array)->max, count_)
+#define                                   DN_IArrayMakeArrayNoZ(ptr_array, count_)                             DN_PArrayMakeArrayNoZ((ptr_array)->data, &(ptr_array)->count, (ptr_array)->max, count_)
+#define                                   DN_IArrayMakeArrayAssert(ptr_array, count_, z_mem)                   DN_PArrayMakeArrayAssert((ptr_array)->data, &(ptr_array)->count, (ptr_array)->max, count_, z_mem)
+#define                                   DN_IArrayMakeArrayAssertZ(ptr_array, count_)                         DN_PArrayMakeArrayAssertZ((ptr_array)->data, &(ptr_array)->count, (ptr_array)->max, count_)
+#define                                   DN_IArrayMakeArrayAssertNoZ(ptr_array, count_)                       DN_PArrayMakeArrayAssertNoZ((ptr_array)->data, &(ptr_array)->count, (ptr_array)->max, count_)
 
 #define                                   DN_IArrayMake(ptr_array, z_mem)                                      DN_PArrayMake((ptr_array)->data, &(ptr_array)->count, (ptr_array)->max, z_mem)
 #define                                   DN_IArrayMakeZ(ptr_array)                                            DN_PArrayMakeZ((ptr_array)->data, &(ptr_array)->count, (ptr_array)->max)
@@ -3625,19 +3875,19 @@ DN_API DN_RaycastV2            DN_RaycastLineIntersectV2                        
 #define                                   DN_IArrayMakeAssertZ(ptr_array)                                      DN_PArrayMakeAssertZ((ptr_array)->data, &(ptr_array)->count, (ptr_array)->max)
 #define                                   DN_IArrayMakeAssertNoZ(ptr_array)                                    DN_PArrayMakeAssertNoZ((ptr_array)->data, &(ptr_array)->count, (ptr_array)->max)
 
-#define                                   DN_IArrayAddArray(ptr_array, items, count, add)                      DN_PArrayAddArray((ptr_array)->data, &(ptr_array)->count, (ptr_array)->max, items, count, add)
+#define                                   DN_IArrayAddArray(ptr_array, items, count_, add)                     DN_PArrayAddArray((ptr_array)->data, &(ptr_array)->count, (ptr_array)->max, items, count_, add)
 #define                                   DN_IArrayAdd(ptr_array, item, add)                                   DN_PArrayAdd((ptr_array)->data, &(ptr_array)->count, (ptr_array)->max, item, add)
-#define                                   DN_IArrayAppendArray(ptr_array, items, count)                        DN_PArrayAppendArray((ptr_array)->data, &(ptr_array)->count, (ptr_array)->max, items, count)
+#define                                   DN_IArrayAppendArray(ptr_array, items, count_)                       DN_PArrayAppendArray((ptr_array)->data, &(ptr_array)->count, (ptr_array)->max, items, count_)
 #define                                   DN_IArrayAppend(ptr_array, item)                                     DN_PArrayAppend((ptr_array)->data, &(ptr_array)->count, (ptr_array)->max, item)
 #define                                   DN_IArrayAppendAssert(ptr_array, item)                               DN_PArrayAppendAssert((ptr_array)->data, &(ptr_array)->count, (ptr_array)->max, item)
-#define                                   DN_IArrayPrependArray(ptr_array, items, count)                       DN_PArrayPrependArray((ptr_array)->data, &(ptr_array)->count, (ptr_array)->max, items, count)
+#define                                   DN_IArrayPrependArray(ptr_array, items, count_)                      DN_PArrayPrependArray((ptr_array)->data, &(ptr_array)->count, (ptr_array)->max, items, count_)
 #define                                   DN_IArrayPrepend(ptr_array, item)                                    DN_PArrayPrepend((ptr_array)->data, &(ptr_array)->count, (ptr_array)->max, item)
-#define                                   DN_IArrayEraseRange(ptr_array, begin_index, count, erase)            DN_PArrayEraseRange((ptr_array)->data, &(ptr_array)->count, begin_index, count, erase)
+#define                                   DN_IArrayEraseRange(ptr_array, begin_index, count_, erase)           DN_PArrayEraseRange((ptr_array)->data, &(ptr_array)->count, begin_index, count_, erase)
 #define                                   DN_IArrayErase(ptr_array, index, erase)                              DN_PArrayErase((ptr_array)->data, &(ptr_array)->count, index, erase)
-#define                                   DN_IArrayInsertArray(ptr_array, index, items, count)                 DN_PArrayInsertArray((ptr_array)->data, &(ptr_array)->count, (ptr_array)->max, index, items, count)
+#define                                   DN_IArrayInsertArray(ptr_array, index, items, count_)                DN_PArrayInsertArray((ptr_array)->data, &(ptr_array)->count, (ptr_array)->max, index, items, count_)
 #define                                   DN_IArrayInsert(ptr_array, index, item)                              DN_PArrayInsert((ptr_array)->data, &(ptr_array)->count, (ptr_array)->max, index, item)
-#define                                   DN_IArrayPopFront(ptr_array, count)                                  DN_PArrayPopFront((ptr_array)->data, &(ptr_array)->count, (ptr_array)->max, count)
-#define                                   DN_IArrayPopBack(ptr_array, count)                                   DN_PArrayPopBack((ptr_array)->data, &(ptr_array)->count, (ptr_array)->max, count)
+#define                                   DN_IArrayPopFront(ptr_array, count_)                                 DN_PArrayPopFront((ptr_array)->data, &(ptr_array)->count, (ptr_array)->max, count_)
+#define                                   DN_IArrayPopBack(ptr_array, count_)                                  DN_PArrayPopBack((ptr_array)->data, &(ptr_array)->count, (ptr_array)->max, count_)
 
 // NOTE: Slices
 //
@@ -3663,10 +3913,14 @@ DN_API void*                              DN_ArrayAddArray               (void *
 DN_API void*                              DN_ArrayAddArrayAssert         (void *data, DN_USize *count, DN_USize max, DN_USize elem_size, void const *elems, DN_USize elems_count, DN_ArrayAdd add, DN_CallSite call_site);
 DN_API bool                               DN_ArrayResizeFromPool         (void **data, DN_USize *count, DN_USize *max, DN_USize elem_size, DN_Pool *pool, DN_USize new_max);
 DN_API bool                               DN_ArrayResizeFromArena        (void **data, DN_USize *count, DN_USize *max, DN_USize elem_size, DN_Arena *arena, DN_USize new_max);
-DN_API bool                               DN_ArrayGrowFromPool           (void **data, DN_USize count, DN_USize *max, DN_USize elem_size, DN_Pool *pool, DN_USize new_max);
-DN_API bool                               DN_ArrayGrowFromArena          (void **data, DN_USize count, DN_USize *max, DN_USize elem_size, DN_Arena *arena, DN_USize new_max);
+DN_API bool                               DN_ArrayGrowFromPool           (void **data, DN_USize *max, DN_USize elem_size, DN_Pool *pool, DN_USize new_max);
+DN_API bool                               DN_ArrayGrowFromArena          (void **data, DN_USize *max, DN_USize elem_size, DN_Arena *arena, DN_USize new_max);
 DN_API bool                               DN_ArrayGrowIfNeededFromPool   (void **data, DN_USize count, DN_USize *max, DN_USize elem_size, DN_Pool *pool, DN_USize add_count);
 DN_API bool                               DN_ArrayGrowIfNeededFromArena  (void **data, DN_USize count, DN_USize *max, DN_USize elem_size, DN_Arena *arena, DN_USize add_count);
+DN_API DN_USize                           DN_ArrayCopyPtrArena           (void **data, void const *src, DN_USize count, DN_USize elem_size, DN_Arena *arena);
+DN_API DN_USize                           DN_ArrayCopyPtrArenaAssert     (void **data, void const *src, DN_USize count, DN_USize elem_size, DN_Arena *arena, DN_CallSite call_site);
+DN_API DN_USize                           DN_ArrayCopyPtrPool            (void **data, void const *src, DN_USize count, DN_USize elem_size, DN_Pool *pool);
+DN_API DN_USize                           DN_ArrayCopyPtrPoolAssert      (void **data, void const *src, DN_USize count, DN_USize elem_size, DN_Pool *pool, DN_CallSite call_site);
 
 #if defined (__cplusplus)
 template <typename T> DN_ArrayFindResult  DN_TArrayFind                  (T *data, DN_USize count, void const *find, DN_ArrayFindEqFunc *eq_func);
@@ -3683,141 +3937,276 @@ template <typename T> T*                  DN_TArrayAddArray              (T *dat
 template <typename T> T*                  DN_TArrayAddArrayAssert        (T *data, DN_USize *count, DN_USize max, T const *elems, DN_USize elems_count, DN_ArrayAdd add, DN_CallSite call_site);
 template <typename T> bool                DN_TArrayResizeFromPool        (T **data, DN_USize *count, DN_USize *max, DN_Pool *pool, DN_USize new_max);
 template <typename T> bool                DN_TArrayResizeFromArena       (T **data, DN_USize *count, DN_USize *max, DN_Arena *arena, DN_USize new_max);
-template <typename T> bool                DN_TArrayGrowFromPool          (T **data, DN_USize count, DN_USize *max, DN_Pool *pool, DN_USize new_max);
-template <typename T> bool                DN_TArrayGrowFromArena         (T **data, DN_USize count, DN_USize *max, DN_Pool *pool, DN_USize new_max);
+template <typename T> bool                DN_TArrayGrowFromPool          (T **data, DN_USize *max, DN_Pool *pool, DN_USize new_max);
+template <typename T> bool                DN_TArrayGrowFromArena         (T **data, DN_USize *max, DN_Pool *pool, DN_USize new_max);
 template <typename T> bool                DN_TArrayGrowIfNeededFromPool  (T **data, DN_USize count, DN_USize *max, DN_Pool *pool, DN_USize add_count);
 template <typename T> bool                DN_TArrayGrowIfNeededFromArena (T **data, DN_USize count, DN_USize *max, DN_Arena *pool, DN_USize add_count);
+template <typename T> DN_USize            DN_TArrayCopyPtrArena          (T **data, T const *src, DN_USize count, DN_Arena *arena);
+template <typename T> DN_USize            DN_TArrayCopyPtrArenaAssert    (T **data, T const *src, DN_USize count, DN_Arena *arena, DN_CallSite call_site);
+template <typename T> DN_USize            DN_TArrayCopyPtrPool           (T **data, T const *src, DN_USize count, DN_Pool *pool);
+template <typename T> DN_USize            DN_TArrayCopyPtrPoolAssert     (T **data, T const *src, DN_USize count, DN_Pool *pool, DN_CallSite call_site);
 #endif
 
-DN_API void*                              DN_SinglyLLDetach              (void **link, void **next);
-DN_API bool                               DN_RingHasSpace                (DN_Ring const *ring, DN_U64 size);
-DN_API bool                               DN_RingHasData                 (DN_Ring const *ring, DN_U64 size);
-DN_API void                               DN_RingWrite                   (DN_Ring *ring, void const *src, DN_U64 src_size);
-#define                                   DN_RingWriteStruct(ring, item) DN_RingWrite((ring), (item), sizeof(*(item)))
-DN_API void                               DN_RingRead                    (DN_Ring *ring, void *dest, DN_U64 dest_size);
-#define                                   DN_RingReadStruct(ring, dest)  DN_RingRead((ring), (dest), sizeof(*(dest)))
+DN_API void*                              DN_SinglyLLDetach                      (void **link, void **next);
+DN_API bool                               DN_RingHasSpace                        (DN_Ring const *ring, DN_U64 size);
+DN_API bool                               DN_RingHasData                         (DN_Ring const *ring, DN_U64 size);
+DN_API void                               DN_RingWrite                           (DN_Ring *ring, void const *src, DN_U64 src_size);
+#define                                   DN_RingWriteStruct(ring_ptr, item_ptr) DN_RingWrite((ring_ptr), (item_ptr), sizeof(*(item_ptr)))
+DN_API void                               DN_RingRead                            (DN_Ring *ring, void *dest, DN_U64 dest_size);
+#define                                   DN_RingReadStruct(ring_ptr, dest_ptr)  DN_RingRead((ring_ptr), (dest_ptr), sizeof(*(dest_ptr)))
 
-// TODO: Replace with a C-style hash table
-#if defined(__cplusplus)
-DN_U32 const DN_DS_MAP_DEFAULT_HASH_SEED = 0x8a1ced49;
-DN_U32 const DN_DS_MAP_SENTINEL_SLOT     = 0;
-template <typename T> DN_DSMap<T>        DN_DSMapInit                  (DN_Arena *arena, DN_U32 size, DN_DSMapFlags flags);
-template <typename T> void               DN_DSMapDeinit                (DN_DSMap<T> *map, DN_ZMem z_mem);
-template <typename T> bool               DN_DSMapIsValid               (DN_DSMap<T> const *map);
-template <typename T> DN_U32             DN_DSMapHash                  (DN_DSMap<T> const *map, DN_DSMapKey key);
-template <typename T> DN_U32             DN_DSMapHashToSlotIndex       (DN_DSMap<T> const *map, DN_DSMapKey key);
-template <typename T> DN_DSMapResult<T>  DN_DSMapFind                  (DN_DSMap<T> const *map, DN_DSMapKey key);
-template <typename T> DN_DSMapResult<T>  DN_DSMapMake                  (DN_DSMap<T> *map, DN_DSMapKey key);
-template <typename T> DN_DSMapResult<T>  DN_DSMapSet                   (DN_DSMap<T> *map, DN_DSMapKey key, T const &value);
-template <typename T> DN_DSMapResult<T>  DN_DSMapFindKeyU64            (DN_DSMap<T> const *map, DN_U64 key);
-template <typename T> DN_DSMapResult<T>  DN_DSMapMakeKeyU64            (DN_DSMap<T> *map,       DN_U64 key);
-template <typename T> DN_DSMapResult<T>  DN_DSMapSetKeyU64             (DN_DSMap<T> *map,       DN_U64 key, T const &value);
-template <typename T> DN_DSMapResult<T>  DN_DSMapFindKeyStr8           (DN_DSMap<T> const *map, DN_Str8 key);
-template <typename T> DN_DSMapResult<T>  DN_DSMapMakeKeyStr8           (DN_DSMap<T> *map,       DN_Str8 key);
-template <typename T> DN_DSMapResult<T>  DN_DSMapSetKeyStr8            (DN_DSMap<T> *map,       DN_Str8 key, T const &value);
-template <typename T> bool               DN_DSMapResize                (DN_DSMap<T> *map, DN_U32 size);
-template <typename T> bool               DN_DSMapErase                 (DN_DSMap<T> *map, DN_DSMapKey key);
-template <typename T> bool               DN_DSMapEraseKeyU64           (DN_DSMap<T> *map, DN_U64 key);
-template <typename T> bool               DN_DSMapEraseKeyStr8          (DN_DSMap<T> *map, DN_Str8 key);
-template <typename T> DN_DSMapKey        DN_DSMapKeyBuffer             (DN_DSMap<T> const *map, void const *data, DN_USize count);
-template <typename T> DN_DSMapKey        DN_DSMapKeyBufferAsU64NoHash  (DN_DSMap<T> const *map, void const *data, DN_USize count);
-template <typename T> DN_DSMapKey        DN_DSMapKeyU64                (DN_DSMap<T> const *map, DN_U64 u64);
-template <typename T> DN_DSMapKey        DN_DSMapKeyStr8               (DN_DSMap<T> const *map, DN_Str8 string);
-#define                                  DN_DSMapKeyCStr8(map, string) DN_DSMapKeyBuffer(map, string, sizeof((string))/sizeof((string)[0]) - 1)
-DN_API                DN_DSMapKey        DN_DSMapKeyU64NoHash          (DN_U64 u64);
-DN_API                bool               DN_DSMapKeyEquals             (DN_DSMapKey lhs, DN_DSMapKey rhs);
-DN_API                bool               operator==                    (DN_DSMapKey lhs, DN_DSMapKey rhs);
-#endif
-
-enum DN_BinPackMode
-{
-  DN_BinPackMode_Serialise,
-  DN_BinPackMode_Deserialise,
-};
-
-struct DN_BinPack
-{
-  DN_Str8Builder writer;
-  DN_Str8        read;
-  DN_USize       read_index;
-};
-
-DN_API bool    DN_BinPackIsEndOfReadStream(DN_BinPack const *pack);
-DN_API void    DN_BinPackUSize            (DN_BinPack *pack, DN_BinPackMode mode, DN_USize *item);
-DN_API void    DN_BinPackU64              (DN_BinPack *pack, DN_BinPackMode mode, DN_U64 *item);
-DN_API void    DN_BinPackU32              (DN_BinPack *pack, DN_BinPackMode mode, DN_U32 *item);
-DN_API void    DN_BinPackU16              (DN_BinPack *pack, DN_BinPackMode mode, DN_U16 *item);
-DN_API void    DN_BinPackU8               (DN_BinPack *pack, DN_BinPackMode mode, DN_U8 *item);
-DN_API void    DN_BinPackI64              (DN_BinPack *pack, DN_BinPackMode mode, DN_I64 *item);
-DN_API void    DN_BinPackI32              (DN_BinPack *pack, DN_BinPackMode mode, DN_I32 *item);
-DN_API void    DN_BinPackI16              (DN_BinPack *pack, DN_BinPackMode mode, DN_I16 *item);
-DN_API void    DN_BinPackI8               (DN_BinPack *pack, DN_BinPackMode mode, DN_I8 *item);
-DN_API void    DN_BinPackF64              (DN_BinPack *pack, DN_BinPackMode mode, DN_F64 *item);
-DN_API void    DN_BinPackF32              (DN_BinPack *pack, DN_BinPackMode mode, DN_F32 *item);
-DN_API void    DN_BinPackV2               (DN_BinPack *pack, DN_BinPackMode mode, DN_V2F32 *item);
-DN_API void    DN_BinPackV4               (DN_BinPack *pack, DN_BinPackMode mode, DN_V4F32 *item);
-DN_API void    DN_BinPackBool             (DN_BinPack *pack, DN_BinPackMode mode, bool *item);
-DN_API void    DN_BinPackStr8FromArena    (DN_BinPack *pack, DN_Arena *arena, DN_BinPackMode mode, DN_Str8 *string);
-DN_API void    DN_BinPackStr8FromPool     (DN_BinPack *pack, DN_Pool *pool, DN_BinPackMode mode, DN_Str8 *string);
-DN_API DN_Str8 DN_BinPackStr8FromBuffer   (DN_BinPack *pack, DN_BinPackMode mode, char *ptr, DN_USize *size, DN_USize max);
-DN_API void    DN_BinPackBytesFromArena   (DN_BinPack *pack, DN_Arena *arena, DN_BinPackMode mode, void **ptr, DN_USize *size);
-DN_API void    DN_BinPackBytesFromPool    (DN_BinPack *pack, DN_Pool *pool, DN_BinPackMode mode, void **ptr, DN_USize *size);
-DN_API void    DN_BinPackCArray           (DN_BinPack *pack, DN_BinPackMode mode, void *ptr, DN_USize size);
-DN_API void    DN_BinPackCBuffer          (DN_BinPack *pack, DN_BinPackMode mode, char *ptr, DN_USize *size, DN_USize max);
-DN_API DN_Str8 DN_BinPackBuild            (DN_BinPack const *pack, DN_Arena *arena);
-
-enum DN_CSVSerialise
-{
-  DN_CSVSerialise_Read,
-  DN_CSVSerialise_Write,
-};
-
-struct DN_CSVTokeniser
-{
-  bool        bad;
-  DN_Str8     string;
-  char        delimiter;
-  char const *it;
-  bool        end_of_line;
-};
-
-struct DN_CSVPack
-{
-  DN_Str8Builder  write_builder;
-  DN_USize        write_column;
-  DN_CSVTokeniser read_tokeniser;
-};
-
-// NOTE: Data structures to create and parse CSV files, supports Python style escaped quotes (e.g.
-// Using "" to escape quotes inside a quoted string).
+// NOTE: Hash Table
+// Overview
+//   A hash table implemented in C-style C++ that is based off and heavily derivative of Jonathan
+//   Blow's "simple hash table" implementation from JAI that he posted on Pastebin
+//   https://pastebin.com/raw/xMUQXshn The goal of this hash table is to provide a relatively
+//   generic table that covers the 99% of use cases. For the 1% you should design a custom table
+//   suited for that workload.
 //
+//   The key features of the simple hash-table, paraphrased
+//
+//     Open-addressed table with each table slot consists of {hash, key, value} for
+//     cache-coherency. Default load factor of 0.7 and uses a 4 byte hash
+//
+//     Tombstoning with quadratic probing using triangular numbers. Less cache friendly than linear
+//     probing but more cache friendly than double hashing. It mitigates clustering of collisions
+//     around the insertion point but early probes maintain cache locality to the initial collision.
+//     Quote from the reference implementation:
+//
+//       We use the 'triangular numbers' version of quadratic probing. It yields more collisions per
+//       insertion than double hashing (double hashing gives us 0.74, triangular numbers give us
+//       0.84) but the collisions are cheaper because the initial probes are cache-coherent, unlike
+//       with double hashing. At large table sizes this ends up mattering substantially.
+//       (examples/hash_table_test.jai, at the 128 million entry table size, takes 15.5 seconds with
+//       triangular numbers, 17.8 seconds with double hashing.)
+//
+//       Triangular numbers are guaranteed to hit every entry in the table:
+//       https://fgiesen.wordpress.com/2015/02/22/triangular-numbers-mod-2n/
+//
+//   This hash table requires that the caller sets up their own struct with the key, value and hash
+//   located in the struct and pass the offsets to these fields into the table such that it can
+//   updated the values in a type-erased manner. By keeping all the table slot data into one struct
+//   ensures that the optimal path of looking up an item requires exactly one cache miss to fetch
+//   the necessary data. As long as the table maintains a 0.7 load factor, probabilistically all
+//   lookups are resolved in 1 shot.
+//
+//   Other tables that opt for {key, key...} {value, value...} {hash, hash...} have benefits and
+//   make varying trade-offs. But assuming that the user is not memory bound and most lookups are
+//   resolved in 1 lookup this optimises for the common case where a simple hash table covers the
+//   99% of use-cases.
+//
+//   Note that this table requires that the user passes a double pointer to where store key-value
+//   structs that the table maintains on their behalf. This is an oddity necessitated because of the
+//   table being implemented using C constructs e.g.:
+//
+//     MyKeyValue *my_kvs = NULL;
+//     DN_HTableInitArgsDefault(MyKeyValue, &my_kvs, ...)
+//
+//   By forcing the user to store the pointer of `my_kvs` we allow you to have a type-safe view
+//   into the objects that the table is manipulating. This is a useful default mode of operation
+//   that makes it easier to debug having a type-safe pointer on-hand to inspect the contents of the
+//   table. This is rather than having the user need to cast `table.kvs` back to its concrete type
+//   every time you inspect the table.
+//
+//   This would not be necessary if this was implemented in basically any other language that
+//   supports generics as a first class citizen.
+//
+// Example
+/*
+  // NOTE: A hash table that maps (U64 -> bool) using the OS heap allocator
+  struct MyKeyValue
+  {
+    DN_HTableHashType hash;  // Must always be `DN_HTableHashType` which is a 4 byte hash
+    DN_U64            key;   // Any arbitrary key as long as it's in the same struct
+    bool              value; // Any arbitrary value as long as it's in the same struct
+  };
+
+  MyKeyValue*         table_kvs  = {};
+  DN_HTableInitArgs   table_args = DN_HTableInitArgsDefault(MyKeyValue, table_kvs, hash, key, value);
+  DN_HTableInitResult table_init = DN_HTableInitHeap(table_args, DN_OS_HeapInitDefault());
+  if (table_init.success) {
+    DN_HTable table = table_init.table;
+    P0I_U8x20 key   = {};
+    bool      value = true;
+    DN_HTableAdd(&table, &key, &value);
+  }
+*/
+DN_API DN_U32                DN_HTableHashFuncDefault (void const* key, DN_USize size);
+DN_API bool                  DN_HTableKeyEqFuncMemcmp (void const* lhs, void const* rhs, DN_USize size);
+DN_API bool                  DN_HTableKeyEqFuncStr8Eq (void const* lhs, void const* rhs, DN_USize size);
+
+#define                      DN_HTableInitArgsDefault(KeyValueT, kvs_ptr, HashField, KeyField, ValueField) DN_HTableInitArgsDefault_(DN_Cast(void **)&kvs_ptr, sizeof(*kvs_ptr), offsetof(KeyValueT, HashField), sizeof(kvs_ptr->KeyField), offsetof(KeyValueT, KeyField), sizeof(kvs_ptr->ValueField), offsetof(KeyValueT, ValueField))
+DN_API DN_HTableInitArgs     DN_HTableInitArgsDefault_(void** kvs, DN_USize size_of_kvs, DN_USize offset_of_hash, DN_USize size_of_key, DN_USize offset_of_key, DN_USize size_of_value, DN_USize offset_of_value);
+DN_API DN_HTableInitResult   DN_HTableInitHeap        (DN_HTableInitArgs args, DN_Heap heap);
+DN_API DN_HTable             DN_HTableInitHeapAssert  (DN_HTableInitArgs args, DN_Heap heap);
+DN_API DN_HTableInitResult   DN_HTableInitPool        (DN_HTableInitArgs args, DN_Pool pool, DN_HTableDeallocPoolOnDeinit dealloc_pool);
+DN_API DN_HTable             DN_HTableInitPoolAssert  (DN_HTableInitArgs args, DN_Pool pool, DN_HTableDeallocPoolOnDeinit dealloc_pool);
+DN_API void                  DN_HTableDeinit          (DN_HTable* table);
+
+DN_API DN_HTableLookupResult DN_HTableLookup          (DN_HTable const* table, void const* key, DN_HTableAllowTombstone allow_tombstone);
+DN_API DN_HTableSlot         DN_HTableFind            (DN_HTable const* table, void const* key);
+DN_API void*                 DN_HTableValueFromFind   (DN_HTable const* table, void const* key);
+DN_API DN_HTableSlot         DN_HTableSlotFromIndex   (DN_HTable const* table, DN_USize index);
+
+DN_API bool                  DN_HTableResize          (DN_HTable* table, DN_USize new_max);
+DN_API void                  DN_HTableClear           (DN_HTable* table);
+DN_API DN_HTableResizeResult DN_HTableGrowMaybe       (DN_HTable* table, DN_USize add_count);
+DN_API DN_HTableAddResult    DN_HTableMake            (DN_HTable* table, void* key);
+DN_API DN_HTableAddResult    DN_HTableAdd             (DN_HTable* table, void* key, void* value);
+DN_API bool                  DN_HTableDel             (DN_HTable* table, void* key);
+
+// NOTE: Binary Packer
+DN_API bool                  DN_BinPackIsEndOfReadStream(DN_BinPack const *pack);
+DN_API void                  DN_BinPackUSize            (DN_BinPack *pack, DN_BinPackMode mode, DN_USize *item);
+DN_API void                  DN_BinPackU64              (DN_BinPack *pack, DN_BinPackMode mode, DN_U64 *item);
+DN_API void                  DN_BinPackU32              (DN_BinPack *pack, DN_BinPackMode mode, DN_U32 *item);
+DN_API void                  DN_BinPackU16              (DN_BinPack *pack, DN_BinPackMode mode, DN_U16 *item);
+DN_API void                  DN_BinPackU8               (DN_BinPack *pack, DN_BinPackMode mode, DN_U8 *item);
+DN_API void                  DN_BinPackI64              (DN_BinPack *pack, DN_BinPackMode mode, DN_I64 *item);
+DN_API void                  DN_BinPackI32              (DN_BinPack *pack, DN_BinPackMode mode, DN_I32 *item);
+DN_API void                  DN_BinPackI16              (DN_BinPack *pack, DN_BinPackMode mode, DN_I16 *item);
+DN_API void                  DN_BinPackI8               (DN_BinPack *pack, DN_BinPackMode mode, DN_I8 *item);
+DN_API void                  DN_BinPackF64              (DN_BinPack *pack, DN_BinPackMode mode, DN_F64 *item);
+DN_API void                  DN_BinPackF32              (DN_BinPack *pack, DN_BinPackMode mode, DN_F32 *item);
+DN_API void                  DN_BinPackV2               (DN_BinPack *pack, DN_BinPackMode mode, DN_V2F32 *item);
+DN_API void                  DN_BinPackV4               (DN_BinPack *pack, DN_BinPackMode mode, DN_V4F32 *item);
+DN_API void                  DN_BinPackBool             (DN_BinPack *pack, DN_BinPackMode mode, bool *item);
+DN_API void                  DN_BinPackStr8FromArena    (DN_BinPack *pack, DN_Arena *arena, DN_BinPackMode mode, DN_Str8 *string);
+DN_API void                  DN_BinPackStr8FromPool     (DN_BinPack *pack, DN_Pool *pool, DN_BinPackMode mode, DN_Str8 *string);
+DN_API DN_Str8               DN_BinPackStr8FromBuffer   (DN_BinPack *pack, DN_BinPackMode mode, char *ptr, DN_USize *size, DN_USize max);
+DN_API void                  DN_BinPackBytesFromArena   (DN_BinPack *pack, DN_Arena *arena, DN_BinPackMode mode, void **ptr, DN_USize *size);
+DN_API void                  DN_BinPackBytesFromPool    (DN_BinPack *pack, DN_Pool *pool, DN_BinPackMode mode, void **ptr, DN_USize *size);
+DN_API void                  DN_BinPackCArray           (DN_BinPack *pack, DN_BinPackMode mode, void *ptr, DN_USize size);
+DN_API void                  DN_BinPackCBuffer          (DN_BinPack *pack, DN_BinPackMode mode, char *ptr, DN_USize *size, DN_USize max);
+DN_API DN_Str8               DN_BinPackBuild            (DN_BinPack const *pack, DN_Arena *arena);
+
+// NOTE: CSV Tokeniser/Packer
+// Overview
+//   Data structures to create and parse CSV files, supports Python style escaped quotes (e.g. Using
+//   "" to escape quotes inside a quoted string).
+
 // API
-//  DN_CSVTokeniserNextN: Reads the next N consecutive fields from the parser. If `column_iterator`
-//  is `false` then the read of the N consecutive fields does not proceed past the end of the
-//  current CSV row. If `true` then it reads the next N fields even if reading would progress onto
-//  the next row.
-DN_API DN_CSVTokeniser DN_CSVTokeniserInit       (DN_Str8 string, char delimiter);
-DN_API bool            DN_CSVTokeniserValid      (DN_CSVTokeniser *tokeniser);
-DN_API bool            DN_CSVTokeniserNextRow    (DN_CSVTokeniser *tokeniser);
-DN_API DN_Str8         DN_CSVTokeniserNextField  (DN_CSVTokeniser *tokeniser);
-DN_API DN_Str8         DN_CSVTokeniserNextColumn (DN_CSVTokeniser *tokeniser);
-DN_API void            DN_CSVTokeniserSkipLine   (DN_CSVTokeniser *tokeniser);
-DN_API int             DN_CSVTokeniserNextN      (DN_CSVTokeniser *tokeniser, DN_Str8 *fields, int fields_size, bool column_iterator);
-DN_API int             DN_CSVTokeniserNextColumnN(DN_CSVTokeniser *tokeniser, DN_Str8 *fields, int fields_size);
-DN_API int             DN_CSVTokeniserNextFieldN (DN_CSVTokeniser *tokeniser, DN_Str8 *fields, int fields_size);
-DN_API void            DN_CSVTokeniserSkipLineN  (DN_CSVTokeniser *tokeniser, int count);
-DN_API void            DN_CSVPackU64             (DN_CSVPack *pack, DN_CSVSerialise serialise, DN_U64 *value);
-DN_API void            DN_CSVPackI64             (DN_CSVPack *pack, DN_CSVSerialise serialise, DN_I64 *value);
-DN_API void            DN_CSVPackI32             (DN_CSVPack *pack, DN_CSVSerialise serialise, DN_I32 *value);
-DN_API void            DN_CSVPackI16             (DN_CSVPack *pack, DN_CSVSerialise serialise, DN_I16 *value);
-DN_API void            DN_CSVPackI8              (DN_CSVPack *pack, DN_CSVSerialise serialise, DN_I8 *value);
-DN_API void            DN_CSVPackU32             (DN_CSVPack *pack, DN_CSVSerialise serialise, DN_U32 *value);
-DN_API void            DN_CSVPackU16             (DN_CSVPack *pack, DN_CSVSerialise serialise, DN_U16 *value);
-DN_API void            DN_CSVPackBoolAsU64       (DN_CSVPack *pack, DN_CSVSerialise serialise, bool *value);
-DN_API void            DN_CSVPackStr8            (DN_CSVPack *pack, DN_CSVSerialise serialise, DN_Str8 *str8, DN_Arena *arena);
-DN_API void            DN_CSVPackBuffer          (DN_CSVPack *pack, DN_CSVSerialise serialise, void *dest, size_t *size);
-DN_API void            DN_CSVPackBufferWithMax   (DN_CSVPack *pack, DN_CSVSerialise serialise, void *dest, size_t *size, size_t max);
-DN_API bool            DN_CSVPackNewLine         (DN_CSVPack *pack, DN_CSVSerialise serialise);
+//  DN_CSVTokeniserNextN
+//  Reads the next N consecutive fields from the parser. If `column_iterator` is `false` then the
+//  read of the N consecutive fields does not proceed past the end of the current CSV row. If `true`
+//  then it reads the next N fields even if reading would progress onto the next row.
+DN_API DN_CSVTokeniser       DN_CSVTokeniserInit        (DN_Str8 string, char delimiter);
+DN_API bool                  DN_CSVTokeniserValid       (DN_CSVTokeniser *tokeniser);
+DN_API bool                  DN_CSVTokeniserNextRow     (DN_CSVTokeniser *tokeniser);
+DN_API DN_Str8               DN_CSVTokeniserNextField   (DN_CSVTokeniser *tokeniser);
+DN_API DN_Str8               DN_CSVTokeniserNextColumn  (DN_CSVTokeniser *tokeniser);
+DN_API void                  DN_CSVTokeniserSkipLine    (DN_CSVTokeniser *tokeniser);
+DN_API int                   DN_CSVTokeniserNextN       (DN_CSVTokeniser *tokeniser, DN_Str8 *fields, int fields_size, bool column_iterator);
+DN_API int                   DN_CSVTokeniserNextColumnN (DN_CSVTokeniser *tokeniser, DN_Str8 *fields, int fields_size);
+DN_API int                   DN_CSVTokeniserNextFieldN  (DN_CSVTokeniser *tokeniser, DN_Str8 *fields, int fields_size);
+DN_API void                  DN_CSVTokeniserSkipLineN   (DN_CSVTokeniser *tokeniser, int count);
+DN_API void                  DN_CSVPackU64              (DN_CSVPack *pack, DN_CSVSerialise serialise, DN_U64 *value);
+DN_API void                  DN_CSVPackI64              (DN_CSVPack *pack, DN_CSVSerialise serialise, DN_I64 *value);
+DN_API void                  DN_CSVPackI32              (DN_CSVPack *pack, DN_CSVSerialise serialise, DN_I32 *value);
+DN_API void                  DN_CSVPackI16              (DN_CSVPack *pack, DN_CSVSerialise serialise, DN_I16 *value);
+DN_API void                  DN_CSVPackI8               (DN_CSVPack *pack, DN_CSVSerialise serialise, DN_I8 *value);
+DN_API void                  DN_CSVPackU32              (DN_CSVPack *pack, DN_CSVSerialise serialise, DN_U32 *value);
+DN_API void                  DN_CSVPackU16              (DN_CSVPack *pack, DN_CSVSerialise serialise, DN_U16 *value);
+DN_API void                  DN_CSVPackBoolAsU64        (DN_CSVPack *pack, DN_CSVSerialise serialise, bool *value);
+DN_API void                  DN_CSVPackStr8             (DN_CSVPack *pack, DN_CSVSerialise serialise, DN_Str8 *str8, DN_Arena *arena);
+DN_API void                  DN_CSVPackBuffer           (DN_CSVPack *pack, DN_CSVSerialise serialise, void *dest, size_t *size);
+DN_API void                  DN_CSVPackBufferWithMax    (DN_CSVPack *pack, DN_CSVSerialise serialise, void *dest, size_t *size, size_t max);
+DN_API bool                  DN_CSVPackNewLine          (DN_CSVPack *pack, DN_CSVSerialise serialise);
+
+// NOTE: Test Framework
+// Overview
+//   A simple barebones testing framework that we use to unit test this library. This framework
+//   allows grouping of unit tests into 1 top-level group with an arbitrary number of tests inside
+//   the group. It uses a begin and end pattern to scope tests into groups.
+
+// Example
+/*
+  DN_Arena    arena  = DN_ArenaFromHeap(DN_Megabytes(1), DN_Kilobytes(64), DN_MemFlags_Nil, DN_OS_HeapInitDefault());
+  DN_TestCore result = DN_TestInit(&arena);
+  for (DN_TestGroupScopeF(&result, "Base")) {
+    for (DN_TestScopeF(&result, "Check that foo != bar!"))
+      DN_TestVerifyStr8NotEq(&result, DN_Str8Lit("foo"), DN_Str8Lit("bar")); // Test passes
+    for (DN_TestScopeF(&result, "Does 1 equal 2?"))
+      DN_TestVerifyUSizeEq(&result,  1, 2); // This test will fail!
+    for (DN_TestScopeF(&result, "Float test, 1 is definitely less than 2"))
+      DN_TestVerifyF64LessThan(&result,  1.f, 2.f); // Floats work as well
+  }
+  DN_Str8 test_output = DN_Str8FromTestCore(&result, &arena, DN_Str8FromTestCoreFlags_Colour);
+  printf("%.*s", DN_Str8PrintFmt(test_output));
+  DN_ArenaDeinit(&arena);
+ */
+
+DN_API DN_TestCore           DN_TestInit                                                       (DN_Arena *arena);
+DN_API void                  DN_TestGroupBeginF                                                (DN_TestCore *test, char const *fmt, ...);
+DN_API void                  DN_TestGroupEnd                                                   (DN_TestCore *test);
+#define                      DN_TestGroupScopeF(test_ptr, fmt, ...)                            bool group_once_ = (DN_TestGroupBeginF(test_ptr, fmt, ##__VA_ARGS__), false); !group_once_; DN_TestGroupEnd(test_ptr), group_once_ = true
+DN_API void                  DN_TestBeginF                                                     (DN_TestCore *test, char const *fmt, ...);
+DN_API void                  DN_TestEnd                                                        (DN_TestCore *test);
+#define                      DN_TestScopeF(test_ptr, fmt, ...)                                 bool test_once_  = (DN_TestBeginF(test_ptr, fmt, ##__VA_ARGS__),      false); !test_once_;  DN_TestEnd(test_ptr),      test_once_  = true
+
+DN_API void                  DN_TestVerifyExprF_                                               (DN_TestCore *test, DN_CallSite call_site, DN_Str8 expr, bool expr_result, char const *fmt, ...);
+#define                      DN_TestVerifyExprF(test_ptr, expr, fmt, ...)                      DN_TestVerifyExprF_(test_ptr, DN_CallSiteNow, DN_Str8Lit(#expr), (expr), fmt, ##__VA_ARGS__)
+#define                      DN_TestVerifyExpr(test_ptr, expr)                                 DN_TestVerifyExprF_(test_ptr, DN_CallSiteNow, DN_Str8Lit(#expr), (expr), "")
+
+DN_API void                  DN_TestVerifyF64Fmt                                               (DN_TestCore *test, DN_CallSite call_site, DN_Str8 val_str8, DN_Str8 expect_str8, DN_F64 val, DN_F64 expect, DN_TestLogic logic, char const *fmt, ...);
+#define                      DN_TestVerifyF64GreaterThanEq(test_ptr, val, expect)              DN_TestVerifyF64Fmt(test_ptr, DN_CallSiteNow, DN_Str8Lit(#val), DN_Str8Lit(#expect), val, expect, DN_TestLogic_GreaterThanEq, "")
+#define                      DN_TestVerifyF64GreaterThanEqF(test_ptr, val, expect, fmt, ...)   DN_TestVerifyF64Fmt(test_ptr, DN_CallSiteNow, DN_Str8Lit(#val), DN_Str8Lit(#expect), val, expect, DN_TestLogic_GreaterThanEq, fmt, ##__VA_ARGS__)
+#define                      DN_TestVerifyF64GreaterThan(test_ptr, val, expect)                DN_TestVerifyF64Fmt(test_ptr, DN_CallSiteNow, DN_Str8Lit(#val), DN_Str8Lit(#expect), val, expect, DN_TestLogic_GreaterThan,   "")
+#define                      DN_TestVerifyF64GreaterThanF(test_ptr, val, expect, fmt, ...)     DN_TestVerifyF64Fmt(test_ptr, DN_CallSiteNow, DN_Str8Lit(#val), DN_Str8Lit(#expect), val, expect, DN_TestLogic_GreaterThan,   fmt, ##__VA_ARGS__)
+#define                      DN_TestVerifyF64LessThan(test_ptr, val, expect)                   DN_TestVerifyF64Fmt(test_ptr, DN_CallSiteNow, DN_Str8Lit(#val), DN_Str8Lit(#expect), val, expect, DN_TestLogic_LessThan,      "")
+#define                      DN_TestVerifyF64LessThanF(test_ptr, val, expect, fmt, ...)        DN_TestVerifyF64Fmt(test_ptr, DN_CallSiteNow, DN_Str8Lit(#val), DN_Str8Lit(#expect), val, expect, DN_TestLogic_LessThan,      fmt, ##__VA_ARGS__)
+#define                      DN_TestVerifyF64LessThanEq(test_ptr, val, expect)                 DN_TestVerifyF64Fmt(test_ptr, DN_CallSiteNow, DN_Str8Lit(#val), DN_Str8Lit(#expect), val, expect, DN_TestLogic_LessThanEq,    "")
+#define                      DN_TestVerifyF64LessThanEqF(test_ptr, val, expect, fmt, ...)      DN_TestVerifyF64Fmt(test_ptr, DN_CallSiteNow, DN_Str8Lit(#val), DN_Str8Lit(#expect), val, expect, DN_TestLogic_LessThanEq,    fmt, ##__VA_ARGS__)
+#define                      DN_TestVerifyF64Eq(test_ptr, val, expect)                         DN_TestVerifyF64Fmt(test_ptr, DN_CallSiteNow, DN_Str8Lit(#val), DN_Str8Lit(#expect), val, expect, DN_TestLogic_Eq,            "")
+#define                      DN_TestVerifyF64EqF(test_ptr, val, expect, fmt, ...)              DN_TestVerifyF64Fmt(test_ptr, DN_CallSiteNow, DN_Str8Lit(#val), DN_Str8Lit(#expect), val, expect, DN_TestLogic_Eq,            fmt, ##__VA_ARGS__)
+#define                      DN_TestVerifyF64NotEq(test_ptr, val, expect)                      DN_TestVerifyF64Fmt(test_ptr, DN_CallSiteNow, DN_Str8Lit(#val), DN_Str8Lit(#expect), val, expect, DN_TestLogic_NotEq,         "")
+#define                      DN_TestVerifyF64NotEqF(test_ptr, val, expect, fmt, ...)           DN_TestVerifyF64Fmt(test_ptr, DN_CallSiteNow, DN_Str8Lit(#val), DN_Str8Lit(#expect), val, expect, DN_TestLogic_NotEq,         fmt, ##__VA_ARGS__)
+
+DN_API void                  DN_TestVerifyISizeF                                               (DN_TestCore *test, DN_CallSite call_site, DN_Str8 val_str8, DN_Str8 expect_str8, DN_ISize val, DN_ISize expect, DN_TestLogic logic, char const *fmt, ...);
+#define                      DN_TestVerifyISizeGreaterThanEq(test_ptr, val, expect)            DN_TestVerifyISizeF(test_ptr, DN_CallSiteNow, DN_Str8Lit(#val), DN_Str8Lit(#expect), val, expect, DN_TestLogic_GreaterThanEq, "")
+#define                      DN_TestVerifyISizeGreaterThanEqF(test_ptr, val, expect, fmt, ...) DN_TestVerifyISizeF(test_ptr, DN_CallSiteNow, DN_Str8Lit(#val), DN_Str8Lit(#expect), val, expect, DN_TestLogic_GreaterThanEq, fmt, ##__VA_ARGS__)
+#define                      DN_TestVerifyISizeGreaterThan(test_ptr, val, expect)              DN_TestVerifyISizeF(test_ptr, DN_CallSiteNow, DN_Str8Lit(#val), DN_Str8Lit(#expect), val, expect, DN_TestLogic_GreaterThan,   "")
+#define                      DN_TestVerifyISizeGreaterThanF(test_ptr, val, expect, fmt, ...)   DN_TestVerifyISizeF(test_ptr, DN_CallSiteNow, DN_Str8Lit(#val), DN_Str8Lit(#expect), val, expect, DN_TestLogic_GreaterThan,   fmt, ##__VA_ARGS__)
+#define                      DN_TestVerifyISizeLessThan(test_ptr, val, expect)                 DN_TestVerifyISizeF(test_ptr, DN_CallSiteNow, DN_Str8Lit(#val), DN_Str8Lit(#expect), val, expect, DN_TestLogic_LessThan,      "")
+#define                      DN_TestVerifyISizeLessThanF(test_ptr, val, expect, fmt, ...)      DN_TestVerifyISizeF(test_ptr, DN_CallSiteNow, DN_Str8Lit(#val), DN_Str8Lit(#expect), val, expect, DN_TestLogic_LessThan,      fmt, ##__VA_ARGS__)
+#define                      DN_TestVerifyISizeLessThanEq(test_ptr, val, expect)               DN_TestVerifyISizeF(test_ptr, DN_CallSiteNow, DN_Str8Lit(#val), DN_Str8Lit(#expect), val, expect, DN_TestLogic_LessThanEq,    "")
+#define                      DN_TestVerifyISizeLessThanEqF(test_ptr, val, expect, fmt, ...)    DN_TestVerifyISizeF(test_ptr, DN_CallSiteNow, DN_Str8Lit(#val), DN_Str8Lit(#expect), val, expect, DN_TestLogic_LessThanEq,    fmt, ##__VA_ARGS__)
+#define                      DN_TestVerifyISizeEq(test_ptr, val, expect)                       DN_TestVerifyISizeF(test_ptr, DN_CallSiteNow, DN_Str8Lit(#val), DN_Str8Lit(#expect), val, expect, DN_TestLogic_Eq,            "")
+#define                      DN_TestVerifyISizeEqF(test_ptr, val, expect, fmt, ...)            DN_TestVerifyISizeF(test_ptr, DN_CallSiteNow, DN_Str8Lit(#val), DN_Str8Lit(#expect), val, expect, DN_TestLogic_Eq,            fmt, ##__VA_ARGS__)
+#define                      DN_TestVerifyISizeNotEq(test_ptr, val, expect)                    DN_TestVerifyISizeF(test_ptr, DN_CallSiteNow, DN_Str8Lit(#val), DN_Str8Lit(#expect), val, expect, DN_TestLogic_NotEq,         "")
+#define                      DN_TestVerifyISizeNotEqF(test_ptr, val, expect, fmt, ...)         DN_TestVerifyISizeF(test_ptr, DN_CallSiteNow, DN_Str8Lit(#val), DN_Str8Lit(#expect), val, expect, DN_TestLogic_NotEq,         fmt, ##__VA_ARGS__)
+
+DN_API void                  DN_TestVerifyUSizeF                                               (DN_TestCore *test, DN_CallSite call_site, DN_Str8 val_str8, DN_Str8 expect_str8, DN_USize val, DN_USize expect, DN_TestLogic logic, char const *fmt, ...);
+#define                      DN_TestVerifyUSizeGreaterThanEq(test_ptr, val, expect)            DN_TestVerifyUSizeF(test_ptr, DN_CallSiteNow, DN_Str8Lit(#val), DN_Str8Lit(#expect), val, expect, DN_TestLogic_GreaterThanEq, "")
+#define                      DN_TestVerifyUSizeGreaterThanEqF(test_ptr, val, expect, fmt, ...) DN_TestVerifyUSizeF(test_ptr, DN_CallSiteNow, DN_Str8Lit(#val), DN_Str8Lit(#expect), val, expect, DN_TestLogic_GreaterThanEq, fmt, ##__VA_ARGS__)
+#define                      DN_TestVerifyUSizeGreaterThan(test_ptr, val, expect)              DN_TestVerifyUSizeF(test_ptr, DN_CallSiteNow, DN_Str8Lit(#val), DN_Str8Lit(#expect), val, expect, DN_TestLogic_GreaterThan,   "")
+#define                      DN_TestVerifyUSizeGreaterThanF(test_ptr, val, expect, fmt, ...)   DN_TestVerifyUSizeF(test_ptr, DN_CallSiteNow, DN_Str8Lit(#val), DN_Str8Lit(#expect), val, expect, DN_TestLogic_GreaterThan,   fmt, ##__VA_ARGS__)
+#define                      DN_TestVerifyUSizeLessThan(test_ptr, val, expect)                 DN_TestVerifyUSizeF(test_ptr, DN_CallSiteNow, DN_Str8Lit(#val), DN_Str8Lit(#expect), val, expect, DN_TestLogic_LessThan,      "")
+#define                      DN_TestVerifyUSizeLessThanF(test_ptr, val, expect, fmt, ...)      DN_TestVerifyUSizeF(test_ptr, DN_CallSiteNow, DN_Str8Lit(#val), DN_Str8Lit(#expect), val, expect, DN_TestLogic_LessThan,      fmt, ##__VA_ARGS__)
+#define                      DN_TestVerifyUSizeLessThanEq(test_ptr, val, expect)               DN_TestVerifyUSizeF(test_ptr, DN_CallSiteNow, DN_Str8Lit(#val), DN_Str8Lit(#expect), val, expect, DN_TestLogic_LessThanEq,    "")
+#define                      DN_TestVerifyUSizeLessThanEqF(test_ptr, val, expect, fmt, ...)    DN_TestVerifyUSizeF(test_ptr, DN_CallSiteNow, DN_Str8Lit(#val), DN_Str8Lit(#expect), val, expect, DN_TestLogic_LessThanEq,    fmt, ##__VA_ARGS__)
+#define                      DN_TestVerifyUSizeEq(test_ptr, val, expect)                       DN_TestVerifyUSizeF(test_ptr, DN_CallSiteNow, DN_Str8Lit(#val), DN_Str8Lit(#expect), val, expect, DN_TestLogic_Eq,            "")
+#define                      DN_TestVerifyUSizeEqF(test_ptr, val, expect, fmt, ...)            DN_TestVerifyUSizeF(test_ptr, DN_CallSiteNow, DN_Str8Lit(#val), DN_Str8Lit(#expect), val, expect, DN_TestLogic_Eq,            fmt, ##__VA_ARGS__)
+#define                      DN_TestVerifyUSizeNotEq(test_ptr, val, expect)                    DN_TestVerifyUSizeF(test_ptr, DN_CallSiteNow, DN_Str8Lit(#val), DN_Str8Lit(#expect), val, expect, DN_TestLogic_NotEq,         "")
+#define                      DN_TestVerifyUSizeNotEqF(test_ptr, val, expect, fmt, ...)         DN_TestVerifyUSizeF(test_ptr, DN_CallSiteNow, DN_Str8Lit(#val), DN_Str8Lit(#expect), val, expect, DN_TestLogic_NotEq,         fmt, ##__VA_ARGS__)
+
+DN_API void                  DN_TestVerifyStr8F                                                (DN_TestCore *test, DN_CallSite call_site, DN_Str8 expr, DN_Str8 str8, DN_Str8 expect, bool expect_eq, char const *fmt, ...);
+#define                      DN_TestVerifyStr8EqF(test_ptr, str8, expect, fmt, ...)            DN_TestVerifyStr8F(test_ptr, DN_CallSiteNow, DN_Str8Lit(#str8 " == " #expect), (str8), (expect), /*expect_eq=*/ true, fmt, ##__VA_ARGS__)
+#define                      DN_TestVerifyStr8Eq(test_ptr, str8, expect)                       DN_TestVerifyStr8F(test_ptr, DN_CallSiteNow, DN_Str8Lit(#str8 " == " #expect), (str8), (expect), /*expect_eq=*/ true, "")
+#define                      DN_TestVerifyStr8NotEqF(test_ptr, str8, expect, fmt, ...)         DN_TestVerifyStr8F(test_ptr, DN_CallSiteNow, DN_Str8Lit(#str8 " != " #expect), (str8), (expect), /*expect_eq=*/ false, fmt, ##__VA_ARGS__)
+#define                      DN_TestVerifyStr8NotEq(test_ptr, str8, expect)                    DN_TestVerifyStr8F(test_ptr, DN_CallSiteNow, DN_Str8Lit(#str8 " != " #expect), (str8), (expect), /*expect_eq=*/ false, "")
+
+DN_API void                  DN_TestVerifyBytesF                                               (DN_TestCore *test, DN_CallSite call_site, DN_Str8 bytes, DN_Str8 expect, bool expect_eq, char const *fmt, ...);
+#define                      DN_TestVerifyBytesEqF(test_ptr, bytes, expect, fmt, ...)          DN_TestVerifyBytesF(test_ptr, DN_CallSiteNow, DN_Str8Lit(#bytes " == " #expect), (bytes), (expect), /*expect_eq=*/ true, fmt, ##__VA_ARGS__)
+#define                      DN_TestVerifyBytesEq(test_ptr, bytes, expect)                     DN_TestVerifyBytesF(test_ptr, DN_CallSiteNow, DN_Str8Lit(#bytes " == " #expect), (bytes), (expect), /*expect_eq=*/ true, "")
+#define                      DN_TestVerifyBytesNotEqF(test_ptr, bytes, expect, fmt, ...)       DN_TestVerifyBytesF(test_ptr, DN_CallSiteNow, DN_Str8Lit(#bytes " != " #expect), (bytes), (expect), /*expect_eq=*/ false, fmt, ##__VA_ARGS__)
+#define                      DN_TestVerifyBytesNotEq(test_ptr, bytes, expect)                  DN_TestVerifyBytesF(test_ptr, DN_CallSiteNow, DN_Str8Lit(#bytes " != " #expect), (bytes), (expect), /*expect_eq=*/ false, "")
+
+DN_API DN_Str8               DN_Str8FromTestCore                                               (DN_TestCore const *test, DN_Arena *arena, DN_Str8FromTestCoreFlags flags);
+
+#if DN_WITH_TESTS
+DN_API DN_TestCore           DN_TestSuite                                                      (DN_Arena *arena_);
+#endif
 
 // TODO: Replace with a C implementation
 template <typename T>
@@ -3868,16 +4257,16 @@ template <typename T> DN_BinarySearchResult DN_BinarySearch                (T co
 template <typename T>
 bool DN_BinarySearch_DefaultLessThan(T const &lhs, T const &rhs)
 {
-    bool result = lhs < rhs;
-    return result;
+  bool result = lhs < rhs;
+  return result;
 }
 
 template <typename T>
 DN_BinarySearchResult DN_BinarySearch(T const                         *array,
-                                        DN_USize                        array_size,
-                                        T const                         &find,
-                                        DN_BinarySearchType             type,
-                                        DN_BinarySearchLessThanProc<T>  less_than)
+                                      DN_USize                        array_size,
+                                      T const                         &find,
+                                      DN_BinarySearchType             type,
+                                      DN_BinarySearchLessThanProc<T>  less_than)
 {
     DN_BinarySearchResult result = {};
     if (!array || array_size <= 0 || !less_than)
@@ -3917,34 +4306,54 @@ DN_BinarySearchResult DN_BinarySearch(T const                         *array,
     return result;
 }
 
-DN_API void DN_LeakTrackAlloc_  (DN_LeakTracker *leak, void *ptr, DN_USize size, bool alloc_can_leak);
-DN_API void DN_LeakTrackDealloc_(DN_LeakTracker *leak, void *ptr);
-DN_API void DN_LeakDump_        (DN_LeakTracker *leak);
+DN_API void                      DN_LeakTrackAlloc_  (DN_LeakTracker *leak, void *ptr, DN_USize size, bool alloc_can_leak);
+DN_API void                      DN_LeakTrackDealloc_(DN_LeakTracker *leak, void *ptr);
+DN_API void                      DN_LeakDump_        (DN_LeakTracker *leak);
 
 #if defined(DN_LEAK_TRACKING)
-#define     DN_LeakTrackAlloc(leak, ptr, size, alloc_can_leak) DN_LeakTrackAlloc_(leak, ptr, size, alloc_can_leak)
-#define     DN_LeakTrackDealloc(leak, ptr)                     DN_LeakTrackDealloc_(leak, ptr)
-#define     DN_LeakDump(leak)                                  DN_LeakDump_(leak)
+#define                          DN_LeakTrackAlloc(leak, ptr, size, alloc_can_leak) DN_LeakTrackAlloc_(leak, ptr, size, alloc_can_leak)
+#define                          DN_LeakTrackDealloc(leak, ptr)                     DN_LeakTrackDealloc_(leak, ptr)
+#define                          DN_LeakDump(leak)                                  DN_LeakDump_(leak)
 #else
-#define     DN_LeakTrackAlloc(leak, ptr, size, alloc_can_leak) do { (void)ptr; (void)size; (void)alloc_can_leak; } while (0)
-#define     DN_LeakTrackDealloc(leak, ptr)                     do { (void)ptr;                                   } while (0)
-#define     DN_LeakDump(leak)                                  do {                                              } while (0)
+#define                          DN_LeakTrackAlloc(leak, ptr, size, alloc_can_leak) do { (void)ptr; (void)size; (void)alloc_can_leak; } while (0)
+#define                          DN_LeakTrackDealloc(leak, ptr)                     do { (void)ptr;                                   } while (0)
+#define                          DN_LeakDump(leak)                                  do {                                              } while (0)
 #endif
 
 #if DN_WITH_OS
-DN_API DN_MemFuncs               DN_MemFuncsFromType                          (DN_MemFuncsType type);
-DN_API DN_MemFuncs               DN_MemFuncsDefault                           ();
-DN_API DN_MemList                DN_MemListFromHeap                           (DN_U64 size, DN_MemFlags flags);
-DN_API DN_MemList                DN_MemListFromVMem                           (DN_U64 reserve, DN_U64 commit, DN_MemFlags flags);
-DN_API DN_Arena                  DN_ArenaFromHeap                             (DN_U64 wize, DN_MemFlags flags);
-DN_API DN_Arena                  DN_ArenaFromVMem                             (DN_U64 reserve, DN_U64 commit, DN_MemFlags flags);
-
-DN_API DN_Str8                   DN_Str8FromHeapF                             (DN_FMT_ATTRIB char const *fmt, ...);
-DN_API DN_Str8                   DN_Str8FromHeap                              (DN_USize count, DN_ZMem z_mem);
-DN_API DN_Str8                   DN_Str8BuilderBuildFromHeap                  (DN_Str8Builder const *builder);
-
+DN_API DN_Str8                   DN_OS_Str8FromStr8BuilderHeap                (DN_Str8Builder const *builder);
 DN_API void                      DN_OS_LogPrint                               (DN_LogTypeParam type, void *user_data, DN_CallSite call_site, DN_FMT_ATTRIB char const *fmt, va_list args);
 DN_API void                      DN_OS_SetLogPrintFuncToOS                    ();
+
+// NOTE: Heap
+// Overview
+//   Helper functions to create a heap allocator that utilises OS memory allocators.
+
+// API
+//   DN_OS_HeapBasicAlloc
+//   DN_OS_HeapBasicDealloc
+//     Helper functions that can be used with as the `basic_alloc` and `basic_dealloc` functions for
+//     `DN_Heap`. These functions essentially call directly into `DN_OS_MemAlloc` and
+//     `DN_OS_MemDealloc`
+
+//   DN_OS_HeapInitVirtual
+//     Create a heap allocator using the OS's native virtual memory APIs (e.g.: reserve, commit,
+//     release)
+
+//   DN_OS_HeapInitBasic
+//     Create a heap allocator using the OS's native malloc-like APIs (e.g.: HeapAlloc on Windows,
+//     malloc on linux)
+
+//   DN_OS_HeapInitDefault
+//     Create a heap allocator using the OS's native memory APIs. Defaults to virtual memory
+//     always unless you are on Emscripten where it'll use basic allocator (virtual memory is not
+//     supported through Emscripten).
+
+DN_API void *                    DN_OS_HeapBasicAlloc                         (DN_USize size);
+DN_API void                      DN_OS_HeapBasicDealloc                       (void *ptr);
+DN_API DN_Heap                   DN_OS_HeapInitBasic                          ();
+DN_API DN_Heap                   DN_OS_HeapInitVirtual                        ();
+DN_API DN_Heap                   DN_OS_HeapInitDefault                        ();
 
 DN_API void *                    DN_OS_MemReserve                             (DN_USize count, DN_MemCommit commit, DN_MemPage page_flags);
 DN_API bool                      DN_OS_MemCommit                              (void *ptr, DN_USize count, DN_U32 page_flags);
@@ -4061,30 +4470,65 @@ DN_API bool                      DN_OS_ConditionVariableWaitUntil             (D
 DN_API void                      DN_OS_ConditionVariableSignal                (DN_OSConditionVariable *cv);
 DN_API void                      DN_OS_ConditionVariableBroadcast             (DN_OSConditionVariable *cv);
 
-DN_API bool                      DN_OS_ThreadInit                             (DN_OSThread *thread, DN_OSThreadFunc *func, DN_OSThreadLane *lane, DN_TCInitArgs tc_init_args, void *user_context);
+// NOTE: Thread
+// Overview
+//   Threading primitives that uses CreateThread on Win32 and pthreads everywhere else. Threads
+//   are also the primitives to implement lanes, a multi-core by default paradigm. More
+//   information is detailed in the OS's Thread Lane APIs.
+// API
+//   DN_OS_ThreadInit
+//     Create a thread that will immediately execute `func`. Pass in a zero initialised `thread`
+//     that will get its fields initialised with the thread information.
+//
+//     `tc_init_args` customises how much memory is allocated for the thread's TLS context which
+//     contains allocators that are exclusively owned by the thread. You may use
+//     DN_TCInitArgsDefault() for sensible default values.
+//
+//     Note not all fields in the thread will be initialised until the thread has itself run its
+//     initialisation code which is entirely dependent on the OS scheduler, scheduling the thread to
+//     execute.
+//
+//     TODO: Allow the caller to wait on the thread initialisation's completion
+
+//   DN_OS_ThreadInitLane
+//     The same as `DN_OS_ThreadInit` but allows setting the lane information. `DN_OS_ThreadInit`
+//     calls into this function with a `lane == NULL` value.
+//
+//     If you are intended to execute code in a lane-esque manner (e.g. GPU style programming on the
+//     CPU, multiple threads, single/linear program execution) pass in `lane` with the fields
+//     populated (the thread's index, how many threads there are in the laneway and the barrier to
+//     share across lanes must be initialised to synchronise different threads).
+//
+//     For the general use-case if you wish to use lanes then prefer the `DN_OS_ThreadLane` APIs
+//     below which create the threads with the lane information setup accordingly.
+DN_API bool                      DN_OS_ThreadInitLane                         (DN_OSThread *thread, DN_OSThreadFunc *func, DN_OSThreadLane *lane, DN_OSThreadInitArgs init_args, void *user_context);
+DN_API bool                      DN_OS_ThreadInit                             (DN_OSThread *thread, DN_OSThreadFunc *func, DN_OSThreadInitArgs init_args, void *user_context);
 DN_API bool                      DN_OS_ThreadJoin                             (DN_OSThread *thread, DN_TCDeinitArenas deinit_arenas);
 DN_API DN_U32                    DN_OS_ThreadID                               ();
+DN_API DN_OSThreadInitArgs       DN_OS_ThreadInitArgsDefault                  ();
 DN_API void                      DN_OS_ThreadSetNameFmt                       (char const *fmt, ...);
 
-// NOTE: Thread lanes provide an abstraction to represent the concept of programming a CPU like a
-// GPU, e.g. SIMT (Single Instruction Multiple Threads). The lane terminology is popularised by Ryan
-// Fleury. SIMT is formally defined as
+// NOTE: Thread Lanes
+// Overview
+//   Thread lanes provide an abstraction to represent the concept of programming a CPU like a
+//   GPU, e.g. SIMT (Single Instruction Multiple Threads). The lane terminology is popularised by Ryan
+//   Fleury. SIMT is formally defined as
 //
-//  Threads are grouped into warps/wavefronts (typically 32 or 64 threads) that execute the same
-//  instruction in lockstep, but each thread operates on different data and maintains its own state
+//    Threads are grouped into warps/wavefronts (typically 32 or 64 threads) that execute the same
+//    instruction in lockstep, but each thread operates on different data and maintains its own state
 //
-// The individual threads in a wavefront on the CPU side are colloquially dubbed "lanes" and a
-// thread lane here contains the necessary state to facilitate this such as the current index in the
-// wavefront and synchronisation primitives to coordinate the different lanes together.
+//   The individual threads in a wavefront on the CPU side are colloquially dubbed "lanes" and a
+//   thread lane here contains the necessary state to facilitate this such as the current index in the
+//   wavefront and synchronisation primitives to coordinate the different lanes together.
 //
-// The idea is to write code in a single-threaded manner (linear execution) but across multiple
-// threads so that the default is all execution paths are inherently multi-threaded by default. Opt
-// out of parallelism instead of opt in. This optimises for the trend of core counts increasing
-// whilst clock counts remain static.
+//   The idea is to write code in a single-threaded manner (linear execution) but across multiple
+//   threads so that the default is all execution paths are inherently multi-threaded by default. Opt
+//   out of parallelism instead of opt in. This optimises for the trend of core counts increasing
+//   whilst clock counts remain static.
 //
-// A laneway is a helper function to initialise the number of requested OS threads/lanes upfront and
-// setup the required synchronisation primitives. It can then be dispatched all the threads which
-// start executing the `entry_point` in parallel.
+//   A laneway is a helper function to initialise the number of requested OS threads/lanes upfront and
+//   setup the required synchronisation primitives. It can then be dispatched all the threads which
+//   start executing the `entry_point` in parallel.
 //
 // API
 //   DN_OS_ThreadLaneSync
@@ -4132,19 +4576,18 @@ DN_API DN_V2USize                DN_OS_ThreadLaneRange                        (D
 
 DN_API DN_OSThreadLaneway        DN_OS_ThreadLanewayFromArgs                  (DN_OSThread* threads, DN_USize threads_count, DN_UPtr* shared_mem);
 DN_API DN_OSThreadLaneway        DN_OS_ThreadLanewayFromArena                 (DN_USize threads_count, DN_Arena* arena);
-DN_API void                      DN_OS_ThreadLanewayDispatch                  (DN_OSThreadLaneway *laneway, DN_OSThreadFunc *entry_point, DN_TCInitArgs tc_init_args, void *user_context);
+DN_API void                      DN_OS_ThreadLanewayDispatch                  (DN_OSThreadLaneway *laneway, DN_OSThreadFunc *entry_point, DN_OSThreadInitArgs init_args, void *user_context);
 DN_API void                      DN_OS_ThreadLanewayJoin                      (DN_OSThreadLaneway *laneway, DN_TCDeinitArenas deinit_arenas);
 
 DN_API DN_OSThreadLane*          DN_OS_TCThreadLane                           ();
 DN_API void                      DN_OS_TCThreadLaneSync                       (void **ptr_to_share);
 DN_API DN_OSThreadLane           DN_OS_TCThreadLaneEquip                      (DN_OSThreadLane lane);
 
-
-DN_API void                      DN_OS_AsyncInit     (DN_OSAsyncCore *async, char *base, DN_USize base_size, DN_OSThread *threads, DN_U32 threads_size);
-DN_API void                      DN_OS_AsyncDeinit   (DN_OSAsyncCore *async);
-DN_API bool                      DN_OS_AsyncQueueWork(DN_OSAsyncCore *async, DN_OSAsyncWorkFunc *func, void *input, DN_U64 wait_time_ms);
-DN_API DN_OSAsyncTask            DN_OS_AsyncQueueTask(DN_OSAsyncCore *async, DN_OSAsyncWorkFunc *func, void *input, DN_U64 wait_time_ms);
-DN_API bool                      DN_OS_AsyncWaitTask (DN_OSAsyncTask *task, DN_U32 timeout_ms);
+DN_API void                      DN_OS_AsyncInit                              (DN_OSAsyncCore *async, char *base, DN_USize base_size, DN_OSThread *threads, DN_U32 threads_size);
+DN_API void                      DN_OS_AsyncDeinit                            (DN_OSAsyncCore *async);
+DN_API bool                      DN_OS_AsyncQueueWork                         (DN_OSAsyncCore *async, DN_OSAsyncWorkFunc *func, void *input, DN_U64 wait_time_ms);
+DN_API DN_OSAsyncTask            DN_OS_AsyncQueueTask                         (DN_OSAsyncCore *async, DN_OSAsyncWorkFunc *func, void *input, DN_U64 wait_time_ms);
+DN_API bool                      DN_OS_AsyncWaitTask                          (DN_OSAsyncTask *task, DN_U32 timeout_ms);
 
 // NOTE: DN_OSPrint
 enum DN_OSPrintDest
@@ -4312,16 +4755,16 @@ bool DN_TArrayResizeFromArena(T **data, DN_USize *count, DN_USize *max, DN_Arena
 }
 
 template <typename T>
-bool DN_TArrayGrowFromPool(T **data, DN_USize count, DN_USize *max, DN_Pool *pool, DN_USize new_max)
+bool DN_TArrayGrowFromPool(T **data, DN_USize *max, DN_Pool *pool, DN_USize new_max)
 {
-  bool result = DN_ArrayGrowFromPool(DN_Cast(void **)data, count, max, sizeof(**data), pool, new_max);
+  bool result = DN_ArrayGrowFromPool(DN_Cast(void **)data, max, sizeof(**data), pool, new_max);
   return result;
 }
 
 template <typename T>
-bool DN_TArrayGrowFromArena(T **data, DN_USize count, DN_USize *max, DN_Arena *arena, DN_USize new_max)
+bool DN_TArrayGrowFromArena(T **data, DN_USize *max, DN_Arena *arena, DN_USize new_max)
 {
-  bool result = DN_ArrayGrowFromArena(DN_Cast(void **)data, count, max, sizeof(**data), arena, new_max);
+  bool result = DN_ArrayGrowFromArena(DN_Cast(void **)data, max, sizeof(**data), arena, new_max);
   return result;
 }
 
@@ -4336,6 +4779,34 @@ template <typename T>
 bool DN_TArrayGrowIfNeededFromArena(T **data, DN_USize count, DN_USize *max, DN_Arena *arena, DN_USize add_count)
 {
   bool result = DN_ArrayGrowIfNeededFromArena(DN_Cast(void **)data, count, max, sizeof(**data), arena, add_count);
+  return result;
+}
+
+template <typename T>
+DN_USize DN_TArrayCopyPtrArena(T **data, T const *src, DN_USize count, DN_Arena *arena)
+{
+  DN_USize result = DN_ArrayCopyPtrArena(DN_Cast(void **)data, src, count, sizeof(T), arena);
+  return result;
+}
+
+template <typename T>
+DN_USize DN_TArrayCopyPtrArenaAssert(T **data, T const *src, DN_USize count, DN_Arena *arena, DN_CallSite call_site)
+{
+  DN_USize result = DN_ArrayCopyPtrArenaAssert(DN_Cast(void **)data, src, count, sizeof(T), arena, call_site);
+  return result;
+}
+
+template <typename T>
+DN_USize DN_TArrayCopyPtrPool(T **data, T const *src, DN_USize count, DN_Pool *pool)
+{
+  DN_USize result = DN_ArrayCopyPtrPool(DN_Cast(void **)data, src, count, sizeof(T), pool);
+  return result;
+}
+
+template <typename T>
+DN_USize DN_TArrayCopyPtrPoolAssert(T **data, T const *src, DN_USize count, DN_Pool *pool, DN_CallSite call_site)
+{
+  DN_USize result = DN_ArrayCopyPtrPoolAssert(DN_Cast(void **)data, src, count, sizeof(T), pool, call_site);
   return result;
 }
 #endif // defined(__cplusplus)
@@ -4549,14 +5020,14 @@ DN_NETResponse      DN_NET_EmcWaitForAnyResponse(DN_NETCore *net, DN_Arena *aren
 #endif // #if DN_WITH_NET_EMSCRIPTEN
 
 #if DN_WITH_OS
-#if defined(DN_PLATFORM_WIN32)
-  #include "OS/dn_os_windows.h"
-  #include "OS/dn_os_w32.h"
-#elif defined(DN_PLATFORM_POSIX) || defined(DN_PLATFORM_EMSCRIPTEN)
-  #include "OS/dn_os_posix.h"
-#else
-  #error Please define a platform e.g. 'DN_PLATFORM_WIN32' to enable the correct implementation for platform APIs
-#endif
+  #if defined(DN_PLATFORM_WIN32)
+    #include "OS/dn_os_windows.h"
+    #include "OS/dn_os_w32.h"
+  #elif defined(DN_PLATFORM_POSIX) || defined(DN_PLATFORM_EMSCRIPTEN)
+    #include "OS/dn_os_posix.h"
+  #else
+    #error Please define a platform e.g. 'DN_PLATFORM_WIN32' to enable the correct implementation for platform APIs
+  #endif
 #endif // #if DN_WITH_OS
 
 #endif // #if !defined(DN_H)

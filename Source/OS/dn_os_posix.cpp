@@ -1281,7 +1281,7 @@ static void *DN_OS_ThreadFunc_(void *user_context)
   return nullptr;
 }
 
-DN_API bool DN_OS_ThreadInit(DN_OSThread *thread, DN_OSThreadFunc *func, DN_OSThreadLane *lane, DN_TCInitArgs tc_init_args, void *user_context)
+DN_API bool DN_OS_ThreadInitLane(DN_OSThread *thread, DN_OSThreadFunc *func, DN_OSThreadLane *lane, DN_OSThreadInitArgs init_args, void *user_context)
 {
   bool result = false;
   if (!thread)
@@ -1291,7 +1291,7 @@ DN_API bool DN_OS_ThreadInit(DN_OSThread *thread, DN_OSThreadFunc *func, DN_OSTh
   thread->user_context   = user_context;
   thread->init_semaphore = DN_OS_SemaphoreInit(0 /*initial_count*/);
   thread->lane           = *lane;
-  thread->tc_init_args   = tc_init_args;
+  thread->tc_init_args   = init_args.tc_args;
 
   // TODO(doyle): Check if semaphore is valid
   // NOTE: pthread_t is essentially the thread ID. In Windows, the handle and
@@ -1307,6 +1307,9 @@ DN_API bool DN_OS_ThreadInit(DN_OSThread *thread, DN_OSThreadFunc *func, DN_OSTh
 
   pthread_attr_t attribs = {};
   pthread_attr_init(&attribs);
+  if (init_args.stack_size)
+    pthread_attr_setstacksize(&attribs, init_args.stack_size);
+
   result = pthread_create(&p_thread, &attribs, DN_OS_ThreadFunc_, thread) == 0;
   pthread_attr_destroy(&attribs);
 
@@ -1415,21 +1418,21 @@ DN_API DN_OSPosixProcSelfStatus DN_OS_PosixProcSelfStatus()
         DN_Memcpy(result.name, str8.data, result.name_size);
       } else if (DN_Str8StartsWith(line, PID, DN_Str8EqCase_Insensitive)) {
         DN_Str8          str8   = DN_Str8TrimWhitespaceAround(DN_Str8Subset(line, PID.count, line.count));
-        DN_U64FromResult to_u64 = DN_U64FromStr8(str8, 0);
+        DN_U64FromResult to_u64 = DN_U64FromStr8(str8);
         result.pid              = to_u64.value;
         DN_Assert(to_u64.success);
       } else if (DN_Str8StartsWith(line, VM_SIZE, DN_Str8EqCase_Insensitive)) {
         DN_Str8 size_with_kb = DN_Str8TrimWhitespaceAround(DN_Str8Subset(line, VM_SIZE.count, line.count));
         DN_Assert(DN_Str8EndsWith(size_with_kb, DN_Str8Lit("kB")));
         DN_Str8          vm_size = DN_Str8BSplit(size_with_kb, DN_Str8Lit(" ")).lhs;
-        DN_U64FromResult to_u64  = DN_U64FromStr8(vm_size, 0);
+        DN_U64FromResult to_u64  = DN_U64FromStr8(vm_size);
         result.vm_size           = DN_Kilobytes(to_u64.value);
         DN_Assert(to_u64.success);
       } else if (DN_Str8StartsWith(line, VM_PEAK, DN_Str8EqCase_Insensitive)) {
         DN_Str8 size_with_kb = DN_Str8TrimWhitespaceAround(DN_Str8Subset(line, VM_PEAK.count, line.count));
         DN_Assert(DN_Str8EndsWith(size_with_kb, DN_Str8Lit("kB")));
         DN_Str8          vm_size = DN_Str8BSplit(size_with_kb, DN_Str8Lit(" ")).lhs;
-        DN_U64FromResult to_u64  = DN_U64FromStr8(vm_size, 0);
+        DN_U64FromResult to_u64  = DN_U64FromStr8(vm_size);
         result.vm_peak           = DN_Kilobytes(to_u64.value);
         DN_Assert(to_u64.success);
       }

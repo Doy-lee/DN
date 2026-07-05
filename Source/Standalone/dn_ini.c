@@ -861,7 +861,7 @@ DN_INIField *DN_INI_AppendKeyF(DN_INICore *ini, DN_INIArena *arena, DN_INISectio
   return result;
 }
 
-#if defined(DN_INI_WITH_UNIT_TESTS)
+#if defined(DN_INI_WITH_TESTS)
 void DN_INI_UnitTests()
 {
   // NOTE: Section and comments
@@ -1141,4 +1141,4 @@ void DN_INI_UnitTests()
     DN_INI_Assert(DN_INI_Str8Eq(parse.first_section.child_first->first_field->next->key, DN_INIStr8Lit("bar")));
   }
 }
-#endif
+#endif // #if defined(DN_INI_WITH_TESTS)

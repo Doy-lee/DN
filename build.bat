@@ -34,17 +34,17 @@ pushd %build_dir%
   :: GR-  Disable C RTTI
   :: Oi   Use CPU Intrinsics
   :: Z7   Combine multi-debug files to one debug file
-  set flags=%flags% -D DN_UNIT_TESTS_WITH_KECCAK %script_dir%\Source\Extra\dn_tests_main.cpp
+  set flags=%flags% %script_dir%\Source\dn_tests.cpp
   set msvc_driver_flags=-EHa -GR- -Od -Oi -Z7 -wd4201 -W4 -nologo %flags% -fsanitize=address
 
   where /q emcc && (
     echo [BUILD] Emscripten emcc detected, compiling ...
-    call emcc -g -msimd128 -msse2 %flags% -o %build_dir%\dn_unit_tests_emcc.js -s FETCH=1 -pthread -s ASYNCIFY=1 -lwebsocket -Wall || echo EMCC build failed&& exit /b 1
+    call emcc -g -msimd128 -msse2 %flags% -o %build_dir%\dn_tests_emcc.js -s FETCH=1 -pthread -s ASYNCIFY=1 -lwebsocket -Wall || echo EMCC build failed&& exit /b 1
   )
 
   where /q cl && (
     echo [BUILD] MSVC cl detected, compiling ...
-    set msvc_cmd=cl -MTd %msvc_driver_flags% -analyze -Fe:dn_unit_tests_msvc -Fo:dn_unit_tests_msvc
+    set msvc_cmd=cl -MTd %msvc_driver_flags% -analyze -Fe:dn_tests_msvc -Fo:dn_tests_msvc
     if exist %build_dir%/Curl/Install/lib/libcurl-d.lib (
       set msvc_cmd=!msvc_cmd! -D DN_WITH_NET_CURL=1 -I %build_dir%/Curl/Install/include %build_dir%/Curl/Install/lib/libcurl-d.lib crypt32.lib ws2_32.lib advapi32.lib wldap32.lib iphlpapi.lib secur32.lib
     )
@@ -63,7 +63,7 @@ pushd %build_dir%
 
   where /q clang-cl && (
     echo [BUILD] LLVM clang-cl detected, compiling ...
-    set clang_cmd=clang-cl -MT %msvc_driver_flags% -fsanitize=undefined -Fe:dn_unit_tests_clang -link
+    set clang_cmd=clang-cl -MT %msvc_driver_flags% -fsanitize=undefined -Fe:dn_tests_clang -link
     powershell -Command "$time = Measure-Command { !clang_cmd! | Out-Default }; Write-Host '[BUILD] clang-cl:'$time.TotalSeconds's'; exit $LASTEXITCODE" || echo CLANG build failed&& exit /b 1
   )
 

@@ -1,8 +1,7 @@
 #define DN_OS_W32_CPP
 
 #if defined(_CLANGD)
-  #define DN_H_WITH_CORE 1
-  #define DN_H_WITH_OS 1
+  #define DN_WITH_OS 1
   #include "../dn.h"
   #include "dn_os_w32.h"
 #endif
@@ -99,13 +98,15 @@ DN_API int DN_OS_MemProtect(void *ptr, DN_USize size, DN_U32 page_flags)
 
 DN_API void *DN_OS_MemAlloc(DN_USize size, DN_ZMem z_mem)
 {
-  DN_Core *dn = DN_Get();
-  DN_AssertRaw(dn->init_flags & DN_InitFlags_OS && "DN must be initialised with the OS flag");
   DN_U32 flags = z_mem == DN_ZMem_Yes ? HEAP_ZERO_MEMORY : 0;
   DN_Assert(size <= DN_Cast(DWORD)(-1));
   void *result = HeapAlloc(GetProcessHeap(), flags, DN_Cast(DWORD) size);
-  DN_AtomicAddU64(&dn->os.mem_allocs_total, 1);
-  DN_AtomicAddU64(&dn->os.mem_allocs_frame, 1);
+
+  DN_Core *dn = DN_Get();
+  if (dn) {
+    DN_AtomicAddU64(&dn->os.mem_allocs_total, 1);
+    DN_AtomicAddU64(&dn->os.mem_allocs_frame, 1);
+  }
   return result;
 }
 
@@ -637,10 +638,10 @@ DN_API bool DN_OS_PathIterateDir(DN_Str8 path, DN_OSDirIterator *it)
   if (it->handle) {
     wide_it.handle = it->handle;
   } else {
-    bool needs_asterisks = DN_Str8EndsWith(path, DN_Str8Lit("\\")) ||
-                           DN_Str8EndsWith(path, DN_Str8Lit("/"));
-    bool has_glob = DN_Str8EndsWith(path, DN_Str8Lit("\\*")) ||
-                    DN_Str8EndsWith(path, DN_Str8Lit("/*"));
+    bool needs_asterisks = DN_Str8EndsWithSensitive(path, DN_Str8Lit("\\")) ||
+                           DN_Str8EndsWithSensitive(path, DN_Str8Lit("/"));
+    bool has_glob = DN_Str8EndsWithSensitive(path, DN_Str8Lit("\\*")) ||
+                    DN_Str8EndsWithSensitive(path, DN_Str8Lit("/*"));
 
     DN_Str8 adjusted_path = path;
     if (!has_glob) {
@@ -1227,14 +1228,13 @@ DN_API void DN_OS_ConditionVariableBroadcast(DN_OSConditionVariable *cv)
   }
 }
 
-// NOTE: DN_OSThread
 static DWORD __stdcall DN_OS_ThreadFunc_(void *user_context)
 {
   DN_OS_ThreadExecute_(user_context);
   return 0;
 }
 
-DN_API bool DN_OS_ThreadInit(DN_OSThread *thread, DN_OSThreadFunc *func, DN_OSThreadLane *lane, DN_TCInitArgs tc_init_args, void *user_context)
+DN_API bool DN_OS_ThreadInitLane(DN_OSThread *thread, DN_OSThreadFunc *func, DN_OSThreadLane *lane, DN_OSThreadInitArgs init_args, void *user_context)
 {
   bool result = false;
   if (!thread)
@@ -1243,7 +1243,7 @@ DN_API bool DN_OS_ThreadInit(DN_OSThread *thread, DN_OSThreadFunc *func, DN_OSTh
   thread->func           = func;
   thread->user_context   = user_context;
   thread->init_semaphore = DN_OS_SemaphoreInit(0 /*initial_count*/);
-  thread->tc_init_args   = tc_init_args;
+  thread->tc_init_args   = init_args.tc_args;
   if (lane) {
     thread->is_lane_set = true;
     thread->lane        = *lane;
@@ -1253,7 +1253,7 @@ DN_API bool DN_OS_ThreadInit(DN_OSThread *thread, DN_OSThreadFunc *func, DN_OSTh
   DWORD               thread_id        = 0;
   SECURITY_ATTRIBUTES security_attribs = {};
   thread->handle                       = CreateThread(&security_attribs,
-                                                      0 /*stack_size*/,
+                                                      init_args.stack_size,
                                                       DN_OS_ThreadFunc_,
                                                       thread,
                                                       0 /*creation_flags*/,
@@ -1522,10 +1522,10 @@ DN_API DN_Str8 DN_OS_W32Str16ToStr8FromHeap(DN_Str16 src)
   if (required_size <= 0)
     return result;
 
-  // NOTE: Str8 allocate ensures there's one extra byte for
-  // null-termination already so no-need to +1 the required size
-  DN_Str8 buffer = DN_Str8FromHeap(required_size, DN_ZMem_No);
-  if (buffer.count == 0)
+  DN_Str8 buffer = {};
+  buffer.data    = DN_Cast(char *) DN_OS_MemAlloc(required_size + 1, DN_ZMem_No);
+  buffer.count   = required_size;
+  if (!buffer.data)
     return result;
 
   int chars_written = WideCharToMultiByte(CP_UTF8, 0 /*dwFlags*/, src.data, src_size, buffer.data, DN_Cast(int) buffer.count, nullptr, nullptr);

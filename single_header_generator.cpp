@@ -65,7 +65,7 @@ static void AppendCppFileLineByLine(DN_Str8Builder *dest, DN_Str8 cpp_path)
           line                     = DN_Str8FromFmtArena(&scratch.arena, "%S// DN: Single header generator commented out => %S", find.start_to_before_match, DN_Str8TrimWhitespaceAround(find.match_to_end_of_buffer));
           DN_Str8 rel_include_path = DN_Str8TrimWhitespaceAround(find.after_match_to_end_of_buffer);
           DN_Str8 root_dir         = DN_Str8FileDirectoryFromPath(cpp_path);
-          extra_include_path       = DN_OS_PathF(&scratch.arena, "%S/%S", root_dir, DN_Str8TrimSuffix(rel_include_path, DN_Str8Lit("\"")));
+          extra_include_path       = DN_OS_PathF(&scratch.arena, "%S/%S", root_dir, DN_Str8TrimSuffixSensitive(rel_include_path, DN_Str8Lit("\"")));
         }
       }
     }
