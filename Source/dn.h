@@ -543,6 +543,9 @@
 #include <stdint.h>
 #include <limits.h>
 #include <inttypes.h> // PRIu64...
+#if !defined(__cplusplus)
+  #include <stdbool.h>
+#endif
 
 #if !defined(DN_OS_WIN32)
 #include <stdlib.h> // exit()
@@ -767,50 +770,60 @@ typedef DN_I32       DN_B32;
   #define DN_CountLeadingZerosUSize(value) DN_CountLeadingZerosU32(value)
 #endif
 
-enum DN_VerifyType
-{
+typedef enum DN_VerifyType {
   DN_VerifyType_Nil,
   DN_VerifyType_Warning,
-};
+} DN_VerifyType;
 
-enum DN_ZMem
-{
+typedef enum DN_ZMem {
   DN_ZMem_No,  // Memory can be handed out without zero-ing it out
   DN_ZMem_Yes, // Memory should be zero-ed out before giving to the callee
-};
+} DN_ZMem;
 
+typedef struct DN_Str8 DN_Str8;
 struct DN_Str8
 {
   char    *data; // The bytes of the string
   DN_USize count; // The number of bytes in the string
 };
 
+typedef struct DN_Str8Slice DN_Str8Slice;
 struct DN_Str8Slice
 {
   DN_Str8 *data;
   DN_USize count;
 };
 
+typedef struct DN_Str8x16 DN_Str8x16;
 struct DN_Str8x16   { char data[16];  DN_USize count; };
+typedef struct DN_Str8x32 DN_Str8x32;
 struct DN_Str8x32   { char data[32];  DN_USize count; };
+typedef struct DN_Str8x64 DN_Str8x64;
 struct DN_Str8x64   { char data[64];  DN_USize count; };
+typedef struct DN_Str8x128 DN_Str8x128;
 struct DN_Str8x128  { char data[128]; DN_USize count; };
+typedef struct DN_Str8x256 DN_Str8x256;
 struct DN_Str8x256  { char data[256]; DN_USize count; };
+typedef struct DN_Str8x512 DN_Str8x512;
 struct DN_Str8x512  { char data[512]; DN_USize count; };
+typedef struct DN_Str8x1024 DN_Str8x1024;
 struct DN_Str8x1024 { char data[1024]; DN_USize count; };
 
+typedef struct DN_Str16 DN_Str16;
 struct DN_Str16 // A pointer and length style string that holds slices to UTF16 bytes.
 {
   wchar_t *data;  // The UTF16 bytes of the string
   DN_USize count; // The number of characters in the string
 };
 
+typedef struct DN_Str16Slice DN_Str16Slice;
 struct DN_Str16Slice
 {
   DN_Str16 *data;
   DN_USize count;
 };
 
+typedef struct DN_CPURegisters DN_CPURegisters;
 struct DN_CPURegisters
 {
   int eax;
@@ -825,6 +838,7 @@ union DN_CPUIDResult
   int             values[4];
 };
 
+typedef struct DN_CPUIDArgs DN_CPUIDArgs;
 struct DN_CPUIDArgs { int eax; int ecx; };
 
 #define DN_CPU_FEAT_XMACRO               \
@@ -883,26 +897,28 @@ struct DN_CPUIDArgs { int eax; int ecx; };
   DN_CPU_FEAT_XENTRY(VAES)               \
   DN_CPU_FEAT_XENTRY(VPCMULQDQ)
 
-enum DN_CPUFeature
-{
+typedef enum DN_CPUFeature {
   #define DN_CPU_FEAT_XENTRY(label) DN_CPUFeature_##label,
   DN_CPU_FEAT_XMACRO
   #undef DN_CPU_FEAT_XENTRY
   DN_CPUFeature_Count,
-};
+} DN_CPUFeature;
 
+typedef struct DN_CPUFeatureDecl DN_CPUFeatureDecl;
 struct DN_CPUFeatureDecl
 {
   DN_CPUFeature value;
   DN_Str8       label;
 };
 
+typedef struct DN_CPUFeatureQuery DN_CPUFeatureQuery;
 struct DN_CPUFeatureQuery
 {
   DN_CPUFeature feature;
   bool          available;
 };
 
+typedef struct DN_CPUReport DN_CPUReport;
 struct DN_CPUReport
 {
   char   vendor[4 /*bytes*/ * 3 /*EDX, ECX, EBX*/ + 1 /*null*/];
@@ -910,6 +926,7 @@ struct DN_CPUReport
   DN_U64 features[(DN_CPUFeature_Count / (sizeof(DN_U64) * 8)) + 1];
 };
 
+typedef struct DN_TicketMutex DN_TicketMutex;
 struct DN_TicketMutex
 {
   unsigned int volatile ticket;  // The next ticket to give out to the thread taking the mutex
@@ -917,30 +934,35 @@ struct DN_TicketMutex
 };
 
 
+typedef struct DN_Hex32 DN_Hex32;
 struct DN_Hex32    { char data[32 + 1];  DN_USize count; };
+typedef struct DN_Hex64 DN_Hex64;
 struct DN_Hex64    { char data[64 + 1];  DN_USize count; };
+typedef struct DN_Hex128 DN_Hex128;
 struct DN_Hex128   { char data[128 + 1]; DN_USize count; };
 
+typedef struct DN_HexU64 DN_HexU64;
 struct DN_HexU64
 {
   char  data[(sizeof(DN_U64) * 2) + 1 /*null-terminator*/];
   DN_U8 count;
 };
 
-enum DN_HexFromU64Type
-{
+typedef enum DN_HexFromU64Type {
   DN_HexFromU64Type_Nil,
   DN_HexFromU64Type_Uppercase,
-};
+} DN_HexFromU64Type;
 
-enum DN_TrimLeadingZero
-{
+typedef enum DN_TrimLeadingZero {
   DN_TrimLeadingZero_No,
   DN_TrimLeadingZero_Yes,
-};
+} DN_TrimLeadingZero;
 
+typedef struct DN_U8x16 DN_U8x16;
 struct DN_U8x16 { DN_U8 data[16]; };
+typedef struct DN_U8x32 DN_U8x32;
 struct DN_U8x32 { DN_U8 data[32]; };
+typedef struct DN_U8x64 DN_U8x64;
 struct DN_U8x64 { DN_U8 data[64]; };
 
 DN_MSVC_WARNING_PUSH
@@ -964,6 +986,7 @@ union DN_V2U64
 };
 DN_MSVC_WARNING_POP
 
+typedef struct DN_CallSite DN_CallSite;
 struct DN_CallSite
 {
   DN_Str8 file;
@@ -997,30 +1020,35 @@ struct DN_DeferHelper
   DN_UniqueName(once);                      \
   end, DN_UniqueName(once) = false
 
+typedef struct DN_U64FromResult DN_U64FromResult;
 struct DN_U64FromResult
 {
   bool   success;
   DN_U64 value;
 };
 
+typedef struct DN_USizeFromResult DN_USizeFromResult;
 struct DN_USizeFromResult
 {
   bool     success;
   DN_USize value;
 };
 
+typedef struct DN_I64FromResult DN_I64FromResult;
 struct DN_I64FromResult
 {
   bool   success;
   DN_I64 value;
 };
 
+typedef struct DN_U8x32FromResult DN_U8x32FromResult;
 struct DN_U8x32FromResult
 {
   bool   success;
   DN_U8x32 value;
 };
 
+typedef struct DN_StackTraceFrame DN_StackTraceFrame;
 struct DN_StackTraceFrame
 {
   DN_U64  address;
@@ -1029,18 +1057,21 @@ struct DN_StackTraceFrame
   DN_Str8 function_name;
 };
 
+typedef struct DN_StackTraceFrameSlice DN_StackTraceFrameSlice;
 struct DN_StackTraceFrameSlice
 {
   DN_StackTraceFrame *data;
   DN_USize            count;
 };
 
+typedef struct DN_StackTraceRawFrame DN_StackTraceRawFrame;
 struct DN_StackTraceRawFrame
 {
   void  *process;
   DN_U64 base_addr;
 };
 
+typedef struct DN_StackTrace DN_StackTrace;
 struct DN_StackTrace
 {
   void   *process;   // [Internal] Windows handle to the process
@@ -1048,17 +1079,17 @@ struct DN_StackTrace
   DN_U16  size;      // The number of `base_addr`'s stored from the walk
 };
 
+typedef struct DN_StackTraceIterator DN_StackTraceIterator;
 struct DN_StackTraceIterator
 {
   DN_StackTraceRawFrame raw_frame;
   DN_U16                index;
 };
 
-enum DN_MemCommit
-{
+typedef enum DN_MemCommit {
   DN_MemCommit_No,
   DN_MemCommit_Yes,
-};
+} DN_MemCommit;
 
 typedef DN_U32 DN_MemPage;
 enum DN_MemPage_
@@ -1110,12 +1141,11 @@ enum DN_MemPage_
   #define DN_ARENA_COMMIT_SIZE DN_Kilobytes(64)
 #endif
 
-enum DN_HeapType
-{
+typedef enum DN_HeapType {
   DN_HeapType_Nil,
   DN_HeapType_Basic,
   DN_HeapType_Virtual,
-};
+} DN_HeapType;
 
 typedef void *(DN_HeapBasicAllocFunc)  (DN_USize count);
 typedef void  (DN_HeapBasicDeallocFunc)(void *ptr);
@@ -1123,6 +1153,7 @@ typedef void  (DN_HeapBasicDeallocFunc)(void *ptr);
 typedef void *(DN_HeapVirtualReserveFunc)(DN_USize count, DN_MemCommit commit, DN_MemPage page_flags);
 typedef bool  (DN_HeapVirtualCommitFunc)(void *ptr, DN_USize count, DN_U32 page_flags);
 typedef void  (DN_HeapVirtualReleaseFunc)(void *ptr, DN_USize count);
+typedef struct DN_Heap DN_Heap;
 struct DN_Heap
 {
   DN_HeapType                type;
@@ -1139,6 +1170,7 @@ struct DN_Heap
   DN_HeapVirtualReleaseFunc  *virtual_release;
 };
 
+typedef struct DN_MemBlock DN_MemBlock;
 struct DN_MemBlock
 {
   DN_MemBlock* prev;
@@ -1148,6 +1180,7 @@ struct DN_MemBlock
   DN_U64       reserve_sum;
 };
 
+typedef struct DN_MemListInfo DN_MemListInfo;
 struct DN_MemListInfo
 {
   DN_U64 used;
@@ -1156,6 +1189,7 @@ struct DN_MemListInfo
   DN_U64 blocks;
 };
 
+typedef struct DN_MemStats DN_MemStats;
 struct DN_MemStats
 {
   DN_MemListInfo info;
@@ -1196,6 +1230,7 @@ enum DN_MemFlags_
   DN_MemFlags_Heap       = 1 << 8,
 };
 
+typedef struct DN_MemList DN_MemList;
 struct DN_MemList
 {
   DN_MemBlock* curr;
@@ -1211,6 +1246,7 @@ struct DN_MemList
   #endif
 };
 
+typedef struct DN_MemListTemp DN_MemListTemp;
 struct DN_MemListTemp
 {
   DN_MemList*   mem;
@@ -1220,24 +1256,23 @@ struct DN_MemListTemp
   #endif
 };
 
-enum DN_AllocatorType
-{
+typedef enum DN_AllocatorType {
   DN_AllocatorType_MemList,
   DN_AllocatorType_Arena,
   DN_AllocatorType_Pool,
-};
+} DN_AllocatorType;
 
+typedef struct DN_Allocator DN_Allocator;
 struct DN_Allocator
 {
   DN_AllocatorType type;
   void*            context;
 };
 
-enum DN_ArenaReset
-{
+typedef enum DN_ArenaReset {
   DN_ArenaReset_No,
   DN_ArenaReset_Yes,
-};
+} DN_ArenaReset;
 
 typedef DN_U32 DN_ArenaFlags;
 enum DN_ArenaFlags_
@@ -1246,6 +1281,7 @@ enum DN_ArenaFlags_
   DN_ArenaFlags_OwnsMemList = 1 << 0,
 };
 
+typedef struct DN_Arena DN_Arena;
 struct DN_Arena
 {
   DN_ArenaFlags   flags;
@@ -1267,6 +1303,7 @@ DN_USize const DN_ARENA_HEADER_SIZE = DN_AlignUpPowerOfTwo(sizeof(DN_Arena), 64)
   #define DN_POOL_DEFAULT_ALIGN 16
 #endif
 
+typedef struct DN_PoolSlot DN_PoolSlot;
 struct DN_PoolSlot
 {
   void        *data;
@@ -1309,6 +1346,7 @@ enum DN_PoolSlotSize
   DN_PoolSlotSize_Count,
 };
 
+typedef struct DN_Pool DN_Pool;
 struct DN_Pool
 {
   DN_Arena    *arena;
@@ -1316,6 +1354,7 @@ struct DN_Pool
   DN_U8        align;
 };
 
+typedef struct DN_UTF8DecodeResult DN_UTF8DecodeResult;
 struct DN_UTF8DecodeResult
 {
   bool    success;
@@ -1323,6 +1362,7 @@ struct DN_UTF8DecodeResult
   DN_U32  codepoint;
 };
 
+typedef struct DN_UTF8DecodeIterator DN_UTF8DecodeIterator;
 struct DN_UTF8DecodeIterator
 {
   bool     init;
@@ -1339,6 +1379,7 @@ enum DN_CodepointCountFlags_
   DN_CodepointCountFlags_SkipANSICode = 1 << 0,
 };
 
+typedef struct DN_NibbleFromU8Result DN_NibbleFromU8Result;
 struct DN_NibbleFromU8Result
 {
   char nibble0;
@@ -1357,6 +1398,7 @@ enum DN_Str8IsAllType
   DN_Str8IsAllType_Hex,
 };
 
+typedef struct DN_Str8BSplitResult DN_Str8BSplitResult;
 struct DN_Str8BSplitResult
 {
   // If there are multiple strings passed to split against, this is the index into that array of
@@ -1366,6 +1408,7 @@ struct DN_Str8BSplitResult
   DN_Str8  rhs;
 };
 
+typedef struct DN_Str8FindResult DN_Str8FindResult;
 struct DN_Str8FindResult
 {
   bool     found;                        // True if string was found. If false, the subsequent fields below are not set.
@@ -1395,6 +1438,7 @@ enum DN_Str8SplitFlags_
   DN_Str8SplitFlags_HandleQuotedStrings = 1 << 1,
 };
 
+typedef struct DN_Str8TruncResult DN_Str8TruncResult;
 struct DN_Str8TruncResult
 {
   bool     truncated;
@@ -1402,6 +1446,7 @@ struct DN_Str8TruncResult
   DN_USize count_req; // Not including null-terminator
 };
 
+typedef struct DN_Str8SplitResult DN_Str8SplitResult;
 struct DN_Str8SplitResult
 {
   DN_Str8 *data;
@@ -1422,6 +1467,7 @@ enum DN_Str8TableFlags_
   DN_Str8TableFlags_RowLines  = 1 << 1,
 };
 
+typedef struct DN_Str8Link DN_Str8Link;
 struct DN_Str8Link
 {
   DN_Str8      string; // The string
@@ -1429,6 +1475,7 @@ struct DN_Str8Link
   DN_Str8Link *prev;   // The prev string in the linked list
 };
 
+typedef struct DN_Str8Builder DN_Str8Builder;
 struct DN_Str8Builder
 {
   DN_Arena*    arena;       // Allocator to use to back the string list
@@ -1459,8 +1506,7 @@ enum DN_AgeUnit_
   DN_AgeUnit_All           = DN_AgeUnit_Ms | DN_AgeUnit_HMS | DN_AgeUnit_Day | DN_AgeUnit_Week | DN_AgeUnit_Year,
 };
 
-enum DN_ByteType
-{
+typedef enum DN_ByteType {
   DN_ByteType_B,
   DN_ByteType_KiB,
   DN_ByteType_MiB,
@@ -1468,8 +1514,9 @@ enum DN_ByteType
   DN_ByteType_TiB,
   DN_ByteType_Count,
   DN_ByteType_Auto,
-};
+} DN_ByteType;
 
+typedef struct DN_ByteCount DN_ByteCount;
 struct DN_ByteCount
 {
   DN_ByteType type;
@@ -1477,6 +1524,7 @@ struct DN_ByteCount
   DN_F64      bytes;
 };
 
+typedef struct DN_Date DN_Date;
 struct DN_Date
 {
   DN_U8  day;
@@ -1488,6 +1536,7 @@ struct DN_Date
   DN_U16 milliseconds;
 };
 
+typedef struct DN_FmtAppendResult DN_FmtAppendResult;
 struct DN_FmtAppendResult
 {
   DN_USize size_req;
@@ -1495,6 +1544,7 @@ struct DN_FmtAppendResult
   bool     truncated;
 };
 
+typedef struct DN_ProfilerAnchor DN_ProfilerAnchor;
 struct DN_ProfilerAnchor
 {
   // Inclusive refers to the time spent to complete the function call
@@ -1510,6 +1560,7 @@ struct DN_ProfilerAnchor
   DN_Str8 name;
 };
 
+typedef struct DN_ProfilerZone DN_ProfilerZone;
 struct DN_ProfilerZone
 {
   struct DN_Profiler *profiler;
@@ -1519,6 +1570,7 @@ struct DN_ProfilerZone
   DN_U64 elapsed_tsc_at_zone_start;
 };
 
+typedef struct DN_ProfilerAnchorArray DN_ProfilerAnchorArray;
 struct DN_ProfilerAnchorArray
 {
   DN_ProfilerAnchor *data;
@@ -1526,6 +1578,7 @@ struct DN_ProfilerAnchorArray
 };
 
 typedef DN_U64 (DN_ProfilerTSCNowFunc)();
+typedef struct DN_Profiler DN_Profiler;
 struct DN_Profiler
 {
   DN_USize               frame_index;
@@ -1570,19 +1623,20 @@ enum DN_BSearchType
   DN_BSearchType_UpperBound,
 };
 
+typedef struct DN_BSearchResult DN_BSearchResult;
 struct DN_BSearchResult
 {
   bool     found;
   DN_USize index;
 };
 
-enum DN_ErrSinkMode
-{
+typedef enum DN_ErrSinkMode {
   DN_ErrSinkMode_Nil,                  // Default behaviour to accumulate errors into the sink
   DN_ErrSinkMode_DebugBreakOnErrorLog, // Debug break (int3) when error is encountered and the sink is ended by the 'end and log' functions.
   DN_ErrSinkMode_ExitOnError,          // When an error is encountered, exit the program with the error code of the error that was caught.
-};
+} DN_ErrSinkMode;
 
+typedef struct DN_ErrSinkMsg DN_ErrSinkMsg;
 struct DN_ErrSinkMsg
 {
   DN_I32         error_code;
@@ -1592,6 +1646,7 @@ struct DN_ErrSinkMsg
   DN_ErrSinkMsg *prev;
 };
 
+typedef struct DN_ErrSinkNode DN_ErrSinkNode;
 struct DN_ErrSinkNode
 {
   DN_CallSite    call_site;    // Call site that the node was created
@@ -1600,6 +1655,7 @@ struct DN_ErrSinkNode
   DN_U64         arena_pos;    // Position to reset the arena when the scope is ended
 };
 
+typedef struct DN_ErrSink DN_ErrSink;
 struct DN_ErrSink
 {
   DN_Arena*      arena;      // Dedicated allocator from the thread's local storage
@@ -1607,6 +1663,7 @@ struct DN_ErrSink
   DN_USize       stack_size;
 };
 
+typedef struct DN_TCScratch DN_TCScratch;
 struct DN_TCScratch
 {
   DN_Arena arena;
@@ -1614,6 +1671,7 @@ struct DN_TCScratch
 };
 
 #if defined(__cplusplus)
+typedef struct DN_TCScratchCpp DN_TCScratchCpp;
 struct DN_TCScratchCpp
 {
   DN_TCScratchCpp(DN_Arena **conflicts, DN_USize count);
@@ -1622,6 +1680,7 @@ struct DN_TCScratchCpp
 };
 #endif
 
+typedef struct DN_TCInitArgs DN_TCInitArgs;
 struct DN_TCInitArgs
 {
   DN_U64 main_reserve;
@@ -1633,6 +1692,7 @@ struct DN_TCInitArgs
   DN_U64 err_sink_commit;
 };
 
+typedef struct DN_TCCore DN_TCCore;
 struct DN_TCCore // (T)hread (C)ontext sitting in thread-local storage
 {
   DN_Str8x64  name;
@@ -1665,7 +1725,9 @@ enum DN_TCDeinitArenas
   DN_TCDeinitArenas_Yes,
 };
 
+typedef struct DN_PCG32 DN_PCG32;
 struct DN_PCG32       { DN_U64 state; };
+typedef struct DN_MurmurHash3 DN_MurmurHash3;
 struct DN_MurmurHash3 { DN_U64 e[2]; };
 
 enum DN_LogType
@@ -1677,12 +1739,12 @@ enum DN_LogType
   DN_LogType_Count,
 };
 
-enum DN_LogBold
-{
+typedef enum DN_LogBold {
   DN_LogBold_No,
   DN_LogBold_Yes,
-};
+} DN_LogBold;
 
+typedef struct DN_LogStyle DN_LogStyle;
 struct DN_LogStyle
 {
   DN_LogBold bold;
@@ -1690,6 +1752,7 @@ struct DN_LogStyle
   DN_U8      r, g, b;
 };
 
+typedef struct DN_LogTypeParam DN_LogTypeParam;
 struct DN_LogTypeParam
 {
   bool    is_u32_enum;
@@ -1703,6 +1766,7 @@ enum DN_ANSIColourMode
   DN_ANSIColourMode_Bg,
 };
 
+typedef struct DN_LogDate DN_LogDate;
 struct DN_LogDate
 {
   DN_U16 year;
@@ -1714,6 +1778,7 @@ struct DN_LogDate
   DN_U8 second;
 };
 
+typedef struct DN_LogPrefixSize DN_LogPrefixSize;
 struct DN_LogPrefixSize
 {
   DN_USize count;
@@ -1732,6 +1797,7 @@ typedef void DN_LogPrintFunc(DN_LogTypeParam type, void *user_data, DN_CallSite 
 
 DN_MSVC_WARNING_PUSH
 DN_MSVC_WARNING_DISABLE(4201) // warning C4201: nonstandard extension used: nameless struct/union
+typedef union DN_V2I32 DN_V2I32;
 union DN_V2I32
 {
   struct { DN_I32 x, y; };
@@ -1739,6 +1805,7 @@ union DN_V2I32
   DN_I32 data[2];
 };
 
+typedef union DN_V2U16 DN_V2U16;
 union DN_V2U16
 {
   struct { DN_U16 x, y; };
@@ -1746,6 +1813,7 @@ union DN_V2U16
   DN_U16 data[2];
 };
 
+typedef union DN_V2U32 DN_V2U32;
 union DN_V2U32
 {
   struct { DN_U32 x,   y; };
@@ -1754,6 +1822,7 @@ union DN_V2U32
   DN_U32 data[2];
 };
 
+typedef union DN_V2F32 DN_V2F32;
 union DN_V2F32
 {
   struct { DN_F32 x, y; };
@@ -1761,12 +1830,14 @@ union DN_V2F32
   DN_F32 data[2];
 };
 
+typedef struct DN_2V2F32 DN_2V2F32;
 struct DN_2V2F32
 {
   DN_V2F32 min;
   DN_V2F32 max;
 };
 
+typedef struct DN_V2F32Array DN_V2F32Array;
 struct DN_V2F32Array
 {
   DN_V2F32 *data;
@@ -1774,6 +1845,7 @@ struct DN_V2F32Array
   DN_USize  max;
 };
 
+typedef union DN_V3F32 DN_V3F32;
 union DN_V3F32
 {
   struct { DN_F32 x, y, z; };
@@ -1782,6 +1854,7 @@ union DN_V3F32
   DN_F32    data[3];
 };
 
+typedef union DN_V4F32 DN_V4F32;
 union DN_V4F32
 {
   struct { DN_F32 x, y, z, w; };
@@ -1791,6 +1864,7 @@ union DN_V4F32
   DN_F32    data[4];
 };
 
+typedef struct DN_V4F32Array DN_V4F32Array;
 struct DN_V4F32Array
 {
   DN_V4F32* data;
@@ -1799,54 +1873,57 @@ struct DN_V4F32Array
 };
 DN_MSVC_WARNING_POP
 
+typedef struct DN_M4 DN_M4;
 struct DN_M4
 {
   DN_F32 columns[4][4]; // Column major matrix
 };
 
+typedef union DN_M2x3 DN_M2x3;
 union DN_M2x3
 {
   DN_F32 e[6];
   DN_F32 row[2][3];
 };
 
+typedef struct DN_M2x3XForm DN_M2x3XForm;
 struct DN_M2x3XForm
 {
   DN_M2x3 forward;
   DN_M2x3 inverse;
 };
 
-enum DN_M2x3ProjOrigin
-{
+typedef enum DN_M2x3ProjOrigin {
   DN_M2x3ProjOrigin_TopLeft,
   DN_M2x3ProjOrigin_Center,
-};
+} DN_M2x3ProjOrigin;
 
+typedef struct DN_Rect DN_Rect;
 struct DN_Rect
 {
   DN_V2F32 pos, size;
 };
 
-enum DN_RectCutClip
-{
+typedef enum DN_RectCutClip {
   DN_RectCutClip_No,
   DN_RectCutClip_Yes,
-};
+} DN_RectCutClip;
 
-enum DN_RectCutSide
-{
+typedef enum DN_RectCutSide {
   DN_RectCutSide_Left,
   DN_RectCutSide_Right,
   DN_RectCutSide_Top,
   DN_RectCutSide_Bottom,
-};
+} DN_RectCutSide;
 
+typedef struct DN_RectCut DN_RectCut;
 struct DN_RectCut
 {
   DN_Rect*       rect;
   DN_RectCutSide side;
 };
 
+typedef struct DN_RaycastV2 DN_RaycastV2;
 struct DN_RaycastV2
 {
   bool   hit; // True if there was an intersection, false if the lines are parallel
@@ -1854,6 +1931,7 @@ struct DN_RaycastV2
   DN_F32 t_b; // Distance along `dir_b` that the intersection occurred, e.g. `origin_b + (dir_b * t_b)`
 };
 
+typedef struct DN_Ring DN_Ring;
 struct DN_Ring
 {
   DN_U64 size;
@@ -1862,18 +1940,17 @@ struct DN_Ring
   DN_U64 read_pos;
 };
 
-enum DN_ArrayErase
-{
+typedef enum DN_ArrayErase {
   DN_ArrayErase_Unstable,
   DN_ArrayErase_Stable,
-};
+} DN_ArrayErase;
 
-enum DN_ArrayAdd
-{
+typedef enum DN_ArrayAdd {
   DN_ArrayAdd_Append,
   DN_ArrayAdd_Prepend,
-};
+} DN_ArrayAdd;
 
+typedef struct DN_ArrayEraseResult DN_ArrayEraseResult;
 struct DN_ArrayEraseResult
 {
   // The next index your for-index should be set to such that you can continue
@@ -1887,6 +1964,7 @@ struct DN_ArrayEraseResult
   DN_USize items_erased; // The number of items erased
 };
 
+typedef struct DN_ArrayFindResult DN_ArrayFindResult;
 struct DN_ArrayFindResult
 {
   bool     success;
@@ -1895,30 +1973,29 @@ struct DN_ArrayFindResult
 };
 typedef bool (DN_ArrayFindEqFunc)(void const *lhs, void const *find);
 
-enum DN_HTableDeallocPoolOnDeinit
-{
+typedef enum DN_HTableDeallocPoolOnDeinit {
   DN_HTableDeallocPoolOnDeinit_No,
   DN_HTableDeallocPoolOnDeinit_Yes,
-};
+} DN_HTableDeallocPoolOnDeinit;
 
-enum DN_HTableHashSentinel
-{
+typedef enum DN_HTableHashSentinel {
   DN_HTableHashSentinel_Empty = 0,
   DN_HTableHashSentinel_Tomb,
   DN_HTableHashSentinel_FirstValid,
-};
+} DN_HTableHashSentinel;
 
+typedef DN_U32 DN_HTableFlags;
 enum DN_HTableFlags_
 {
   DN_HTableFlags_DeallocPoolOnDeinit = 1 << 0,
   DN_HTableFlags_UsingHeap           = 1 << 1,
 };
 
-typedef DN_U32 DN_HTableHashType;
-typedef DN_U32 DN_HTableFlags;
-
+typedef DN_U32 DN_HTableHashType; // NOTE: Alias for the hash table's `hash` (4 unsigned bytes)
 typedef DN_U32(DN_HTableHashFunc) (void const *key, DN_USize size);
 typedef bool  (DN_HTableKeyEqFunc)(void const *lhs, void const *rhs, DN_USize size);
+
+typedef struct DN_HTable DN_HTable;
 struct DN_HTable
 {
   // NOTE: The total number of slots used by the table is defined as `count` + `tombs_count`
@@ -1943,6 +2020,7 @@ struct DN_HTable
   DN_USize size_of_value;
 };
 
+typedef struct DN_HTableInitArgs DN_HTableInitArgs;
 struct DN_HTableInitArgs
 {
   DN_F32              load_factor;
@@ -1958,6 +2036,7 @@ struct DN_HTableInitArgs
   DN_USize            size_of_value;
 };
 
+typedef struct DN_HTableSlot DN_HTableSlot;
 struct DN_HTableSlot
 {
   // NOTE: Type-erased lookup of the {hash, key, value} object in the hash table
@@ -1969,6 +2048,7 @@ struct DN_HTableSlot
   void*             value;     // Pointer to the value embedded in the user's `kvs` struct
 };
 
+typedef struct DN_HTableAddResult DN_HTableAddResult;
 struct DN_HTableAddResult
 {
   bool          success; // Adding fails if adding required a table resize and resizing failed (out-of-memory)
@@ -1976,18 +2056,21 @@ struct DN_HTableAddResult
   DN_HTableSlot slot;    // Table slot containing the value you just added, zero initialised struct on failure
 };
 
+typedef struct DN_HTableLookupResult DN_HTableLookupResult;
 struct DN_HTableLookupResult
 {
   DN_HTableHashType key_hash; // hash(key) that was used to look up `slot`
   DN_HTableSlot     slot;     // KV object from `kvs`, always set (either empty, tombed, or active slot)
 };
 
+typedef struct DN_HTableResizeResult DN_HTableResizeResult;
 struct DN_HTableResizeResult
 {
   bool success;
   bool needed_resize;
 };
 
+typedef struct DN_HTableInitResult DN_HTableInitResult;
 struct DN_HTableInitResult
 {
   DN_HTable table;
@@ -2006,6 +2089,7 @@ enum DN_LeakAllocFlag
   DN_LeakAllocFlag_LeakPermitted = 1 << 1,
 };
 
+typedef struct DN_LeakAlloc DN_LeakAlloc;
 struct DN_LeakAlloc
 {
   void     *ptr;               // 8  Pointer to the allocation being tracked
@@ -2020,6 +2104,7 @@ struct DN_LeakAlloc
 // expensive. Enforce that there is no unexpected padding.
 DN_StaticAssert(sizeof(DN_LeakAlloc) == 64 || sizeof(DN_LeakAlloc) == 32); // NOTE: 64 bit vs 32 bit pointers respectively
 
+typedef struct DN_LeakTrackerKV DN_LeakTrackerKV;
 struct DN_LeakTrackerKV
 {
   DN_HTableHashType hash;
@@ -2027,6 +2112,7 @@ struct DN_LeakTrackerKV
   DN_LeakAlloc      value;
 };
 
+typedef struct DN_LeakTracker DN_LeakTracker;
 struct DN_LeakTracker
 {
   DN_LeakTrackerKV *alloc_table_kvs;
@@ -2049,12 +2135,12 @@ enum DN_InitFlags_
   DN_InitFlags_LogAllFeatures = DN_InitFlags_LogLibFeatures | DN_InitFlags_LogCPUFeatures,
 };
 
-enum DN_BinPackMode
-{
+typedef enum DN_BinPackMode {
   DN_BinPackMode_Serialise,
   DN_BinPackMode_Deserialise,
-};
+} DN_BinPackMode;
 
+typedef struct DN_BinPack DN_BinPack;
 struct DN_BinPack
 {
   DN_Str8Builder writer;
@@ -2062,12 +2148,12 @@ struct DN_BinPack
   DN_USize       read_index;
 };
 
-enum DN_CSVSerialise
-{
+typedef enum DN_CSVSerialise {
   DN_CSVSerialise_Read,
   DN_CSVSerialise_Write,
-};
+} DN_CSVSerialise;
 
+typedef struct DN_CSVTokeniser DN_CSVTokeniser;
 struct DN_CSVTokeniser
 {
   bool        bad;
@@ -2077,6 +2163,7 @@ struct DN_CSVTokeniser
   bool        end_of_line;
 };
 
+typedef struct DN_CSVPack DN_CSVPack;
 struct DN_CSVPack
 {
   DN_Str8Builder  write_builder;
@@ -2084,6 +2171,7 @@ struct DN_CSVPack
   DN_CSVTokeniser read_tokeniser;
 };
 
+typedef struct DN_TestDiagnosticRow DN_TestDiagnosticRow;
 struct DN_TestDiagnosticRow
 {
   DN_Str8     expr;
@@ -2092,6 +2180,7 @@ struct DN_TestDiagnosticRow
   DN_Str8     message;
 };
 
+typedef struct DN_TestEntry DN_TestEntry;
 struct DN_TestEntry
 {
   bool                  failed;
@@ -2103,6 +2192,7 @@ struct DN_TestEntry
   DN_U64                ts_end;
 };
 
+typedef struct DN_TestGroup DN_TestGroup;
 struct DN_TestGroup
 {
   DN_Str8        name;
@@ -2114,6 +2204,7 @@ struct DN_TestGroup
   DN_TestEntry*  curr_entry;    // Active test being executed and results should be updated into
 };
 
+typedef struct DN_TestCore DN_TestCore;
 struct DN_TestCore
 {
   DN_Arena*      arena;
@@ -2129,15 +2220,14 @@ struct DN_TestCore
   DN_TestGroup*  curr_group;   // Active test group being executed and test entries are being added to
 };
 
-enum DN_TestLogic
-{
+typedef enum DN_TestLogic {
   DN_TestLogic_GreaterThan,
   DN_TestLogic_GreaterThanEq,
   DN_TestLogic_LessThan,
   DN_TestLogic_LessThanEq,
   DN_TestLogic_Eq,
   DN_TestLogic_NotEq,
-};
+} DN_TestLogic;
 
 typedef DN_U32 DN_Str8FromTestCoreFlags;
 enum DN_Str8FromTestCoreFlags_
@@ -2187,6 +2277,8 @@ DN_MSVC_WARNING_POP
 #endif
 
 extern DN_CPUFeatureDecl g_dn_cpu_feature_decl[DN_CPUFeature_Count];
+
+typedef struct DN_OSTimer DN_OSTimer;
 struct DN_OSTimer /// Record time between two time-points using the OS's performance counter.
 {
   DN_U64 start;
@@ -2201,6 +2293,7 @@ enum DN_OSPathInfoType
   DN_OSPathInfoType_File,
 };
 
+typedef struct DN_OSPathInfo DN_OSPathInfo;
 struct DN_OSPathInfo
 {
   bool              exists;
@@ -2211,6 +2304,7 @@ struct DN_OSPathInfo
   DN_U64            size;
 };
 
+typedef struct DN_OSDirIterator DN_OSDirIterator;
 struct DN_OSDirIterator
 {
   void   *handle;
@@ -2219,27 +2313,27 @@ struct DN_OSDirIterator
 };
 
 // NOTE: R/W Stream API
+typedef struct DN_OSFileRead DN_OSFileRead;
 struct DN_OSFileRead
 {
   bool     success;
   DN_USize bytes_read;
 };
 
+typedef struct DN_OSFile DN_OSFile;
 struct DN_OSFile
 {
   bool  error;
   void *handle;
 };
 
-enum DN_OSFileOpen
-{
+typedef enum DN_OSFileOpen {
   DN_OSFileOpen_CreateAlways, // Create file if it does not exist, otherwise, zero out the file and open
   DN_OSFileOpen_OpenIfExist,  // Open file at path only if it exists
   DN_OSFileOpen_OpenAlways,   // Open file at path, create file if it does not exist
-};
+} DN_OSFileOpen;
 
 typedef DN_U32 DN_OSFileAccess;
-
 enum DN_OSFileAccess_
 {
   DN_OSFileAccess_Read       = 1 << 0,
@@ -2251,15 +2345,16 @@ enum DN_OSFileAccess_
 };
 
 // NOTE: DN_OSPath
-#if !defined(DN_OSPathSeperator)
-  #if defined(DN_OS_WIN32)
-    #define DN_OSPathSeperator "\\"
+#if !defined(DN_OSPathSeparator)
+  #if defined(DN_PLATFORM_WIN32)
+    #define DN_OSPathSeparator "\\"
   #else
-    #define DN_OSPathSeperator "/"
+    #define DN_OSPathSeparator "/"
   #endif
-  #define DN_OSPathSeperatorString DN_Str8Lit(DN_OSPathSeperator)
+  #define DN_OSPathSeparatorStr8 DN_Str8Lit(DN_OSPathSeparator)
 #endif
 
+typedef struct DN_OSPathLink DN_OSPathLink;
 struct DN_OSPathLink
 {
   DN_Str8        string;
@@ -2267,6 +2362,7 @@ struct DN_OSPathLink
   DN_OSPathLink *prev;
 };
 
+typedef struct DN_OSPath DN_OSPath;
 struct DN_OSPath
 {
   bool           has_prefix_path_separator;
@@ -2276,9 +2372,7 @@ struct DN_OSPath
   DN_U16         links_size;
 };
 
-// NOTE: DN_OSExec
 typedef DN_U32 DN_OSExecFlags;
-
 enum DN_OSExecFlags_
 {
   DN_OSExecFlags_Nil                 = 0,
@@ -2288,6 +2382,7 @@ enum DN_OSExecFlags_
   DN_OSExecFlags_MergeStderrToStdout = 1 << 2 | DN_OSExecFlags_SaveOutput,
 };
 
+typedef struct DN_OSExecAsyncHandle DN_OSExecAsyncHandle;
 struct DN_OSExecAsyncHandle
 {
   DN_OSExecFlags exec_flags;
@@ -2300,6 +2395,7 @@ struct DN_OSExecAsyncHandle
   void          *stderr_write;
 };
 
+typedef struct DN_OSExecResult DN_OSExecResult;
 struct DN_OSExecResult
 {
   bool    finished;
@@ -2309,6 +2405,7 @@ struct DN_OSExecResult
   DN_U32  exit_code;
 };
 
+typedef struct DN_OSExecArgs DN_OSExecArgs;
 struct DN_OSExecArgs
 {
   DN_OSExecFlags flags;
@@ -2319,34 +2416,39 @@ struct DN_OSExecArgs
 // NOTE: DN_OSSemaphore
 DN_U32 const DN_OS_SEMAPHORE_INFINITE_TIMEOUT = UINT32_MAX;
 
+typedef struct DN_OSSemaphore DN_OSSemaphore;
 struct DN_OSSemaphore
 {
   DN_U64 handle;
 };
 
+typedef struct DN_OSBarrier DN_OSBarrier;
 struct DN_OSBarrier
 {
   DN_U64 handle;
 };
 
-enum DN_OSSemaphoreWaitResult
-{
+typedef enum DN_OSSemaphoreWaitResult {
   DN_OSSemaphoreWaitResult_Failed,
   DN_OSSemaphoreWaitResult_Success,
   DN_OSSemaphoreWaitResult_Timeout,
-};
+} DN_OSSemaphoreWaitResult;
 
+typedef struct DN_OSMutex DN_OSMutex;
 struct DN_OSMutex
 {
   DN_U64 handle;
 };
 
+typedef struct DN_OSConditionVariable DN_OSConditionVariable;
 struct DN_OSConditionVariable
 {
   DN_U64 handle;
 };
 
 typedef DN_I32(DN_OSThreadFunc)(struct DN_OSThread *);
+
+typedef struct DN_OSThreadInitArgs DN_OSThreadInitArgs;
 struct DN_OSThreadInitArgs
 {
   // NOTE: Customise much memory the thread's TLS context will be initialised with which contains
@@ -2358,6 +2460,7 @@ struct DN_OSThreadInitArgs
    DN_USize      stack_size;
 };
 
+typedef struct DN_OSThreadLane DN_OSThreadLane;
 struct DN_OSThreadLane
 {
   DN_USize     index;
@@ -2366,6 +2469,7 @@ struct DN_OSThreadLane
   void*        shared_mem;
 };
 
+typedef struct DN_OSThreadLaneway DN_OSThreadLaneway;
 struct DN_OSThreadLaneway
 {
   DN_OSThread* threads;
@@ -2374,6 +2478,7 @@ struct DN_OSThreadLaneway
   DN_OSBarrier barrier;
 };
 
+typedef struct DN_OSThread DN_OSThread;
 struct DN_OSThread
 {
   DN_Str8x64       name;
@@ -2388,16 +2493,40 @@ struct DN_OSThread
   DN_TCInitArgs    tc_init_args;
 };
 
+typedef DN_U32 DN_OSLogFlags;
+enum DN_OSLoggerFlags_
+{
+  DN_OSLoggerFlags_Nil       = 0,
+  DN_OSLoggerFlags_File      = 1 << 0, // Write the log to disk
+  DN_OSLoggerFlags_NoColour  = 1 << 2, // Prevent outputting logs with ANSI colour codes (note: logs written to disk never use colour)
+  DN_OSLoggerFlags_NoOutput  = 1 << 3, // Prevent outputting to the terminal
+
+  // NOTE: Internal flags, do not use
+  DN_OSLoggerFlags_FileError = 1 << 4, // On error opening the log file, this flag is sticky until log file path is updated
+};
+
+typedef struct DN_OSLogger DN_OSLogger;
+struct DN_OSLogger
+{
+  DN_OSLogFlags  flags;
+
+  // NOTE: Enable log rotation by setting `rotate_every_n_bytes`, `rotate_count` to non-zero values
+  // and set the `DN_OSLoggerFlags_File` flag in `flags`.
+  DN_USize       rotate_every_n_bytes; // Set this to the number of bytes the file should be before rotating
+  DN_USize       rotate_count;         // Set this to the number of files to have in rotation
+
+  // NOTE: Internal fields, do not modify
+  DN_OSFile      file;               // Handle to file managed by the logger internally
+  DN_Str8        file_path;          // Set the file path to write to using `DN_OS_LoggerSetFilePath`
+  DN_TicketMutex file_mutex;         // Mutex locked when writing to disk
+  DN_TicketMutex mutex;              // Mutex locked when writing to standard-error
+};
+
+typedef struct DN_OSCore DN_OSCore;
 struct DN_OSCore
 {
   DN_CPUReport           cpu_report;
-
-  // NOTE: Logging
-  bool                   log_to_file;              // Output logs to file as well as standard out
-  DN_OSFile              log_file;                 // TODO(dn): Hmmm, how should we do this... ?
-  DN_TicketMutex         log_file_mutex;           // Is locked when instantiating the log_file for the first time
-  bool                   log_no_colour;            // Disable colours in the logging output
-  DN_TicketMutex         log_mutex;
+  DN_OSLogger            logger;
 
   // NOTE: OS
   DN_U32                 logical_processor_count;
@@ -2418,6 +2547,7 @@ struct DN_OSCore
   void*                  platform_context;
 };
 
+typedef struct DN_OSDiskSpace DN_OSDiskSpace;
 struct DN_OSDiskSpace
 {
   bool   success;
@@ -2425,13 +2555,13 @@ struct DN_OSDiskSpace
   DN_U64 size;
 };
 
-enum DN_OSAsyncPriority
-{
+typedef enum DN_OSAsyncPriority {
   DN_OSAsyncPriority_Low,
   DN_OSAsyncPriority_High,
   DN_OSAsyncPriority_Count,
-};
+} DN_OSAsyncPriority;
 
+typedef struct DN_OSAsyncCore DN_OSAsyncCore;
 struct DN_OSAsyncCore
 {
   DN_OSMutex             ring_mutex;
@@ -2444,6 +2574,7 @@ struct DN_OSAsyncCore
   DN_U32                 join_threads;
 };
 
+typedef struct DN_OSAsyncWorkArgs DN_OSAsyncWorkArgs;
 struct DN_OSAsyncWorkArgs
 {
   DN_OSThread *thread;
@@ -2452,6 +2583,7 @@ struct DN_OSAsyncWorkArgs
 
 typedef void(DN_OSAsyncWorkFunc)(DN_OSAsyncWorkArgs work_args);
 
+typedef struct DN_OSAsyncWork DN_OSAsyncWork;
 struct DN_OSAsyncWork
 {
   DN_OSAsyncWorkFunc *func;
@@ -2459,14 +2591,16 @@ struct DN_OSAsyncWork
   void             *output;
 };
 
+typedef struct DN_OSAsyncTask DN_OSAsyncTask;
 struct DN_OSAsyncTask
 {
   bool           queued;
-  DN_OSAsyncWork   work;
+  DN_OSAsyncWork work;
   DN_OSSemaphore completion_sem;
 };
 #endif // #if DN_WITH_OS
 
+typedef struct DN_Core DN_Core;
 struct DN_Core
 {
   DN_InitFlags     init_flags;
@@ -2572,11 +2706,11 @@ DN_API bool                     DN_CPUHasAllFeatures                            
 DN_API void                     DN_CPUSetFeature                                       (DN_CPUReport *report, DN_CPUFeature feature);
 DN_API DN_CPUReport             DN_CPUGetReport                                        ();
 
-DN_API void                     DN_TicketMutex_Begin                                   (DN_TicketMutex *mutex);
-DN_API void                     DN_TicketMutex_End                                     (DN_TicketMutex *mutex);
-DN_API DN_UInt                  DN_TicketMutex_MakeTicket                              (DN_TicketMutex *mutex);
-DN_API void                     DN_TicketMutex_BeginTicket                             (DN_TicketMutex const *mutex, DN_UInt ticket);
-DN_API bool                     DN_TicketMutex_CanLock                                 (DN_TicketMutex const *mutex, DN_UInt ticket);
+DN_API void                     DN_TicketMutexBegin                                    (DN_TicketMutex *mutex);
+DN_API void                     DN_TicketMutexEnd                                      (DN_TicketMutex *mutex);
+DN_API DN_UInt                  DN_TicketMutexMakeTicket                               (DN_TicketMutex *mutex);
+DN_API void                     DN_TicketMutexBeginTicket                              (DN_TicketMutex const *mutex, DN_UInt ticket);
+DN_API bool                     DN_TicketMutexCanLock                                  (DN_TicketMutex const *mutex, DN_UInt ticket);
 
 DN_API void                     DN_BitUnsetInplace                                     (DN_USize *flags, DN_USize bitfield);
 DN_API void                     DN_BitSetInplace                                       (DN_USize *flags, DN_USize bitfield);
@@ -2768,6 +2902,7 @@ DN_API void*                    DN_ArenaAlloc                                   
 DN_API void*                    DN_ArenaAllocContiguous                                (DN_Arena *arena, DN_U64 size, DN_U8 align, DN_ZMem z_arena);
 DN_API void*                    DN_ArenaCopy                                           (DN_Arena *arena, void const *data, DN_U64 size, DN_U8 align);
 DN_API void                     DN_ArenaDeinit                                         (DN_Arena *arena);
+DN_API bool                     DN_ArenaOwnsPtr                                        (DN_Arena const *arena, void *ptr);
 
 #define                         DN_ArenaNew(arena, T, zmem)                            (T *)DN_ArenaAlloc(arena, sizeof(T), alignof(T), zmem)
 #define                         DN_ArenaNewZ(arena, T)                                 (T *)DN_ArenaAlloc(arena, sizeof(T), alignof(T), DN_ZMem_Yes)
@@ -4265,8 +4400,42 @@ DN_API void                  DN_LeakDump_                                       
 
 #if DN_WITH_OS
 DN_API DN_Str8               DN_OS_Str8FromStr8BuilderHeap                                     (DN_Str8Builder const *builder);
-DN_API void                  DN_OS_LogPrint                                                    (DN_LogTypeParam type, void *user_data, DN_CallSite call_site, DN_FMT_ATTRIB char const *fmt, va_list args);
+DN_API void                  DN_OS_LogPrint                                                    (DN_LogTypeParam type, void *user_data, DN_CallSite call_site, DN_LogFlags flags, DN_FMT_ATTRIB char const *fmt, va_list args);
 DN_API void                  DN_OS_SetLogPrintFuncToOS                                         ();
+
+// NOTE: Logger
+// Overview
+//   Logger that utilises the OS facilities to log to standard-error or to a file. Can optionally
+//   rotate log files by setting the `rotate_` prefixed member functions. The logger can be used
+//   across multiple threads without issue.
+//
+//   A rotating logger will write to the file specified by `DN_OS_LoggerSetFilePath`. When that log
+//   file exceeds `rotate_every_n_bytes` in size, this file will be moved to
+//   `<file_path>.<rotate_index>`. All other files in that sequence, if they exist, are shifted
+//   down one. The last file in the rotation gets deleted. If there are any OS issues with
+//   rotating a file (like permissions or directories with the same name as the rotation target)
+//   then it will output a warning to standard-error and disable logging to disk.
+//
+//   Rotating errors can be flushed by fixing the issue at the OS level and clearing the flag
+//   `DN_OSLoggerFlags_FileError` from the logger before attempting to log again. Setting a new
+//   file path via `DN_OS_LoggerSetFilePath` will also clear this flag.
+//
+//   The rotating logger outputs files to the base `file_path` and then rotates it to
+//   `<file_path>.1` after the desired size is rotated for example:
+//
+//     <file_path>
+//     <file_path>.1
+//     ..
+//     <file_path>.N-1
+//
+//   The target byte count for rotation is a hint. A large log message on a file teetering against
+//   the maximum allowed byte size will cause the log file to exceed the target size before being
+//   rotated on the next log invocation.
+
+DN_API DN_Str8               DN_OS_LoggerGetRotateFilePath                                     (DN_Str8 base_file_path, DN_Arena *arena, DN_USize rotate_index);
+DN_API void                  DN_OS_LoggerSetFilePath                                           (DN_OSLogger *logger, DN_Pool *pool, DN_Str8 file_path);
+DN_API void                  DN_OS_LoggerFV                                                    (DN_OSLogger *logger, DN_LogTypeParam type, DN_CallSite call_site, DN_LogFlags flags, DN_FMT_ATTRIB char const *fmt, va_list args);
+DN_API void                  DN_OS_LoggerF                                                     (DN_OSLogger *logger, DN_LogTypeParam type, DN_CallSite call_site, DN_LogFlags flags, DN_FMT_ATTRIB char const *fmt, ...);
 
 // NOTE: Heap
 // Overview
@@ -4374,15 +4543,19 @@ DN_API bool                      DN_OS_PathAddRef                             (D
 DN_API bool                      DN_OS_PathAdd                                (DN_Arena *arena, DN_OSPath *fs_path, DN_Str8 path);
 DN_API bool                      DN_OS_PathAddF                               (DN_Arena *arena, DN_OSPath *fs_path, DN_FMT_ATTRIB char const *fmt, ...);
 DN_API bool                      DN_OS_PathPop                                (DN_OSPath *fs_path);
-DN_API DN_Str8                   DN_OS_PathBuildWithSeparator                 (DN_Arena *arena, DN_OSPath const *fs_path, DN_Str8 path_separator);
-DN_API DN_Str8                   DN_OS_PathTo                                 (DN_Arena *arena, DN_Str8 path, DN_Str8 path_separtor);
-DN_API DN_Str8                   DN_OS_PathToF                                (DN_Arena *arena, DN_Str8 path_separator, DN_FMT_ATTRIB char const *fmt, ...);
-DN_API DN_Str8                   DN_OS_Path                                   (DN_Arena *arena, DN_Str8 path);
-DN_API DN_Str8                   DN_OS_PathF                                  (DN_Arena *arena, DN_FMT_ATTRIB char const *fmt, ...);
+DN_API DN_Str8                   DN_OS_PathBuildWithSeparatorAllocator        (DN_Allocator allocator, DN_OSPath const *fs_path, DN_Str8 path_separator);
+DN_API DN_Str8                   DN_OS_PathToArena                            (DN_Arena *arena, DN_Str8 path, DN_Str8 path_separtor);
+DN_API DN_Str8                   DN_OS_PathToPool                             (DN_Pool  *pool,  DN_Str8 path, DN_Str8 path_separtor);
+DN_API DN_Str8                   DN_OS_PathToFmtArena                         (DN_Arena *arena, DN_Str8 path_separator, DN_FMT_ATTRIB char const *fmt, ...);
+DN_API DN_Str8                   DN_OS_PathToFmtPool                          (DN_Pool  *pool,  DN_Str8 path_separator, DN_FMT_ATTRIB char const *fmt, ...);
+DN_API DN_Str8                   DN_OS_PathArena                              (DN_Arena *arena, DN_Str8 path);
+DN_API DN_Str8                   DN_OS_PathPool                               (DN_Pool  *pool,  DN_Str8 path);
+DN_API DN_Str8                   DN_OS_PathFmtArena                           (DN_Arena *arena, DN_FMT_ATTRIB char const *fmt, ...);
+DN_API DN_Str8                   DN_OS_PathFmtPool                            (DN_Pool  *pool,  DN_FMT_ATTRIB char const *fmt, ...);
 
-#define                          DN_OS_PathBuildFwdSlash(allocator, fs_path)  DN_OS_PathBuildWithSeparator(allocator, fs_path, DN_Str8Lit("/"))
-#define                          DN_OS_PathBuildBackSlash(allocator, fs_path) DN_OS_PathBuildWithSeparator(allocator, fs_path, DN_Str8Lit("\\"))
-#define                          DN_OS_PathBuild(allocator, fs_path)          DN_OS_PathBuildWithSeparator(allocator, fs_path, DN_OSPathSeparatorString)
+#define                          DN_OS_PathBuildFwdSlash(allocator, fs_path)  DN_OS_PathBuildWithSeparatorAllocator(allocator, fs_path, DN_Str8Lit("/"))
+#define                          DN_OS_PathBuildBackSlash(allocator, fs_path) DN_OS_PathBuildWithSeparatorAllocator(allocator, fs_path, DN_Str8Lit("\\"))
+#define                          DN_OS_PathBuild(allocator, fs_path)          DN_OS_PathBuildWithSeparatorAllocator(allocator, fs_path, DN_OSPathSeparatorStr8)
 
 DN_API void                      DN_OS_Exit                                   (int32_t exit_code);
 DN_API DN_OSExecResult           DN_OS_ExecPump                               (DN_OSExecAsyncHandle handle, char *stdout_buffer, size_t *stdout_size, char *stderr_buffer, size_t *stderr_size, DN_U32 timeout_ms, DN_ErrSink  *err);
@@ -4533,11 +4706,10 @@ DN_API DN_OSAsyncTask            DN_OS_AsyncQueueTask                         (D
 DN_API bool                      DN_OS_AsyncWaitTask                          (DN_OSAsyncTask *task, DN_U32 timeout_ms);
 
 // NOTE: DN_OSPrint
-enum DN_OSPrintDest
-{
+typedef enum DN_OSPrintDest {
   DN_OSPrintDest_Out,
   DN_OSPrintDest_Err,
-};
+} DN_OSPrintDest;
 
 // NOTE: Print Macros
 #define DN_OS_PrintOut(string)                       DN_OS_Print(DN_OSPrintDest_Out, string)
@@ -4755,15 +4927,13 @@ DN_USize DN_TArrayCopyPtrPoolAssert(T **data, T const *src, DN_USize count, DN_P
 #endif // defined(__cplusplus)
 
 #if DN_WITH_NET
-enum DN_NETRequestType
-{
+typedef enum DN_NETRequestType {
   DN_NETRequestType_Nil,
   DN_NETRequestType_HTTP,
   DN_NETRequestType_WS,
-};
+} DN_NETRequestType;
 
-enum DN_NETResponseState
-{
+typedef enum DN_NETResponseState {
   DN_NETResponseState_Nil,
   DN_NETResponseState_Error,
   DN_NETResponseState_HTTP,
@@ -4773,16 +4943,15 @@ enum DN_NETResponseState
   DN_NETResponseState_WSClose,
   DN_NETResponseState_WSPing,
   DN_NETResponseState_WSPong,
-};
+} DN_NETResponseState;
 
-enum DN_NETWSSend
-{
+typedef enum DN_NETWSSend {
   DN_NETWSSend_Text,
   DN_NETWSSend_Binary,
   DN_NETWSSend_Close,
   DN_NETWSSend_Ping,
   DN_NETWSSend_Pong,
-};
+} DN_NETWSSend;
 
 typedef DN_U32 DN_NETDoHTTPFlags;
 enum DN_NETDoHTTPFlags_
@@ -4792,6 +4961,7 @@ enum DN_NETDoHTTPFlags_
   DN_NETDoHTTPFlags_DisableSSLVerify = 1 << 1,
 };
 
+typedef struct DN_NETDoHTTPArgs DN_NETDoHTTPArgs;
 struct DN_NETDoHTTPArgs
 {
   // NOTE: WS and HTTP args
@@ -4805,12 +4975,14 @@ struct DN_NETDoHTTPArgs
   DN_Str8            payload;
 };
 
+typedef struct DN_NETRequestHandle DN_NETRequestHandle;
 struct DN_NETRequestHandle
 {
   DN_UPtr handle;
   DN_U64  gen;
 };
 
+typedef struct DN_NETResponse DN_NETResponse;
 struct DN_NETResponse
 {
   // NOTE: When filling these fields, all their values are copied internally in the library so the
@@ -4826,6 +4998,7 @@ struct DN_NETResponse
   DN_U32              http_status;
 };
 
+typedef struct DN_NETRequest DN_NETRequest;
 struct DN_NETRequest
 {
   DN_MemList        mem;
@@ -4851,6 +5024,7 @@ typedef void               (DN_NETDoWSSendFunc)          (DN_NETRequestHandle ha
 typedef DN_NETResponse     (DN_NETWaitForResponseFunc)   (DN_NETRequestHandle handle, DN_Arena *arena, DN_U32 timeout_ms);
 typedef DN_NETResponse     (DN_NETWaitForAnyResponseFunc)(struct DN_NETCore *net, DN_Arena *arena, DN_U32 timeout_ms);
 
+typedef struct DN_NETInterface DN_NETInterface;
 struct DN_NETInterface
 {
   DN_NETInitFunc*               init;
@@ -4862,6 +5036,7 @@ struct DN_NETInterface
   DN_NETWaitForAnyResponseFunc* wait_for_any_response;
 };
 
+typedef struct DN_NETCore DN_NETCore;
 struct DN_NETCore
 {
   char           *base;
@@ -4912,6 +5087,7 @@ void                DN_NET_EndFinishedRequest   (DN_NETRequest *request);
 #if !DN_WITH_OS || !DN_WITH_NET
   #error "NET API with CURL requires #define DN_WITH_NET 1 and #define DN_WITH_OS 1"
 #endif
+typedef struct DN_NETCurlCore DN_NETCurlCore;
 struct DN_NETCurlCore
 {
   // NOTE: Shared w/ user and networking thread
