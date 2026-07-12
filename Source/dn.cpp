@@ -1540,14 +1540,14 @@ DN_API void DN_MemListClear(DN_MemList *mem)
   DN_MemListPopTo(mem, 0);
 }
 
-DN_API bool DN_MemListOwnsPtr(DN_MemList const *mem, void *ptr)
+DN_API bool DN_MemListOwnsPtr(DN_MemList const *mem, void const *ptr)
 {
-  bool      result   = false;
-  uintptr_t uint_ptr = DN_Cast(uintptr_t) ptr;
+  bool      result = false;
+  DN_UPtr uint_ptr = DN_Cast(DN_UPtr) ptr;
   for (DN_MemBlock const *block = mem ? mem->curr : nullptr; !result && block; block = block->prev) {
-    uintptr_t begin = DN_Cast(uintptr_t) block + DN_ARENA_HEADER_SIZE;
-    uintptr_t end   = begin + block->reserve;
-    result          = uint_ptr >= begin && uint_ptr <= end;
+    DN_UPtr begin = DN_Cast(DN_UPtr) block + DN_ARENA_HEADER_SIZE;
+    DN_UPtr end   = begin + block->reserve;
+    result        = uint_ptr >= begin && uint_ptr <= end;
   }
   return result;
 }
@@ -11535,11 +11535,19 @@ DN_API DN_Str8 DN_OS_Str8FromStr8BuilderHeap(DN_Str8Builder const *builder)
   return result;
 }
 
-DN_API void DN_OS_LogPrint(DN_LogTypeParam type, void *user_data, DN_CallSite call_site, DN_LogFlags flags, DN_FMT_ATTRIB char const *fmt, va_list args)
+DN_API void DN_OS_LogPrintFV(DN_LogTypeParam type, void *user_data, DN_CallSite call_site, DN_LogFlags flags, DN_FMT_ATTRIB char const *fmt, va_list args)
 {
   DN_OSCore *os       = DN_Cast(DN_OSCore *)user_data;
   DN_OSLogger *logger = &os->logger;
   DN_OS_LoggerFV(logger, type, call_site, flags, fmt, args);
+}
+
+DN_API void DN_OS_LogPrintF(DN_LogTypeParam type, void *user_data, DN_CallSite call_site, DN_LogFlags flags, DN_FMT_ATTRIB char const *fmt, ...)
+{
+  va_list args;
+  va_start(args, fmt);
+  DN_OS_LogPrintFV(type, user_data, call_site, flags, fmt, args);
+  va_end(args);
 }
 
 DN_API DN_Str8 DN_OS_LoggerGetRotateFilePath(DN_Str8 base_file_path, DN_Arena *arena, DN_USize rotate_index)
@@ -11738,7 +11746,7 @@ DN_API void DN_OS_LoggerF(DN_OSLogger *logger, DN_LogTypeParam type, DN_CallSite
 DN_API void DN_OS_SetLogPrintFuncToOS()
 {
   DN_Core *dn = DN_Get();
-  DN_LogSetPrintFunc(DN_OS_LogPrint, &dn->os);
+  DN_LogSetPrintFunc(DN_OS_LogPrintFV, &dn->os);
 }
 
 DN_API void *DN_OS_HeapBasicAlloc(DN_USize size)
@@ -11775,6 +11783,20 @@ DN_API DN_Heap DN_OS_HeapInitDefault()
   #else
     result = DN_OS_HeapInitVirtual();
   #endif
+  return result;
+}
+
+DN_API DN_Arena DN_OS_ArenaFromHeapVirtual(DN_U64 reserve, DN_U64 commit, DN_MemFlags flags)
+{
+  DN_Heap heap    = DN_OS_HeapInitVirtual();
+  DN_Arena result = DN_ArenaFromHeap(reserve, commit, flags, heap);
+  return result;
+}
+
+DN_API DN_Arena DN_OS_ArenaFromHeapBasic(DN_U64 size, DN_MemFlags flags)
+{
+  DN_Heap heap    = DN_OS_HeapInitBasic();
+  DN_Arena result = DN_ArenaFromHeap(/*reserve=*/ size, /*commit=*/ size, flags, heap);
   return result;
 }
 

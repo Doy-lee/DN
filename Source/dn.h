@@ -2840,7 +2840,7 @@ DN_API void                     DN_MemListPopTo                                 
 DN_API void                     DN_MemListPop                                          (DN_MemList *mem, DN_U64 amount);
 DN_API DN_U64                   DN_MemListPos                                          (DN_MemList const *mem);
 DN_API void                     DN_MemListClear                                        (DN_MemList *mem);
-DN_API bool                     DN_MemListOwnsPtr                                      (DN_MemList const *mem, void *ptr);
+DN_API bool                     DN_MemListOwnsPtr                                      (DN_MemList const *mem, void const *ptr);
 DN_API DN_Str8x64               DN_MemListInfoStr8x64                                  (DN_MemListInfo info);
 DN_API DN_MemListTemp           DN_MemListTempBegin                                    (DN_MemList *mem);
 DN_API void                     DN_MemListTempEnd                                      (DN_MemListTemp mem);
@@ -4500,7 +4500,8 @@ DN_API void                  DN_LeakDump_                                       
 
 #if DN_WITH_OS
 DN_API DN_Str8               DN_OS_Str8FromStr8BuilderHeap                                     (DN_Str8Builder const *builder);
-DN_API void                  DN_OS_LogPrint                                                    (DN_LogTypeParam type, void *user_data, DN_CallSite call_site, DN_LogFlags flags, DN_FMT_ATTRIB char const *fmt, va_list args);
+DN_API void                  DN_OS_LogPrintFV                                                  (DN_LogTypeParam type, void *user_data, DN_CallSite call_site, DN_LogFlags flags, DN_FMT_ATTRIB char const *fmt, va_list args);
+DN_API void                  DN_OS_LogPrintF                                                   (DN_LogTypeParam type, void *user_data, DN_CallSite call_site, DN_LogFlags flags, DN_FMT_ATTRIB char const *fmt, ...);
 DN_API void                  DN_OS_SetLogPrintFuncToOS                                         ();
 
 // NOTE: Logger
@@ -4566,6 +4567,9 @@ DN_API void                      DN_OS_HeapBasicDealloc                       (v
 DN_API DN_Heap                   DN_OS_HeapInitBasic                          ();
 DN_API DN_Heap                   DN_OS_HeapInitVirtual                        ();
 DN_API DN_Heap                   DN_OS_HeapInitDefault                        ();
+
+DN_API DN_Arena                  DN_OS_ArenaFromHeapVirtual                   (DN_U64 reserve, DN_U64 commit, DN_MemFlags flags);
+DN_API DN_Arena                  DN_OS_ArenaFromHeapBasic                     (DN_U64 size, DN_MemFlags flags);
 
 DN_API void *                    DN_OS_MemReserve                             (DN_USize count, DN_MemCommit commit, DN_MemPage page_flags);
 DN_API bool                      DN_OS_MemCommit                              (void *ptr, DN_USize count, DN_U32 page_flags);

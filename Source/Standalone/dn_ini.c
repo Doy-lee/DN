@@ -862,7 +862,7 @@ DN_INIField *DN_INI_AppendKeyF(DN_INICore *ini, DN_INIArena *arena, DN_INISectio
 }
 
 #if defined(DN_INI_WITH_TESTS)
-void DN_INI_UnitTests()
+void DN_INI_TestSuite()
 {
   // NOTE: Section and comments
   {
