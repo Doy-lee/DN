@@ -1027,6 +1027,13 @@ struct DN_U64FromResult
   DN_U64 value;
 };
 
+typedef struct DN_U32FromResult DN_U32FromResult;
+struct DN_U32FromResult
+{
+  bool   success;
+  DN_U32 value;
+};
+
 typedef struct DN_USizeFromResult DN_USizeFromResult;
 struct DN_USizeFromResult
 {
@@ -2986,9 +2993,15 @@ DN_API DN_U64                   DN_U64FromU8x32HiBEUnsafe                       
 DN_API DN_U64FromResult         DN_U64FromU8x32HiBE                                    (DN_U8x32 const *val); // Checks [0:24) bytes aren't set before getting the U64
 DN_API DN_USize                 DN_USizeFromU8x32HiBEUnsafe                            (DN_U8x32 const *val); // Get USize stored in big-endian at the high bytes [32 - sizeof USize:32)
 DN_API DN_USizeFromResult       DN_USizeFromU8x32HiBE                                  (DN_U8x32 const *val); // Checks [0:sizeof USize) bytes aren't set before getting the U64
-DN_API DN_I64FromResult         DN_I64FromStr8                                         (DN_Str8 string, char separator);
-DN_API DN_I64FromResult         DN_I64FromPtr                                          (void const *data, DN_USize size, char separator);
-DN_API DN_I64                   DN_I64FromPtrUnsafe                                    (void const *data, DN_USize size, char separator);
+DN_API DN_U32FromResult         DN_U32FromHexStr8                                      (DN_Str8 hex);
+DN_API DN_U32FromResult         DN_U32FromStr8Delimiters                               (DN_Str8 string, DN_Str8 const *delimiters, DN_USize delimiters_count);
+DN_API DN_U32FromResult         DN_U32FromStr8Delimiter                                (DN_Str8 string, DN_Str8 delimiter);
+DN_API DN_U32FromResult         DN_U32FromPtr                                          (void const *data, DN_USize size);
+DN_API DN_I64FromResult         DN_I64FromStr8Delimiters                               (DN_Str8 string, DN_Str8 const *delimiters, DN_USize delimiters_count);
+DN_API DN_I64FromResult         DN_I64FromStr8Delimiter                                (DN_Str8 string, DN_Str8 delimiter);
+DN_API DN_I64FromResult         DN_I64FromStr8                                         (DN_Str8 string);
+DN_API DN_I64FromResult         DN_I64FromPtr                                          (void const *data, DN_USize size);
+DN_API DN_I64                   DN_I64FromPtrUnsafe                                    (void const *data, DN_USize size);
 
 DN_API bool                     DN_U8x32Eq                                             (DN_U8x32 const *lhs, DN_U8x32 const *rhs);
 DN_API DN_U8x32                 DN_U8x32FromBytesLeftPadZ                              (DN_U8 const *ptr, DN_USize size);
@@ -3206,6 +3219,7 @@ DN_API DN_Str8                  DN_Str8HexFromPtrBytesArena                     
 DN_API DN_Str8                  DN_Str8HexFromStr8BytesArena                           (DN_Str8 bytes, DN_Arena *arena, DN_TrimLeadingZero trim_leading_z);
 DN_API DN_Hex32                 DN_Hex32FromPtrBytes16                                 (void const *bytes, DN_USize bytes_count, DN_TrimLeadingZero trim_leading_z);
 DN_API DN_Hex64                 DN_Hex64FromPtrBytes32                                 (void const *bytes, DN_USize bytes_count, DN_TrimLeadingZero trim_leading_z);
+DN_API DN_Hex64                 DN_Hex64FromU8x32                                      (DN_U8x32 const *value, DN_TrimLeadingZero trim_leading_z);
 DN_API DN_Hex128                DN_Hex128FromPtrBytes64                                (void const *bytes, DN_USize bytes_count, DN_TrimLeadingZero trim_leading_z);
 
 DN_API DN_Str8x128              DN_AgeStr8FromMsU64                                    (DN_U64 duration_ms, DN_AgeUnit units);
@@ -4048,26 +4062,14 @@ DN_API DN_RaycastV2            DN_RaycastLineIntersectV2                        
 #define                                   DN_LArrayMakeAssert(c_array, ptr_size, z_mem)                        DN_PArrayMakeAssert(c_array, ptr_size, DN_ArrayCountU(c_array), z_mem)
 #define                                   DN_LArrayMakeAssertZ(c_array, ptr_size)                              DN_PArrayMakeAssertZ(c_array, ptr_size, DN_ArrayCountU(c_array))
 #define                                   DN_LArrayMakeAssertNoZ(c_array, ptr_size)                            DN_PArrayMakeAssertNoZ(c_array, ptr_size, DN_ArrayCountU(c_array))
-#define                                   DN_LArrayMakeArena(c_array, ptr_size, arena, z_mem)                  DN_PArrayMakeArena(c_array, ptr_size, DN_ArrayCountU(c_array), arena, z_mem)
-#define                                   DN_LArrayMakeArenaZ(c_array, ptr_size, arena)                        DN_PArrayMakeArenaZ(c_array, ptr_size, DN_ArrayCountU(c_array), arena)
-#define                                   DN_LArrayMakeArenaNoZ(c_array, ptr_size, arena)                      DN_PArrayMakeArenaNoZ(c_array, ptr_size, DN_ArrayCountU(c_array), arena)
-#define                                   DN_LArrayMakePool(c_array, ptr_size, pool, z_mem)                    DN_PArrayMakePool(c_array, ptr_size, DN_ArrayCountU(c_array), pool, z_mem)
-#define                                   DN_LArrayMakePoolZ(c_array, ptr_size, pool)                          DN_PArrayMakePoolZ(c_array, ptr_size, DN_ArrayCountU(c_array), pool)
-#define                                   DN_LArrayMakePoolNoZ(c_array, ptr_size, pool)                        DN_PArrayMakePoolNoZ(c_array, ptr_size, DN_ArrayCountU(c_array), pool)
 
 #define                                   DN_LArrayAddArray(c_array, ptr_size, items, count, add)              DN_PArrayAddArray(c_array, ptr_size, DN_ArrayCountU(c_array), items, count, add)
 #define                                   DN_LArrayAdd(c_array, ptr_size, item, add)                           DN_PArrayAdd(c_array, ptr_size, DN_ArrayCountU(c_array), item, add)
-#define                                   DN_LArrayAddArena(c_array, ptr_size, arena, item, add)               DN_PArrayAddArena(c_array, ptr_size, DN_ArrayCountU(c_array), arena, item, add)
-#define                                   DN_LArrayAddPool(c_array, ptr_size, pool, item, add)                 DN_PArrayAddPool(c_array, ptr_size, DN_ArrayCountU(c_array), pool, item, add)
 #define                                   DN_LArrayAppendArray(c_array, ptr_size, items, count)                DN_PArrayAppendArray(c_array, ptr_size, DN_ArrayCountU(c_array), items, count)
 #define                                   DN_LArrayAppend(c_array, ptr_size, item)                             DN_PArrayAppend(c_array, ptr_size, DN_ArrayCountU(c_array), item)
-#define                                   DN_LArrayAppendArena(c_array, ptr_size, arena, item)                 DN_PArrayAppendArena(c_array, ptr_size, DN_ArrayCountU(c_array), arena, item)
-#define                                   DN_LArrayAppendPool(c_array, ptr_size, pool, item)                   DN_PArrayAppendPool(c_array, ptr_size, DN_ArrayCountU(c_array), pool, item)
 #define                                   DN_LArrayAppendAssert(c_array, ptr_size, item)                       DN_PArrayAppendAssert(c_array, ptr_size, DN_ArrayCountU(c_array), item)
 #define                                   DN_LArrayPrependArray(c_array, ptr_size, items, count)               DN_PArrayPrependArray(c_array, ptr_size, DN_ArrayCountU(c_array), items, count)
 #define                                   DN_LArrayPrepend(c_array, ptr_size, item)                            DN_PArrayPrepend(c_array, ptr_size, DN_ArrayCountU(c_array), item)
-#define                                   DN_LArrayPrependArena(c_array, ptr_size, arena, item)                DN_PArrayPrependArena(c_array, ptr_size, DN_ArrayCountU(c_array), arena, item)
-#define                                   DN_LArrayPrependPool(c_array, ptr_size, pool, item)                  DN_PArrayPrependPool(c_array, ptr_size, DN_ArrayCountU(c_array), pool, item)
 #define                                   DN_LArrayEraseRange(c_array, ptr_size, begin_index, count, erase)    DN_PArrayEraseRange(c_array, ptr_size, begin_index, count, erase)
 #define                                   DN_LArrayErase(c_array, ptr_size, index, erase)                      DN_PArrayErase(c_array, ptr_size, index, erase)
 #define                                   DN_LArrayInsertArray(c_array, ptr_size, index, items, count)         DN_PArrayInsertArray(c_array, ptr_size, DN_ArrayCountU(c_array), index, items, count)
@@ -5281,7 +5283,6 @@ DN_Str8             DN_NET_Str8DiagnosticFromResponse(DN_NETResponse const* resp
 // NOTE: Internal functions for different networking implementations to use
 void                DN_NET_BaseInit             (DN_NETCore *net, char *base, DN_U64 base_size);
 DN_NETRequestHandle DN_NET_SetupRequest         (DN_NETRequest *request, DN_Str8 url, DN_Str8 method, DN_NETDoHTTPArgs const *args, DN_NETRequestType type);
-void                DN_NET_EndFinishedRequest   (DN_NETRequest *request);
 #endif
 
 #if DN_WITH_NET_CURL
@@ -5310,6 +5311,11 @@ struct DN_NETCurlCore
   DN_NETRequest *response_list;       // Finished requests that are to be deqeued by the user via wait for response
   DN_NETRequest *deinit_list;         // Requests that are finished and are awaiting to be de-initialised by the CURL thread
   DN_NETRequest *free_list;           // Request pool that new requests will use before allocating
+  DN_USize       request_count;
+  DN_USize       response_count;
+  DN_USize       deinit_count;
+  DN_USize       free_count;
+  DN_USize       thread_request_count;
 
   // NOTE: Networking thread only
   DN_NETRequest *thread_request_list; // Current requests being executed by the CURL thread.

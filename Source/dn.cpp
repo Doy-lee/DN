@@ -348,6 +348,18 @@ DN_API DN_U32 DN_AlignUpPowerOfTwoU32(DN_U32 val)
   return result;
 }
 
+DN_API void DN_ByteSwapU64Ptr(DN_U8 *dest, DN_U64 src)
+{
+  dest[0] = DN_Cast(DN_U8)((src >> 56) & 0xFF);
+  dest[1] = DN_Cast(DN_U8)((src >> 48) & 0xFF);
+  dest[2] = DN_Cast(DN_U8)((src >> 40) & 0xFF);
+  dest[3] = DN_Cast(DN_U8)((src >> 32) & 0xFF);
+  dest[4] = DN_Cast(DN_U8)((src >> 24) & 0xFF);
+  dest[5] = DN_Cast(DN_U8)((src >> 16) & 0xFF);
+  dest[6] = DN_Cast(DN_U8)((src >> 8) & 0xFF);
+  dest[7] = DN_Cast(DN_U8)(src & 0xFF);
+}
+
 DN_API DN_CPUIDResult DN_CPUID(DN_CPUIDArgs args)
 {
   DN_CPUIDResult result = {};
@@ -2589,19 +2601,48 @@ DN_API DN_USizeFromResult DN_USizeFromU8x32HiBE(DN_U8x32 const *val)
   return result;
 }
 
-DN_API void DN_ByteSwapU64Ptr(DN_U8 *dest, DN_U64 src)
+static DN_U32FromResult DN_U32FromU64FromResult_(DN_U64FromResult u64)
 {
-  dest[0] = DN_Cast(DN_U8)((src >> 56) & 0xFF);
-  dest[1] = DN_Cast(DN_U8)((src >> 48) & 0xFF);
-  dest[2] = DN_Cast(DN_U8)((src >> 40) & 0xFF);
-  dest[3] = DN_Cast(DN_U8)((src >> 32) & 0xFF);
-  dest[4] = DN_Cast(DN_U8)((src >> 24) & 0xFF);
-  dest[5] = DN_Cast(DN_U8)((src >> 16) & 0xFF);
-  dest[6] = DN_Cast(DN_U8)((src >> 8) & 0xFF);
-  dest[7] = DN_Cast(DN_U8)(src & 0xFF);
+  DN_U32FromResult result = {};
+  result.value            = DN_Cast(DN_U32)DN_Min(u64.value, UINT32_MAX);
+  result.success          = u64.value <= UINT32_MAX;
+  return result;
 }
 
-DN_API DN_I64FromResult DN_I64FromStr8(DN_Str8 string, char separator)
+DN_API DN_U32FromResult DN_U32FromHexStr8(DN_Str8 hex)
+{
+  DN_U64FromResult u64    = DN_U64FromHexPtr(hex.data, hex.count);
+  DN_U32FromResult result = DN_U32FromU64FromResult_(u64);
+  return result;
+}
+
+DN_API DN_U32FromResult DN_U32FromStr8Delimiters(DN_Str8 string, DN_Str8 const *delimiters, DN_USize delimiters_count)
+{
+  DN_U64FromResult u64    = DN_U64FromStr8Delimiters(string, delimiters, delimiters_count);
+  DN_U32FromResult result = DN_U32FromU64FromResult_(u64);
+  return result;
+}
+
+DN_API DN_U32FromResult DN_U32FromStr8Delimiter(DN_Str8 string, DN_Str8 delimiter)
+{
+  DN_U32FromResult result = DN_U32FromStr8Delimiters(string, &delimiter, 1);
+  return result;
+}
+
+DN_API DN_U32FromResult DN_U32FromStr8(DN_Str8 string)
+{
+  DN_U64FromResult u64    = DN_U64FromStr8(string);
+  DN_U32FromResult result = DN_U32FromU64FromResult_(u64);
+  return result;
+}
+
+DN_API DN_U32FromResult DN_U32FromPtr(void const *data, DN_USize size)
+{
+  DN_U32FromResult result = DN_U32FromStr8(DN_Str8FromPtr(data, size));
+  return result;
+}
+
+DN_API DN_I64FromResult DN_I64FromStr8Delimiters(DN_Str8 string, DN_Str8 const *delimiters, DN_USize delimiters_count)
 {
   // NOTE: Argument check
   DN_I64FromResult result = {};
@@ -2617,6 +2658,7 @@ DN_API DN_I64FromResult DN_I64FromStr8(DN_Str8 string, char separator)
     return result;
   }
 
+  // NOTE: Handle negation
   bool     negative    = false;
   DN_USize start_index = 0;
   if (!DN_CharIsDigit(trim_string.data[0])) {
@@ -2628,12 +2670,25 @@ DN_API DN_I64FromResult DN_I64FromStr8(DN_Str8 string, char separator)
 
   // NOTE: Convert the string number to the binary number
   for (DN_USize index = start_index; index < trim_string.count; index++) {
-    char ch = trim_string.data[index];
+
+    // NOTE: Check for presence of the delimiter, we skip the first character as a U64 string
+    // prefixed with a delimiter is not considered valid.
     if (index) {
-      if (separator != 0 && ch == separator)
+      DN_USize max_delimiter_match = 0;
+      for (DN_ForItSize(it, DN_Str8 const, delimiters, delimiters_count)) {
+        DN_Str8 delimiter   = *it.data;
+        DN_Str8 check_slice = DN_Str8Subset(trim_string, index, delimiter.count);
+        if (DN_Str8EqSensitive(check_slice, delimiter))
+          max_delimiter_match = DN_Max(max_delimiter_match, delimiter.count); // Take length, there might be multiple so we keep going
+      }
+
+      if (max_delimiter_match) {
+        index += max_delimiter_match - 1;
         continue;
+      }
     }
 
+    char ch = trim_string.data[index];
     if (!DN_CharIsDigit(ch))
       return result;
 
@@ -2649,16 +2704,28 @@ DN_API DN_I64FromResult DN_I64FromStr8(DN_Str8 string, char separator)
   return result;
 }
 
-DN_API DN_I64FromResult DN_I64FromPtr(void const *data, DN_USize size, char separator)
+DN_API DN_I64FromResult DN_I64FromStr8Delimiter(DN_Str8 string, DN_Str8 delimiter)
 {
-  DN_Str8          str8   = DN_Str8FromPtr((char *)data, size);
-  DN_I64FromResult result = DN_I64FromStr8(str8, separator);
+  DN_I64FromResult result = DN_I64FromStr8Delimiters(string, &delimiter, 1);
   return result;
 }
 
-DN_API DN_I64 DN_I64FromPtrUnsafe(void const *data, DN_USize size, char separator)
+DN_API DN_I64FromResult DN_I64FromStr8(DN_Str8 string)
 {
-  DN_I64FromResult from   = DN_I64FromPtr(data, size, separator);
+  DN_I64FromResult result = DN_I64FromStr8Delimiters(string, nullptr, 0);
+  return result;
+}
+
+DN_API DN_I64FromResult DN_I64FromPtr(void const *data, DN_USize size)
+{
+  DN_Str8          str8   = DN_Str8FromPtr((char *)data, size);
+  DN_I64FromResult result = DN_I64FromStr8Delimiters(str8, nullptr, 0);
+  return result;
+}
+
+DN_API DN_I64 DN_I64FromPtrUnsafe(void const *data, DN_USize size)
+{
+  DN_I64FromResult from   = DN_I64FromPtr(data, size);
   DN_I64           result = from.value;
   DN_Assert(from.success);
   return result;
@@ -5163,6 +5230,12 @@ DN_API DN_Hex64 DN_Hex64FromPtrBytes32(void const *bytes, DN_USize bytes_count, 
   DN_Assert(bytes_count * 2 == sizeof result.data - 1);
   result.count = DN_PtrHexFromPtrBytes(bytes, bytes_count, result.data, sizeof result.data, trim_leading_z);
   DN_Assert(result.count <= sizeof result.data - 1);
+  return result;
+}
+
+DN_API DN_Hex64 DN_Hex64FromU8x32(DN_U8x32 const *value, DN_TrimLeadingZero trim_leading_z)
+{
+  DN_Hex64 result = DN_Hex64FromPtrBytes32(value->data, DN_ArrayCountU(value->data), trim_leading_z);
   return result;
 }
 
@@ -9217,7 +9290,7 @@ DN_API void DN_CSVPackI64(DN_CSVPack *pack, DN_CSVSerialise serialise, DN_I64 *v
 {
   if (serialise == DN_CSVSerialise_Read) {
     DN_Str8          csv_value = DN_CSVTokeniserNextColumn(&pack->read_tokeniser);
-    DN_I64FromResult to_i64    = DN_I64FromStr8(csv_value, 0);
+    DN_I64FromResult to_i64    = DN_I64FromStr8(csv_value);
     DN_Assert(to_i64.success);
     *value = to_i64.value;
   } else {
@@ -10905,49 +10978,49 @@ DN_API DN_TestCore DN_TestSuite(DN_Arena *arena_)
 
       // NOTE: DN_I64FromStr8
       for (DN_TestScopeF(&result, "[Strings] To I64: Convert empty string")) {
-        DN_I64FromResult str_result = DN_I64FromStr8(DN_Str8Lit(""), 0);
+        DN_I64FromResult str_result = DN_I64FromStr8(DN_Str8Lit(""));
         DN_TestVerifyExpr(&result, str_result.success);
         DN_TestVerifyExpr(&result, str_result.value == 0);
       }
 
       for (DN_TestScopeF(&result, "[Strings] To I64: Convert \"1\"")) {
-        DN_I64FromResult str_result = DN_I64FromStr8(DN_Str8Lit("1"), 0);
+        DN_I64FromResult str_result = DN_I64FromStr8(DN_Str8Lit("1"));
         DN_TestVerifyExpr(&result, str_result.success);
         DN_TestVerifyExpr(&result, str_result.value == 1);
       }
 
       for (DN_TestScopeF(&result, "[Strings] To I64: Convert \"-0\"")) {
-        DN_I64FromResult str_result = DN_I64FromStr8(DN_Str8Lit("-0"), 0);
+        DN_I64FromResult str_result = DN_I64FromStr8(DN_Str8Lit("-0"));
         DN_TestVerifyExpr(&result, str_result.success);
         DN_TestVerifyExpr(&result, str_result.value == 0);
       }
 
       for (DN_TestScopeF(&result, "[Strings] To I64: Convert \"-1\"")) {
-        DN_I64FromResult str_result = DN_I64FromStr8(DN_Str8Lit("-1"), 0);
+        DN_I64FromResult str_result = DN_I64FromStr8(DN_Str8Lit("-1"));
         DN_TestVerifyExpr(&result, str_result.success);
         DN_TestVerifyExpr(&result, str_result.value == -1);
       }
 
       for (DN_TestScopeF(&result, "[Strings] To I64: Convert \"1.2\"")) {
-        DN_I64FromResult str_result = DN_I64FromStr8(DN_Str8Lit("1.2"), 0);
+        DN_I64FromResult str_result = DN_I64FromStr8(DN_Str8Lit("1.2"));
         DN_TestVerifyExpr(&result, !str_result.success);
         DN_TestVerifyExpr(&result, str_result.value == 1);
       }
 
       for (DN_TestScopeF(&result, "[Strings] To I64: Convert \"1,234\"")) {
-        DN_I64FromResult str_result = DN_I64FromStr8(DN_Str8Lit("1,234"), ',');
+        DN_I64FromResult str_result = DN_I64FromStr8Delimiter(DN_Str8Lit("1,234"), DN_Str8Lit(","));
         DN_TestVerifyExpr(&result, str_result.success);
         DN_TestVerifyExpr(&result, str_result.value == 1234);
       }
 
       for (DN_TestScopeF(&result, "[Strings] To I64: Convert \"1,2\"")) {
-        DN_I64FromResult str_result = DN_I64FromStr8(DN_Str8Lit("1,2"), ',');
+        DN_I64FromResult str_result = DN_I64FromStr8Delimiter(DN_Str8Lit("1,2"), DN_Str8Lit(","));
         DN_TestVerifyExpr(&result, str_result.success);
         DN_TestVerifyExpr(&result, str_result.value == 12);
       }
 
       for (DN_TestScopeF(&result, "[Strings] To I64: Convert \"12a3\"")) {
-        DN_I64FromResult str_result = DN_I64FromStr8(DN_Str8Lit("12a3"), 0);
+        DN_I64FromResult str_result = DN_I64FromStr8(DN_Str8Lit("12a3"));
         DN_TestVerifyExpr(&result, !str_result.success);
         DN_TestVerifyExpr(&result, str_result.value == 12);
       }
@@ -13035,8 +13108,14 @@ DN_NETRequestHandle DN_NET_SetupRequest(DN_NETRequest *request, DN_Str8 url, DN_
   // NOTE: Setup request
   DN_Assert(request);
   if (request) {
-    if (!request->mem.curr)
+    if (request->mem.curr)
+      DN_AssertF(request->arena.mem == nullptr,
+                 "DN_NET_RequestRecycle should be called on the request before putting it into the "
+                 "free-list and reusing it. This is so that we centralise the one place that we "
+                 "reinitialise the temp arena for the request into this codepath.");
+    else
       request->mem = DN_MemListFromHeap(DN_Megabytes(1), DN_Kilobytes(1), DN_MemFlags_Nil, DN_OS_HeapInitVirtual());
+
     request->arena  = DN_ArenaTempBeginFromMemList(&request->mem);
     request->type   = type;
     request->gen    = DN_Max(request->gen + 1, 1);
@@ -13069,10 +13148,25 @@ DN_NETRequestHandle DN_NET_SetupRequest(DN_NETRequest *request, DN_Str8 url, DN_
   return result;
 }
 
-void DN_NET_EndFinishedRequest(DN_NETRequest *request)
+void DN_NET_RequestRecycle(DN_NETRequest *request)
 {
-  // NOTE: Deallocate the memory used in the request and reset the string builder
+  DN_NETRequest resetter        = {};
+  resetter.mem                  = request->mem;
+  resetter.arena                = request->arena;
+  resetter.start_response_arena = request->start_response_arena;
+  resetter.gen                  = request->gen + 1;
+  DN_Memcpy(resetter.context, request->context, sizeof(resetter.context));
+  *request               = resetter;
+
+  // NOTE: Deallocate the memory used in the request. Note we have to end the start response arena
+  // first to satisfy the UAF checker which requires that the temporary memory arenas are ended in
+  // the reverse order that they were created in.
+  //
+  // The arenas are created when `DN_NET_SetupRequest` is called to reuse the request.
   DN_ArenaTempEnd(&request->start_response_arena, DN_ArenaReset_Yes);
+  DN_ArenaTempEnd(&request->arena, DN_ArenaReset_Yes);
+  request->arena                = {};
+  request->start_response_arena = {};
 }
 #endif // #if DN_WITH_NET
 
@@ -13140,8 +13234,13 @@ static void DN_NET_CurlMarkRequestDone_(DN_NETCore *net, DN_NETRequest *request)
   DN_NETCurlCore *curl = DN_Cast(DN_NETCurlCore *)net->context;
   for (DN_OS_MutexScope(&curl->list_mutex)) {
     DN_Assert(DN_NET_CurlRequestIsInList(curl->thread_request_list, request));
+
     DN_DoublyLLDetach(curl->thread_request_list, request);
+    DN_Assert(curl->thread_request_count);
+    curl->thread_request_count--;
+
     DN_DoublyLLAppend(curl->response_list, request);
+    curl->response_count++;
   }
   DN_OS_SemaphoreIncrement(&net->completion_sem, 1);
   DN_OS_SemaphoreIncrement(&request->completion_sem, 1);
@@ -13188,8 +13287,11 @@ static int32_t DN_NET_CurlThreadEntryPoint_(DN_OSThread *thread)
           for (DN_OS_MutexScope(&curl->list_mutex)) {
             DN_Assert(DN_NET_CurlRequestIsInList(curl->request_list, req));
             DN_DoublyLLDetach(curl->request_list, req);
+            DN_Assert(curl->request_count);
+            curl->request_count--;
           }
           DN_DoublyLLAppend(curl->thread_request_list, req);
+          curl->thread_request_count++;
 
           // NOTE: Add the connection to CURLM and start ticking it once we finish handling all the
           // ring events
@@ -13235,15 +13337,18 @@ static int32_t DN_NET_CurlThreadEntryPoint_(DN_OSThread *thread)
           // NOTE: End the temp memory storing the WS data we just read and the user returned to us
           // (we got their receipt back). Then restart the temp memory scope for the next websocket
           // payload
-          DN_NET_EndFinishedRequest(req);
+          DN_ArenaTempEnd(&req->start_response_arena, DN_ArenaReset_Yes);
           req->start_response_arena = DN_ArenaTempBeginFromArena(&req->arena);
           curl_req->str8_builder    = DN_Str8BuilderFromArena(&req->start_response_arena);
 
           for (DN_OS_MutexScope(&curl->list_mutex)) {
             DN_Assert(DN_NET_CurlRequestIsInList(curl->request_list, req));
             DN_DoublyLLDetach(curl->request_list, req);
+            DN_Assert(curl->request_count);
+            curl->request_count--;
           }
           DN_DoublyLLAppend(curl->thread_request_list, req);
+          curl->thread_request_count++;
         } break;
 
         case DN_NETCurlRingEventType_DeinitRequest: {
@@ -13258,10 +13363,11 @@ static int32_t DN_NET_CurlThreadEntryPoint_(DN_OSThread *thread)
           for (DN_OS_MutexScope(&curl->list_mutex)) {
             DN_Assert(DN_NET_CurlRequestIsInList(curl->deinit_list, request));
             DN_DoublyLLDetach(curl->deinit_list, request);
+            DN_Assert(curl->deinit_count);
+            curl->deinit_count--;
           }
 
           // NOTE: Now we can modify the request, release resources
-          DN_NET_EndFinishedRequest(request);
           DN_OS_SemaphoreDeinit(&request->completion_sem);
 
           curl_multi_remove_handle(curl->thread_curlm, curl_req->handle);
@@ -13273,15 +13379,13 @@ static int32_t DN_NET_CurlThreadEntryPoint_(DN_OSThread *thread)
           curl_req->handle = copy;
 
           // NOTE: Zero the struct preserving just the data we need to retain
-          DN_NETRequest resetter = {};
-          resetter.arena         = request->arena;
-          resetter.gen           = request->gen + 1;
-          DN_Memcpy(resetter.context, request->context, sizeof(resetter.context));
-          *request               = resetter;
+          DN_NET_RequestRecycle(request);
 
           // NOTE: Add it to the free list
-          for (DN_OS_MutexScope(&curl->list_mutex))
+          for (DN_OS_MutexScope(&curl->list_mutex)) {
             DN_DoublyLLAppend(curl->free_list, request);
+            curl->free_count++;
+          }
         } break;
       }
     }
@@ -13525,10 +13629,20 @@ static DN_NETRequestHandle DN_NET_CurlDoRequest_(DN_NETCore *net, DN_Str8 url, D
     for (DN_OS_MutexScope(&curl_core->list_mutex)) {
       req = curl_core->free_list;
       DN_DoublyLLDetach(curl_core->free_list, req);
+      if (req) {
+        DN_Assert(curl_core->free_count);
+        curl_core->free_count--;
+      }
     }
 
-    // NOTE None in the free list so allocate one
-    if (!req) {
+    if (req) {
+      DN_AssertF(req->mem.curr->used == DN_ARENA_HEADER_SIZE,
+                "A reused request from the free-list should have its memory reset essentially to "
+                "zero. If this isn't the case then we're leaking memory and have forgotten to "
+                "reset the arena before putting the request back into the free list. Request has "
+                "used %s.", DN_Str8x32FromByteCountU64Auto(req->mem.curr->used).data);
+    } else{
+      // NOTE: None in the free list so allocate one
       DN_OS_MutexLock(&curl_core->list_mutex);
       DN_U64 arena_pos            = DN_MemListPos(net->arena.mem);
       req                         = DN_ArenaNewZ(&net->arena, DN_NETRequest);
@@ -13625,8 +13739,10 @@ static DN_NETRequestHandle DN_NET_CurlDoRequest_(DN_NETCore *net, DN_Str8 url, D
     // NOTE: Immediately add the request to the request list so it happens "atomically" in the
     // calling thread. If the calling thread deinitialises this layer before the CURL thread can be
     // pre-empted, we can lose track of this request.
-    for (DN_OS_MutexScope(&curl_core->list_mutex))
+    for (DN_OS_MutexScope(&curl_core->list_mutex)) {
       DN_DoublyLLAppend(curl_core->request_list, req);
+      curl_core->request_count++;
+    }
 
     // NOTE: Enqueue request to go into CURL's ring queue. The CURL thread will sleep and wait for
     // bytes to come in for the request and then dump the response into the done list to be consumed
@@ -13710,15 +13826,20 @@ static DN_NETResponse DN_NET_CurlHandleFinishedRequest_(DN_NETCurlCore *curl, DN
     DN_AssertF(DN_NET_CurlRequestIsInList(curl->response_list, req),
                "A completed response should only signal the completion semaphore when it's in the response list");
     DN_DoublyLLDetach(curl->response_list, req);
+    DN_Assert(curl->response_count);
+    curl->response_count--;
 
     // NOTE: A websocket that is continuing to get data should go back into the request list because
     // there's more data to be received. All other requests need to go into the deinit list (so that
     // we keep track of it in the time inbetween it takes for the CURL thread to be scheduled and
     // release the CURL handle from CURLM and release resources e.t.c.)
-    if (continue_ws_request)
+    if (continue_ws_request) {
       DN_DoublyLLAppend(curl->request_list, req);
-    else
+      curl->request_count++;
+    } else {
       DN_DoublyLLAppend(curl->deinit_list, req);
+      curl->deinit_count++;
+    }
   }
 
   // NOTE: Submit the post-request event to the CURL thread
@@ -13839,7 +13960,7 @@ static DN_NETEmcWSEvent *DN_NET_EmcAllocWSEvent_(DN_NETRequest *request)
 {
   // NOTE: Allocate the event and attach to the request
   DN_NETEmcRequest *emc_request = DN_Cast(DN_NETEmcRequest *) request->context[1];
-  DN_NETEmcWSEvent *result      = DN_ArenaNew(&request->arena, DN_NETEmcWSEvent, DN_ZMem_Yes);
+  DN_NETEmcWSEvent *result      = DN_ArenaNew(&request->start_response_arena, DN_NETEmcWSEvent, DN_ZMem_Yes);
   DN_Assert(result);
   if (result) {
     if (!emc_request->first_event)
@@ -13887,7 +14008,7 @@ static bool DN_NET_EmcWSOnMessage(int eventType, const EmscriptenWebSocketMessag
   DN_NETEmcWSEvent *net_event = DN_NET_EmcAllocWSEvent_(req);
   net_event->state            = event->isText ? DN_NETResponseState_WSText : DN_NETResponseState_WSBinary;
   if (event->numBytes > 0)
-    net_event->payload = DN_Str8FromPtrArena(event->data, event->numBytes, &req->arena);
+    net_event->payload = DN_Str8FromPtrArena(event->data, event->numBytes, &req->start_response_arena);
   DN_NET_EmcOnRequestDone_(net, req);
   return true;
 }
@@ -13908,7 +14029,12 @@ static bool DN_NET_EmcWSOnClose(int eventType, EmscriptenWebSocketCloseEvent con
   DN_NETCore       *net       = DN_Cast(DN_NETCore *) req->context[0];
   DN_NETEmcWSEvent *net_event = DN_NET_EmcAllocWSEvent_(req);
   net_event->state            = DN_NETResponseState_WSClose;
-  net_event->payload          = DN_Str8FromFmtArena(&req->arena, "Websocket closed '%.*s': (%u) %s (was %s close)", DN_Str8PrintFmt(req->url), event->code, event->reason, event->wasClean ? "clean" : "unclean");
+  net_event->payload          = DN_Str8FromFmtArena(&req->start_response_arena,
+                                                    "Websocket closed '%.*s': (%u) %s (was %s close)",
+                                                    DN_Str8PrintFmt(req->url),
+                                                    event->code,
+                                                    event->reason,
+                                                    event->wasClean ? "clean" : "unclean");
   DN_NET_EmcOnRequestDone_(net, req);
   return true;
 }
@@ -13957,25 +14083,19 @@ static DN_NETRequest *DN_NET_EmcAllocRequest_(DN_NETCore *net)
   DN_NETRequest *result = emc->free_list;
   if (result) {
     emc->free_list = emc->free_list->next;
-    result->next      = nullptr;
+    result->next   = nullptr;
     DN_Assert(result->prev == nullptr);
     if (emc->free_list) {
       DN_Assert(emc->free_list->prev == nullptr);
     }
   } else {
-    // NOTE: Setup the request's arena here. WASM doesn't have the concept of virtual memory
-    // so we use malloc to initialise it.
-    result = DN_ArenaNew(&net->arena, DN_NETRequest, DN_ZMem_Yes);
-    if (result) {
-      result->arena = DN_ArenaFromMemList(&result->mem);
-    }
+    result             = DN_ArenaNew(&net->arena, DN_NETRequest, DN_ZMem_Yes);
+    result->context[1] = DN_Cast(DN_UPtr) DN_ArenaNew(&net->arena, DN_NETEmcRequest, DN_ZMem_Yes);
   }
 
   // NOTE: Setup some emscripten specific data into our request context
-  if (result) {
+  if (result)
     result->context[0] = DN_Cast(DN_UPtr) net;
-  }
-
   return result;
 }
 
@@ -14048,9 +14168,6 @@ DN_NETRequestHandle DN_NET_EmcDoWS(DN_NETCore *net, DN_Str8 url)
   if (!req)
     return result;
 
-  // NOTE: Setup some emscripten specific data into our request context
-  req->context[1] = DN_Cast(DN_UPtr) DN_ArenaNew(&req->start_response_arena, DN_NETEmcRequest, DN_ZMem_Yes);
-
   // NOTE: Create the websocket request and dispatch it via emscripten
   EmscriptenWebSocketCreateAttributes attr;
   emscripten_websocket_init_create_attributes(&attr);
@@ -14082,7 +14199,7 @@ void DN_NET_EmcDoWSSend(DN_NETRequestHandle handle, DN_Str8 data, DN_NETWSSend s
         DN_U64  pos                  = DN_MemListPos(request_ptr->start_response_arena.mem);
         DN_Str8 data_null_terminated = DN_Str8FromStr8Arena(data, &request_ptr->start_response_arena);
         result                       = emscripten_websocket_send_utf8_text(emc_request->socket, data_null_terminated.data);
-        DN_MemListPopTo(request_ptr->arena.mem, pos);
+        DN_MemListPopTo(request_ptr->start_response_arena.mem, pos);
       } break;
 
       case DN_NETWSSend_Binary: {
@@ -14161,19 +14278,21 @@ static DN_NETResponse DN_NET_EmcHandleFinishedRequest_(DN_NETCore *net, DN_NETEm
     // NOTE: Deallocate the memory used in the request and reset the string builder (as all
     // payload(s) have been read from the request).
     if (!end_request)
-        DN_ArenaTempEnd(&request->start_response_arena, DN_ArenaReset_Yes);
+      DN_ArenaTempEnd(&request->start_response_arena, DN_ArenaReset_Yes);
   }
 
   if (end_request) {
-    DN_NET_EndFinishedRequest(request);
     emscripten_websocket_delete(emc_request->socket);
     emc_request->socket = 0;
 
     DN_NETEmcCore *emc = DN_Cast(DN_NETEmcCore *) net->context;
     request->next      = emc->free_list;
     request->prev      = nullptr;
-    request->gen++;
     emc->free_list     = request;
+
+    DN_Assert(emc_request->first_event == nullptr);
+    DN_Assert(emc_request->last_event == nullptr);
+    DN_NET_RequestRecycle(request);
   }
 
   return result;
