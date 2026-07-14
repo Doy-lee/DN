@@ -3131,6 +3131,7 @@ DN_API DN_Str8                  DN_Str8AppendFV                                 
 DN_API DN_Str8                  DN_Str8FillF                                           (DN_Arena *arena, DN_USize count, char const *fmt, ...);
 DN_API DN_Str8                  DN_Str8FillFV                                          (DN_Arena *arena, DN_USize count, char const *fmt, va_list args);
 DN_API void                     DN_Str8Remove                                          (DN_Str8 *string, DN_USize offset, DN_USize count);
+DN_API DN_Str8                  DN_Str8TruncateArena                                   (DN_Str8 string, DN_USize max_count, DN_Str8 truncator, DN_Arena *arena);
 DN_API DN_Str8TruncResult       DN_Str8TruncMiddlePtr                                  (DN_Str8 str8, DN_USize side_size, DN_Str8 truncator, char *dest, DN_USize dest_max);
 DN_API DN_Str8TruncResult       DN_Str8TruncMiddle                                     (DN_Str8 str8, DN_USize side_size, DN_Str8 truncator, DN_Arena *arena);
 DN_API DN_Str8                  DN_Str8Lower                                           (DN_Str8 string, DN_Arena *arena);

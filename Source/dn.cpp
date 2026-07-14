@@ -3815,6 +3815,18 @@ DN_API void DN_Str8Remove(DN_Str8 *string, DN_USize offset, DN_USize count)
   string->count -= bytes_to_move;
 }
 
+DN_API DN_Str8 DN_Str8TruncateArena(DN_Str8 string, DN_USize max_count, DN_Str8 truncator, DN_Arena *arena)
+{
+  DN_Str8 result = {};
+  if (string.count > max_count) {
+    DN_Str8 string_trunc = DN_Str8Subset(string, 0, max_count);
+    result               = DN_Str8FromFmtArena(arena, "%.*s%.*s", DN_Str8PrintFmt(string_trunc), DN_Str8PrintFmt(truncator));
+  } else {
+    result = DN_Str8FromStr8Arena(string, arena);
+  }
+  return result;
+}
+
 DN_API DN_Str8TruncResult DN_Str8TruncMiddlePtr(DN_Str8 str8, DN_USize side_size, DN_Str8 truncator, char *dest, DN_USize dest_max)
 {
   DN_Assert(side_size <= DN_USIZE_MAX / 2);
