@@ -3262,27 +3262,38 @@ DN_API DN_Str8x32 DN_Str8x32FromU64(DN_U64 val, char separator)
 }
 
 
-DN_API bool DN_Str8IsAll(DN_Str8 string, DN_Str8IsAllType is_all)
+DN_API bool DN_Str8Is(DN_Str8 string, DN_Str8IsFlags flags)
 {
   bool result = string.count;
   if (!result)
     return result;
 
-  switch (is_all) {
-    case DN_Str8IsAllType_Digits: {
-      for (DN_USize index = 0; result && index < string.count; index++)
-        result = string.data[index] >= '0' && string.data[index] <= '9';
-    } break;
-
-    case DN_Str8IsAllType_Hex: {
-      DN_Str8 trimmed = DN_Str8TrimPrefix(string, DN_Str8Lit("0x"), DN_Str8EqCase_Insensitive);
-      for (DN_USize index = 0; result && index < trimmed.count; index++) {
-        char ch = trimmed.data[index];
-        result  = (ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F');
-      }
-    } break;
+  if (result && (flags & DN_Str8IsFlags_Digits)) {
+    for (DN_USize index = 0; result && index < string.count; index++)
+      result = string.data[index] >= '0' && string.data[index] <= '9';
   }
 
+  if (result && (flags & DN_Str8IsFlags_Hex)) {
+    DN_Str8 trimmed = DN_Str8TrimPrefix(string, DN_Str8Lit("0x"), DN_Str8EqCase_Insensitive);
+    for (DN_USize index = 0; result && index < trimmed.count; index++) {
+      char ch = trimmed.data[index];
+      result  = (ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F');
+    }
+  }
+
+  if (result && (flags & DN_Str8IsFlags_Lowercase)) {
+    for (DN_USize index = 0; result && index < string.count; index++) {
+      if (string.data[index] >= 'A' && string.data[index] <= 'Z')
+        result = false;
+    }
+  }
+
+  if (result && (flags & DN_Str8IsFlags_Uppercase)) {
+    for (DN_USize index = 0; result && index < string.count; index++) {
+      if (string.data[index] >= 'a' && string.data[index] <= 'z')
+        result = false;
+    }
+  }
   return result;
 }
 
@@ -10930,28 +10941,28 @@ DN_API DN_TestCore DN_TestSuite(DN_Arena *arena_)
       }
 
       for (DN_TestScopeF(&result, "[Strings] Is all digits fails on non-digit string")) {
-        DN_B32 str_result = DN_Str8IsAll(DN_Str8Lit("@123string"), DN_Str8IsAllType_Digits);
+        DN_B32 str_result = DN_Str8Is(DN_Str8Lit("@123string"), DN_Str8IsFlags_Digits);
         DN_TestVerifyExpr(&result, str_result == false);
       }
 
       for (DN_TestScopeF(&result, "[Strings] Is all digits fails on nullptr")) {
-        DN_B32 str_result = DN_Str8IsAll(DN_Str8FromPtr(nullptr, 0), DN_Str8IsAllType_Digits);
+        DN_B32 str_result = DN_Str8Is(DN_Str8FromPtr(nullptr, 0), DN_Str8IsFlags_Digits);
         DN_TestVerifyExpr(&result, str_result == false);
       }
 
       for (DN_TestScopeF(&result, "[Strings] Is all digits fails on string w/ 0 size")) {
         char const buf[]      = "@123string";
-        DN_B32     str_result = DN_Str8IsAll(DN_Str8FromPtr(buf, 0), DN_Str8IsAllType_Digits);
+        DN_B32     str_result = DN_Str8Is(DN_Str8FromPtr(buf, 0), DN_Str8IsFlags_Digits);
         DN_TestVerifyExpr(&result, !str_result);
       }
 
       for (DN_TestScopeF(&result, "[Strings] Is all digits success")) {
-        DN_B32 str_result = DN_Str8IsAll(DN_Str8Lit("23"), DN_Str8IsAllType_Digits);
+        DN_B32 str_result = DN_Str8Is(DN_Str8Lit("23"), DN_Str8IsFlags_Digits);
         DN_TestVerifyExpr(&result, DN_Cast(bool) str_result == true);
       }
 
       for (DN_TestScopeF(&result, "[Strings] Is all digits fails on whitespace")) {
-        DN_B32 str_result = DN_Str8IsAll(DN_Str8Lit("23 "), DN_Str8IsAllType_Digits);
+        DN_B32 str_result = DN_Str8Is(DN_Str8Lit("23 "), DN_Str8IsFlags_Digits);
         DN_TestVerifyExpr(&result, DN_Cast(bool) str_result == false);
       }
 
