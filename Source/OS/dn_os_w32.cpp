@@ -683,7 +683,7 @@ DN_API DN_OSExecResult DN_OS_ExecPump(DN_OSExecAsyncHandle handle,
                                       char                *stderr_buffer,
                                       DN_USize            *stderr_size,
                                       DN_U32               timeout_ms,
-                                      DN_ErrSink        *err)
+                                      DN_ErrSink          *err)
 {
   DN_OSExecResult result             = {};
   size_t          stdout_buffer_size = 0;
@@ -1240,14 +1240,7 @@ DN_API bool DN_OS_ThreadInitLane(DN_OSThread *thread, DN_OSThreadFunc *func, DN_
   if (!thread)
     return result;
 
-  thread->func           = func;
-  thread->user_context   = user_context;
-  thread->init_semaphore = DN_OS_SemaphoreInit(0 /*initial_count*/);
-  thread->tc_init_args   = init_args.tc_args;
-  if (lane) {
-    thread->is_lane_set = true;
-    thread->lane        = *lane;
-  }
+  DN_OS_ThreadPreInit_(thread, func, lane, init_args, user_context);
 
   // TODO(doyle): Check if semaphore is valid
   DWORD               thread_id        = 0;
@@ -1259,25 +1252,25 @@ DN_API bool DN_OS_ThreadInitLane(DN_OSThread *thread, DN_OSThreadFunc *func, DN_
                                                       0 /*creation_flags*/,
                                                       &thread_id);
 
-  result = thread->handle != INVALID_HANDLE_VALUE;
-  if (result)
-    thread->thread_id = thread_id;
-
-  // NOTE: Ensure that thread_id is set before 'thread->func' is called.
+  result = thread->handle != NULL;
   if (result) {
-    DN_OS_SemaphoreIncrement(&thread->init_semaphore, 1);
-  } else {
-    DN_OS_SemaphoreDeinit(&thread->init_semaphore);
-    *thread = {};
+    thread->thread_id = thread_id;
+    if (thread->flags & DN_OSThreadFlags_Detached) {
+      CloseHandle(thread->handle);
+      thread->handle = NULL;
+    }
   }
 
+  DN_OS_ThreadPostInit_(thread, result);
   return result;
 }
 
 DN_API bool DN_OS_ThreadJoin(DN_OSThread *thread, DN_TCDeinitArenas deinit_arenas)
 {
   bool result = false;
-  if (thread && thread->handle) {
+  if (thread && thread->handle && thread->handle != INVALID_HANDLE_VALUE) {
+    DN_AssertF(DN_BitIsNotSet(thread->flags, DN_OSThreadFlags_Detached),
+               "Detached threads should have their handle immediately closed and invalidated so this branch should never hit.");
     DWORD wait_result = WaitForSingleObject(thread->handle, INFINITE);
     result            = wait_result == WAIT_OBJECT_0;
     CloseHandle(thread->handle);

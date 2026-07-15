@@ -383,7 +383,7 @@
   // NOTE: consoleapi.h ///////////////////////////////////////////////////////////////////////////
   extern "C"
   {
-  __declspec(dllimport) BOOL __stdcall WriteConsoleA(HANDLE hConsoleOutput, const VOID* lpBuffer, DWORD nNumberOfCharsToWrite, DWORD *lpNumberOfCharsWritten, VOID *lpReserved);
+  __declspec(dllimport) BOOL __stdcall WriteConsoleW(HANDLE hConsoleOutput, const VOID* lpBuffer, DWORD nNumberOfCharsToWrite, DWORD *lpNumberOfCharsWritten, VOID *lpReserved);
   __declspec(dllimport) BOOL __stdcall AllocConsole(VOID);
   __declspec(dllimport) BOOL __stdcall FreeConsole(VOID);
   __declspec(dllimport) BOOL __stdcall AttachConsole(DWORD dwProcessId);

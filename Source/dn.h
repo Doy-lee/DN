@@ -2457,6 +2457,13 @@ struct DN_OSConditionVariable
 
 typedef DN_I32(DN_OSThreadFunc)(struct DN_OSThread *);
 
+typedef DN_U32 DN_OSThreadFlags;
+enum DN_OSThreadFlags_
+{
+  DN_OSThreadFlags_Nil      = 0,
+  DN_OSThreadFlags_Detached = 1 << 0,
+};
+
 typedef struct DN_OSThreadInitArgs DN_OSThreadInitArgs;
 struct DN_OSThreadInitArgs
 {
@@ -2466,7 +2473,8 @@ struct DN_OSThreadInitArgs
 
    // NOTE: Set how much stack space in bytes the thread will have. Leave this value to 0 to defer
    // to the OS's default stack size.
-   DN_USize      stack_size;
+   DN_USize         stack_size;
+   DN_OSThreadFlags flags;
 };
 
 typedef struct DN_OSThreadLane DN_OSThreadLane;
@@ -2490,6 +2498,7 @@ struct DN_OSThreadLaneway
 typedef struct DN_OSThread DN_OSThread;
 struct DN_OSThread
 {
+  DN_OSThreadFlags flags;
   DN_Str8x64       name;
   DN_TCCore        context;
   DN_OSThreadLane  lane;
@@ -2498,7 +2507,8 @@ struct DN_OSThread
   DN_U64           thread_id;
   void            *user_context;
   DN_OSThreadFunc *func;
-  DN_OSSemaphore   init_semaphore;
+  DN_OSSemaphore   thread_exec_wait_for_thread_id_sem;
+  DN_OSSemaphore   caller_wait_for_thread_init_to_finish_sem;
   DN_TCInitArgs    tc_init_args;
 };
 

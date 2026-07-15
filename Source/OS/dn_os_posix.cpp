@@ -1287,11 +1287,7 @@ DN_API bool DN_OS_ThreadInitLane(DN_OSThread *thread, DN_OSThreadFunc *func, DN_
   if (!thread)
     return result;
 
-  thread->func           = func;
-  thread->user_context   = user_context;
-  thread->init_semaphore = DN_OS_SemaphoreInit(0 /*initial_count*/);
-  thread->lane           = *lane;
-  thread->tc_init_args   = init_args.tc_args;
+  DN_OS_ThreadPreInit_(thread, func, lane, init_args, user_context);
 
   // TODO(doyle): Check if semaphore is valid
   // NOTE: pthread_t is essentially the thread ID. In Windows, the handle and
@@ -1316,15 +1312,13 @@ DN_API bool DN_OS_ThreadInitLane(DN_OSThread *thread, DN_OSThreadFunc *func, DN_
   if (result) {
     DN_Memcpy(&thread->handle, &p_thread, sizeof(p_thread));
     DN_Memcpy(&thread->thread_id, &p_thread, sizeof(p_thread));
+    if (thread->flags & DN_OSThreadFlags_Detached) {
+      pthread_detach(p_thread);
+      thread->handle = {};
+    }
   }
 
-  if (result) {
-    DN_OS_SemaphoreIncrement(&thread->init_semaphore, 1);
-  } else {
-    DN_OS_SemaphoreDeinit(&thread->init_semaphore);
-    *thread = {};
-  }
-
+  DN_OS_ThreadPostInit_(thread, result);
   return result;
 }
 
@@ -1332,6 +1326,8 @@ DN_API bool DN_OS_ThreadJoin(DN_OSThread *thread, DN_TCDeinitArenas deinit_arena
 {
   bool result = false;
   if (thread && thread->handle) {
+    DN_AssertF(DN_BitIsNotSet(thread->flags, DN_OSThreadFlags_Detached),
+               "Detached threads should have their handle immediately closed and invalidated so this branch should never hit.");
     pthread_t thread_id = {};
     DN_Memcpy(&thread_id, &thread->thread_id, sizeof(thread_id));
 

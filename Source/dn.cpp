@@ -2187,13 +2187,12 @@ DN_API void DN_TCInitFromHeap(DN_TCCore *tc, DN_U64 thread_id, DN_TCInitArgs arg
 
 DN_API void DN_TCDeinit(DN_TCCore *tc, DN_TCDeinitArenas deinit_arenas)
 {
+  // NOTE: That we deallocate the main memory last as TC might be allocated in that arena.
   if (deinit_arenas == DN_TCDeinitArenas_Yes) {
-    DN_MemListDeinit(tc->main_arena->mem);
-    for (DN_ForIndexU(index, tc->temp_arenas_count)) {
+    for (DN_ForIndexU(index, tc->temp_arenas_count))
       DN_MemListDeinit(tc->temp_arenas[index]->mem);
-      DN_MemListDeinit(tc->temp_arenas[index]->mem);
-    }
     DN_MemListDeinit(tc->err_sink.arena->mem);
+    DN_MemListDeinit(tc->main_arena->mem);
   }
 }
 
@@ -12367,11 +12366,32 @@ DN_API DN_OSExecResult DN_OS_ExecOrAbort(DN_Str8Slice cmd_line, DN_OSExecArgs *a
   return result;
 }
 
-// NOTE: DN_OSThread
 static void DN_OS_ThreadExecute_(void *user_context)
 {
   DN_OSThread *thread = DN_Cast(DN_OSThread *) user_context;
+
+  // NOTE: Wait on the semaphore, the thread that initiated the thread is going to retrieve the
+  // thread ID, then set it the value on `thread->thread_id` pointer then increment this semaphore
+  // to unblock this thread.
+  //
+  // This semaphore is deleted in the caller's thread when we unblock them by signalling the
+  // semaphore below this.
+  DN_OS_SemaphoreWait(&thread->thread_exec_wait_for_thread_id_sem, DN_OS_SEMAPHORE_INFINITE_TIMEOUT);
+
+  // NOTE: Setup thread context (TLS) _after_ thread ID is setup.
   DN_TCInitFromHeap(&thread->context, thread->thread_id, thread->tc_init_args, DN_OS_HeapInitDefault());
+
+  // NOTE: Once all initialisation is done, if the thread is to be detached, make a copy of the
+  // thread pointer because the caller is not guaranteeing to keep the thread pointer alive (they
+  // can throw away the DN_OSThread since they want to detach the thread)
+  //
+  // Note that the caller _cannot_ throw away the thread pointer until we increment the semaphore
+  // below as the OS implementation _should_ be sleeping on that semaphore.
+  if (thread->flags & DN_OSThreadFlags_Detached)
+    thread = DN_ArenaNewCopy(thread->context.main_arena, DN_OSThread, thread);
+
+  // NOTE: Equip the pointers into TLS only _after_ the thread context is copied (if it was
+  // detached) to avoid potential dangling ref in the TLS.
   DN_TCEquip(&thread->context);
   if (thread->is_lane_set) {
     DN_OS_TCThreadLaneEquip(thread->lane);
@@ -12379,8 +12399,55 @@ static void DN_OS_ThreadExecute_(void *user_context)
   } else {
     DN_OS_ThreadSetNameFmt("T%zu", thread->lane.index, thread->lane.count, thread->thread_id);
   }
-  DN_OS_SemaphoreWait(&thread->init_semaphore, DN_OS_SEMAPHORE_INFINITE_TIMEOUT);
+
+  // NOTE: Now we can increment the semaphore that the caller's thread is waiting on now that we've
+  // safely initialised the thread's contents and made a copy if necessary.
+  DN_OS_SemaphoreIncrement(&thread->caller_wait_for_thread_init_to_finish_sem, 1);
+
+  // NOTE: Run the user's code
   thread->func(thread);
+
+  // NOTE: If we're detached, it's this thread's responsibility to cleanup itself. In the platform
+  // layer it should have closed any references to the thread so we should just need to cleanup the
+  // TLS.
+  if (thread->flags & DN_OSThreadFlags_Detached)
+    DN_TCDeinit(&thread->context, DN_TCDeinitArenas_Yes);
+}
+
+static void DN_OS_ThreadPreInit_(DN_OSThread *thread, DN_OSThreadFunc *func, DN_OSThreadLane *lane, DN_OSThreadInitArgs init_args, void *user_context)
+{
+  if (thread) {
+    thread->func                                      = func;
+    thread->user_context                              = user_context;
+    thread->thread_exec_wait_for_thread_id_sem        = DN_OS_SemaphoreInit(0 /*initial_count*/);
+    thread->caller_wait_for_thread_init_to_finish_sem = DN_OS_SemaphoreInit(0 /*initial_count*/);
+    thread->tc_init_args                              = init_args.tc_args;
+    thread->flags                                     = init_args.flags;
+    if (lane) {
+      thread->is_lane_set = true;
+      thread->lane        = *lane;
+    }
+  }
+}
+
+static void DN_OS_ThreadPostInit_(DN_OSThread *thread, bool result)
+{
+  // NOTE: Ensure that thread_id is set before 'thread->func' is called.
+  if (result) {
+    // NOTE: Unblock the thread executor now that thread_id and flags have been set
+    DN_OS_SemaphoreIncrement(&thread->thread_exec_wait_for_thread_id_sem, 1);
+
+    // NOTE: Wait for the thread to finish initialising before we leave
+    DN_OS_SemaphoreWait(&thread->caller_wait_for_thread_init_to_finish_sem,
+                        DN_OS_SEMAPHORE_INFINITE_TIMEOUT);
+  }
+
+  // NOTE: Clean up the semaphores
+  DN_OS_SemaphoreDeinit(&thread->thread_exec_wait_for_thread_id_sem);
+  DN_OS_SemaphoreDeinit(&thread->caller_wait_for_thread_init_to_finish_sem);
+
+  if (!result)
+    *thread = {};
 }
 
 DN_API DN_OSThreadInitArgs DN_OS_ThreadInitArgsDefault()
@@ -12704,10 +12771,14 @@ DN_API void DN_OS_Print(DN_OSPrintDest dest, DN_Str8 string)
   DN_Assert(string.count < DN_Cast(unsigned long) - 1);
   unsigned long bytes_written = 0;
   (void)bytes_written;
-  if (print_to_console)
-    WriteConsoleA(print_handle, string.data, DN_Cast(unsigned long) string.count, &bytes_written, nullptr);
-  else
+  if (print_to_console) {
+    DN_TCScratch scratch = DN_TCScratchBeginArena(nullptr, 0);
+    DN_Str16 string16 = DN_OS_W32Str8ToStr16(&scratch.arena, string);
+    WriteConsoleW(print_handle, string16.data, DN_Cast(unsigned long) string16.count, &bytes_written, nullptr);
+    DN_TCScratchEnd(&scratch);
+  } else {
     WriteFile(print_handle, string.data, DN_Cast(unsigned long) string.count, &bytes_written, nullptr);
+  }
 #else
   fprintf(dest == DN_OSPrintDest_Out ? stdout : stderr, "%.*s", DN_Str8PrintFmt(string));
 #endif
