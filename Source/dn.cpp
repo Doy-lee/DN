@@ -2174,15 +2174,24 @@ DN_API DN_TCInitArgs DN_TCInitArgsDefault()
 DN_API void DN_TCInitFromHeap(DN_TCCore *tc, DN_U64 thread_id, DN_TCInitArgs args, DN_Heap heap)
 {
   DN_Assert(args.temp_count <= DN_ArrayCountU(tc->temp_arenas));
-  tc->main_arena_mem_     = DN_MemListFromHeap(args.main_reserve, args.main_commit, DN_MemFlags_AllocCanLeak | DN_MemFlags_NoAllocTrack, heap);
+  DN_MemList main_mem_stack = DN_MemListFromHeap(args.main_reserve, args.main_commit, DN_MemFlags_AllocCanLeak | DN_MemFlags_NoAllocTrack, heap);
+  DN_MemList *main_mem      = DN_MemListNewCopy(&main_mem_stack, DN_MemList, &main_mem_stack);
+  DN_Arena   *main_arena    = DN_MemListNewZ(main_mem, DN_Arena);
+  *main_arena               = DN_ArenaFromMemList(main_mem);
+
+  DN_Arena *temp_arenas = DN_MemListNewArrayZ(main_mem, DN_Arena, args.temp_count);
   for (DN_ForIndexU(index, args.temp_count)) {
-    tc->temp_arena_mems_[index] = DN_MemListFromHeap(args.temp_reserve, args.temp_commit, DN_MemFlags_AllocCanLeak | DN_MemFlags_NoAllocTrack, heap);
-    tc->temp_arenas_[index]     = DN_ArenaFromMemList(&tc->temp_arena_mems_[index]);
+    DN_MemList temp_mem_stack = DN_MemListFromHeap(args.temp_reserve, args.temp_commit, DN_MemFlags_AllocCanLeak | DN_MemFlags_NoAllocTrack, heap);
+    DN_MemList *temp_mem      = DN_MemListNewCopy(main_mem, DN_MemList, &temp_mem_stack);
+    temp_arenas[index]        = DN_ArenaFromMemList(temp_mem);
   }
-  tc->err_sink_arena_mem_ = DN_MemListFromHeap(args.err_sink_reserve, args.err_sink_commit, DN_MemFlags_AllocCanLeak | DN_MemFlags_NoAllocTrack, heap);
-  tc->main_arena_         = DN_ArenaFromMemList(&tc->main_arena_mem_);
-  tc->err_sink_arena_     = DN_ArenaFromMemList(&tc->err_sink_arena_mem_);
-  DN_TCInit(tc, thread_id, &tc->main_arena_, tc->temp_arenas_, args.temp_count, &tc->err_sink_arena_);
+
+  DN_MemList err_sink_mem_stack = DN_MemListFromHeap(args.err_sink_reserve, args.err_sink_commit, DN_MemFlags_AllocCanLeak | DN_MemFlags_NoAllocTrack, heap);
+  DN_MemList *err_sink_mem      = DN_MemListNewCopy(main_mem, DN_MemList, &err_sink_mem_stack);
+  DN_Arena *err_sink_arena      = DN_MemListNewZ(main_mem, DN_Arena);
+  *err_sink_arena               = DN_ArenaFromMemList(err_sink_mem);
+
+  DN_TCInit(tc, thread_id, main_arena, temp_arenas, args.temp_count, err_sink_arena);
 }
 
 DN_API void DN_TCDeinit(DN_TCCore *tc, DN_TCDeinitArenas deinit_arenas)

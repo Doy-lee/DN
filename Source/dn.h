@@ -1712,14 +1712,6 @@ struct DN_TCCore // (T)hread (C)ontext sitting in thread-local storage
   char        lane_opaque[sizeof(DN_U64) * 4];
   void*       user_context;
 
-  DN_MemList  main_arena_mem_;
-  DN_MemList  temp_arena_mems_[4];
-  DN_MemList  err_sink_arena_mem_;
-
-  DN_Arena    main_arena_;
-  DN_Arena    temp_arenas_[4];
-  DN_Arena    err_sink_arena_;
-
   DN_Arena*   main_arena;
   DN_Pool     main_pool;
   DN_Arena*   temp_arenas[4];
