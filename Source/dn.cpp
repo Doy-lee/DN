@@ -1467,8 +1467,8 @@ DN_API void DN_MemListPopTo(DN_MemList *mem, DN_U64 init_used)
   if (!mem || !mem->curr)
     return;
 
-  // NOTE: Free any memory blocks allocated additionally from the initial block to revert to
-  DN_U64         used = DN_Max(DN_ARENA_HEADER_SIZE, init_used);
+  // NOTE: Free any memory blocks until we get back to the starting block
+  DN_U64       used = DN_Max(DN_ARENA_HEADER_SIZE, init_used);
   DN_MemBlock *curr = mem->curr;
   while (curr->reserve_sum >= used) {
     DN_MemBlock *block_to_free = curr;
@@ -1483,10 +1483,16 @@ DN_API void DN_MemListPopTo(DN_MemList *mem, DN_U64 init_used)
   }
 
   // NOTE: Revert the memory block we returned to
-  DN_U64 old_used      = curr->used;
-  mem->stats.info.used = old_used;
-  mem->curr            = curr;
-  curr->used           = used - curr->reserve_sum;
+  DN_U64 old_used = curr->used;
+  mem->curr       = curr;
+
+  // NOTE: Undo the used amount on the cumulative used count in the stats. This reverts the used
+  // number to how much memory has been used, not including this block.
+  mem->stats.info.used -= old_used;
+
+  // NOTE: Calculate the new correct used amount for this block after reversion and then apply it
+  curr->used            = used - curr->reserve_sum;
+  mem->stats.info.used += curr->used;
 
   // NOTE: Scrub memory that we used previously in the block but no longer after reverting
   DN_MSVC_WARNING_PUSH
@@ -1517,7 +1523,6 @@ DN_API void DN_MemListPopTo(DN_MemList *mem, DN_U64 init_used)
     DN_USize poison_size = ((char *)curr + curr->commit) - poison_ptr;
     DN_ASanPoisonMemoryRegion(poison_ptr, poison_size);
   }
-  mem->stats.info.used += curr->used;
 }
 
 DN_API void DN_MemListPop(DN_MemList *mem, DN_U64 amount)
@@ -1725,6 +1730,7 @@ DN_API DN_Arena DN_ArenaTempBeginFromArena(DN_Arena *arena)
 
 DN_API void DN_ArenaTempEnd(DN_Arena *arena, DN_ArenaReset reset)
 {
+  // NOTE: Do the UAF check
 #if DN_ARENA_TEMP_MEM_UAF_GUARD
   DN_AssertF(arena->uaf_guard_temp_mem, "Arena was not created with temp memory");
   DN_ArenaUAFCheck_(arena, DN_ArenaUAFCheckReportType_TempEndOutOfOrder);
@@ -1732,6 +1738,7 @@ DN_API void DN_ArenaTempEnd(DN_Arena *arena, DN_ArenaReset reset)
   DN_AssertF(arena->temp_mem.mem, "Arena was not created with temp memory");
 #endif
 
+  // NOTE: Reset the arena
   if (reset == DN_ArenaReset_Yes) {
 #if DN_ARENA_TEMP_MEM_UAF_GUARD
     DN_MemListTempEnd(*arena->uaf_guard_temp_mem);
@@ -1740,6 +1747,8 @@ DN_API void DN_ArenaTempEnd(DN_Arena *arena, DN_ArenaReset reset)
 #endif
   }
 
+  // NOTE: Pop the UAF guard off (note the UAF was allocated on the temp arena itself, so when we
+  // reset the arena, the old UAF guard has been deallocated).
 #if DN_ARENA_TEMP_MEM_UAF_GUARD
   DN_MemList *mem                = arena->mem;
   mem->uaf_guard_active_id       = arena->uaf_guard_prev_id;
