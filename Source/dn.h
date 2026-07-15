@@ -612,6 +612,7 @@
 #define DN_Min(a, b) (((a) < (b)) ? (a) : (b))
 #define DN_Clamp(val, lo, hi) DN_Max(DN_Min(val, hi), lo)
 #define DN_Squared(val) ((val) * (val))
+#define DN_ArgShift(ptr, size) ((size) ? ((size)--, *(ptr)++) : 0)
 
 #define DN_Swap(a, b) \
   do {                \
