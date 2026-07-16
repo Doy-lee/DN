@@ -10,6 +10,7 @@ struct DN_SHCLIArgs
 {
   bool    valid;
   DN_Str8 exe_path;
+  DN_Str8 ini_path;
   DN_Str8 account_secret;
   DN_Str8 seed_node_url;
   DN_Str8 display_name;
@@ -25,12 +26,23 @@ struct DN_SHCLIEatArgResult
   DN_USize     arg_count; // Next argument count that that the caller should assume
 };
 
+enum DN_SHLogMode
+{
+  DN_SHLogMode_Blocking,
+  DN_SHLogMode_Detached,
+};
+
 // NOTE: Seshc
 // Overview
 //   Helper library that provides some useful APIs for programatically calling the Seshc CLI
 //   executable to send messages from your C/C++ application.
-DN_Str8              DN_SH_CLIOptionsStr8  ();
-DN_SHCLIEatArgResult DN_SH_CLIEatArg       (DN_SHCLIArgs *args, char const **arg_ptr, int arg_count);
-bool                 DN_SH_CLIArgsSendDMFmt(DN_SHCLIArgs *cli_args, DN_Str8 sesh_pkey_hex, char const *fmt, ...);
+DN_SHCLIArgs         DN_SH_CLIArgsCopy             (DN_SHCLIArgs const *src, DN_Arena *arena);
+DN_Str8              DN_SH_CLIOptionsStr8          ();
+DN_SHCLIEatArgResult DN_SH_CLIEatArg               (DN_SHCLIArgs *args, char const **arg_ptr, int arg_count);
+bool                 DN_SH_CLIArgsSendDMBlockingFmt(DN_SHCLIArgs *cli_args, DN_Str8 sesh_pkey, char const *fmt, ...);
+void                 DN_SH_CLIArgsSendDMDetachedFmt(DN_SHCLIArgs *cli_args, DN_Str8 sesh_pkey, char const *fmt, ...);
+void                 DN_SH_LogBroadcastFmtV        (DN_SHLogMode mode, DN_LogType type, DN_SHCLIArgs *cli_args, DN_Str8 short_desc, char const *fmt, va_list args);
+void                 DN_SH_LogBroadcastBlockingFmt (DN_LogType type, DN_SHCLIArgs *cli_args, DN_Str8 short_desc, char const *fmt, ...);
+void                 DN_SH_LogBroadcastDetachedFmt (DN_LogType type, DN_SHCLIArgs *cli_args, DN_Str8 short_desc, char const *fmt, ...);
 
 #endif // #if !defined(DN_SESHC_H)
