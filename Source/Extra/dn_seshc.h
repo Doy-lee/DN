@@ -29,11 +29,8 @@ struct DN_SHCLIEatArgResult
 // Overview
 //   Helper library that provides some useful APIs for programatically calling the Seshc CLI
 //   executable to send messages from your C/C++ application.
-void                 DN_SH_LogBroadcast            (DN_LogType type, DN_SHCLIArgs *cli_args, DN_Str8 short_desc, char const *fmt, ...);
-DN_SHCLIArgs         DN_SH_CLIArgsCopy             (DN_SHCLIArgs const *src, DN_Arena *arena);
-DN_Str8              DN_SH_CLIOptionsStr8          ();
-DN_SHCLIEatArgResult DN_SH_CLIEatArg               (DN_SHCLIArgs *args, char const **arg_ptr, int arg_count);
-bool                 DN_SH_CLIArgsSendDMBlockingFmt(DN_SHCLIArgs *cli_args, DN_Str8 sesh_pkey_hex, char const *fmt, ...);
-void                 DN_SH_CLIArgsSendDMDetachedFmt(DN_SHCLIArgs *cli_args, DN_Str8 sesh_pkey_hex, char const *fmt, ...);
+DN_Str8              DN_SH_CLIOptionsStr8  ();
+DN_SHCLIEatArgResult DN_SH_CLIEatArg       (DN_SHCLIArgs *args, char const **arg_ptr, int arg_count);
+bool                 DN_SH_CLIArgsSendDMFmt(DN_SHCLIArgs *cli_args, DN_Str8 sesh_pkey_hex, char const *fmt, ...);
 
 #endif // #if !defined(DN_SESHC_H)

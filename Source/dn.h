@@ -2387,8 +2387,8 @@ typedef struct DN_OSExecAsyncHandle DN_OSExecAsyncHandle;
 struct DN_OSExecAsyncHandle
 {
   DN_OSExecFlags exec_flags;
-  DN_U32       os_error_code;
-  DN_U32       exit_code;
+  DN_U32         os_error_code;
+  DN_U32         exit_code;
   void          *process;
   void          *stdout_read;
   void          *stdout_write;
