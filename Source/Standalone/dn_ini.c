@@ -220,6 +220,7 @@ DN_INIToken DN_INI_NextToken(DN_INITokeniser const *tokeniser)
           tokeniser->prev_token.type == DN_INITokenType_MultilineValue ||
           tokeniser->prev_token.type == DN_INITokenType_Section) {
         result.type = DN_INITokenType_EndOfStream;
+        break;
       } else {
         result.type  = DN_INITokenType_Error;
         result.error = DN_INIStr8Lit("Premature end of stream encountered malforming the last key-value pair");
