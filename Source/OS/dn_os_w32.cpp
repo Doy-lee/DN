@@ -1307,18 +1307,21 @@ DN_API bool DN_OS_ThreadInitLane(DN_OSThread *thread, DN_OSThreadFunc *func, DN_
   return result;
 }
 
-DN_API bool DN_OS_ThreadJoin(DN_OSThread *thread, DN_TCDeinitArenas deinit_arenas)
+DN_API bool DN_OS_ThreadJoin(DN_OSThread *thread, DN_U32 timeout_ms, DN_TCDeinitArenas deinit_arenas)
 {
-  bool result = false;
+  bool result = true;
   if (thread && thread->handle && thread->handle != INVALID_HANDLE_VALUE) {
     DN_AssertF(DN_BitIsNotSet(thread->flags, DN_OSThreadFlags_Detached),
                "Detached threads should have their handle immediately closed and invalidated so this branch should never hit.");
-    DWORD wait_result = WaitForSingleObject(thread->handle, INFINITE);
-    result            = wait_result == WAIT_OBJECT_0;
-    CloseHandle(thread->handle);
-    thread->handle    = INVALID_HANDLE_VALUE;
-    thread->thread_id = {};
-    DN_TCDeinit(&thread->context, deinit_arenas);
+    DWORD wait_result = WaitForSingleObject(thread->handle, timeout_ms);
+    if (wait_result == WAIT_OBJECT_0) {
+      CloseHandle(thread->handle);
+      thread->handle    = INVALID_HANDLE_VALUE;
+      thread->thread_id = {};
+      DN_TCDeinit(&thread->context, deinit_arenas);
+    } else {
+      result = false;
+    }
   }
   return result;
 }

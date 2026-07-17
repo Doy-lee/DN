@@ -2512,6 +2512,9 @@ struct DN_OSThread
   DN_OSThreadFunc *func;
   DN_OSSemaphore   thread_exec_wait_for_thread_id_sem;
   DN_OSSemaphore   caller_wait_for_thread_init_to_finish_sem;
+#if !defined(DN_PLATFORM_WIN32)
+  DN_OSSemaphore   join_done_sem;
+#endif
   DN_TCInitArgs    tc_init_args;
 };
 
@@ -4771,9 +4774,13 @@ DN_API void                      DN_OS_ConditionVariableBroadcast             (D
 //
 //     For the general use-case if you wish to use lanes then prefer the `DN_OS_ThreadLane` APIs
 //     below which create the threads with the lane information setup accordingly.
+
+//   DN_OS_ThreadJoin
+//     Returns true if the thread joined successfully or it is already joined. False if timed out
+//     waiting for the thread to join.
 DN_API bool                      DN_OS_ThreadInitLane                         (DN_OSThread *thread, DN_OSThreadFunc *func, DN_OSThreadLane *lane, DN_OSThreadInitArgs init_args, void *user_context);
 DN_API bool                      DN_OS_ThreadInit                             (DN_OSThread *thread, DN_OSThreadFunc *func, DN_OSThreadInitArgs init_args, void *user_context);
-DN_API bool                      DN_OS_ThreadJoin                             (DN_OSThread *thread, DN_TCDeinitArenas deinit_arenas);
+DN_API bool                      DN_OS_ThreadJoin                             (DN_OSThread *thread, DN_U32 timeout_ms, DN_TCDeinitArenas deinit_arenas);
 DN_API DN_U32                    DN_OS_ThreadID                               ();
 DN_API DN_OSThreadInitArgs       DN_OS_ThreadInitArgsDefault                  ();
 DN_API void                      DN_OS_ThreadSetNameFmt                       (char const *fmt, ...);
@@ -4847,7 +4854,7 @@ DN_API DN_V2USize                DN_OS_ThreadLaneRange                        (D
 DN_API DN_OSThreadLaneway        DN_OS_ThreadLanewayFromArgs                  (DN_OSThread* threads, DN_USize threads_count, DN_UPtr* shared_mem);
 DN_API DN_OSThreadLaneway        DN_OS_ThreadLanewayFromArena                 (DN_USize threads_count, DN_Arena* arena);
 DN_API void                      DN_OS_ThreadLanewayDispatch                  (DN_OSThreadLaneway *laneway, DN_OSThreadFunc *entry_point, DN_OSThreadInitArgs init_args, void *user_context);
-DN_API void                      DN_OS_ThreadLanewayJoin                      (DN_OSThreadLaneway *laneway, DN_TCDeinitArenas deinit_arenas);
+DN_API void                      DN_OS_ThreadLanewayJoin                      (DN_OSThreadLaneway *laneway, DN_U32 timeout_ms, DN_TCDeinitArenas deinit_arenas);
 
 DN_API DN_OSThreadLane*          DN_OS_TCThreadLane                           ();
 DN_API void                      DN_OS_TCThreadLaneSync                       (void **ptr_to_share);

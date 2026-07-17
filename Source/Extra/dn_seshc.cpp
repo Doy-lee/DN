@@ -1,11 +1,13 @@
 #include "dn_seshc.h"
 
-struct DN_SHSendDMThreadContext_
+struct DN_SHMsgSendAsyncContext_
 {
-  DN_Arena     arena;
-  DN_SHCLIArgs args;
-  DN_Str8      sesh_pkey_hex;
-  DN_Str8      msg;
+  bool             send_success;
+  DN_Arena*        arena;
+  DN_SHCLIArgs     args;
+  DN_SHMsgSendData send;
+  DN_Str8          msg;
+  bool             detached;
 };
 
 DN_SHCLIArgs DN_SH_CLIArgsCopy(DN_SHCLIArgs const *src, DN_Arena *arena)
@@ -13,10 +15,8 @@ DN_SHCLIArgs DN_SH_CLIArgsCopy(DN_SHCLIArgs const *src, DN_Arena *arena)
   DN_SHCLIArgs result   = {};
   result                = *src;
   result.exe_path       = DN_Str8FromStr8Arena(src->exe_path, arena);
-  result.account_secret = DN_Str8FromStr8Arena(src->account_secret, arena);
+  result.ini_path       = DN_Str8FromStr8Arena(src->ini_path, arena);
   result.seed_node_url  = DN_Str8FromStr8Arena(src->seed_node_url, arena);
-  result.display_name   = DN_Str8FromStr8Arena(src->display_name, arena);
-  result.recipient_pkey = DN_Str8FromStr8Arena(src->recipient_pkey, arena);
   return result;
 }
 
@@ -25,16 +25,10 @@ DN_Str8 DN_SH_CLIOptionsStr8()
   DN_Str8 result = DN_Str8Lit(
 "SESHC OPTIONS (note all options must be set to activate Seshc):\n"
 "  --seshc-exe-path <path>              Path to the Seshc EXE file to invoke for sending messages\n"
-"  --seshc-ini-path <path>              Path to the .ini file to load the secret/recipient public\n"
-"                                       key (only used if you are using `ini:` syntax)\n"
-"  --seshc-account-secret <secret>      Specify the secret of the Session account to send a message\n"
-"                                       as (see --help on the Seshc EXE for more info)\n"
+"  --seshc-ini-path <path>              Path to the .ini file to load Seshc arguments from\n"
+"                                       (such as account secrets, display name, recipient...)\n"
 "  --seshc-seed-node <url>              URL to the Session seed node for determining the nodes to\n"
 "                                       send the message to\n"
-"  --seshc-display-name <name>          Display name to send the message as\n"
-"  --seshc-recipient-pkey <name|ini:..> Recipient to send the message as (must be 0x05 prefixed, 0x\n"
-"                                       is optional), or alternatively `ini:` syntax (see --help on\n"
-"                                       the Seshc EXE for more info)."
   );
   return result;
 }
@@ -75,46 +69,19 @@ DN_SHCLIEatArgResult DN_SH_CLIEatArg(DN_SHCLIArgs *args, char const **arg_ptr, i
       }
     }
 
-    if (!result.eaten && DN_Str8EqInsensitive(arg, DN_Str8Lit("--seshc-account-secret"))) {
-      (void)DN_ArgShift(result.arg_ptr, result.arg_count);
-      result.eaten         = true;
-      args->account_secret = DN_Str8FromCStr8(DN_ArgShift(result.arg_ptr, result.arg_count));
-    }
-
     if (!result.eaten && DN_Str8EqInsensitive(arg, DN_Str8Lit("--seshc-seed-node"))) {
       (void)DN_ArgShift(result.arg_ptr, result.arg_count);
       result.eaten        = true;
       args->seed_node_url = DN_Str8FromCStr8(DN_ArgShift(result.arg_ptr, result.arg_count));
     }
-
-    if (!result.eaten && DN_Str8EqInsensitive(arg, DN_Str8Lit("--seshc-display-name"))) {
-      (void)DN_ArgShift(result.arg_ptr, result.arg_count);
-      result.eaten       = true;
-      args->display_name = DN_Str8FromCStr8(DN_ArgShift(result.arg_ptr, result.arg_count));
-    }
-
-    if (!result.eaten && DN_Str8EqInsensitive(arg, DN_Str8Lit("--seshc-recipient-pkey"))) {
-      (void)DN_ArgShift(result.arg_ptr, result.arg_count);
-      result.eaten         = true;
-      args->recipient_pkey = DN_Str8FromCStr8(DN_ArgShift(result.arg_ptr, result.arg_count));
-
-      DN_Str8 check      = DN_Str8TrimHexPrefix(args->recipient_pkey);
-      bool ini_prefixed  = DN_Str8StartsWithSensitive(check, DN_Str8Lit("ini:"));
-      bool sesh_prefixed = !ini_prefixed && (DN_Str8StartsWithSensitive(check, DN_Str8Lit("05")) || DN_Str8StartsWithInsensitive(check, DN_Str8Lit("0x05")));
-      if (!ini_prefixed && !sesh_prefixed) {
-        result.error_msg     = DN_Str8Lit("Seshc recipient public key does not specify a 05 prefixed public key, or, use `ini:` to specify a public key in the .ini file");
-        result.error_arg     = args->recipient_pkey;
-        args->recipient_pkey = {};
-      }
-    }
   }
 
-  if (args->seed_node_url.count && args->account_secret.count && args->exe_path.count && args->recipient_pkey.count)
+  if (args->seed_node_url.count && args->exe_path.count && args->ini_path.count)
     args->valid = true;
   return result;
 }
 
-bool DN_SH_CLIArgsSendDMBlockingFmt(DN_SHCLIArgs *cli_args, DN_Str8 sesh_pkey, char const *fmt, ...)
+bool DN_SH_MsgSendBlockingFmt(DN_SHMsgSendData send, DN_SHCLIArgs *cli_args, char const *fmt, ...)
 {
   bool result = false;
   if (cli_args->valid) {
@@ -136,23 +103,21 @@ bool DN_SH_CLIArgsSendDMBlockingFmt(DN_SHCLIArgs *cli_args, DN_Str8 sesh_pkey, c
     DN_LArrayAppend(cmds, &cmds_count, cli_args->exe_path);
 
     DN_LArrayAppend(cmds, &cmds_count, account_secret_arg);
-    DN_LArrayAppend(cmds, &cmds_count, cli_args->account_secret);
+    DN_LArrayAppend(cmds, &cmds_count, send.account_secret);
 
     DN_LArrayAppend(cmds, &cmds_count, seed_node_url_arg);
     DN_LArrayAppend(cmds, &cmds_count, cli_args->seed_node_url);
 
-    if (cli_args->display_name.count) {
+    if (send.display_name.count) {
       DN_LArrayAppend(cmds, &cmds_count, display_name_arg);
-      DN_LArrayAppend(cmds, &cmds_count, cli_args->display_name);
+      DN_LArrayAppend(cmds, &cmds_count, send.display_name);
     }
 
-    if (cli_args->ini_path.count) {
-      DN_LArrayAppend(cmds, &cmds_count, ini_path_arg);
-      DN_LArrayAppend(cmds, &cmds_count, cli_args->ini_path);
-    }
+    DN_LArrayAppend(cmds, &cmds_count, ini_path_arg);
+    DN_LArrayAppend(cmds, &cmds_count, cli_args->ini_path);
 
     DN_LArrayAppend(cmds, &cmds_count, send_arg);
-    DN_LArrayAppend(cmds, &cmds_count, sesh_pkey);
+    DN_LArrayAppend(cmds, &cmds_count, send.recipient);
 
     DN_LArrayAppend(cmds, &cmds_count, msg);
 
@@ -167,7 +132,7 @@ bool DN_SH_CLIArgsSendDMBlockingFmt(DN_SHCLIArgs *cli_args, DN_Str8 sesh_pkey, c
     result               = exec.os_error_code == 0 && exec.exit_code == 0;
     if (!result) {
       DN_LogErrorF("Error sending message to %.*s (exit code: %d, os: %d): %.*s",
-                   DN_Str8PrintFmt(cli_args->recipient_pkey),
+                   DN_Str8PrintFmt(send.recipient),
                    exec.exit_code,
                    exec.os_error_code,
                    DN_Str8PrintFmt(exec.stderr_text));
@@ -178,59 +143,76 @@ bool DN_SH_CLIArgsSendDMBlockingFmt(DN_SHCLIArgs *cli_args, DN_Str8 sesh_pkey, c
   return result;
 }
 
-static int DN_SH_CLIArgsSendDMDetachedFmtThreadFunc_(DN_OSThread *thread)
+static int DN_SH_MsgSendDetachedFmtThreadFunc_(DN_OSThread *thread)
 {
-  DN_SHSendDMThreadContext_ *context = DN_Cast(DN_SHSendDMThreadContext_ *) thread->user_context;
-  DN_SH_CLIArgsSendDMBlockingFmt(&context->args, context->sesh_pkey_hex, "%.*s", DN_Str8PrintFmt(context->msg));
-  DN_ArenaDeinit(&context->arena);
+  DN_SHMsgSendAsyncContext_ *context = DN_Cast(DN_SHMsgSendAsyncContext_ *) thread->user_context;
+  context->send_success              = DN_SH_MsgSendBlockingFmt(context->send, &context->args, "%.*s", DN_Str8PrintFmt(context->msg));
+  if (context->detached)
+    DN_ArenaDeinit(context->arena);
   return 0;
 }
 
-void DN_SH_CLIArgsSendDMDetachedFmt(DN_SHCLIArgs *cli_args, DN_Str8 sesh_pkey, char const *fmt, ...)
+static DN_SHMsgSendAsyncHandle DN_SH_MsgSendAsyncFmtVMaybeDetached_(DN_SHMsgSendData send, DN_SHCLIArgs *cli_args, DN_Arena *arena, bool detached, char const *fmt, va_list args)
 {
+  DN_SHMsgSendAsyncHandle result = {};
   if (!cli_args->valid)
-    return;
+    return result;
 
   // NOTE: Setup context
-  DN_Arena arena                     = DN_OS_ArenaFromHeapVirtual(0, 0, DN_MemFlags_Nil);
-  DN_SHSendDMThreadContext_ *context = DN_ArenaNewZ(&arena, DN_SHSendDMThreadContext_);
-  context->args                      = DN_SH_CLIArgsCopy(cli_args, &arena);
-  context->sesh_pkey_hex             = DN_Str8FromStr8Arena(sesh_pkey, &arena);
-
-  va_list args;
-  va_start(args, fmt);
-  context->msg  = DN_Str8FromFmtVArena(&arena, fmt, args);
-  va_end(args);
-
-  // NOTE: Set the arena last after all allocations
-  context->arena = arena;
-
-  // NOTE: Setup thread to be detached
-  DN_OSThread         thread       = {};
-  DN_OSThreadInitArgs thread_args  = DN_OS_ThreadInitArgsDefault();
-  thread_args.flags               |= DN_OSThreadFlags_Detached;
+  DN_SHMsgSendAsyncContext_ *context = DN_ArenaNewZ(arena, DN_SHMsgSendAsyncContext_);
+  context->args                      = DN_SH_CLIArgsCopy(cli_args, arena);
+  context->send                      = send;
+  context->arena                     = arena;
+  context->msg                       = DN_Str8FromFmtVArena(arena, fmt, args);
+  context->detached                  = detached;
 
   // NOTE: Execute and forget
-  DN_OS_ThreadInit(&thread, DN_SH_CLIArgsSendDMDetachedFmtThreadFunc_, thread_args, context);
+  DN_OSThreadInitArgs thread_args = DN_OS_ThreadInitArgsDefault();
+  if (detached)
+    thread_args.flags |= DN_OSThreadFlags_Detached;
+
+  DN_OS_ThreadInit(&result.thread, DN_SH_MsgSendDetachedFmtThreadFunc_, thread_args, context);
+  return result;
 }
 
-void DN_SH_LogBroadcastBlockingFmt(DN_LogType type, DN_SHCLIArgs *cli_args, DN_Str8 short_desc, char const *fmt, ...)
+void DN_SH_MsgSendDetachedFmt(DN_SHMsgSendData send, DN_SHCLIArgs *cli_args, char const *fmt, ...)
 {
+  DN_Arena  arena_stack = DN_OS_ArenaFromHeapVirtual(0, 0, DN_MemFlags_Nil);
+  DN_Arena *arena       = DN_ArenaNewZ(&arena_stack, DN_Arena);
+  *arena                = arena_stack;
+
   va_list args;
   va_start(args, fmt);
-  DN_SH_LogBroadcastFmtV(DN_SHLogMode_Blocking, type, cli_args, short_desc, fmt, args);
+  DN_SH_MsgSendAsyncFmtVMaybeDetached_(send, cli_args, arena, /*detached=*/ true, fmt, args);
   va_end(args);
 }
 
-void DN_SH_LogBroadcastDetachedFmt(DN_LogType type, DN_SHCLIArgs *cli_args, DN_Str8 short_desc, char const *fmt, ...)
+DN_SHMsgSendAsyncHandle DN_SH_MsgSendAsyncFmt(DN_SHMsgSendData send, DN_SHCLIArgs *cli_args, DN_Arena *arena, char const *fmt, ...)
 {
   va_list args;
   va_start(args, fmt);
-  DN_SH_LogBroadcastFmtV(DN_SHLogMode_Detached, type, cli_args, short_desc, fmt, args);
+  DN_SHMsgSendAsyncHandle result = DN_SH_MsgSendAsyncFmtVMaybeDetached_(send, cli_args, arena, /*detached=*/ false, fmt, args);
   va_end(args);
+  return result;
 }
 
-void DN_SH_LogBroadcastFmtV(DN_SHLogMode mode, DN_LogType type, DN_SHCLIArgs *cli_args, DN_Str8 short_desc, char const *fmt, va_list args)
+DN_SHMsgSendAsyncStatus DN_SH_MsgSendAsyncWait(DN_SHMsgSendAsyncHandle *handle, DN_U32 timeout_ms)
+{
+  DN_SHMsgSendAsyncStatus result = DN_SHMsgSendAsyncStatus_Success;
+  if (handle && handle->thread.user_context) {
+    bool joined = DN_OS_ThreadJoin(&handle->thread, timeout_ms, DN_TCDeinitArenas_Yes);
+    if (joined) {
+      DN_SHMsgSendAsyncContext_ *context = DN_Cast(DN_SHMsgSendAsyncContext_ *) handle->thread.user_context;
+      result                             = context->send_success ? DN_SHMsgSendAsyncStatus_Success : DN_SHMsgSendAsyncStatus_Failed;
+      *handle                            = {};
+    } else {
+      result = DN_SHMsgSendAsyncStatus_Timeout;
+    }
+  }
+  return result;
+}
+
+void DN_SH_LogBroadcastFmtV(DN_SHLogMode mode, DN_LogType type, DN_SHMsgSendData send, DN_SHCLIArgs *cli_args, DN_Str8 short_desc, char const *fmt, va_list args)
 {
   DN_TCScratch scratch = DN_TCScratchBeginArena(nullptr, 0);
   DN_Str8      msg     = DN_Str8FromFmtVArena(&scratch.arena, fmt, args);
@@ -266,40 +248,56 @@ void DN_SH_LogBroadcastFmtV(DN_SHLogMode mode, DN_LogType type, DN_SHCLIArgs *cl
     time_emoji = DN_Str8Lit("🌑");
 
   if (mode == DN_SHLogMode_Detached) {
-    DN_SH_CLIArgsSendDMDetachedFmt(cli_args,
-                                   cli_args->recipient_pkey,
-                                   "%.*s%.*s\n"
-                                   "%.*s %u-%02u-%02u %u:%02u:%02u %s\n"
-                                   "%.*s",
-                                   DN_Str8PrintFmt(prefix),
-                                   DN_Str8PrintFmt(short_desc),
-                                   DN_Str8PrintFmt(time_emoji),
-                                   date.year,
-                                   date.month,
-                                   date.day,
-                                   hour12,
-                                   date.minutes,
-                                   date.seconds,
-                                   am_pm,
-                                   DN_Str8PrintFmt(msg));
+    DN_SH_MsgSendDetachedFmt(send,
+                             cli_args,
+                             "%.*s%.*s\n"
+                             "%.*s %u-%02u-%02u %u:%02u:%02u %s\n"
+                             "%.*s",
+                             DN_Str8PrintFmt(prefix),
+                             DN_Str8PrintFmt(short_desc),
+                             DN_Str8PrintFmt(time_emoji),
+                             date.year,
+                             date.month,
+                             date.day,
+                             hour12,
+                             date.minutes,
+                             date.seconds,
+                             am_pm,
+                             DN_Str8PrintFmt(msg));
   } else {
     DN_Assert(mode == DN_SHLogMode_Blocking);
-    DN_SH_CLIArgsSendDMBlockingFmt(cli_args,
-                                   cli_args->recipient_pkey,
-                                   "%.*s %.*s\n"
-                                   "%.*s %u-%02u-%02u %u:%02u:%02u %s\n"
-                                   "%.*s",
-                                   DN_Str8PrintFmt(prefix),
-                                   DN_Str8PrintFmt(short_desc),
-                                   DN_Str8PrintFmt(time_emoji),
-                                   date.year,
-                                   date.month,
-                                   date.day,
-                                   hour12,
-                                   date.minutes,
-                                   date.seconds,
-                                   am_pm,
-                                   DN_Str8PrintFmt(msg));
+    DN_SH_MsgSendBlockingFmt(send,
+                             cli_args,
+                             "%.*s %.*s\n"
+                             "%.*s %u-%02u-%02u %u:%02u:%02u %s\n"
+                             "%.*s",
+                             DN_Str8PrintFmt(prefix),
+                             DN_Str8PrintFmt(short_desc),
+                             DN_Str8PrintFmt(time_emoji),
+                             date.year,
+                             date.month,
+                             date.day,
+                             hour12,
+                             date.minutes,
+                             date.seconds,
+                             am_pm,
+                             DN_Str8PrintFmt(msg));
   }
   DN_TCScratchEnd(&scratch);
+}
+
+void DN_SH_LogBroadcastBlockingFmt(DN_LogType type, DN_SHMsgSendData send, DN_SHCLIArgs *cli_args, DN_Str8 short_desc, char const *fmt, ...)
+{
+  va_list args;
+  va_start(args, fmt);
+  DN_SH_LogBroadcastFmtV(DN_SHLogMode_Blocking, type, send, cli_args, short_desc, fmt, args);
+  va_end(args);
+}
+
+void DN_SH_LogBroadcastDetachedFmt(DN_LogType type, DN_SHMsgSendData send, DN_SHCLIArgs *cli_args, DN_Str8 short_desc, char const *fmt, ...)
+{
+  va_list args;
+  va_start(args, fmt);
+  DN_SH_LogBroadcastFmtV(DN_SHLogMode_Detached, type, send, cli_args, short_desc, fmt, args);
+  va_end(args);
 }

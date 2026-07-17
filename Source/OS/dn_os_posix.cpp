@@ -1322,20 +1322,26 @@ DN_API bool DN_OS_ThreadInitLane(DN_OSThread *thread, DN_OSThreadFunc *func, DN_
   return result;
 }
 
-DN_API bool DN_OS_ThreadJoin(DN_OSThread *thread, DN_TCDeinitArenas deinit_arenas)
+DN_API bool DN_OS_ThreadJoin(DN_OSThread *thread, DN_U32 timeout_ms, DN_TCDeinitArenas deinit_arenas)
 {
-  bool result = false;
+  bool result = true;
   if (thread && thread->handle) {
     DN_AssertF(DN_BitIsNotSet(thread->flags, DN_OSThreadFlags_Detached),
                "Detached threads should have their handle immediately closed and invalidated so this branch should never hit.");
     pthread_t thread_id = {};
     DN_Memcpy(&thread_id, &thread->thread_id, sizeof(thread_id));
 
-    void *return_val  = nullptr;
-    result            = pthread_join(thread_id, &return_val) == 0;
-    thread->handle    = {};
-    thread->thread_id = {};
-    DN_TCDeinit(&thread->context, deinit_arenas);
+    DN_OSSemaphoreWaitResult wait_result = DN_OS_SemaphoreWait(&thread->join_done_sem, timeout_ms);
+    if (wait_result == DN_OSSemaphoreWaitResult_Success) {
+      void *return_val = {};
+      pthread_join(thread_id, &return_val);
+      thread->handle    = {};
+      thread->thread_id = {};
+      DN_TCDeinit(&thread->context, deinit_arenas);
+      DN_OS_SemaphoreDeinit(&thread->join_done_sem);
+    } else {
+      result = false;
+    }
   }
   return result;
 }

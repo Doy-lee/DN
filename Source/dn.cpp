@@ -12443,8 +12443,18 @@ static void DN_OS_ThreadExecute_(void *user_context)
   // NOTE: If we're detached, it's this thread's responsibility to cleanup itself. In the platform
   // layer it should have closed any references to the thread so we should just need to cleanup the
   // TLS.
-  if (thread->flags & DN_OSThreadFlags_Detached)
+  if (thread->flags & DN_OSThreadFlags_Detached) {
+    #if !defined(DN_PLATFORM_WIN32)
+    // NOTE: Cleanup the semaphore since we're detached, all left-over resources need to be cleaned
+    // up ourselves.
+    DN_OS_SemaphoreDeinit(&thread->join_done_sem);
+    #endif
     DN_TCDeinit(&thread->context, DN_TCDeinitArenas_Yes);
+  } else {
+    #if !defined(DN_PLATFORM_WIN32)
+    DN_OS_SemaphoreIncrement(&thread->join_done_sem, 1); // NOTE: Signal for DN_OS_ThreadJoin waits on this.
+    #endif
+  }
 }
 
 static void DN_OS_ThreadPreInit_(DN_OSThread *thread, DN_OSThreadFunc *func, DN_OSThreadLane *lane, DN_OSThreadInitArgs init_args, void *user_context)
@@ -12454,6 +12464,9 @@ static void DN_OS_ThreadPreInit_(DN_OSThread *thread, DN_OSThreadFunc *func, DN_
     thread->user_context                              = user_context;
     thread->thread_exec_wait_for_thread_id_sem        = DN_OS_SemaphoreInit(0 /*initial_count*/);
     thread->caller_wait_for_thread_init_to_finish_sem = DN_OS_SemaphoreInit(0 /*initial_count*/);
+#if !defined(DN_PLATFORM_WIN32)
+    thread->join_done_sem                             = DN_OS_SemaphoreInit(0 /*initial_count*/);
+#endif
     thread->tc_init_args                              = init_args.tc_args;
     thread->flags                                     = init_args.flags;
     if (lane) {
@@ -12479,8 +12492,12 @@ static void DN_OS_ThreadPostInit_(DN_OSThread *thread, bool result)
   DN_OS_SemaphoreDeinit(&thread->thread_exec_wait_for_thread_id_sem);
   DN_OS_SemaphoreDeinit(&thread->caller_wait_for_thread_init_to_finish_sem);
 
-  if (!result)
+  if (!result) {
+    #if !defined(DN_PLATFORM_WIN32)
+    DN_OS_SemaphoreDeinit(&thread->join_done_sem);
+    #endif
     *thread = {};
+  }
 }
 
 DN_API DN_OSThreadInitArgs DN_OS_ThreadInitArgsDefault()
@@ -12598,10 +12615,10 @@ DN_API void DN_OS_ThreadLanewayDispatch(DN_OSThreadLaneway *laneway, DN_OSThread
   }
 }
 
-DN_API void DN_OS_ThreadLanewayJoin(DN_OSThreadLaneway *laneway, DN_TCDeinitArenas deinit_arenas)
+DN_API void DN_OS_ThreadLanewayJoin(DN_OSThreadLaneway *laneway, DN_U32 timeout_ms, DN_TCDeinitArenas deinit_arenas)
 {
   for (DN_ForItSize(it, DN_OSThread, laneway->threads, laneway->threads_count))
-    DN_OS_ThreadJoin(it.data, deinit_arenas);
+    DN_OS_ThreadJoin(it.data, timeout_ms, deinit_arenas);
   DN_OS_BarrierDeinit(&laneway->barrier);
 }
 
@@ -12685,7 +12702,7 @@ DN_API void DN_OS_AsyncDeinit(DN_OSAsyncCore *async)
   DN_AtomicSetValue32(&async->join_threads, true);
   DN_OS_SemaphoreIncrement(&async->worker_sem, async->thread_count);
   for (DN_ForItSize(it, DN_OSThread, async->threads, async->thread_count))
-    DN_OS_ThreadJoin(it.data, DN_TCDeinitArenas_Yes);
+    DN_OS_ThreadJoin(it.data, UINT32_MAX, DN_TCDeinitArenas_Yes);
 }
 
 static bool DN_OS_AsyncQueueTask_(DN_OSAsyncCore *async, DN_OSAsyncTask const *task, DN_U64 wait_time_ms) {
@@ -12727,7 +12744,7 @@ DN_API DN_OSAsyncTask DN_OS_AsyncQueueTask(DN_OSAsyncCore *async, DN_OSAsyncWork
   result.completion_sem = DN_OS_SemaphoreInit(0);
   result.queued         = DN_OS_AsyncQueueTask_(async, &result, wait_time_ms);
   if (!result.queued)
-      DN_OS_SemaphoreDeinit(&result.completion_sem);
+    DN_OS_SemaphoreDeinit(&result.completion_sem);
   return result;
 }
 
@@ -13772,7 +13789,7 @@ void DN_NET_CurlDeinit(DN_NETCore *net)
   DN_NETCurlCore *curl = DN_Cast(DN_NETCurlCore *) net->context;
   curl->kill_thread    = true;
   curl_multi_wakeup(curl->thread_curlm);
-  DN_OS_ThreadJoin(&curl->thread, DN_TCDeinitArenas_Yes);
+  DN_OS_ThreadJoin(&curl->thread, UINT32_MAX, DN_TCDeinitArenas_Yes);
 }
 
 static DN_NETRequestHandle DN_NET_CurlDoRequest_(DN_NETCore *net, DN_Str8 url, DN_Str8 method, DN_NETDoHTTPArgs const *args, DN_NETRequestType type)
