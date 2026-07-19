@@ -27,9 +27,9 @@ DN_MSVC_WARNING_DISABLE(6262) // Function uses '29804' bytes of stack.  Consider
 int main(int, char**)
 {
   DN_Core dn = {};
-  DN_Init(&dn, DN_InitFlags_LogAllFeatures | DN_InitFlags_OS, DN_TCInitArgsDefault());
+  DN_Init(&dn, DN_InitFlags_LogAllFeatures | DN_InitFlags_OS, DN_TcInitArgsDefault());
 
-  DN_Arena*   arena     = DN_TCMainArena();
+  DN_Arena*   arena     = DN_TcMainArena();
   DN_TestCore dn_test   = DN_TestSuite(arena);
   DN_TestCore sha3_test = DN_SHA3_TestSuite(arena);
   DN_Str8     dn_str8   = DN_Str8FromTestCore(&dn_test, arena, DN_Str8FromTestCoreFlags_Colour);

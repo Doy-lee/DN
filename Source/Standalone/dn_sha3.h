@@ -681,7 +681,7 @@ enum DN_SHA3TestHash
 
 static void DN_SHA3_TestHashDispatch_(DN_TestCore *test, DN_SHA3TestHash hash_type, DN_Str8 input)
 {
-  DN_TCScratch scratch   = DN_TCScratchBeginArena(&test->arena, 1);
+  DN_TcScratch scratch   = DN_TcScratchBeginArena(&test->arena, 1);
   DN_Str8      input_hex = DN_Str8HexFromPtrBytesArena(input.data, input.count, &scratch.arena, DN_TrimLeadingZero_No);
   switch (hash_type) {
     case DN_SHA3TestHash_Count: DN_AssertInvalidCodePath; break;
@@ -741,7 +741,7 @@ static void DN_SHA3_TestHashDispatch_(DN_TestCore *test, DN_SHA3TestHash hash_ty
       DN_TestVerifyBytesEqF(test, DN_Str8FromLitArray(hash.data), DN_Str8FromLitArray(expect.data), "Input: %.*s", DN_Str8PrintFmt(input_hex));
     } break;
   }
-  DN_TCScratchEnd(&scratch);
+  DN_TcScratchEnd(&scratch);
 }
 
 DN_TestCore DN_SHA3_TestSuite(DN_Arena *arena)
@@ -780,13 +780,13 @@ DN_TestCore DN_SHA3_TestSuite(DN_Arena *arena)
 
       // NOTE: Test SHA3 against some deterministic inputs generated from a PRNG
       for (DN_TestScopeF(&result, "[%.*s] Deterministic random inputs", DN_Str8PrintFmt(hash_name))) {
-        DN_PCG32 rng = DN_PCG32Init(0xd48e'be21'2af8'733d);
+        DN_Pcg32 rng = DN_Pcg32Init(0xd48e'be21'2af8'733d);
         for (DN_USize index = 0; index < 128; index++) {
           // NOTE: Create a 4kb buffer with the deterministic contents
           char   src[4096] = {};
-          DN_U32 src_size  = DN_PCG32Range(&rng, 0, sizeof(src));
+          DN_U32 src_size  = DN_Pcg32Range(&rng, 0, sizeof(src));
           for (DN_USize src_index = 0; src_index < src_size; src_index++)
-            src[src_index] = DN_Cast(char) DN_PCG32Range(&rng, 0, 255);
+            src[src_index] = DN_Cast(char) DN_Pcg32Range(&rng, 0, 255);
 
           // NOTE: Do the hashing
           DN_Str8 input = DN_Str8FromPtr(src, src_size);

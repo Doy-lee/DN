@@ -26,8 +26,8 @@ struct File
 
 static void AppendCppFileLineByLine(DN_Str8Builder *dest, DN_Str8 cpp_path)
 {
-  DN_TCScratch scratch = DN_TCScratchBeginArena(&dest->arena, 1);
-  DN_ErrSink  *err     = DN_TCErrSinkBeginDefault();
+  DN_TcScratch scratch = DN_TcScratchBeginArena(&dest->arena, 1);
+  DN_ErrSink  *err     = DN_TcErrSinkBeginDefault();
   DN_Str8      buffer  = DN_OS_FileReadAllArena(&scratch.arena, cpp_path, err);
   DN_ErrSinkEndExitIfErrorF(err, -1, "Failed to load file from '%S' for appending", cpp_path);
 
@@ -44,7 +44,7 @@ static void AppendCppFileLineByLine(DN_Str8Builder *dest, DN_Str8 cpp_path)
     if (!inside_clangd_preprocessor_block) {
       DN_Str8FindResult find = DN_Str8FindStr8(line, DN_Str8Lit("#if defined(_CLANGD)"), DN_Str8EqCase_Sensitive);
       if (find.found) {
-        line                             = DN_Str8FromFmtArena(&scratch.arena, "%S// DN: Single header generator commented out => %S", find.start_to_before_match, DN_Str8TrimWhitespaceAround(find.match_to_end_of_buffer));
+        line                             = DN_Str8FmtArena(&scratch.arena, "%S// DN: Single header generator commented out => %S", find.start_to_before_match, DN_Str8TrimWhitespaceAround(find.match_to_end_of_buffer));
         commented_out                    = true;
         inside_clangd_preprocessor_block = true;
       }
@@ -62,7 +62,7 @@ static void AppendCppFileLineByLine(DN_Str8Builder *dest, DN_Str8 cpp_path)
       if (!ignore.found) {
         DN_Str8FindResult find = DN_Str8FindStr8(line, DN_Str8Lit("#include \""), DN_Str8EqCase_Sensitive);
         if (find.found) {
-          line                     = DN_Str8FromFmtArena(&scratch.arena, "%S// DN: Single header generator commented out => %S", find.start_to_before_match, DN_Str8TrimWhitespaceAround(find.match_to_end_of_buffer));
+          line                     = DN_Str8FmtArena(&scratch.arena, "%S// DN: Single header generator commented out => %S", find.start_to_before_match, DN_Str8TrimWhitespaceAround(find.match_to_end_of_buffer));
           DN_Str8 rel_include_path = DN_Str8TrimWhitespaceAround(find.after_match_to_end_of_buffer);
           DN_Str8 root_dir         = DN_Str8FileDirectoryFromPath(cpp_path);
           extra_include_path       = DN_OS_PathFmtArena(&scratch.arena, "%S/%S", root_dir, DN_Str8TrimSuffixSensitive(rel_include_path, DN_Str8Lit("\"")));
@@ -73,7 +73,7 @@ static void AppendCppFileLineByLine(DN_Str8Builder *dest, DN_Str8 cpp_path)
     // NOTE: Detect if we're at the end of the CLAND block
     if (inside_clangd_preprocessor_block) {
       if (!commented_out)
-        line = DN_Str8FromFmtArena(&scratch.arena, "// %S", line);
+        line = DN_Str8FmtArena(&scratch.arena, "// %S", line);
       if (DN_Str8FindStr8(line, DN_Str8Lit("#endif"), DN_Str8EqCase_Sensitive).found)
         inside_clangd_preprocessor_block = false;
     }
@@ -84,13 +84,13 @@ static void AppendCppFileLineByLine(DN_Str8Builder *dest, DN_Str8 cpp_path)
     if (extra_include_path.count)
       AppendCppFileLineByLine(dest, extra_include_path);
   }
-  DN_TCScratchEnd(&scratch);
+  DN_TcScratchEnd(&scratch);
 }
 
 int main(int argc, char **argv)
 {
   DN_Core dn = {};
-  DN_Init(&dn, DN_InitFlags_OS, DN_TCInitArgsDefault());
+  DN_Init(&dn, DN_InitFlags_OS, DN_TcInitArgsDefault());
 
   if (argc != 3) {
     DN_OS_PrintErrF("USAGE: %s <path/to/dn/Source> <output_dir>", argv[0]);
@@ -109,7 +109,7 @@ int main(int argc, char **argv)
   };
 
   for (DN_ForIndexU(type, FileType_Count)) {
-    DN_TCScratch   scratch = DN_TCScratchBeginArena(nullptr, 0);
+    DN_TcScratch   scratch = DN_TcScratchBeginArena(nullptr, 0);
     DN_Str8Builder builder = DN_Str8BuilderFromArena(&scratch.arena);
     DN_Str8        suffix  = type == FileType_Header ? DN_Str8Lit("h") : DN_Str8Lit("cpp");
     for (DN_ForItCArray(it, DN_Str8 const, REL_FILE_PATHS)) {
@@ -122,7 +122,7 @@ int main(int argc, char **argv)
 
     DN_Str8     buffer             = DN_Str8TrimWhitespaceAround(DN_Str8FromStr8BuilderArena(&builder, &scratch.arena));
     DN_Str8     single_header_path = DN_OS_PathFmtArena(&scratch.arena, "%S/dn_single_header.%S", output_dir, suffix);
-    DN_ErrSink *err                = DN_TCErrSinkBeginDefault();
+    DN_ErrSink *err                = DN_TcErrSinkBeginDefault();
     DN_OS_FileWriteAllSafe(single_header_path, buffer, err);
     DN_ErrSinkEndExitIfErrorF(err, -1, "Failed to write Single header file '%S'", single_header_path);
   }

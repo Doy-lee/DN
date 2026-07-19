@@ -210,7 +210,7 @@ DN_API void DN_OS_GenBytesSecure(void *buffer, DN_U32 size)
 
 DN_API DN_OSDiskSpace DN_OS_DiskSpace(DN_Str8 path)
 {
-  DN_TCScratch   scratch = DN_TCScratchBeginArena(nullptr, 0);
+  DN_TcScratch   scratch = DN_TcScratchBeginArena(nullptr, 0);
   DN_OSDiskSpace result  = {};
   DN_Str16       path16  = DN_OS_W32Str8ToStr16(&scratch.arena, path);
 
@@ -221,36 +221,36 @@ DN_API DN_OSDiskSpace DN_OS_DiskSpace(DN_Str8 path)
                            &free_bytes_avail_to_caller,
                            &total_number_of_bytes,
                            &total_number_of_free_bytes)) {
-    DN_TCScratchEnd(&scratch);
+    DN_TcScratchEnd(&scratch);
     return result;
   }
 
   result.success = true;
   result.avail   = free_bytes_avail_to_caller.QuadPart;
   result.size    = total_number_of_bytes.QuadPart;
-  DN_TCScratchEnd(&scratch);
+  DN_TcScratchEnd(&scratch);
   return result;
 }
 
 DN_API bool DN_OS_SetEnvVar(DN_Str8 name, DN_Str8 value)
 {
-  DN_TCScratch scratch = DN_TCScratchBeginArena(nullptr, 0);
+  DN_TcScratch scratch = DN_TcScratchBeginArena(nullptr, 0);
   DN_Str16     name16  = DN_OS_W32Str8ToStr16(&scratch.arena, name);
   DN_Str16     value16 = DN_OS_W32Str8ToStr16(&scratch.arena, value);
   bool         result  = SetEnvironmentVariableW(name16.data, value16.data) != 0;
-  DN_TCScratchEnd(&scratch);
+  DN_TcScratchEnd(&scratch);
   return result;
 }
 
-DN_API DN_Str8 DN_OS_EXEPath(DN_Arena *arena)
+DN_API DN_Str8 DN_OS_ExePath(DN_Arena *arena)
 {
   DN_Str8 result = {};
   if (!arena)
     return result;
-  DN_TCScratch scratch   = DN_TCScratchBeginArena(&arena, 1);
+  DN_TcScratch scratch   = DN_TcScratchBeginArena(&arena, 1);
   DN_Str16     exe_dir16 = DN_OS_W32EXEPathW(&scratch.arena);
   result                 = DN_OS_W32Str16ToStr8(arena, exe_dir16);
-  DN_TCScratchEnd(&scratch);
+  DN_TcScratchEnd(&scratch);
   return result;
 }
 
@@ -287,7 +287,7 @@ static DN_U64 DN_OS_W32FileTimeToSeconds_(FILETIME const *time)
 DN_API bool DN_OS_FileCopy(DN_Str8 src, DN_Str8 dest, bool overwrite, DN_ErrSink *err)
 {
   bool       result = false;
-  DN_TCScratch scratch = DN_TCScratchBeginArena(nullptr, 0);
+  DN_TcScratch scratch = DN_TcScratchBeginArena(nullptr, 0);
   DN_Str16     src16   = DN_OS_W32Str8ToStr16(&scratch.arena, src);
   DN_Str16     dest16  = DN_OS_W32Str8ToStr16(&scratch.arena, dest);
 
@@ -304,14 +304,14 @@ DN_API bool DN_OS_FileCopy(DN_Str8 src, DN_Str8 dest, bool overwrite, DN_ErrSink
                        win_error.code,
                        DN_Str8PrintFmt(win_error.msg));
   }
-  DN_TCScratchEnd(&scratch);
+  DN_TcScratchEnd(&scratch);
   return result;
 }
 
 DN_API bool DN_OS_FileMove(DN_Str8 src, DN_Str8 dest, bool overwrite, DN_ErrSink *err)
 {
   bool         result = false;
-  DN_TCScratch scratch   = DN_TCScratchBeginArena(nullptr, 0);
+  DN_TcScratch scratch   = DN_TcScratchBeginArena(nullptr, 0);
   DN_Str16     src16  = DN_OS_W32Str8ToStr16(&scratch.arena, src);
   DN_Str16     dest16 = DN_OS_W32Str8ToStr16(&scratch.arena, dest);
 
@@ -330,7 +330,7 @@ DN_API bool DN_OS_FileMove(DN_Str8 src, DN_Str8 dest, bool overwrite, DN_ErrSink
                          win_error.code,
                          DN_Str8PrintFmt(win_error.msg));
   }
-  DN_TCScratchEnd(&scratch);
+  DN_TcScratchEnd(&scratch);
   return result;
 }
 
@@ -367,7 +367,7 @@ DN_API DN_OSFile DN_OS_FileOpen(DN_Str8 path, DN_OSFileOpen open_mode, DN_OSFile
       access_mode |= GENERIC_EXECUTE;
   }
 
-  DN_TCScratch scratch = DN_TCScratchBeginArena(nullptr, 0);
+  DN_TcScratch scratch = DN_TcScratchBeginArena(nullptr, 0);
   DN_Str16     path16  = DN_OS_W32Str8ToStr16(&scratch.arena, path);
   void        *handle  = CreateFileW(/*LPCWSTR               lpFileName*/ path16.data,
                                      /*DWORD                 dwDesiredAccess*/ access_mode,
@@ -381,12 +381,12 @@ DN_API DN_OSFile DN_OS_FileOpen(DN_Str8 path, DN_OSFileOpen open_mode, DN_OSFile
     DN_OSW32Error win_error = DN_OS_W32LastError(&scratch.arena);
     result.error          = true;
     DN_ErrSinkAppendF(err, win_error.code, "Failed to open file at '%.*s': '%.*s'", DN_Str8PrintFmt(path), DN_Str8PrintFmt(win_error.msg));
-    DN_TCScratchEnd(&scratch);
+    DN_TcScratchEnd(&scratch);
     return result;
   }
 
   result.handle = handle;
-  DN_TCScratchEnd(&scratch);
+  DN_TcScratchEnd(&scratch);
   return result;
 }
 
@@ -409,15 +409,15 @@ DN_API DN_OSFileRead DN_OS_FileRead(DN_OSFile *file, void *buffer, DN_USize size
                                        /*LPDWORD      lpNumberOfByesRead*/ &bytes_read,
                                        /*LPOVERLAPPED lpOverlapped*/ nullptr);
   if (read_result == 0) {
-    DN_TCScratch  scratch   = DN_TCScratchBeginArena(nullptr, 0);
+    DN_TcScratch  scratch   = DN_TcScratchBeginArena(nullptr, 0);
     DN_OSW32Error win_error = DN_OS_W32LastError(&scratch.arena);
     DN_ErrSinkAppendF(err, win_error.code, "Failed to read data from file: (%u) %.*s", win_error.code, DN_Str8PrintFmt(win_error.msg));
-    DN_TCScratchEnd(&scratch);
+    DN_TcScratchEnd(&scratch);
     return result;
   }
 
   if (bytes_read != size) {
-    DN_TCScratch  scratch   = DN_TCScratchBeginArena(nullptr, 0);
+    DN_TcScratch  scratch   = DN_TcScratchBeginArena(nullptr, 0);
     DN_OSW32Error win_error = DN_OS_W32LastError(&scratch.arena);
     DN_ErrSinkAppendF(
         err,
@@ -427,7 +427,7 @@ DN_API DN_OSFileRead DN_OS_FileRead(DN_OSFile *file, void *buffer, DN_USize size
         DN_Cast(unsigned long) size,
         win_error.code,
         DN_Str8PrintFmt(win_error.msg));
-    DN_TCScratchEnd(&scratch);
+    DN_TcScratchEnd(&scratch);
     return result;
   }
 
@@ -451,11 +451,11 @@ DN_API bool DN_OS_FileWritePtr(DN_OSFile *file, void const *buffer, DN_USize siz
   }
 
   if (!result) {
-    DN_TCScratch  scratch          = DN_TCScratchBeginArena(nullptr, 0);
+    DN_TcScratch  scratch          = DN_TcScratchBeginArena(nullptr, 0);
     DN_OSW32Error win_error        = DN_OS_W32LastError(&scratch.arena);
     DN_Str8x32    buffer_size_str8 = DN_Str8x32FromByteCountU64Auto(size);
     DN_ErrSinkAppendF(err, win_error.code, "Failed to write buffer (%.*s) to file handle: %.*s", DN_Str8PrintFmt(buffer_size_str8), DN_Str8PrintFmt(win_error.msg));
-    DN_TCScratchEnd(&scratch);
+    DN_TcScratchEnd(&scratch);
   }
   return result;
 }
@@ -467,10 +467,10 @@ DN_API bool DN_OS_FileFlush(DN_OSFile *file, DN_ErrSink *err)
 
   BOOL result = FlushFileBuffers(DN_Cast(HANDLE) file->handle);
   if (!result) {
-    DN_TCScratch  scratch   = DN_TCScratchBeginArena(nullptr, 0);
+    DN_TcScratch  scratch   = DN_TcScratchBeginArena(nullptr, 0);
     DN_OSW32Error win_error = DN_OS_W32LastError(&scratch.arena);
     DN_ErrSinkAppendF(err, win_error.code, "Failed to flush file buffer to disk: %.*s", DN_Str8PrintFmt(win_error.msg));
-    DN_TCScratchEnd(&scratch);
+    DN_TcScratchEnd(&scratch);
   }
 
   return DN_Cast(bool) result;
@@ -490,12 +490,12 @@ DN_API DN_OSPathInfo DN_OS_PathInfo(DN_Str8 path)
   if (path.count == 0)
     return result;
 
-  DN_TCScratch scratch = DN_TCScratchBeginArena(nullptr, 0);
+  DN_TcScratch scratch = DN_TcScratchBeginArena(nullptr, 0);
   DN_Str16     path16  = DN_OS_W32Str8ToStr16(&scratch.arena, path);
 
   WIN32_FILE_ATTRIBUTE_DATA attrib_data = {};
   if (!GetFileAttributesExW(path16.data, GetFileExInfoStandard, &attrib_data)) {
-    DN_TCScratchEnd(&scratch);
+    DN_TcScratchEnd(&scratch);
     return result;
   }
 
@@ -516,7 +516,7 @@ DN_API DN_OSPathInfo DN_OS_PathInfo(DN_Str8 path)
       result.type = DN_OSPathInfoType_File;
   }
 
-  DN_TCScratchEnd(&scratch);
+  DN_TcScratchEnd(&scratch);
   return result;
 }
 
@@ -526,14 +526,14 @@ DN_API bool DN_OS_PathDelete(DN_Str8 path)
   if (path.count == 0)
     return result;
 
-  DN_TCScratch scratch = DN_TCScratchBeginArena(nullptr, 0);
+  DN_TcScratch scratch = DN_TcScratchBeginArena(nullptr, 0);
   DN_Str16     path16  = DN_OS_W32Str8ToStr16(&scratch.arena, path);
   if (path16.count) {
     result = DeleteFileW(path16.data);
     if (!result)
       result = RemoveDirectoryW(path16.data);
   }
-  DN_TCScratchEnd(&scratch);
+  DN_TcScratchEnd(&scratch);
   return result;
 }
 
@@ -543,7 +543,7 @@ DN_API bool DN_OS_PathIsFile(DN_Str8 path)
   if (path.count == 0)
     return result;
 
-  DN_TCScratch scratch = DN_TCScratchBeginArena(nullptr, 0);
+  DN_TcScratch scratch = DN_TcScratchBeginArena(nullptr, 0);
   DN_Str16     path16  = DN_OS_W32Str8ToStr16(&scratch.arena, path);
   if (path16.count) {
     WIN32_FILE_ATTRIBUTE_DATA attrib_data = {};
@@ -551,7 +551,7 @@ DN_API bool DN_OS_PathIsFile(DN_Str8 path)
       result = (attrib_data.dwFileAttributes != INVALID_FILE_ATTRIBUTES) &&
                !(attrib_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY);
   }
-  DN_TCScratchEnd(&scratch);
+  DN_TcScratchEnd(&scratch);
   return result;
 }
 
@@ -561,7 +561,7 @@ DN_API bool DN_OS_PathIsDir(DN_Str8 path)
   if (path.count == 0)
     return result;
 
-  DN_TCScratch scratch = DN_TCScratchBeginArena(nullptr, 0);
+  DN_TcScratch scratch = DN_TcScratchBeginArena(nullptr, 0);
   DN_Str16     path16  = DN_OS_W32Str8ToStr16(&scratch.arena, path);
   if (path16.count) {
     WIN32_FILE_ATTRIBUTE_DATA attrib_data = {};
@@ -570,14 +570,14 @@ DN_API bool DN_OS_PathIsDir(DN_Str8 path)
                (attrib_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY);
   }
 
-  DN_TCScratchEnd(&scratch);
+  DN_TcScratchEnd(&scratch);
   return result;
 }
 
 DN_API bool DN_OS_PathMakeDir(DN_Str8 path)
 {
   bool         result  = true;
-  DN_TCScratch scratch = DN_TCScratchBeginArena(nullptr, 0);
+  DN_TcScratch scratch = DN_TcScratchBeginArena(nullptr, 0);
   DN_Str16     path16  = DN_OS_W32Str8ToStr16(&scratch.arena, path);
 
   // NOTE: Go back from the end of the string to all the directories in the
@@ -610,7 +610,7 @@ DN_API bool DN_OS_PathMakeDir(DN_Str8 path)
           // NOTE: There's some kind of file that exists at the path
           // but it's not a directory. This request to make a
           // directory is invalid.
-          DN_TCScratchEnd(&scratch);
+          DN_TcScratchEnd(&scratch);
           return false;
         }
       } else {
@@ -623,7 +623,7 @@ DN_API bool DN_OS_PathMakeDir(DN_Str8 path)
         path16.data[index] = temp; // Undo null termination
     }
   }
-  DN_TCScratchEnd(&scratch);
+  DN_TcScratchEnd(&scratch);
   return result;
 }
 
@@ -632,7 +632,7 @@ DN_API bool DN_OS_PathIterateDir(DN_Str8 path, DN_OSDirIterator *it)
   if (path.count == 0 || !it || path.count <= 0)
     return false;
 
-  DN_TCScratch             scratch    = DN_TCScratchBeginArena(nullptr, 0);
+  DN_TcScratch             scratch    = DN_TcScratchBeginArena(nullptr, 0);
   DN_OSW32FolderIteratorW wide_it = {};
   DN_Str16               path16  = {};
   if (it->handle) {
@@ -656,7 +656,7 @@ DN_API bool DN_OS_PathIterateDir(DN_Str8 path, DN_OSDirIterator *it)
 
     path16 = DN_OS_W32Str8ToStr16(&scratch.arena, adjusted_path);
     if (path16.count <= 0) { // Conversion error
-      DN_TCScratchEnd(&scratch);
+      DN_TcScratchEnd(&scratch);
       return false;
     }
   }
@@ -668,7 +668,7 @@ DN_API bool DN_OS_PathIterateDir(DN_Str8 path, DN_OSDirIterator *it)
     it->file_name = DN_Str8FromPtr(it->buffer, size);
   }
 
-  DN_TCScratchEnd(&scratch);
+  DN_TcScratchEnd(&scratch);
   return result;
 }
 
@@ -712,9 +712,9 @@ DN_API DN_OSExecResult DN_OS_ExecPump(DN_OSExecAsyncHandle handle,
     return result;
   }
 
-  DN_TCScratch scratch                   = DN_TCScratchBeginArena(nullptr, 0);
-  DWORD      stdout_bytes_available = 0;
-  DWORD      stderr_bytes_available = 0;
+  DN_TcScratch scratch                = DN_TcScratchBeginArena(nullptr, 0);
+  DWORD        stdout_bytes_available = 0;
+  DWORD        stderr_bytes_available = 0;
   PeekNamedPipe(handle.stdout_read, nullptr, 0, nullptr, &stdout_bytes_available, nullptr);
   PeekNamedPipe(handle.stderr_read, nullptr, 0, nullptr, &stderr_bytes_available, nullptr);
 
@@ -726,9 +726,11 @@ DN_API DN_OSExecResult DN_OS_ExecPump(DN_OSExecAsyncHandle handle,
     DN_OSW32Error win_error = DN_OS_W32LastError(&scratch.arena);
     result.os_error_code  = win_error.code;
     DN_ErrSinkAppendF(err, result.os_error_code, "Executed command failed to terminate: %.*s", DN_Str8PrintFmt(win_error.msg));
-    DN_TCScratchEnd(&scratch);
+    DN_TcScratchEnd(&scratch);
     return result;
-  } else if (exec_result == WAIT_TIMEOUT || exec_result == WAIT_OBJECT_0) {
+  }
+
+  if (exec_result == WAIT_TIMEOUT || exec_result == WAIT_OBJECT_0) {
     // NOTE: Read stdout from process
     // If the pipes are full, the process will block. We periodically
     // flush the pipes to make sure this doesn't happen
@@ -796,7 +798,7 @@ DN_API DN_OSExecResult DN_OS_ExecPump(DN_OSExecAsyncHandle handle,
 
   result.stdout_text = DN_Str8FromPtr(stdout_buffer, stdout_size ? *stdout_size : 0);
   result.stderr_text = DN_Str8FromPtr(stderr_buffer, stderr_size ? *stderr_size : 0);
-  DN_TCScratchEnd(&scratch);
+  DN_TcScratchEnd(&scratch);
   return result;
 }
 
@@ -818,7 +820,7 @@ DN_API DN_OSExecResult DN_OS_ExecWait(DN_OSExecAsyncHandle handle, DN_Arena *are
     return result;
   }
 
-  DN_TCScratch   scratch        = DN_TCScratchBeginArena(&arena, 1);
+  DN_TcScratch   scratch        = DN_TcScratchBeginArena(&arena, 1);
   DN_Str8Builder stdout_builder = {};
   DN_Str8Builder stderr_builder = {};
   if (arena) {
@@ -843,11 +845,11 @@ DN_API DN_OSExecResult DN_OS_ExecWait(DN_OSExecAsyncHandle handle, DN_Arena *are
   // NOTE: Get stdout/stderr. If no arena is passed this is a no-op
   result.stdout_text = DN_Str8FromStr8BuilderArena(&stdout_builder, arena);
   result.stderr_text = DN_Str8FromStr8BuilderArena(&stderr_builder, arena);
-  DN_TCScratchEnd(&scratch);
+  DN_TcScratchEnd(&scratch);
   return result;
 }
 
-DN_API DN_OSExecAsyncHandle DN_OS_ExecAsync(DN_Str8Slice cmd_line, DN_OSExecArgs *args, DN_ErrSink *err)
+DN_API DN_OSExecAsyncHandle DN_OS_ExecAsync(DN_Str8Slice cmd_line, DN_OSExecArgs args, DN_ErrSink *err)
 {
   // NOTE: Pre-amble
   DN_OSExecAsyncHandle result = {};
@@ -856,7 +858,7 @@ DN_API DN_OSExecAsyncHandle DN_OS_ExecAsync(DN_Str8Slice cmd_line, DN_OSExecArgs
 
   // NOTE: Render the command line into single string to pass into the Win32 API. We'll quote the
   // string on behalf of the user if there's whitespace in the string
-  DN_TCScratch scratch = DN_TCScratchBeginArena(nullptr, 0);
+  DN_TcScratch scratch = DN_TcScratchBeginArena(nullptr, 0);
   DN_Str8      cmd     = {};
   {
     DN_USize count_req     = 0;
@@ -900,9 +902,9 @@ DN_API DN_OSExecAsyncHandle DN_OS_ExecAsync(DN_Str8Slice cmd_line, DN_OSExecArgs
   DN_AssertF(cmd.count < DN_Kilobytes(32), "Command exceeds the allowable size in Win32");
 
   DN_Str16       cmd16         = DN_OS_W32Str8ToStr16(&scratch.arena, cmd);
-  DN_Str16       working_dir16 = DN_OS_W32Str8ToStr16(&scratch.arena, args->working_dir);
+  DN_Str16       working_dir16 = DN_OS_W32Str8ToStr16(&scratch.arena, args.working_dir);
   DN_Str8Builder env_builder   = DN_Str8BuilderFromArena(&scratch.arena);
-  DN_Str8BuilderAppendArrayRef(&env_builder, args->environment.data, args->environment.count);
+  DN_Str8BuilderAppendArrayRef(&env_builder, args.environment.data, args.environment.count);
   if (env_builder.string_size)
     DN_Str8BuilderAppendRef(&env_builder, DN_Str8Lit("\0"));
 
@@ -927,7 +929,7 @@ DN_API DN_OSExecAsyncHandle DN_OS_ExecAsync(DN_Str8Slice cmd_line, DN_OSExecArgs
     }
   };
 
-  if (DN_BitIsSet(args->flags, DN_OSExecFlags_SaveStdout)) {
+  if (DN_BitIsSet(args.flags, DN_OSExecFlags_SaveStdout)) {
     if (!CreatePipe(&stdout_read, &stdout_write, &save_std_security_attribs, /*nSize*/ 0)) {
       DN_OSW32Error win_error = DN_OS_W32LastError(&scratch.arena);
       result.os_error_code  = win_error.code;
@@ -937,7 +939,7 @@ DN_API DN_OSExecAsyncHandle DN_OS_ExecAsync(DN_Str8Slice cmd_line, DN_OSExecArgs
           "Failed to create stdout pipe to redirect the output of the command '%.*s': %.*s",
           DN_Str8PrintFmt(cmd),
           DN_Str8PrintFmt(win_error.msg));
-      DN_TCScratchEnd(&scratch);
+      DN_TcScratchEnd(&scratch);
       return result;
     }
 
@@ -950,7 +952,7 @@ DN_API DN_OSExecAsyncHandle DN_OS_ExecAsync(DN_Str8Slice cmd_line, DN_OSExecArgs
                          "execute command '%.*s': %.*s",
                          DN_Str8PrintFmt(cmd),
                          DN_Str8PrintFmt(win_error.msg));
-      DN_TCScratchEnd(&scratch);
+      DN_TcScratchEnd(&scratch);
       return result;
     }
   }
@@ -966,8 +968,8 @@ DN_API DN_OSExecAsyncHandle DN_OS_ExecAsync(DN_Str8Slice cmd_line, DN_OSExecArgs
     }
   };
 
-  if (DN_BitIsSet(args->flags, DN_OSExecFlags_SaveStderr)) {
-    if (DN_BitIsSet(args->flags, DN_OSExecFlags_MergeStderrToStdout)) {
+  if (DN_BitIsSet(args.flags, DN_OSExecFlags_SaveStderr)) {
+    if (DN_BitIsSet(args.flags, DN_OSExecFlags_MergeStderrToStdout)) {
       stderr_read  = stdout_read;
       stderr_write = stdout_write;
     } else {
@@ -980,7 +982,7 @@ DN_API DN_OSExecAsyncHandle DN_OS_ExecAsync(DN_Str8Slice cmd_line, DN_OSExecArgs
             "Failed to create stderr pipe to redirect the output of the command '%.*s': %.*s",
             DN_Str8PrintFmt(cmd),
             DN_Str8PrintFmt(win_error.msg));
-        DN_TCScratchEnd(&scratch);
+        DN_TcScratchEnd(&scratch);
         return result;
       }
 
@@ -993,7 +995,7 @@ DN_API DN_OSExecAsyncHandle DN_OS_ExecAsync(DN_Str8Slice cmd_line, DN_OSExecArgs
                           "execute command '%.*s': %.*s",
                           DN_Str8PrintFmt(cmd),
                           DN_Str8PrintFmt(win_error.msg));
-        DN_TCScratchEnd(&scratch);
+        DN_TcScratchEnd(&scratch);
         return result;
       }
     }
@@ -1021,7 +1023,7 @@ DN_API DN_OSExecAsyncHandle DN_OS_ExecAsync(DN_Str8Slice cmd_line, DN_OSExecArgs
     DN_OSW32Error win_error = DN_OS_W32LastError(&scratch.arena);
     result.os_error_code  = win_error.code;
     DN_ErrSinkAppendF(err, result.os_error_code, "Failed to execute command '%.*s': %.*s", DN_Str8PrintFmt(cmd), DN_Str8PrintFmt(win_error.msg));
-    DN_TCScratchEnd(&scratch);
+    DN_TcScratchEnd(&scratch);
     return result;
   }
 
@@ -1030,12 +1032,12 @@ DN_API DN_OSExecAsyncHandle DN_OS_ExecAsync(DN_Str8Slice cmd_line, DN_OSExecArgs
   result.process      = proc_info.hProcess;
   result.stdout_read  = stdout_read;
   result.stdout_write = stdout_write;
-  if (DN_BitIsSet(args->flags, DN_OSExecFlags_SaveStderr) && DN_BitIsNotSet(args->flags, DN_OSExecFlags_MergeStderrToStdout)) {
+  if (DN_BitIsSet(args.flags, DN_OSExecFlags_SaveStderr) && DN_BitIsNotSet(args.flags, DN_OSExecFlags_MergeStderrToStdout)) {
     result.stderr_read  = stderr_read;
     result.stderr_write = stderr_write;
   }
-  result.exec_flags = args->flags;
-  DN_TCScratchEnd(&scratch);
+  result.exec_flags = args.flags;
+  DN_TcScratchEnd(&scratch);
   return result;
 }
 
@@ -1307,7 +1309,7 @@ DN_API bool DN_OS_ThreadInitLane(DN_OSThread *thread, DN_OSThreadFunc *func, DN_
   return result;
 }
 
-DN_API bool DN_OS_ThreadJoin(DN_OSThread *thread, DN_U32 timeout_ms, DN_TCDeinitArenas deinit_arenas)
+DN_API bool DN_OS_ThreadJoin(DN_OSThread *thread, DN_U32 timeout_ms, DN_TcDeinitArenas deinit_arenas)
 {
   bool result = true;
   if (thread && thread->handle && thread->handle != INVALID_HANDLE_VALUE) {
@@ -1318,7 +1320,7 @@ DN_API bool DN_OS_ThreadJoin(DN_OSThread *thread, DN_U32 timeout_ms, DN_TCDeinit
       CloseHandle(thread->handle);
       thread->handle    = INVALID_HANDLE_VALUE;
       thread->thread_id = {};
-      DN_TCDeinit(&thread->context, deinit_arenas);
+      DN_TcDeinit(&thread->context, deinit_arenas);
     } else {
       result = false;
     }
@@ -1339,7 +1341,7 @@ DN_API void DN_OS_W32ThreadSetName(DN_Str8 name)
   //
   // See: https://learn.microsoft.com/en-us/windows/w32/api/processthreadsapi/nf-processthreadsapi-setthreaddescription
   DN_OSW32Core  *w32     = DN_OS_W32GetCore();
-  DN_TCScratch scratch = DN_TCScratchBeginArena(nullptr, 0);
+  DN_TcScratch scratch = DN_TcScratchBeginArena(nullptr, 0);
   if (w32->set_thread_description) {
     DN_Str16 name16 = DN_OS_W32Str8ToStr16(&scratch.arena, name);
     w32->set_thread_description(GetCurrentThread(), (WCHAR *)name16.data);
@@ -1371,7 +1373,7 @@ DN_API void DN_OS_W32ThreadSetName(DN_Str8 name)
     }
     DN_MSVC_WARNING_POP
   }
-  DN_TCScratchEnd(&scratch);
+  DN_TcScratchEnd(&scratch);
 }
 
 DN_API DN_Str16 DN_OS_W32ErrorCodeToMsg16Alloc(DN_U32 error_code)
@@ -1582,7 +1584,7 @@ DN_API DN_Str8 DN_OS_W32Str16ToStr8FromHeap(DN_Str16 src)
 // NOTE: Windows Executable Directory //////////////////////////////////////////
 DN_API DN_Str16 DN_OS_W32EXEPathW(DN_Arena *arena)
 {
-  DN_TCScratch scratch        = DN_TCScratchBeginArena(&arena, 1);
+  DN_TcScratch scratch        = DN_TcScratchBeginArena(&arena, 1);
   DN_Str16   result      = {};
   DN_USize   module_size = 0;
   wchar_t   *module_path = nullptr;
@@ -1590,7 +1592,7 @@ DN_API DN_Str16 DN_OS_W32EXEPathW(DN_Arena *arena)
     module_size += 256;
     module_path = DN_ArenaNewArray(&scratch.arena, wchar_t, module_size, DN_ZMem_No);
     if (!module_path) {
-      DN_TCScratchEnd(&scratch);
+      DN_TcScratchEnd(&scratch);
       return result;
     }
     module_size = DN_Cast(DN_USize) GetModuleFileNameW(nullptr /*module*/, module_path, DN_Cast(int) module_size);
@@ -1604,14 +1606,14 @@ DN_API DN_Str16 DN_OS_W32EXEPathW(DN_Arena *arena)
   result.count = module_size;
   DN_Memcpy(result.data, module_path, sizeof(wchar_t) * result.count);
   result.data[result.count] = 0;
-  DN_TCScratchEnd(&scratch);
+  DN_TcScratchEnd(&scratch);
   return result;
 }
 
-DN_API DN_Str16 DN_OS_W32EXEDirW(DN_Arena *arena)
+DN_API DN_Str16 DN_OS_W32ExeDirW(DN_Arena *arena)
 {
   // TODO(doyle): Implement a DN_Str16_BinarySearchReverse
-  DN_TCScratch scratch        = DN_TCScratchBeginArena(&arena, 1);
+  DN_TcScratch scratch        = DN_TcScratchBeginArena(&arena, 1);
   DN_Str16   result      = {};
   DN_USize   module_size = 0;
   wchar_t   *module_path = nullptr;
@@ -1619,7 +1621,7 @@ DN_API DN_Str16 DN_OS_W32EXEDirW(DN_Arena *arena)
     module_size += 256;
     module_path = DN_ArenaNewArray(&scratch.arena, wchar_t, module_size, DN_ZMem_No);
     if (!module_path) {
-      DN_TCScratchEnd(&scratch);
+      DN_TcScratchEnd(&scratch);
       return result;
     }
     module_size = DN_Cast(DN_USize) GetModuleFileNameW(nullptr /*module*/, module_path, DN_Cast(int) module_size);
@@ -1633,17 +1635,17 @@ DN_API DN_Str16 DN_OS_W32EXEDirW(DN_Arena *arena)
   result.count = index_of_last_slash;
   DN_Memcpy(result.data, module_path, sizeof(wchar_t) * result.count);
   result.data[result.count] = 0;
-  DN_TCScratchEnd(&scratch);
+  DN_TcScratchEnd(&scratch);
   return result;
 }
 
 DN_API DN_Str8 DN_OS_W32WorkingDir(DN_Arena *arena, DN_Str8 suffix)
 {
-  DN_TCScratch scratch  = DN_TCScratchBeginArena(&arena, 1);
+  DN_TcScratch scratch  = DN_TcScratchBeginArena(&arena, 1);
   DN_Str16     suffix16 = DN_OS_W32Str8ToStr16(&scratch.arena, suffix);
   DN_Str16     dir16    = DN_OS_W32WorkingDirW(&scratch.arena, suffix16);
   DN_Str8      result   = DN_OS_W32Str16ToStr8(arena, dir16);
-  DN_TCScratchEnd(&scratch);
+  DN_TcScratchEnd(&scratch);
   return result;
 }
 
@@ -1653,26 +1655,26 @@ DN_API DN_Str16 DN_OS_W32WorkingDirW(DN_Arena *arena, DN_Str16 suffix)
   DN_Str16 result = {};
 
   // NOTE: required_size is the size required *including* the null-terminator
-  DN_TCScratch  scratch       = DN_TCScratchBeginArena(&arena, 1);
+  DN_TcScratch  scratch       = DN_TcScratchBeginArena(&arena, 1);
   unsigned long required_size = GetCurrentDirectoryW(0, nullptr);
   unsigned long desired_size  = required_size + DN_Cast(unsigned long) suffix.count;
 
   wchar_t *scratch_w_path = DN_ArenaNewArray(&scratch.arena, wchar_t, desired_size, DN_ZMem_No);
   if (!scratch_w_path) {
-    DN_TCScratchEnd(&scratch);
+    DN_TcScratchEnd(&scratch);
     return result;
   }
 
   unsigned long bytes_written_wo_null_terminator = GetCurrentDirectoryW(desired_size, scratch_w_path);
   if ((bytes_written_wo_null_terminator + 1) != required_size) {
     // TODO(dn): Error
-    DN_TCScratchEnd(&scratch);
+    DN_TcScratchEnd(&scratch);
     return result;
   }
 
   wchar_t *w_path = DN_ArenaNewArray(arena, wchar_t, desired_size, DN_ZMem_No);
   if (!w_path) {
-    DN_TCScratchEnd(&scratch);
+    DN_TcScratchEnd(&scratch);
     return result;
   }
 
@@ -1683,7 +1685,7 @@ DN_API DN_Str16 DN_OS_W32WorkingDirW(DN_Arena *arena, DN_Str16 suffix)
   }
 
   result = DN_Str16{w_path, DN_Cast(DN_USize)(desired_size - 1)};
-  DN_TCScratchEnd(&scratch);
+  DN_TcScratchEnd(&scratch);
   return result;
 }
 

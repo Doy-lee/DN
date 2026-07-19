@@ -19,7 +19,7 @@ enum DN_ArenaUAFCheckReportType_
 
 DN_Core *g_dn_;
 
-DN_API void DN_Init(DN_Core *dn, DN_InitFlags flags, DN_TCInitArgs args)
+DN_API void DN_Init(DN_Core *dn, DN_InitFlags flags, DN_TcInitArgs args)
 {
   DN_Set(dn);
   dn->init_flags = flags;
@@ -91,8 +91,8 @@ DN_API void DN_Init(DN_Core *dn, DN_InitFlags flags, DN_TCInitArgs args)
     #endif
 
     // NOTE: Initialise thread context
-    DN_TCInitFromHeap(&dn->main_tc, DN_OS_ThreadID(), args, DN_OS_HeapInitDefault());
-    DN_TCEquip(&dn->main_tc);
+    DN_TcInitFromHeap(&dn->main_tc, DN_OS_ThreadID(), args, DN_OS_HeapInitDefault());
+    DN_TcEquip(&dn->main_tc);
   }
 
   if (DN_BitIsSet(flags, DN_InitFlags_LeakTracker)) {
@@ -224,7 +224,7 @@ DN_API bool DN_VerifyArgsF(DN_VerifyType type, bool expr, DN_CallSite call_site,
   if (result)
     return result;
 
-  DN_TCScratch scratch = DN_TCScratchBeginArena(nullptr, 0);
+  DN_TcScratch scratch = DN_TcScratchBeginArena(nullptr, 0);
   {
     DN_Str8Builder builder = DN_Str8BuilderFromArena(&scratch.arena);
 
@@ -251,7 +251,7 @@ DN_API bool DN_VerifyArgsF(DN_VerifyType type, bool expr, DN_CallSite call_site,
     DN_LogTypeParam log_type_param = DN_LogTypeParamFromType(log_type);
     DN_LogPrintF(log_type_param, call_site, DN_LogFlags_Nil, "%.*s", DN_Str8PrintFmt(log));
   }
-  DN_TCScratchEnd(&scratch);
+  DN_TcScratchEnd(&scratch);
 
   if (type == DN_VerifyType_Nil && DN_PARANOIA_LEVEL) {
     DN_DebugBreak;
@@ -535,7 +535,7 @@ DN_API DN_CPUReport DN_CPUGetReport()
       case DN_CPUFeature_POPCNT:             available = (fn_0000_[0x0001].reg.ecx & (1 << 23)); break;
       case DN_CPUFeature_RDRAND:             available = (fn_0000_[0x0001].reg.ecx & (1 << 30)); break;
       case DN_CPUFeature_RDSEED:             available = (fn_0000_[0x0007].reg.ebx & (1 << 18)); break;
-      case DN_CPUFeature_RDTSCP:             available = (fn_8000_[0x0001].reg.edx & (1 << 27)); break;
+      case DN_CPUFeature_RDTscP:             available = (fn_8000_[0x0001].reg.edx & (1 << 27)); break;
       case DN_CPUFeature_SHA:                available = (fn_0000_[0x0007].reg.ebx & (1 << 29)); break;
       case DN_CPUFeature_SSE:                available = (fn_0000_[0x0001].reg.edx & (1 << 25)); break;
       case DN_CPUFeature_SSE2:               available = (fn_0000_[0x0001].reg.edx & (1 << 26)); break;
@@ -544,7 +544,7 @@ DN_API DN_CPUReport DN_CPUGetReport()
       case DN_CPUFeature_SSE42:              available = (fn_0000_[0x0001].reg.ecx & (1 << 20)); break;
       case DN_CPUFeature_SSE4A:              available = (fn_8000_[0x0001].reg.ecx & (1 << 6)); break;
       case DN_CPUFeature_SSSE3:              available = (fn_0000_[0x0001].reg.ecx & (1 << 9)); break;
-      case DN_CPUFeature_TSC:                available = (fn_0000_[0x0001].reg.edx & (1 << 4)); break;
+      case DN_CPUFeature_Tsc:                available = (fn_0000_[0x0001].reg.edx & (1 << 4)); break;
       case DN_CPUFeature_TscInvariant:       available = (fn_8000_[0x0007].reg.edx & (1 << 8)); break;
       case DN_CPUFeature_VAES:               available = (fn_0000_[0x0007].reg.ecx & (1 << 9)); break;
       case DN_CPUFeature_VPCMULQDQ:          available = (fn_0000_[0x0007].reg.ecx & (1 << 10)); break;
@@ -1622,12 +1622,12 @@ static void DN_ArenaUAFCheck_(DN_Arena *arena, DN_ArenaUAFCheckReportType_ type)
       // NOTE: MSVC does not recognise %'u which is a STB extension which causes a lot of incorrect
       // format arguments warnings that we mute here.
       DN_MSVC_WARNING_PUSH
-      DN_MSVC_WARNING_DISABLE(6271) // Extra argument passed to 'DN_Str8FromFmtArena'
+      DN_MSVC_WARNING_DISABLE(6271) // Extra argument passed to 'DN_Str8FmtArena'
       DN_MSVC_WARNING_DISABLE(6067) // _Param_(10) in call to 'DN_LogPrint' must be the address of a string. Actual type: 'int'.
       DN_MSVC_WARNING_DISABLE(6273) // Non-integer passed as _Param_(11) when an integer is required in call to 'DN_LogPrint' Actual type: 'char *'.
       DN_Str8 error_msg = {};
       if (type == DN_ArenaUAFCheckReportType_AllocViolation) {
-        error_msg = DN_Str8FromFmtAllocator(allocator,
+        error_msg = DN_Str8FmtAllocator(allocator,
                                             "\n\nArena use-after-free (UAF) detected in temporary memory usage! This allocation (trace "
                                             "shown above) is attempting to allocate memory inside the active temporary region (id: %'u) "
                                             "but belongs to a different region (id: %'u). This means when the active temporary region is "
@@ -2087,7 +2087,7 @@ DN_API bool DN_ErrSinkEndLogError_(DN_ErrSink *err, DN_CallSite call_site, DN_St
 
 DN_API bool DN_ErrSinkEndLogErrorFV_(DN_ErrSink *err, DN_CallSite call_site, DN_FMT_ATTRIB char const *fmt, va_list args)
 {
-  DN_Str8 log    = DN_Str8FromFmtVArena(err->arena, fmt, args);
+  DN_Str8 log    = DN_Str8FmtVArena(err->arena, fmt, args);
   bool    result = DN_ErrSinkEndLogError_(err, call_site, log);
   return result;
 }
@@ -2096,7 +2096,7 @@ DN_API bool DN_ErrSinkEndLogErrorF_(DN_ErrSink *err, DN_CallSite call_site, DN_F
 {
   va_list args;
   va_start(args, fmt);
-  DN_Str8    log    = DN_Str8FromFmtVArena(err->arena, fmt, args);
+  DN_Str8    log    = DN_Str8FmtVArena(err->arena, fmt, args);
   bool       result = DN_ErrSinkEndLogError_(err, call_site, log);
   va_end(args);
   return result;
@@ -2129,7 +2129,7 @@ DN_API void DN_ErrSinkAppendFV_(DN_ErrSink *err, DN_U32 error_code, DN_CallSite 
 
   DN_ErrSinkMsg *msg = DN_ArenaNew(err->arena, DN_ErrSinkMsg, DN_ZMem_Yes);
   DN_Assert(msg);
-  msg->msg        = DN_Str8FromFmtVArena(err->arena, fmt, args);
+  msg->msg        = DN_Str8FmtVArena(err->arena, fmt, args);
   msg->error_code = error_code;
   msg->call_site  = call_site;
   DN_SentinelDoublyLLPrepend(node->msg_sentinel, msg);
@@ -2145,9 +2145,9 @@ DN_API void DN_ErrSinkAppendF_(DN_ErrSink *err, DN_U32 error_code, DN_CallSite c
   va_end(args);
 }
 
-DN_THREAD_LOCAL DN_TCCore *g_dn_thread_context;
+DN_THREAD_LOCAL DN_TcCore *g_dn_thread_context;
 
-DN_API void DN_TCInit(DN_TCCore *tc, DN_U64 thread_id, DN_Arena *main_arena, DN_Arena *temp_arenas, DN_USize temp_arenas_count, DN_Arena *err_sink_arena)
+DN_API void DN_TcInit(DN_TcCore *tc, DN_U64 thread_id, DN_Arena *main_arena, DN_Arena *temp_arenas, DN_USize temp_arenas_count, DN_Arena *err_sink_arena)
 {
   tc->thread_id      = thread_id;
   tc->main_arena     = main_arena;
@@ -2158,9 +2158,9 @@ DN_API void DN_TCInit(DN_TCCore *tc, DN_U64 thread_id, DN_Arena *main_arena, DN_
     tc->temp_arenas[tc->temp_arenas_count++] = temp_arenas + index;
 }
 
-DN_API DN_TCInitArgs DN_TCInitArgsDefault()
+DN_API DN_TcInitArgs DN_TcInitArgsDefault()
 {
-  DN_TCInitArgs result    = {};
+  DN_TcInitArgs result    = {};
   result.main_reserve     = DN_Kilobytes(64);
   result.main_commit      = DN_Kilobytes(4);
   result.temp_reserve     = DN_Kilobytes(64);
@@ -2171,7 +2171,7 @@ DN_API DN_TCInitArgs DN_TCInitArgsDefault()
   return result;
 }
 
-DN_API void DN_TCInitFromHeap(DN_TCCore *tc, DN_U64 thread_id, DN_TCInitArgs args, DN_Heap heap)
+DN_API void DN_TcInitFromHeap(DN_TcCore *tc, DN_U64 thread_id, DN_TcInitArgs args, DN_Heap heap)
 {
   DN_Assert(args.temp_count <= DN_ArrayCountU(tc->temp_arenas));
   DN_MemList main_mem_stack = DN_MemListFromHeap(args.main_reserve, args.main_commit, DN_MemFlags_AllocCanLeak | DN_MemFlags_NoAllocTrack, heap);
@@ -2191,13 +2191,13 @@ DN_API void DN_TCInitFromHeap(DN_TCCore *tc, DN_U64 thread_id, DN_TCInitArgs arg
   DN_Arena *err_sink_arena      = DN_MemListNewZ(main_mem, DN_Arena);
   *err_sink_arena               = DN_ArenaFromMemList(err_sink_mem);
 
-  DN_TCInit(tc, thread_id, main_arena, temp_arenas, args.temp_count, err_sink_arena);
+  DN_TcInit(tc, thread_id, main_arena, temp_arenas, args.temp_count, err_sink_arena);
 }
 
-DN_API void DN_TCDeinit(DN_TCCore *tc, DN_TCDeinitArenas deinit_arenas)
+DN_API void DN_TcDeinit(DN_TcCore *tc, DN_TcDeinitArenas deinit_arenas)
 {
   // NOTE: That we deallocate the main memory last as TC might be allocated in that arena.
-  if (deinit_arenas == DN_TCDeinitArenas_Yes) {
+  if (deinit_arenas == DN_TcDeinitArenas_Yes) {
     for (DN_ForIndexU(index, tc->temp_arenas_count))
       DN_MemListDeinit(tc->temp_arenas[index]->mem);
     DN_MemListDeinit(tc->err_sink.arena->mem);
@@ -2205,35 +2205,35 @@ DN_API void DN_TCDeinit(DN_TCCore *tc, DN_TCDeinitArenas deinit_arenas)
   }
 }
 
-DN_API void DN_TCEquip(DN_TCCore *tc)
+DN_API void DN_TcEquip(DN_TcCore *tc)
 {
   g_dn_thread_context = tc;
 }
 
-DN_API DN_TCCore *DN_TCGet()
+DN_API DN_TcCore *DN_TcGet()
 {
   DN_AssertRaw(g_dn_thread_context &&
-               "This thread's thread context has not been equipped yet. Ensure that DN_TCInit(...) "
-               "has been called to create a thread context and call DN_TCEquip(...) in the current "
+               "This thread's thread context has not been equipped yet. Ensure that DN_TcInit(...) "
+               "has been called to create a thread context and call DN_TcEquip(...) in the current "
                "thread to make it retrievable via this function");
   return g_dn_thread_context;
 }
 
-DN_API DN_Arena *DN_TCMainArena()
+DN_API DN_Arena *DN_TcMainArena()
 {
-  DN_TCCore *tc     = DN_TCGet();
+  DN_TcCore *tc     = DN_TcGet();
   DN_Arena  *result = tc->main_arena;
   return result;
 }
 
-DN_API DN_Pool *DN_TCMainPool()
+DN_API DN_Pool *DN_TcMainPool()
 {
-  DN_TCCore *tc     = DN_TCGet();
+  DN_TcCore *tc     = DN_TcGet();
   DN_Pool   *result = &tc->main_pool;
   return result;
 }
 
-DN_API DN_Arena DN_TCTempArenaAllocator(DN_Allocator *conflicts, DN_USize count)
+DN_API DN_Arena DN_TcTempArenaAllocator(DN_Allocator *conflicts, DN_USize count)
 {
   DN_MemList *conflict_mem_lists[8];
   DN_USize    conflict_mem_lists_count = 0;
@@ -2264,7 +2264,7 @@ DN_API DN_Arena DN_TCTempArenaAllocator(DN_Allocator *conflicts, DN_USize count)
     DN_Assert(added);
   }
 
-  DN_TCCore  *tc     = DN_TCGet();
+  DN_TcCore  *tc     = DN_TcGet();
   DN_Arena    result = {};
   for (DN_ForItSize(it, DN_Arena *, tc->temp_arenas, tc->temp_arenas_count)) {
     bool        is_usable = true;
@@ -2288,9 +2288,9 @@ DN_API DN_Arena DN_TCTempArenaAllocator(DN_Allocator *conflicts, DN_USize count)
   return result;
 }
 
-DN_API DN_Arena DN_TCTempArenaFromArena(DN_Arena **conflicts, DN_USize count)
+DN_API DN_Arena DN_TcTempArenaFromArena(DN_Arena **conflicts, DN_USize count)
 {
-  DN_TCCore  *tc           = DN_TCGet();
+  DN_TcCore  *tc           = DN_TcGet();
   DN_Arena    result       = {};
   for (DN_ForItSize(it, DN_Arena *, tc->temp_arenas, tc->temp_arenas_count)) {
     bool        is_usable = true;
@@ -2316,32 +2316,32 @@ DN_API DN_Arena DN_TCTempArenaFromArena(DN_Arena **conflicts, DN_USize count)
 }
 
 #if defined(__cplusplus)
-DN_TCScratchCpp::DN_TCScratchCpp(DN_Arena **conflicts, DN_USize count)
+DN_TcScratchCpp::DN_TcScratchCpp(DN_Arena **conflicts, DN_USize count)
 {
-  this->data = DN_TCScratchBeginArena(conflicts, count);
+  this->data = DN_TcScratchBeginArena(conflicts, count);
 }
 
-DN_TCScratchCpp::~DN_TCScratchCpp()
+DN_TcScratchCpp::~DN_TcScratchCpp()
 {
-  DN_TCScratchEnd(&this->data);
+  DN_TcScratchEnd(&this->data);
 }
 #endif
 
-DN_API DN_TCScratch DN_TCScratchBeginAllocator(DN_Allocator *conflicts, DN_USize count)
+DN_API DN_TcScratch DN_TcScratchBeginAllocator(DN_Allocator *conflicts, DN_USize count)
 {
-  DN_TCScratch result = {};
-  result.arena        = DN_TCTempArenaAllocator(conflicts, count);
+  DN_TcScratch result = {};
+  result.arena        = DN_TcTempArenaAllocator(conflicts, count);
   return result;
 }
 
-DN_API DN_TCScratch DN_TCScratchBeginArena(DN_Arena **conflicts, DN_USize count)
+DN_API DN_TcScratch DN_TcScratchBeginArena(DN_Arena **conflicts, DN_USize count)
 {
-  DN_TCScratch result = {};
-  result.arena        = DN_TCTempArenaFromArena(conflicts, count);
+  DN_TcScratch result = {};
+  result.arena        = DN_TcTempArenaFromArena(conflicts, count);
   return result;
 }
 
-DN_API void DN_TCScratchEnd(DN_TCScratch *scratch)
+DN_API void DN_TcScratchEnd(DN_TcScratch *scratch)
 {
   DN_Assert(scratch->destructed == false);
   DN_ArenaTempEnd(&scratch->arena, DN_ArenaReset_Yes);
@@ -2349,22 +2349,22 @@ DN_API void DN_TCScratchEnd(DN_TCScratch *scratch)
   scratch->destructed = true;
 }
 
-DN_API void DN_TCSetFrameArena(DN_Arena *arena)
+DN_API void DN_TcSetFrameArena(DN_Arena *arena)
 {
-  DN_TCCore *tc   = DN_TCGet();
+  DN_TcCore *tc   = DN_TcGet();
   tc->frame_arena = arena;
 }
 
-DN_API DN_Arena *DN_TCFrameArena()
+DN_API DN_Arena *DN_TcFrameArena()
 {
-  DN_TCCore *tc     = DN_TCGet();
+  DN_TcCore *tc     = DN_TcGet();
   DN_Arena  *result = tc->frame_arena;
   return result;
 }
 
-DN_API DN_ErrSink *DN_TCErrSink()
+DN_API DN_ErrSink *DN_TcErrSink()
 {
-  DN_TCCore  *tc     = DN_TCGet();
+  DN_TcCore  *tc     = DN_TcGet();
   DN_ErrSink *result = &tc->err_sink;
   return result;
 }
@@ -2855,7 +2855,7 @@ DN_API DN_FmtAppendResult DN_FmtVAppend(char *buf, DN_USize *buf_size, DN_USize 
 {
   DN_FmtAppendResult result         = {};
   DN_USize           starting_size  = *buf_size;
-  result.size_req                   = DN_VSNPrintF(buf + *buf_size, DN_Cast(int)(buf_max - *buf_size), fmt, args);
+  result.size_req                   = DN_Vsnprintf(buf + *buf_size, DN_Cast(int)(buf_max - *buf_size), fmt, args);
   *buf_size                        += result.size_req;
   if (*buf_size >= (buf_max - 1))
     *buf_size = buf_max - 1;
@@ -2889,7 +2889,7 @@ DN_API DN_USize DN_FmtCount(DN_FMT_ATTRIB char const *fmt, ...)
 {
   va_list args;
   va_start(args, fmt);
-  DN_USize result = DN_VSNPrintF(nullptr, 0, fmt, args);
+  DN_USize result = DN_Vsnprintf(nullptr, 0, fmt, args);
   va_end(args);
   return result;
 }
@@ -2898,7 +2898,7 @@ DN_API DN_USize DN_FmtVCount(DN_FMT_ATTRIB char const *fmt, va_list args)
 {
   va_list args_copy;
   va_copy(args_copy, args);
-  DN_USize result = DN_VSNPrintF(nullptr, 0, fmt, args_copy);
+  DN_USize result = DN_Vsnprintf(nullptr, 0, fmt, args_copy);
   va_end(args_copy);
   return result;
 }
@@ -2996,7 +2996,7 @@ DN_API DN_Str8 DN_Str8FromStr8Pool(DN_Str8 string, DN_Pool *pool)
   return result;
 }
 
-DN_API DN_Str8 DN_Str8FromFmtVAllocator(DN_Allocator allocator, DN_FMT_ATTRIB char const *fmt, va_list args)
+DN_API DN_Str8 DN_Str8FmtVAllocator(DN_Allocator allocator, DN_FMT_ATTRIB char const *fmt, va_list args)
 {
   DN_USize count  = DN_FmtVCount(fmt, args);
   DN_Str8  result = DN_Str8AllocAllocator(count, DN_ZMem_No, allocator);
@@ -3008,41 +3008,41 @@ DN_API DN_Str8 DN_Str8FromFmtVAllocator(DN_Allocator allocator, DN_FMT_ATTRIB ch
   return result;
 }
 
-DN_API DN_Str8 DN_Str8FromFmtVArena(DN_Arena *arena, DN_FMT_ATTRIB char const *fmt, va_list args)
+DN_API DN_Str8 DN_Str8FmtVArena(DN_Arena *arena, DN_FMT_ATTRIB char const *fmt, va_list args)
 {
-  DN_Str8 result = DN_Str8FromFmtVAllocator(DN_AllocatorFromArena(arena), fmt, args);
+  DN_Str8 result = DN_Str8FmtVAllocator(DN_AllocatorFromArena(arena), fmt, args);
   return result;
 }
 
-DN_API DN_Str8 DN_Str8FromFmtAllocator(DN_Allocator allocator, DN_FMT_ATTRIB char const *fmt, ...)
+DN_API DN_Str8 DN_Str8FmtAllocator(DN_Allocator allocator, DN_FMT_ATTRIB char const *fmt, ...)
 {
   va_list va;
   va_start(va, fmt);
-  DN_Str8 result = DN_Str8FromFmtVAllocator(allocator, fmt, va);
+  DN_Str8 result = DN_Str8FmtVAllocator(allocator, fmt, va);
   va_end(va);
   return result;
 }
 
-DN_API DN_Str8 DN_Str8FromFmtArena(DN_Arena *arena, DN_FMT_ATTRIB char const *fmt, ...)
+DN_API DN_Str8 DN_Str8FmtArena(DN_Arena *arena, DN_FMT_ATTRIB char const *fmt, ...)
 {
   va_list va;
   va_start(va, fmt);
-  DN_Str8 result = DN_Str8FromFmtVArena(arena, fmt, va);
+  DN_Str8 result = DN_Str8FmtVArena(arena, fmt, va);
   va_end(va);
   return result;
 }
 
-DN_API DN_Str8 DN_Str8FromFmtVPool(DN_Pool *pool, DN_FMT_ATTRIB char const *fmt, va_list args)
+DN_API DN_Str8 DN_Str8FmtVPool(DN_Pool *pool, DN_FMT_ATTRIB char const *fmt, va_list args)
 {
-  DN_Str8 result = DN_Str8FromFmtVAllocator(DN_AllocatorFromPool(pool), fmt, args);
+  DN_Str8 result = DN_Str8FmtVAllocator(DN_AllocatorFromPool(pool), fmt, args);
   return result;
 }
 
-DN_API DN_Str8 DN_Str8FromFmtPool(DN_Pool *pool, DN_FMT_ATTRIB char const *fmt, ...)
+DN_API DN_Str8 DN_Str8FmtPool(DN_Pool *pool, DN_FMT_ATTRIB char const *fmt, ...)
 {
   va_list args;
   va_start(args, fmt);
-  DN_Str8 result = DN_Str8FromFmtVPool(pool, fmt, args);
+  DN_Str8 result = DN_Str8FmtVPool(pool, fmt, args);
   va_end(args);
   return result;
 }
@@ -3803,7 +3803,7 @@ DN_API DN_Str8 DN_Str8AppendF(DN_Arena *arena, DN_Str8 string, char const *fmt, 
 DN_API DN_Str8 DN_Str8AppendFV(DN_Arena *arena, DN_Str8 string, char const *fmt, va_list args)
 {
   // TODO: Calculate size and write into one buffer instead of 2 appends
-  DN_Str8 append = DN_Str8FromFmtVArena(arena, fmt, args);
+  DN_Str8 append = DN_Str8FmtVArena(arena, fmt, args);
   DN_Str8 result = DN_Str8AllocArena(string.count + append.count, DN_ZMem_No, arena);
   DN_Memcpy(result.data, string.data, string.count);
   DN_Memcpy(result.data + string.count, append.data, append.count);
@@ -3821,7 +3821,7 @@ DN_API DN_Str8 DN_Str8FillF(DN_Arena *arena, DN_USize count, char const *fmt, ..
 
 DN_API DN_Str8 DN_Str8FillFV(DN_Arena *arena, DN_USize count, char const *fmt, va_list args)
 {
-  DN_Str8 fill = DN_Str8FromFmtVArena(arena, fmt, args);
+  DN_Str8 fill = DN_Str8FmtVArena(arena, fmt, args);
   DN_Str8 result = DN_Str8AllocArena(count * fill.count, DN_ZMem_No, arena);
   for (DN_USize index = 0; index < count; index++) {
     void *dest = result.data + (index * fill.count);
@@ -3848,7 +3848,7 @@ DN_API DN_Str8 DN_Str8TruncateArena(DN_Str8 string, DN_USize max_count, DN_Str8 
   DN_Str8 result = {};
   if (string.count > max_count) {
     DN_Str8 string_trunc = DN_Str8Subset(string, 0, max_count);
-    result               = DN_Str8FromFmtArena(arena, "%.*s%.*s", DN_Str8PrintFmt(string_trunc), DN_Str8PrintFmt(truncator));
+    result               = DN_Str8FmtArena(arena, "%.*s%.*s", DN_Str8PrintFmt(string_trunc), DN_Str8PrintFmt(truncator));
   } else {
     result = DN_Str8FromStr8Arena(string, arena);
   }
@@ -3931,7 +3931,7 @@ DN_API DN_Str8 DN_Str8Replace(DN_Str8       string,
     return result;
   }
 
-  DN_TCScratch   scratch        = DN_TCScratchBeginArena(&arena, 1);
+  DN_TcScratch   scratch        = DN_TcScratchBeginArena(&arena, 1);
   DN_Str8Builder string_builder = DN_Str8BuilderFromArena(&scratch.arena);
   DN_USize       max            = string.count - find.count;
   DN_USize       head           = start_index;
@@ -3965,7 +3965,7 @@ DN_API DN_Str8 DN_Str8Replace(DN_Str8       string,
     DN_Str8BuilderAppendRef(&string_builder, remainder);
     result = DN_Str8FromStr8BuilderArena(&string_builder, arena);
   }
-  DN_TCScratchEnd(&scratch);
+  DN_TcScratchEnd(&scratch);
   return result;
 }
 
@@ -3983,7 +3983,7 @@ DN_API DN_Str8 DN_Str8ReplaceInsensitive(DN_Str8 string, DN_Str8 find, DN_Str8 r
 
 DN_API DN_Str8 DN_Str8PadNewLinesAllocator(DN_Str8 string, DN_Str8 pad_string, DN_Allocator allocator)
 {
-  DN_TCScratch   scratch = DN_TCScratchBeginAllocator(&allocator, 1);
+  DN_TcScratch   scratch = DN_TcScratchBeginAllocator(&allocator, 1);
   DN_Str8Builder builder = DN_Str8BuilderFromArena(&scratch.arena);
   DN_Str8        it      = string;
   while (it.count) {
@@ -3993,7 +3993,7 @@ DN_API DN_Str8 DN_Str8PadNewLinesAllocator(DN_Str8 string, DN_Str8 pad_string, D
   }
 
   DN_Str8 result = DN_Str8FromStr8BuilderDelimitAllocator(&builder, pad_string, allocator);
-  DN_TCScratchEnd(&scratch);
+  DN_TcScratchEnd(&scratch);
   return result;
 }
 
@@ -4007,13 +4007,13 @@ DN_API DN_USize DN_USizeCodepointCountFromUTF8(DN_Str8 str, DN_CodepointCountFla
 {
   DN_USize result = 0;
 
-  if (DN_BitIsNotSet(flags, DN_CodepointCountFlags_SkipANSICode)) {
+  if (DN_BitIsNotSet(flags, DN_CodepointCountFlags_SkipAnsiCode)) {
     DN_UTF8DecodeIterator it = {};
     while (DN_UTF8DecodeIterate(&it, str))
       ;
     result = it.codepoint_index;
   } else {
-    // NOTE: ANSI SGR (Select Graphic Rendition) sequence handling
+    // NOTE: Ansi SGR (Select Graphic Rendition) sequence handling
     // Format:             ESC [ parameter_bytes intermediate_bytes final_byte
     // Common examples:    \x1b[31m (red), \x1b[1;31m (bold red), \x1b[0m (reset)
     // Parameter bytes:    0x30-0x3F (digits and :;<=>?)
@@ -4046,7 +4046,7 @@ DN_API DN_USize DN_USizeCodepointCountFromUTF8(DN_Str8 str, DN_CodepointCountFla
 
 DN_API DN_Str8 DN_Str8LineBreakAllocator(DN_Str8 src, DN_USize desired_width, DN_Str8 delimiter, DN_Str8LineBreakMode mode, DN_Allocator allocator)
 {
-  DN_TCScratch   scratch = DN_TCScratchBeginAllocator(&allocator, 1);
+  DN_TcScratch   scratch = DN_TcScratchBeginAllocator(&allocator, 1);
   DN_Str8Builder builder = DN_Str8BuilderFromArena(&scratch.arena);
 
   if (mode == DN_Str8LineBreakMode_AtWord) {
@@ -4113,7 +4113,7 @@ DN_API DN_Str8 DN_Str8LineBreakAllocator(DN_Str8 src, DN_USize desired_width, DN
   }
 
   DN_Str8 result = DN_Str8FromStr8BuilderDelimitAllocator(&builder, delimiter, allocator);
-  DN_TCScratchEnd(&scratch);
+  DN_TcScratchEnd(&scratch);
   return result;
 }
 
@@ -4125,12 +4125,12 @@ DN_API DN_Str8 DN_Str8LineBreakArena(DN_Str8 src, DN_USize desired_width, DN_Str
 
 DN_API DN_Str8 DN_Str8Table(DN_Str8 const *rows, DN_USize num_rows, DN_USize num_cols, DN_Str8TableFlags flags, DN_Arena *arena)
 {
-  DN_TCScratch scratch         = DN_TCScratchBeginArena(&arena, 1);
+  DN_TcScratch scratch         = DN_TcScratchBeginArena(&arena, 1);
   DN_U16       col_widths[128] = {};
   for (DN_USize i = 0; i < num_cols; i++) {
     for (DN_USize j = 0; j < num_rows; j++) {
       DN_USize index = j * num_cols + i;
-      col_widths[i]  = DN_Max(col_widths[i], (DN_U16)DN_USizeCodepointCountFromUTF8(rows[index], DN_CodepointCountFlags_SkipANSICode));
+      col_widths[i]  = DN_Max(col_widths[i], (DN_U16)DN_USizeCodepointCountFromUTF8(rows[index], DN_CodepointCountFlags_SkipAnsiCode));
     }
   }
 
@@ -4149,7 +4149,7 @@ DN_API DN_Str8 DN_Str8Table(DN_Str8 const *rows, DN_USize num_rows, DN_USize num
       DN_USize index = (i * num_cols) + j;
       DN_Str8  item  = rows[index];
       DN_Str8BuilderAppendF(&builder, " %.*s", DN_Str8PrintFmt(item));
-      DN_USize item_width = DN_USizeCodepointCountFromUTF8(item, DN_CodepointCountFlags_SkipANSICode);
+      DN_USize item_width = DN_USizeCodepointCountFromUTF8(item, DN_CodepointCountFlags_SkipAnsiCode);
       for (DN_USize k = 0; k < col_widths[j] - item_width; k++)
         DN_Str8BuilderAppendF(&builder, " ");
       DN_Str8BuilderAppendF(&builder, " |");
@@ -4179,7 +4179,7 @@ DN_API DN_Str8 DN_Str8Table(DN_Str8 const *rows, DN_USize num_rows, DN_USize num
   }
 
   DN_Str8 result = DN_Str8FromStr8BuilderArena(&builder, arena);
-  DN_TCScratchEnd(&scratch);
+  DN_TcScratchEnd(&scratch);
   return result;
 }
 
@@ -4266,7 +4266,7 @@ DN_API DN_Str8FindResult DN_Str8FindStr8AVX512F(DN_Str8 string, DN_Str8 find)
         return result;
       }
 
-      zero_byte_mask = DN_BitClearNextLSB(zero_byte_mask);
+      zero_byte_mask = DN_BitClearNextLsb(zero_byte_mask);
     }
 
     ptr += sizeof(__m512i);
@@ -4370,7 +4370,7 @@ DN_API DN_Str8FindResult DN_Str8FindLastStr8AVX512F(DN_Str8 string, DN_Str8 find
         return result;
       }
 
-      zero_byte_mask = DN_BitClearNextLSB(zero_byte_mask);
+      zero_byte_mask = DN_BitClearNextLsb(zero_byte_mask);
     }
   }
 
@@ -4733,7 +4733,7 @@ DN_API bool DN_Str8BuilderAddArrayCopy(DN_Str8Builder *builder, DN_Str8 const *s
 
 DN_API bool DN_Str8BuilderAddFV(DN_Str8Builder *builder, DN_Str8BuilderAdd add, DN_FMT_ATTRIB char const *fmt, va_list args)
 {
-  DN_Str8 string  = DN_Str8FromFmtVArena(builder->arena, fmt, args);
+  DN_Str8 string  = DN_Str8FmtVArena(builder->arena, fmt, args);
   DN_U64  arena_p = DN_MemListPos(builder->arena->mem);
   bool    result  = DN_Str8BuilderAddArrayRef(builder, &string, 1, add);
   if (!result)
@@ -5515,7 +5515,7 @@ DN_API DN_Str8x32 DN_Str8x32FromByteCountU64(DN_U64 bytes, DN_ByteType type)
   return result;
 }
 
-DN_API DN_Profiler DN_ProfilerInit(DN_ProfilerAnchor *anchors, DN_USize count, DN_USize anchors_per_frame, DN_ProfilerTSCNowFunc *tsc_now, DN_U64 tsc_frequency)
+DN_API DN_Profiler DN_ProfilerInit(DN_ProfilerAnchor *anchors, DN_USize count, DN_USize anchors_per_frame, DN_ProfilerTscNowFunc *tsc_now, DN_U64 tsc_frequency)
 {
   DN_Profiler result       = {};
   result.anchors           = anchors;
@@ -5525,22 +5525,22 @@ DN_API DN_Profiler DN_ProfilerInit(DN_ProfilerAnchor *anchors, DN_USize count, D
   result.tsc_frequency     = tsc_frequency;
 
   DN_AssertF(result.tsc_frequency != 0,
-             "You must set this to the frequency of the timestamp counter function (TSC) (e.g. how "
+             "You must set this to the frequency of the timestamp counter function (Tsc) (e.g. how "
              "many ticks occur between timestamps). We use this to determine the duration between "
-             "each zone's recorded TSC. For example if the 'tsc_now' was set to Window's "
+             "each zone's recorded Tsc. For example if the 'tsc_now' was set to Window's "
              "QueryPerformanceCounter then 'tsc_frequency' would be set to the value of "
              "QueryPerformanceFrequency which is typically 10mhz (e.g. The duration between two "
-             "consecutive TSC's is 10mhz)."
+             "consecutive Tsc's is 10mhz)."
              ""
-             "Hence frequency can't be zero otherwise it's a divide by 0. If you don't have a TSC "
+             "Hence frequency can't be zero otherwise it's a divide by 0. If you don't have a Tsc "
              "function and pass in null, the profiler defaults to rdtsc() and you must measure the "
              "frequency of rdtsc yourself. The reason for this is that measuring rdtsc requires "
-             "having some alternate timing mechanism to measure the duration between the TSCs "
+             "having some alternate timing mechanism to measure the duration between the Tscs "
              "provided by rdtsc and this profiler makes no assumption about what timing primitives "
              "are available other than rdtsc which is a CPU builtin available on basically all "
              "platforms or have an equivalent (e.g. __builtin_readcyclecounter)"
              ""
-             "This codebase provides DN_OS_EstimateTSCPerSecond() as an example of how to that for "
+             "This codebase provides DN_OS_EstimateTscPerSecond() as an example of how to that for "
              "convenience and is available if compiling with the OS layer. Some platforms like "
              "Emscripten don't support rdtsc() so you should use an alternative method like "
              "emscripten_get_now() or clock_gettime with CLOCK_MONOTONIC.");
@@ -5589,7 +5589,7 @@ DN_API DN_ProfilerZone DN_ProfilerBeginZone(DN_Profiler *profiler, DN_Str8 name,
   #endif
 
   result.profiler                  = profiler;
-  result.begin_tsc                 = profiler->tsc_now ? profiler->tsc_now() : DN_CPUGetTSC();
+  result.begin_tsc                 = profiler->tsc_now ? profiler->tsc_now() : DN_CPUGetTsc();
   result.anchor_index              = anchor_index;
   result.parent_zone               = profiler->parent_zone;
   result.elapsed_tsc_at_zone_start = anchor->tsc_inclusive;
@@ -5608,13 +5608,13 @@ DN_API void DN_ProfilerEndZone(DN_ProfilerZone zone)
 
   DN_ProfilerAnchorArray array       = DN_ProfilerFrameAnchors(profiler);
   DN_ProfilerAnchor     *anchor      = array.data + zone.anchor_index;
-  DN_U64                 tsc_now     = profiler->tsc_now ? profiler->tsc_now() : DN_CPUGetTSC();
+  DN_U64                 tsc_now     = profiler->tsc_now ? profiler->tsc_now() : DN_CPUGetTsc();
   DN_U64                 elapsed_tsc = tsc_now - zone.begin_tsc;
 
-  // NOTE: We snap the elapsed TSC at the zone start and overwrite every time we end zones. If we
+  // NOTE: We snap the elapsed Tsc at the zone start and overwrite every time we end zones. If we
   // nest zones, the nested zones will clobber the inclusive timestamp with their values.
   // This is fine, as long as all the zones and begun and ended correctly, when the top-most zone
-  // in the stack ends, it will overwrite the TSC with the elapsed time overall for just that top
+  // in the stack ends, it will overwrite the Tsc with the elapsed time overall for just that top
   // most function, unclobbering the elapsed time sitting in the anchor.
   anchor->tsc_inclusive  = zone.elapsed_tsc_at_zone_start + elapsed_tsc;
   anchor->tsc_exclusive += elapsed_tsc;
@@ -5695,13 +5695,13 @@ DN_API void DN_ProfilerFmtToStdout(DN_Profiler *profiler)
   }
 }
 
-DN_API DN_F64 DN_ProfilerSecFromTSC(DN_Profiler *profiler, DN_U64 duration_tsc)
+DN_API DN_F64 DN_ProfilerSecFromTsc(DN_Profiler *profiler, DN_U64 duration_tsc)
 {
   DN_F64 result = DN_Cast(DN_F64)duration_tsc / profiler->tsc_frequency;
   return result;
 }
 
-DN_API DN_F64 DN_ProfilerMsFromTSC(DN_Profiler *profiler, DN_U64 duration_tsc)
+DN_API DN_F64 DN_ProfilerMsFromTsc(DN_Profiler *profiler, DN_U64 duration_tsc)
 {
   DN_F64 result = DN_Cast(DN_F64)duration_tsc / profiler->tsc_frequency * 1000.0;
   return result;
@@ -5721,12 +5721,12 @@ static void DN_QSortSwapElems_(void *array, DN_USize elem_size, DN_USize lhs_ind
 
   char         temp_buffer[512];
   bool         use_buffer = elem_size <= DN_ArrayCountU(temp_buffer);
-  DN_TCScratch scratch    = {};
+  DN_TcScratch scratch    = {};
   char        *temp       = {};
   if (use_buffer) {
     temp = temp_buffer;
   } else {
-    scratch = DN_TCScratchBeginArena(nullptr, 0);
+    scratch = DN_TcScratchBeginArena(nullptr, 0);
     temp    = DN_ArenaNewArray(&scratch.arena, char, elem_size, DN_ZMem_No);
   }
 
@@ -5737,19 +5737,19 @@ static void DN_QSortSwapElems_(void *array, DN_USize elem_size, DN_USize lhs_ind
   DN_Memcpy(rhs, temp, elem_size);
 
   if (!use_buffer)
-    DN_TCScratchEnd(&scratch);
+    DN_TcScratchEnd(&scratch);
 }
 
 static void DN_QSortInsertion_(void *array, DN_USize array_size, DN_USize elem_size, void *user_context, DN_QSortCompareFunc *compare)
 {
   char         temp_buffer[512];
   bool         use_buffer = elem_size <= DN_ArrayCountU(temp_buffer);
-  DN_TCScratch scratch    = {};
+  DN_TcScratch scratch    = {};
   char        *temp       = {};
   if (use_buffer) {
     temp = temp_buffer;
   } else {
-    scratch = DN_TCScratchBeginArena(nullptr, 0);
+    scratch = DN_TcScratchBeginArena(nullptr, 0);
     temp    = DN_ArenaNewArray(&scratch.arena, char, elem_size, DN_ZMem_No);
   }
 
@@ -5770,7 +5770,7 @@ static void DN_QSortInsertion_(void *array, DN_USize array_size, DN_USize elem_s
   }
 
   if (!use_buffer)
-    DN_TCScratchEnd(&scratch);
+    DN_TcScratchEnd(&scratch);
 }
 
 DN_API void DN_QSort(void *array, DN_USize array_size, DN_USize elem_size, void *user_context, DN_QSortCompareFunc *compare)
@@ -5976,16 +5976,16 @@ DN_API DN_BSearchResult DN_BSearchU32(DN_U32 const *array, DN_USize count, DN_U3
 
 #define DN_PCG_DEFAULT_MULTIPLIER_64 6364136223846793005ULL
 #define DN_PCG_DEFAULT_INCREMENT_64  1442695040888963407ULL
-DN_API DN_PCG32 DN_PCG32Init(DN_U64 seed)
+DN_API DN_Pcg32 DN_Pcg32Init(DN_U64 seed)
 {
-  DN_PCG32 result = {};
-  DN_PCG32Next(&result);
+  DN_Pcg32 result = {};
+  DN_Pcg32Next(&result);
   result.state += seed;
-  DN_PCG32Next(&result);
+  DN_Pcg32Next(&result);
   return result;
 }
 
-DN_API DN_U32 DN_PCG32Next(DN_PCG32 *rng)
+DN_API DN_U32 DN_Pcg32Next(DN_Pcg32 *rng)
 {
   DN_U64 state = rng->state;
   rng->state     = state * DN_PCG_DEFAULT_MULTIPLIER_64 + DN_PCG_DEFAULT_INCREMENT_64;
@@ -5996,39 +5996,39 @@ DN_API DN_U32 DN_PCG32Next(DN_PCG32 *rng)
   return rot ? (value >> rot) | (value << (32 - rot)) : value;
 }
 
-DN_API DN_U64 DN_PCG32Next64(DN_PCG32 *rng)
+DN_API DN_U64 DN_Pcg32Next64(DN_Pcg32 *rng)
 {
-  DN_U64 value = DN_PCG32Next(rng);
+  DN_U64 value = DN_Pcg32Next(rng);
   value <<= 32;
-  value |= DN_PCG32Next(rng);
+  value |= DN_Pcg32Next(rng);
   return value;
 }
 
-DN_API DN_U32 DN_PCG32Range(DN_PCG32 *rng, DN_U32 low, DN_U32 high)
+DN_API DN_U32 DN_Pcg32Range(DN_Pcg32 *rng, DN_U32 low, DN_U32 high)
 {
   DN_U32 bound     = high - low;
   DN_U32 threshold = -(DN_I32)bound % bound;
 
   for (;;) {
-    DN_U32 r = DN_PCG32Next(rng);
+    DN_U32 r = DN_Pcg32Next(rng);
     if (r >= threshold)
       return low + (r % bound);
   }
 }
 
-DN_API DN_F32 DN_PCG32NextF32(DN_PCG32 *rng)
+DN_API DN_F32 DN_Pcg32NextF32(DN_Pcg32 *rng)
 {
-  DN_U32 x = DN_PCG32Next(rng);
+  DN_U32 x = DN_Pcg32Next(rng);
   return (DN_F32)(DN_I32)(x >> 8) * 0x1.0p-24f;
 }
 
-DN_API DN_F64 DN_PCG32NextF64(DN_PCG32 *rng)
+DN_API DN_F64 DN_Pcg32NextF64(DN_Pcg32 *rng)
 {
-  DN_U64 x = DN_PCG32Next64(rng);
+  DN_U64 x = DN_Pcg32Next64(rng);
   return (DN_F64)(DN_I64)(x >> 11) * 0x1.0p-53;
 }
 
-DN_API void DN_PCG32Advance(DN_PCG32 *rng, DN_U64 delta)
+DN_API void DN_Pcg32Advance(DN_Pcg32 *rng, DN_U64 delta)
 {
   DN_U64 cur_mult = DN_PCG_DEFAULT_MULTIPLIER_64;
   DN_U64 cur_plus = DN_PCG_DEFAULT_INCREMENT_64;
@@ -6050,7 +6050,7 @@ DN_API void DN_PCG32Advance(DN_PCG32 *rng, DN_U64 delta)
 }
 
 // Default values recommended by: http://isthe.com/chongo/tech/comp/fnv/
-DN_API DN_U32 DN_FNV1AHashU32FromBytes(void const *bytes, DN_USize count, DN_U32 hash)
+DN_API DN_U32 DN_Fnv1aHashU32FromBytes(void const *bytes, DN_USize count, DN_U32 hash)
 {
   auto buffer = DN_Cast(DN_U8 const *)bytes;
   for (DN_USize i = 0; i < count; i++)
@@ -6058,7 +6058,7 @@ DN_API DN_U32 DN_FNV1AHashU32FromBytes(void const *bytes, DN_USize count, DN_U32
   return hash;
 }
 
-DN_API DN_U64 DN_FNV1AHashU64FromBytes(void const *bytes, DN_USize count, DN_U64 hash)
+DN_API DN_U64 DN_Fnv1aHashU64FromBytes(void const *bytes, DN_USize count, DN_U64 hash)
 {
     auto buffer = DN_Cast(DN_U8 const *)bytes;
     for (DN_USize i = 0; i < count; i++)
@@ -6295,67 +6295,67 @@ DN_API DN_U32 DN_Murmur3HashU32FromBytesX64(void const *bytes, int len, DN_U32 s
   return result;
 }
 
-DN_API DN_Str8x32 DN_Str8x32FromANSIColourCodeU8RGB(DN_ANSIColourMode mode, DN_U8 r, DN_U8 g, DN_U8 b)
+DN_API DN_Str8x32 DN_Str8x32FromAnsiColourCodeU8Rgb(DN_AnsiColourMode mode, DN_U8 r, DN_U8 g, DN_U8 b)
 {
   DN_Str8x32 result = DN_Str8x32FromFmt("\x1b[%d;2;%u;%u;%um",
-                                        mode == DN_ANSIColourMode_Fg ? 38 : 48,
+                                        mode == DN_AnsiColourMode_Fg ? 38 : 48,
                                         r,
                                         g,
                                         b);
   return result;
 }
 
-DN_API DN_Str8x32 DN_Str8x32FromANSIColourCodeV3F32RGB255(DN_ANSIColourMode mode, DN_V3F32 rgb_255)
+DN_API DN_Str8x32 DN_Str8x32FromAnsiColourCodeV3F32Rgb255(DN_AnsiColourMode mode, DN_V3F32 rgb_255)
 {
-  DN_Str8x32 result = DN_Str8x32FromANSIColourCodeU8RGB(mode, DN_Cast(DN_U8)rgb_255.r, DN_Cast(DN_U8)rgb_255.g, DN_Cast(DN_U8)rgb_255.b);
+  DN_Str8x32 result = DN_Str8x32FromAnsiColourCodeU8Rgb(mode, DN_Cast(DN_U8)rgb_255.r, DN_Cast(DN_U8)rgb_255.g, DN_Cast(DN_U8)rgb_255.b);
   return result;
 }
 
-DN_API DN_Str8x32 DN_Str8x32FromANSIColourCodeU32RGB(DN_ANSIColourMode mode, DN_U32 value)
+DN_API DN_Str8x32 DN_Str8x32FromAnsiColourCodeU32Rgb(DN_AnsiColourMode mode, DN_U32 value)
 {
   DN_U8      r      = DN_Cast(DN_U8)(value >> 24);
   DN_U8      g      = DN_Cast(DN_U8)(value >> 16);
   DN_U8      b      = DN_Cast(DN_U8)(value >> 8);
-  DN_Str8x32 result = DN_Str8x32FromANSIColourCodeU8RGB(mode, r, g, b);
+  DN_Str8x32 result = DN_Str8x32FromAnsiColourCodeU8Rgb(mode, r, g, b);
   return result;
 }
 
-DN_API DN_Str8 DN_Str8FromStr8ANSIColourU8RGBArena(DN_ANSIColourMode mode, DN_Str8 str8, DN_U8 r, DN_U8 g, DN_U8 b, DN_Arena *arena)
+DN_API DN_Str8 DN_Str8FromStr8AnsiColourU8RgbArena(DN_AnsiColourMode mode, DN_Str8 str8, DN_U8 r, DN_U8 g, DN_U8 b, DN_Arena *arena)
 {
-  DN_Str8x32 ansi   = DN_Str8x32FromANSIColourCodeU8RGB(mode, r, g, b);
-  DN_Str8    result = DN_Str8FromFmtArena(arena, "%.*s%.*s%s", DN_Str8PrintFmt(ansi), DN_Str8PrintFmt(str8), DN_ANSICodeResetLit);
+  DN_Str8x32 ansi   = DN_Str8x32FromAnsiColourCodeU8Rgb(mode, r, g, b);
+  DN_Str8    result = DN_Str8FmtArena(arena, "%.*s%.*s%s", DN_Str8PrintFmt(ansi), DN_Str8PrintFmt(str8), DN_AnsiCodeResetLit);
   return result;
 }
 
-DN_API DN_Str8 DN_Str8FromStr8ANSIColourV3F32RGB255Arena(DN_ANSIColourMode mode, DN_Str8 str8, DN_V3F32 rgb_255, DN_Arena *arena)
+DN_API DN_Str8 DN_Str8FromStr8AnsiColourV3F32Rgb255Arena(DN_AnsiColourMode mode, DN_Str8 str8, DN_V3F32 rgb_255, DN_Arena *arena)
 {
-  DN_Str8 result = DN_Str8FromStr8ANSIColourU8RGBArena(mode, str8, DN_Cast(DN_U8)rgb_255.r, DN_Cast(DN_U8)rgb_255.g, DN_Cast(DN_U8)rgb_255.b, arena);
+  DN_Str8 result = DN_Str8FromStr8AnsiColourU8RgbArena(mode, str8, DN_Cast(DN_U8)rgb_255.r, DN_Cast(DN_U8)rgb_255.g, DN_Cast(DN_U8)rgb_255.b, arena);
   return result;
 }
 
-DN_API DN_Str8 DN_Str8ANSIColourU8RGBFromFmtVArena(DN_ANSIColourMode mode, DN_U8 r, DN_U8 g, DN_U8 b, DN_Arena *arena, char const *fmt, va_list args)
+DN_API DN_Str8 DN_Str8AnsiColourU8RgbFromFmtVArena(DN_AnsiColourMode mode, DN_U8 r, DN_U8 g, DN_U8 b, DN_Arena *arena, char const *fmt, va_list args)
 {
-  DN_TCScratch scratch = DN_TCScratchBeginArena(&arena, 1);
-  DN_Str8      string  = DN_Str8FromFmtVArena(&scratch.arena, fmt, args);
-  DN_Str8      result  = DN_Str8FromStr8ANSIColourU8RGBArena(mode, string, r, g, b, arena);
-  DN_TCScratchEnd(&scratch);
+  DN_TcScratch scratch = DN_TcScratchBeginArena(&arena, 1);
+  DN_Str8      string  = DN_Str8FmtVArena(&scratch.arena, fmt, args);
+  DN_Str8      result  = DN_Str8FromStr8AnsiColourU8RgbArena(mode, string, r, g, b, arena);
+  DN_TcScratchEnd(&scratch);
   return result;
 }
 
-DN_API DN_Str8 DN_Str8FromFmtANSIColourU8RGBArena(DN_ANSIColourMode mode, DN_U8 r, DN_U8 g, DN_U8 b, DN_Arena *arena, char const *fmt, ...)
+DN_API DN_Str8 DN_Str8FmtAnsiColourU8RgbArena(DN_AnsiColourMode mode, DN_U8 r, DN_U8 g, DN_U8 b, DN_Arena *arena, char const *fmt, ...)
 {
   va_list args;
   va_start(args, fmt);
-  DN_Str8 result = DN_Str8ANSIColourU8RGBFromFmtVArena(mode, r, g, b, arena, fmt, args);
+  DN_Str8 result = DN_Str8AnsiColourU8RgbFromFmtVArena(mode, r, g, b, arena, fmt, args);
   va_end(args);
   return result;
 }
 
-DN_API DN_Str8 DN_Str8FromFmtANSIColourV3F32RGB255Arena(DN_ANSIColourMode mode, DN_V3F32 rgb_255, DN_Arena *arena, char const *fmt, ...)
+DN_API DN_Str8 DN_Str8FmtAnsiColourV3F32Rgb255Arena(DN_AnsiColourMode mode, DN_V3F32 rgb_255, DN_Arena *arena, char const *fmt, ...)
 {
   va_list args;
   va_start(args, fmt);
-  DN_Str8 result = DN_Str8ANSIColourU8RGBFromFmtVArena(mode, DN_Cast(DN_U8)rgb_255.r, DN_Cast(DN_U8)rgb_255.g, DN_Cast(DN_U8)rgb_255.b, arena, fmt, args);
+  DN_Str8 result = DN_Str8AnsiColourU8RgbFromFmtVArena(mode, DN_Cast(DN_U8)rgb_255.r, DN_Cast(DN_U8)rgb_255.g, DN_Cast(DN_U8)rgb_255.b, arena, fmt, args);
   va_end(args);
   return result;
 }
@@ -6381,13 +6381,13 @@ DN_API DN_LogPrefixSize DN_LogMakePrefix(DN_LogStyle style, DN_LogTypeParam type
   DN_Str8    bold_esc   = {};
   DN_Str8    reset_esc  = {};
   if (style.colour) {
-    bold_esc   = DN_Str8Lit(DN_ANSICodeBoldLit);
-    reset_esc  = DN_Str8Lit(DN_ANSICodeResetLit);
-    colour_esc = DN_Str8x32FromANSIColourCodeU8RGB(DN_ANSIColourMode_Fg, style.r, style.g, style.b);
+    bold_esc   = DN_Str8Lit(DN_AnsiCodeBoldLit);
+    reset_esc  = DN_Str8Lit(DN_AnsiCodeResetLit);
+    colour_esc = DN_Str8x32FromAnsiColourCodeU8Rgb(DN_AnsiColourMode_Fg, style.r, style.g, style.b);
   }
 
   DN_Str8 file_name = DN_Str8FileNameFromPath(call_site.file);
-  int     size      = DN_SNPrintF(dest,
+  int     size      = DN_Snprintf(dest,
                          DN_Cast(int)dest_size,
                          "%04u-%02u-%02uT%02u:%02u:%02u" // date
                          "%.*s"                          // colour
@@ -7345,7 +7345,7 @@ DN_API DN_V4F32 DN_V4F32Lerp(DN_V4F32 lhs, DN_F32 t01, DN_V4F32 rhs)
   return result;
 }
 
-DN_API bool DN_V4F32RGBA01IsValid(DN_V4F32 rgba01)
+DN_API bool DN_V4F32Rgba01IsValid(DN_V4F32 rgba01)
 {
   bool result = rgba01.r >= 0 && rgba01.r <= 1.f &&
                 rgba01.g >= 0 && rgba01.g <= 1.f &&
@@ -7354,58 +7354,58 @@ DN_API bool DN_V4F32RGBA01IsValid(DN_V4F32 rgba01)
   return result;
 }
 
-DN_API DN_V4F32 DN_V4F32RGBA01FromRGBU32(DN_U32 u32)
+DN_API DN_V4F32 DN_V4F32Rgba01FromRgbU32(DN_U32 u32)
 {
   DN_U8    r      = (DN_U8)((u32 & 0x00FF0000) >> 16);
   DN_U8    g      = (DN_U8)((u32 & 0x0000FF00) >> 8);
   DN_U8    b      = (DN_U8)((u32 & 0x000000FF) >> 0);
-  DN_V4F32 result = DN_V4F32RGBA01FromRGBU8(r, g, b);
+  DN_V4F32 result = DN_V4F32Rgba01FromRgbU8(r, g, b);
   return result;
 }
 
-DN_API DN_V4F32 DN_V4F32RGBA01FromRGBAU32(DN_U32 u32)
+DN_API DN_V4F32 DN_V4F32Rgba01FromRgbaU32(DN_U32 u32)
 {
   DN_U8    r      = (DN_U8)((u32 & 0xFF000000) >> 24);
   DN_U8    g      = (DN_U8)((u32 & 0x00FF0000) >> 16);
   DN_U8    b      = (DN_U8)((u32 & 0x0000FF00) >> 8);
   DN_U8    a      = (DN_U8)((u32 & 0x000000FF) >> 0);
-  DN_V4F32 result = DN_V4F32RGBA01FromRGBAU8(r, g, b, a);
+  DN_V4F32 result = DN_V4F32Rgba01FromRgbaU8(r, g, b, a);
   return result;
 }
 
-#define DN_SRGB_COEFFICIENT_F32 2.2f
-DN_API DN_V4F32 DN_V4F32Linear01FromSRGB01(DN_V4F32 srgb01)
+#define DN_Srgb_COEFFICIENT_F32 2.2f
+DN_API DN_V4F32 DN_V4F32Linear01FromSrgb01(DN_V4F32 srgb01)
 {
   DN_Assert(srgb01.x >= 0.f && srgb01.x <= 1.f);
   DN_Assert(srgb01.y >= 0.f && srgb01.y <= 1.f);
   DN_Assert(srgb01.z >= 0.f && srgb01.z <= 1.f);
   DN_Assert(srgb01.a >= 0.f && srgb01.a <= 1.f);
   DN_V4F32 result = {};
-  result.r        = DN_PowF32(srgb01.r, DN_SRGB_COEFFICIENT_F32);
-  result.g        = DN_PowF32(srgb01.g, DN_SRGB_COEFFICIENT_F32);
-  result.b        = DN_PowF32(srgb01.b, DN_SRGB_COEFFICIENT_F32);
+  result.r        = DN_PowF32(srgb01.r, DN_Srgb_COEFFICIENT_F32);
+  result.g        = DN_PowF32(srgb01.g, DN_Srgb_COEFFICIENT_F32);
+  result.b        = DN_PowF32(srgb01.b, DN_Srgb_COEFFICIENT_F32);
   result.a        = srgb01.a;
   return result;
 }
 
 DN_API DN_V4F32 DN_V4F32Linear01Desaturate(DN_V4F32 linear01, DN_F32 t01)
 {
-  DN_F32   luminance = (linear01.r * DN_V3F32_RGB_LUMINANCE.r) + (linear01.g * DN_V3F32_RGB_LUMINANCE.g) + (linear01.b * DN_V3F32_RGB_LUMINANCE.b);
+  DN_F32   luminance = (linear01.r * DN_V3F32_Rgb_LUMINANCE.r) + (linear01.g * DN_V3F32_Rgb_LUMINANCE.g) + (linear01.b * DN_V3F32_Rgb_LUMINANCE.b);
   DN_V4F32 result    = linear01;
   result.rgb         = DN_V3F32Lerp(result.rgb, t01, DN_V3F32From1N(luminance));
   return result;
 }
 
-DN_API DN_V4F32 DN_V4F32SRGB01FromLinear01(DN_V4F32 linear01)
+DN_API DN_V4F32 DN_V4F32Srgb01FromLinear01(DN_V4F32 linear01)
 {
   DN_Assert(linear01.x >= 0.f && linear01.x <= 1.f);
   DN_Assert(linear01.y >= 0.f && linear01.y <= 1.f);
   DN_Assert(linear01.z >= 0.f && linear01.z <= 1.f);
   DN_Assert(linear01.a >= 0.f && linear01.a <= 1.f);
   DN_V4F32 result = {};
-  result.r        = DN_PowF32(linear01.r, 1.f / DN_SRGB_COEFFICIENT_F32);
-  result.g        = DN_PowF32(linear01.g, 1.f / DN_SRGB_COEFFICIENT_F32);
-  result.b        = DN_PowF32(linear01.b, 1.f / DN_SRGB_COEFFICIENT_F32);
+  result.r        = DN_PowF32(linear01.r, 1.f / DN_Srgb_COEFFICIENT_F32);
+  result.g        = DN_PowF32(linear01.g, 1.f / DN_Srgb_COEFFICIENT_F32);
+  result.b        = DN_PowF32(linear01.b, 1.f / DN_Srgb_COEFFICIENT_F32);
   result.a        = linear01.a;
   return result;
 }
@@ -9449,7 +9449,7 @@ DN_API void DN_TestGroupBeginF(DN_TestCore *test, char const *fmt, ...)
   // NOTE: Set up the group
   va_list args;
   va_start(args, fmt);
-  group->name = DN_Str8FromFmtVArena(test->arena, fmt, args);
+  group->name = DN_Str8FmtVArena(test->arena, fmt, args);
   va_end(args);
 
   // NOTE: Mark as active
@@ -9478,7 +9478,7 @@ DN_API void DN_TestBeginF(DN_TestCore *test, char const *fmt, ...)
   // NOTE: Fill in test entry
   va_list args;
   va_start(args, fmt);
-  entry->name = DN_Str8FromFmtVArena(test->arena, fmt, args);
+  entry->name = DN_Str8FmtVArena(test->arena, fmt, args);
   va_end(args);
 
   // NOTE: Mark as active
@@ -9504,11 +9504,11 @@ DN_API void DN_TestEnd(DN_TestCore *test)
 
 DN_API DN_Str8 DN_Str8FromTestCore(DN_TestCore const *test, DN_Arena *arena, DN_Str8FromTestCoreFlags flags)
 {
-  DN_TCScratch scratch       = DN_TCScratchBeginArena(&arena, 1);
+  DN_TcScratch scratch       = DN_TcScratchBeginArena(&arena, 1);
   DN_USize     padding_count = 100;
   DN_Str8      padding_line  = DN_Str8FillF(&scratch.arena, padding_count, ".");
   if (flags & DN_Str8FromTestCoreFlags_Colour)
-    padding_line = DN_Str8FromFmtANSIColourU8RGBArena(DN_ANSIColourMode_Fg, 64, 64, 64, &scratch.arena, "%.*s", DN_Str8PrintFmt(padding_line));
+    padding_line = DN_Str8FmtAnsiColourU8RgbArena(DN_AnsiColourMode_Fg, 64, 64, 64, &scratch.arena, "%.*s", DN_Str8PrintFmt(padding_line));
 
   DN_V3F32 const good_colour = DN_V3F32From3N(0, 255, 0);
   DN_V3F32 const bad_colour  = DN_V3F32From3N(255, 0, 0);
@@ -9530,7 +9530,7 @@ DN_API DN_Str8 DN_Str8FromTestCore(DN_TestCore const *test, DN_Arena *arena, DN_
         group_successes++;
 
       // NOTE: Extract the test name and pad the line with dots (.)
-      DN_Str8  test_prefix = DN_Str8FromFmtArena(&scratch.arena, "  [%zu/%zu] %.*s ", entry_it.index + 1, group->entries_count, DN_Str8PrintFmt(entry->name));
+      DN_Str8  test_prefix = DN_Str8FmtArena(&scratch.arena, "  [%zu/%zu] %.*s ", entry_it.index + 1, group->entries_count, DN_Str8PrintFmt(entry->name));
       if (test_prefix.count < padding_line.count) {
         DN_USize remaining = padding_line.count - test_prefix.count;
         DN_Str8  padder    = DN_Str8Subset(padding_line, 0, remaining);
@@ -9541,9 +9541,9 @@ DN_API DN_Str8 DN_Str8FromTestCore(DN_TestCore const *test, DN_Arena *arena, DN_
       DN_Str8 outcome_str8 = entry->failed ? DN_Str8Lit("FAILED") : DN_Str8Lit("OK");
       if (flags & DN_Str8FromTestCoreFlags_Colour) {
         if (entry->failed)
-          outcome_str8 = DN_Str8FromFmtANSIColourV3F32RGB255Arena(DN_ANSIColourMode_Fg, bad_colour, &scratch.arena, "%.*s", DN_Str8PrintFmt(outcome_str8));
+          outcome_str8 = DN_Str8FmtAnsiColourV3F32Rgb255Arena(DN_AnsiColourMode_Fg, bad_colour, &scratch.arena, "%.*s", DN_Str8PrintFmt(outcome_str8));
         else
-          outcome_str8 = DN_Str8FromFmtANSIColourV3F32RGB255Arena(DN_ANSIColourMode_Fg, good_colour, &scratch.arena, "%.*s", DN_Str8PrintFmt(outcome_str8));
+          outcome_str8 = DN_Str8FmtAnsiColourV3F32Rgb255Arena(DN_AnsiColourMode_Fg, good_colour, &scratch.arena, "%.*s", DN_Str8PrintFmt(outcome_str8));
       }
 
       DN_F64 elapsed_ms = DN_OS_PerfCounterMs(entry->ts_begin, entry->ts_end);
@@ -9572,7 +9572,7 @@ DN_API DN_Str8 DN_Str8FromTestCore(DN_TestCore const *test, DN_Arena *arena, DN_
           DN_Str8               file_name = DN_Str8FileNameFromPath(row->call_site.file);
           rows_str8[row_index++]          = row->expr;
           rows_str8[row_index++]          = row->invariant;
-          rows_str8[row_index++]          = DN_Str8FromFmtArena(&scratch.arena, "%.*s:%u", DN_Str8PrintFmt(file_name), row->call_site.line);
+          rows_str8[row_index++]          = DN_Str8FmtArena(&scratch.arena, "%.*s:%u", DN_Str8PrintFmt(file_name), row->call_site.line);
 
           DN_Str8 table = DN_Str8Table(rows_str8, row_count, col_count, table_flags, &scratch.arena);
           table         = DN_Str8PadNewLinesArena(table, DN_Str8Lit("  "), &scratch.arena);
@@ -9590,13 +9590,13 @@ DN_API DN_Str8 DN_Str8FromTestCore(DN_TestCore const *test, DN_Arena *arena, DN_
     DN_MSVC_WARNING_PUSH
     DN_MSVC_WARNING_DISABLE(6067) // _Param_(3) in call to 'DN_Str8BuilderAppendF' must be the address of a string. Actual type: 'const unsigned __int64'.
     DN_MSVC_WARNING_DISABLE(6271) // Extra argument passed to 'DN_Str8BuilderAppendF'.
-    DN_Str8 group_prefix = DN_Str8FromFmtArena(&scratch.arena, "%'zu/%'zu test%s", group_successes, group->entries_count, group_successes > 1 ? "s" :"");
+    DN_Str8 group_prefix = DN_Str8FmtArena(&scratch.arena, "%'zu/%'zu test%s", group_successes, group->entries_count, group_successes > 1 ? "s" :"");
     DN_MSVC_WARNING_POP
     if (flags & DN_Str8FromTestCoreFlags_Colour) {
       if (group_failures == 0)
-        group_prefix = DN_Str8FromFmtANSIColourV3F32RGB255Arena(DN_ANSIColourMode_Fg, good_colour, &scratch.arena, "%.*s", DN_Str8PrintFmt(group_prefix));
+        group_prefix = DN_Str8FmtAnsiColourV3F32Rgb255Arena(DN_AnsiColourMode_Fg, good_colour, &scratch.arena, "%.*s", DN_Str8PrintFmt(group_prefix));
       else
-        group_prefix = DN_Str8FromFmtANSIColourV3F32RGB255Arena(DN_ANSIColourMode_Fg, bad_colour, &scratch.arena, "%.*s", DN_Str8PrintFmt(group_prefix));
+        group_prefix = DN_Str8FmtAnsiColourV3F32Rgb255Arena(DN_AnsiColourMode_Fg, bad_colour, &scratch.arena, "%.*s", DN_Str8PrintFmt(group_prefix));
     }
     DN_Str8BuilderAppendF(&builder, "\n  %.*s passed in [%.*s] %.3fms (%zu failed)\n", DN_Str8PrintFmt(group_prefix), DN_Str8PrintFmt(group->name), elapsed_ms, group_failures);
   }
@@ -9619,7 +9619,7 @@ DN_API DN_TestDiagnosticRow *DN_TestVerifySetupFmtV(DN_TestCore *test, DN_CallSi
     result            = DN_PArrayMakeZ(entry->diagnostics, &entry->diagnostics_count, entry->diagnostics_max);
     result->expr      = expr;
     result->call_site = call_site;
-    result->message   = DN_Str8FromFmtVArena(test->arena, fmt, args);
+    result->message   = DN_Str8FmtVArena(test->arena, fmt, args);
   }
   return result;
 }
@@ -9631,7 +9631,7 @@ DN_API void DN_TestVerifyExprF_(DN_TestCore *test, DN_CallSite call_site, DN_Str
   DN_TestDiagnosticRow *row = DN_TestVerifySetupFmtV(test, call_site, expr, /*verify_failed=*/ !expr_result, fmt, args);
   va_end(args);
   if (row)
-    row->invariant = DN_Str8FromFmtArena(test->arena, "%s (expected %s)", expr_result ? "true" : "false", expr_result ? "false" : "true");
+    row->invariant = DN_Str8FmtArena(test->arena, "%s (expected %s)", expr_result ? "true" : "false", expr_result ? "false" : "true");
 }
 
 DN_API void DN_TestVerifyF64Fmt(DN_TestCore *test, DN_CallSite call_site, DN_Str8 val_str8, DN_Str8 expect_str8, DN_F64 val, DN_F64 expect, DN_TestLogic logic, char const *fmt, ...)
@@ -9652,8 +9652,8 @@ DN_API void DN_TestVerifyF64Fmt(DN_TestCore *test, DN_CallSite call_site, DN_Str
   DN_TestDiagnosticRow *row = DN_TestVerifySetupFmtV(test, call_site, /*expr=*/ DN_Str8Lit(""), verify_failed, fmt, args);
   va_end(args);
   if (row) {
-    row->expr      = DN_Str8FromFmtArena(test->arena, "%.*s %.*s %.*s",        DN_Str8PrintFmt(val_str8), DN_Str8PrintFmt(logic_str8),     DN_Str8PrintFmt(expect_str8));
-    row->invariant = DN_Str8FromFmtArena(test->arena, "%f %.*s %f (expected)", val,                       DN_Str8PrintFmt(logic_inv_str8), expect);
+    row->expr      = DN_Str8FmtArena(test->arena, "%.*s %.*s %.*s",        DN_Str8PrintFmt(val_str8), DN_Str8PrintFmt(logic_str8),     DN_Str8PrintFmt(expect_str8));
+    row->invariant = DN_Str8FmtArena(test->arena, "%f %.*s %f (expected)", val,                       DN_Str8PrintFmt(logic_inv_str8), expect);
   }
 }
 
@@ -9675,12 +9675,12 @@ DN_API void DN_TestVerifyISizeF(DN_TestCore *test, DN_CallSite call_site, DN_Str
   DN_TestDiagnosticRow *row = DN_TestVerifySetupFmtV(test, call_site, /*expr=*/ DN_Str8Lit(""), verify_failed, fmt, args);
   va_end(args);
   if (row) {
-    row->expr      = DN_Str8FromFmtArena(test->arena, "%.*s %.*s %.*s",            DN_Str8PrintFmt(val_str8), DN_Str8PrintFmt(logic_str8),     DN_Str8PrintFmt(expect_str8));
+    row->expr      = DN_Str8FmtArena(test->arena, "%.*s %.*s %.*s",            DN_Str8PrintFmt(val_str8), DN_Str8PrintFmt(logic_str8),     DN_Str8PrintFmt(expect_str8));
     DN_MSVC_WARNING_PUSH
-    DN_MSVC_WARNING_DISABLE(6067) // _Param_(4) in call to 'DN_Str8FromFmtArena' must be the address of a string. Actual type: 'int'.
-    DN_MSVC_WARNING_DISABLE(6328) // Size mismatch: '__int64' passed as _Param_(3) when 'unsigned int' is required in call to 'DN_Str8FromFmtArena'
-    DN_MSVC_WARNING_DISABLE(6271) // Extra argument passed to 'DN_Str8FromFmtArena'.
-    row->invariant = DN_Str8FromFmtArena(test->arena, "%'zd %.*s %'zd (expected)", val,                       DN_Str8PrintFmt(logic_inv_str8), expect);
+    DN_MSVC_WARNING_DISABLE(6067) // _Param_(4) in call to 'DN_Str8FmtArena' must be the address of a string. Actual type: 'int'.
+    DN_MSVC_WARNING_DISABLE(6328) // Size mismatch: '__int64' passed as _Param_(3) when 'unsigned int' is required in call to 'DN_Str8FmtArena'
+    DN_MSVC_WARNING_DISABLE(6271) // Extra argument passed to 'DN_Str8FmtArena'.
+    row->invariant = DN_Str8FmtArena(test->arena, "%'zd %.*s %'zd (expected)", val,                       DN_Str8PrintFmt(logic_inv_str8), expect);
     DN_MSVC_WARNING_POP
   }
 }
@@ -9703,12 +9703,12 @@ DN_API void DN_TestVerifyUSizeF(DN_TestCore *test, DN_CallSite call_site, DN_Str
   DN_TestDiagnosticRow *row = DN_TestVerifySetupFmtV(test, call_site, /*expr=*/ DN_Str8Lit(""), verify_failed, fmt, args);
   va_end(args);
   if (row) {
-    row->expr      = DN_Str8FromFmtArena(test->arena, "%.*s %.*s %.*s",            DN_Str8PrintFmt(val_str8), DN_Str8PrintFmt(logic_str8),     DN_Str8PrintFmt(expect_str8));
+    row->expr      = DN_Str8FmtArena(test->arena, "%.*s %.*s %.*s",            DN_Str8PrintFmt(val_str8), DN_Str8PrintFmt(logic_str8),     DN_Str8PrintFmt(expect_str8));
     DN_MSVC_WARNING_PUSH
-    DN_MSVC_WARNING_DISABLE(6067) // _Param_(4) in call to 'DN_Str8FromFmtArena' must be the address of a string. Actual type: 'int'.
-    DN_MSVC_WARNING_DISABLE(6328) // Size mismatch: '__int64' passed as _Param_(3) when 'unsigned int' is required in call to 'DN_Str8FromFmtArena'
-    DN_MSVC_WARNING_DISABLE(6271) // Extra argument passed to 'DN_Str8FromFmtArena'.
-    row->invariant = DN_Str8FromFmtArena(test->arena, "%'zu %.*s %'zu (expected)", val,                       DN_Str8PrintFmt(logic_inv_str8), expect);
+    DN_MSVC_WARNING_DISABLE(6067) // _Param_(4) in call to 'DN_Str8FmtArena' must be the address of a string. Actual type: 'int'.
+    DN_MSVC_WARNING_DISABLE(6328) // Size mismatch: '__int64' passed as _Param_(3) when 'unsigned int' is required in call to 'DN_Str8FmtArena'
+    DN_MSVC_WARNING_DISABLE(6271) // Extra argument passed to 'DN_Str8FmtArena'.
+    row->invariant = DN_Str8FmtArena(test->arena, "%'zu %.*s %'zu (expected)", val,                       DN_Str8PrintFmt(logic_inv_str8), expect);
     DN_MSVC_WARNING_POP
   }
 }
@@ -9727,9 +9727,9 @@ DN_API void DN_TestVerifyStr8F(DN_TestCore *test, DN_CallSite call_site, DN_Str8
   va_end(args);
   if (row) {
     if (expect_eq)
-      row->invariant = DN_Str8FromFmtArena(test->arena, "\"%.*s\" != \"%.*s\"", DN_Str8PrintFmt(str8), DN_Str8PrintFmt(expect));
+      row->invariant = DN_Str8FmtArena(test->arena, "\"%.*s\" != \"%.*s\"", DN_Str8PrintFmt(str8), DN_Str8PrintFmt(expect));
     else
-      row->invariant = DN_Str8FromFmtArena(test->arena, "\"%.*s\" == \"%.*s\"", DN_Str8PrintFmt(str8), DN_Str8PrintFmt(expect));
+      row->invariant = DN_Str8FmtArena(test->arena, "\"%.*s\" == \"%.*s\"", DN_Str8PrintFmt(str8), DN_Str8PrintFmt(expect));
   }
 }
 
@@ -9749,9 +9749,9 @@ DN_API void DN_TestVerifyBytesF(DN_TestCore *test, DN_CallSite call_site, DN_Str
     DN_Str8 bytes_hex  = DN_Str8HexFromStr8BytesArena(bytes, test->arena, DN_TrimLeadingZero_No);
     DN_Str8 expect_hex = DN_Str8HexFromStr8BytesArena(expect, test->arena, DN_TrimLeadingZero_No);
     if (expect_eq)
-      row->invariant = DN_Str8FromFmtArena(test->arena, "\"%.*s\" != \"%.*s\"", DN_Str8PrintFmt(bytes_hex), DN_Str8PrintFmt(expect_hex));
+      row->invariant = DN_Str8FmtArena(test->arena, "\"%.*s\" != \"%.*s\"", DN_Str8PrintFmt(bytes_hex), DN_Str8PrintFmt(expect_hex));
     else
-      row->invariant = DN_Str8FromFmtArena(test->arena, "\"%.*s\" == \"%.*s\"", DN_Str8PrintFmt(bytes_hex), DN_Str8PrintFmt(expect_hex));
+      row->invariant = DN_Str8FmtArena(test->arena, "\"%.*s\" == \"%.*s\"", DN_Str8PrintFmt(bytes_hex), DN_Str8PrintFmt(expect_hex));
   }
 }
 
@@ -9834,7 +9834,7 @@ struct DN_RefImplCPUReport {
 
   bool SYSCALL(void)     const { return isIntel_  && f_81_EDX_ & (1 << 11); }
   bool MMXEXT(void)      const { return isAMD_    && f_81_EDX_ & (1 << 22); }
-  bool RDTSCP(void)      const { return f_81_EDX_ &              (1 << 27); }
+  bool RDTscP(void)      const { return f_81_EDX_ &              (1 << 27); }
   bool _3DNOWEXT(void)   const { return isAMD_    && f_81_EDX_ & (1 << 30); }
   bool _3DNOW(void)      const { return isAMD_    && f_81_EDX_ & (1 << 31); }
 };
@@ -10035,7 +10035,7 @@ DN_API DN_TestCore DN_TestSuite(DN_Arena *arena_)
         DN_TestVerifyExpr(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_POPCNT) == ref_cpu_report.POPCNT());
         DN_TestVerifyExpr(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_RDRAND) == ref_cpu_report.RDRAND());
         DN_TestVerifyExpr(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_RDSEED) == ref_cpu_report.RDSEED());
-        DN_TestVerifyExpr(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_RDTSCP) == ref_cpu_report.RDTSCP());
+        DN_TestVerifyExpr(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_RDTscP) == ref_cpu_report.RDTscP());
         DN_TestVerifyExpr(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_SHA) == ref_cpu_report.SHA());
         DN_TestVerifyExpr(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_SSE) == ref_cpu_report.SSE());
         DN_TestVerifyExpr(&result, DN_CPUHasFeature(&cpu_report, DN_CPUFeature_SSE2) == ref_cpu_report.SSE2());
@@ -10104,8 +10104,8 @@ DN_API DN_TestCore DN_TestSuite(DN_Arena *arena_)
           DN_TestVerifyExprF(&result, a == b, "a: %" PRId64 ", b: %" PRId64, a, b);
         }
 
-        for (DN_TestScopeF(&result, "[Intrinsics] CPUGetTSC compile check")) {
-          DN_CPUGetTSC();
+        for (DN_TestScopeF(&result, "[Intrinsics] CPUGetTsc compile check")) {
+          DN_CPUGetTsc();
         }
 
         for (DN_TestScopeF(&result, "[Intrinsics] CompilerReadBarrierAndCPUReadFence compile check")) {
@@ -10203,8 +10203,8 @@ DN_API DN_TestCore DN_TestSuite(DN_Arena *arena_)
 
     // NOTE: Hex/Bytes
     {
-      DN_TCScratch scratch = DN_TCScratchBeginArena(&arena_, 1);
-      DN_DEFER { DN_TCScratchEnd(&scratch); };
+      DN_TcScratch scratch = DN_TcScratchBeginArena(&arena_, 1);
+      DN_DEFER { DN_TcScratchEnd(&scratch); };
 
       for (DN_TestScopeF(&result, "[Hex/Bytes] Convert 0x123")) {
         uint64_t val = DN_U64FromHexStr8Unsafe(DN_Str8Lit("0x123"));
@@ -10642,11 +10642,11 @@ DN_API DN_TestCore DN_TestSuite(DN_Arena *arena_)
       }
 
       for (DN_TestScopeF(&result, "[OS] Query executable directory")) {
-        DN_TCScratch scratch = DN_TCScratchBeginArena(&arena_, 1);
-        DN_Str8      os_result = DN_OS_EXEDir(&scratch.arena);
+        DN_TcScratch scratch = DN_TcScratchBeginArena(&arena_, 1);
+        DN_Str8      os_result = DN_OS_ExeDir(&scratch.arena);
         DN_TestVerifyExpr(&result, os_result.count > 0);
         DN_TestVerifyExprF(&result, DN_OS_PathIsDir(os_result), "result(%zu): %.*s", os_result.count, DN_Str8PrintFmt(os_result));
-        DN_TCScratchEnd(&scratch);
+        DN_TcScratchEnd(&scratch);
       }
 
       for (DN_TestScopeF(&result, "[OS] DN_OS_PerfCounterNow")) {
@@ -10688,7 +10688,7 @@ DN_API DN_TestCore DN_TestSuite(DN_Arena *arena_)
         DN_TestVerifyExpr(&result, write_result);
         DN_TestVerifyExpr(&result, DN_OS_PathIsFile(SRC_FILE));
 
-        DN_TCScratch scratch = DN_TCScratchBeginArena(&arena_, 1);
+        DN_TcScratch scratch = DN_TcScratchBeginArena(&arena_, 1);
         DN_Str8      read_file = DN_OS_FileReadAllArena(&scratch.arena, SRC_FILE, nullptr);
         DN_TestVerifyExprF(&result, read_file.count > 0, "Failed to load file");
         DN_TestVerifyExprF(&result, read_file.count == 4, "File read wrong amount of bytes (%zu)", read_file.count);
@@ -10714,7 +10714,7 @@ DN_API DN_TestCore DN_TestSuite(DN_Arena *arena_)
         DN_B32 delete_non_existent_moved_file = DN_OS_PathDelete(MOVE_FILE);
         DN_TestVerifyExpr(&result, delete_non_existent_moved_file == false);
         DN_TestVerifyExpr(&result, delete_non_existent_src_file == false);
-        DN_TCScratchEnd(&scratch);
+        DN_TcScratchEnd(&scratch);
       }
 
       for (DN_TestScopeF(&result, "[OS] Wait timeout")) {
@@ -10880,7 +10880,7 @@ DN_API DN_TestCore DN_TestSuite(DN_Arena *arena_)
       for (DN_TestScopeF(&result, "[Strings] Format from arena")) {
         DN_MemList mem   = DN_MemListFromBuffer(arena_base, sizeof(arena_base), DN_MemFlags_Nil);
         DN_Arena   arena = DN_ArenaFromMemList(&mem);
-        DN_Str8  str8   = DN_Str8FromFmtArena(&arena, "Foo Bar %d", 5);
+        DN_Str8  str8   = DN_Str8FmtArena(&arena, "Foo Bar %d", 5);
         DN_Str8  expect = DN_Str8Lit("Foo Bar 5");
         DN_TestVerifyStr8EqF(&result, str8, expect, "str8=%.*s", DN_Str8PrintFmt(str8), DN_Str8PrintFmt(expect));
       }
@@ -10889,7 +10889,7 @@ DN_API DN_TestCore DN_TestSuite(DN_Arena *arena_)
         DN_MemList mem   = DN_MemListFromBuffer(arena_base, sizeof(arena_base), DN_MemFlags_Nil);
         DN_Arena   arena = DN_ArenaFromMemList(&mem);
         DN_Pool    pool  = DN_PoolFromArena(&arena, 0);
-        DN_Str8    str8   = DN_Str8FromFmtPool(&pool, "Foo Bar %d", 5);
+        DN_Str8    str8   = DN_Str8FmtPool(&pool, "Foo Bar %d", 5);
         DN_Str8    expect = DN_Str8Lit("Foo Bar 5");
         DN_TestVerifyStr8EqF(&result, str8, expect, "str8=%.*s", DN_Str8PrintFmt(str8), DN_Str8PrintFmt(expect));
       }
@@ -10901,24 +10901,24 @@ DN_API DN_TestCore DN_TestSuite(DN_Arena *arena_)
       }
 
       for (DN_TestScopeF(&result, "[Strings] Initialise with format string")) {
-        DN_TCScratch scratch = DN_TCScratchBeginArena(&arena_, 1);
-        DN_Str8      string  = DN_Str8FromFmtArena(&scratch.arena, "%s", "AB");
+        DN_TcScratch scratch = DN_TcScratchBeginArena(&arena_, 1);
+        DN_Str8      string  = DN_Str8FmtArena(&scratch.arena, "%s", "AB");
         DN_TestVerifyUSizeEqF(&result, string.count, 2, "size: %zu", string.count);
         DN_TestVerifyExprF(&result, string.data[0] == 'A', "string[0]: %c", string.data[0]);
         DN_TestVerifyExprF(&result, string.data[1] == 'B', "string[1]: %c", string.data[1]);
         DN_TestVerifyExprF(&result, string.data[2] == 0, "string[2]: %c", string.data[2]);
-        DN_TCScratchEnd(&scratch);
+        DN_TcScratchEnd(&scratch);
       }
 
       for (DN_TestScopeF(&result, "[Strings] Copy string")) {
-        DN_TCScratch scratch = DN_TCScratchBeginArena(&arena_, 1);
+        DN_TcScratch scratch = DN_TcScratchBeginArena(&arena_, 1);
         DN_Str8      string  = DN_Str8Lit("AB");
         DN_Str8      copy    = DN_Str8FromStr8Arena(string, &scratch.arena);
         DN_TestVerifyUSizeEqF(&result, copy.count, 2, "size: %zu", copy.count);
         DN_TestVerifyExprF(&result, copy.data[0] == 'A', "copy[0]: %c", copy.data[0]);
         DN_TestVerifyExprF(&result, copy.data[1] == 'B', "copy[1]: %c", copy.data[1]);
         DN_TestVerifyExprF(&result, copy.data[2] == 0, "copy[2]: %c", copy.data[2]);
-        DN_TCScratchEnd(&scratch);
+        DN_TcScratchEnd(&scratch);
       }
 
       for (DN_TestScopeF(&result, "[Strings] Trim whitespace around string")) {
@@ -10927,10 +10927,10 @@ DN_API DN_TestCore DN_TestSuite(DN_Arena *arena_)
       }
 
       for (DN_TestScopeF(&result, "[Strings] Allocate string from arena")) {
-        DN_TCScratch scratch = DN_TCScratchBeginArena(&arena_, 1);
+        DN_TcScratch scratch = DN_TcScratchBeginArena(&arena_, 1);
         DN_Str8      string  = DN_Str8AllocArena(2, DN_ZMem_No, &scratch.arena);
         DN_TestVerifyUSizeEqF(&result, string.count, 2, "size: %zu", string.count);
-        DN_TCScratchEnd(&scratch);
+        DN_TcScratchEnd(&scratch);
       }
 
       for (DN_TestScopeF(&result, "[Strings] Trim prefix with matching prefix")) {
@@ -11255,7 +11255,7 @@ DN_API DN_TestCore DN_TestSuite(DN_Arena *arena_)
       }
 
       for (DN_TestScopeF(&result, "[Strings] TruncMiddle: Arena wrapper allocates and truncates correctly")) {
-        DN_TCScratch scratch = DN_TCScratchBeginArena(&arena_, 1);
+        DN_TcScratch scratch = DN_TcScratchBeginArena(&arena_, 1);
         DN_Str8            str     = DN_Str8Lit("HelloBeautifulWorld");
         DN_Str8            trunc   = DN_Str8Lit("...");
         DN_Str8TruncResult res     = DN_Str8TruncMiddle(str, 5, trunc, &scratch.arena);
@@ -11263,14 +11263,14 @@ DN_API DN_TestCore DN_TestSuite(DN_Arena *arena_)
         DN_TestVerifyUSizeEq(&result, res.count_req, 13);
         DN_TestVerifyStr8EqF(&result, res.str8, DN_Str8Lit("Hello...World"), "%.*s", DN_Str8PrintFmt(res.str8));
         DN_TestVerifyExpr(&result, res.str8.data[res.str8.count] == '\0');
-        DN_TCScratchEnd(&scratch);
+        DN_TcScratchEnd(&scratch);
       }
     }
 
     // NOTE: Win
     #if defined(DN_PLATFORM_WIN32)
     {
-      DN_TCScratch scratch = DN_TCScratchBeginArena(&arena_, 1);
+      DN_TcScratch scratch = DN_TcScratchBeginArena(&arena_, 1);
       DN_Str8      input8  = DN_Str8Lit("String");
       DN_Str16     input16 = DN_Str16{(wchar_t *)(L"String"), sizeof(L"String") / sizeof(L"String"[0]) - 1};
 
@@ -11308,7 +11308,7 @@ DN_API DN_TestCore DN_TestSuite(DN_Arena *arena_)
         DN_TestVerifyExpr(&result, DN_Memcmp(EXPECTED, string8.data, sizeof(EXPECTED)) == 0);
       }
 
-      DN_TCScratchEnd(&scratch);
+      DN_TcScratchEnd(&scratch);
     }
     #endif // DN_PLATFORM_WIN32
 
@@ -11616,16 +11616,16 @@ DN_API void DN_OS_LoggerSetFilePath(DN_OSLogger *logger, DN_Pool *pool, DN_Str8 
 
 static void DN_OS_DoLogFileSetupAndRotation_(DN_OSLogger *logger)
 {
-  DN_TCScratch scratch = DN_TCScratchBeginArena(nullptr, 0);
+  DN_TcScratch scratch = DN_TcScratchBeginArena(nullptr, 0);
   DN_Str8 error        = {};
   DN_TicketMutexBegin(&logger->file_mutex);
   if (logger->flags & DN_OSLoggerFlags_File) {
 
     // NOTE: Set a default file path to log to if it's not been set yet
     if (logger->file_path.count == 0) {
-      DN_Str8      exe_dir           = DN_OS_EXEDir(&scratch.arena);
+      DN_Str8      exe_dir           = DN_OS_ExeDir(&scratch.arena);
       DN_Str8      default_file_path = DN_OS_PathFmtArena(&scratch.arena, "%.*s/dn.log", DN_Str8PrintFmt(exe_dir));
-      DN_OS_LoggerSetFilePathNoMutex_(logger, DN_TCMainPool(), default_file_path);
+      DN_OS_LoggerSetFilePathNoMutex_(logger, DN_TcMainPool(), default_file_path);
     }
 
     // NOTE Rotate the log file if the criteria is met
@@ -11648,7 +11648,7 @@ static void DN_OS_DoLogFileSetupAndRotation_(DN_OSLogger *logger)
         DN_OSPathInfo recheck_file_info = DN_OS_PathInfo(logger->file_path);
         if (recheck_file_info.size >= logger->rotate_every_n_bytes) {
           logger->flags |= DN_OSLoggerFlags_FileError;
-          error          = DN_Str8FromFmtArena(&scratch.arena, "Rotating of log files failed at (%.*s). Logging to disk is disabled", DN_Str8PrintFmt(logger->file_path));
+          error          = DN_Str8FmtArena(&scratch.arena, "Rotating of log files failed at (%.*s). Logging to disk is disabled", DN_Str8PrintFmt(logger->file_path));
         }
       }
     }
@@ -11659,7 +11659,7 @@ static void DN_OS_DoLogFileSetupAndRotation_(DN_OSLogger *logger)
         DN_OSPathInfo file_path_info  = DN_OS_PathInfo(logger->file_path);
         if (file_path_info.exists && file_path_info.type != DN_OSPathInfoType_File) {
           logger->flags |= DN_OSLoggerFlags_FileError;
-          error          = DN_Str8FromFmtArena(&scratch.arena, "File path to log to (%.*s) exists but is not a writable file. Logging to disk is disabled.", DN_Str8PrintFmt(logger->file_path));
+          error          = DN_Str8FmtArena(&scratch.arena, "File path to log to (%.*s) exists but is not a writable file. Logging to disk is disabled.", DN_Str8PrintFmt(logger->file_path));
         }
 
         if (DN_BitIsNotSet(logger->flags, DN_OSLoggerFlags_FileError))
@@ -11672,7 +11672,7 @@ static void DN_OS_DoLogFileSetupAndRotation_(DN_OSLogger *logger)
     if (DN_BitIsNotSet(logger->flags, DN_OSLoggerFlags_FileError)) {
       if (logger->file.error) {
         logger->flags |= DN_OSLoggerFlags_FileError;
-        error          = DN_Str8FromFmtArena(&scratch.arena, "Failed to open file (%.*s) for logging. Logging to disk is disabled", DN_Str8PrintFmt(logger->file_path));
+        error          = DN_Str8FmtArena(&scratch.arena, "Failed to open file (%.*s) for logging. Logging to disk is disabled", DN_Str8PrintFmt(logger->file_path));
       }
     }
   }
@@ -11681,7 +11681,7 @@ static void DN_OS_DoLogFileSetupAndRotation_(DN_OSLogger *logger)
   // NOTE: Error is logged outside of the mutex since logging will recurse back into the OS logger
   if (error.count)
     DN_LogWarningF("%.*s", DN_Str8PrintFmt(error));
-  DN_TCScratchEnd(&scratch);
+  DN_TcScratchEnd(&scratch);
 }
 
 DN_API void DN_OS_LoggerFV(DN_OSLogger *logger, DN_LogTypeParam type, DN_CallSite call_site, DN_LogFlags flags, DN_FMT_ATTRIB char const *fmt, va_list args)
@@ -11846,18 +11846,17 @@ DN_API DN_Str8x32 DN_OS_DateLocalTimeStr8Now(char date_separator, char hms_separ
   return result;
 }
 
-// NOTE: Other
-DN_API DN_Str8 DN_OS_EXEDir(DN_Arena *arena)
+DN_API DN_Str8 DN_OS_ExeDir(DN_Arena *arena)
 {
   DN_Str8 result = {};
   if (!arena)
     return result;
-  DN_TCScratch        scratch      = DN_TCScratchBeginArena(&arena, 1);
-  DN_Str8             exe_path     = DN_OS_EXEPath(&scratch.arena);
+  DN_TcScratch        scratch      = DN_TcScratchBeginArena(&arena, 1);
+  DN_Str8             exe_path     = DN_OS_ExePath(&scratch.arena);
   DN_Str8             separators[] = {DN_Str8Lit("/"), DN_Str8Lit("\\")};
   DN_Str8BSplitResult split        = DN_Str8BSplitLastArray(exe_path, separators, DN_ArrayCountU(separators));
   result                           = DN_Str8FromStr8Arena(split.lhs, arena);
-  DN_TCScratchEnd(&scratch);
+  DN_TcScratchEnd(&scratch);
   return result;
 }
 
@@ -11930,17 +11929,17 @@ DN_API DN_F64 DN_OS_TimerNs(DN_OSTimer timer)
   return result;
 }
 
-DN_API uint64_t DN_OS_EstimateTSCPerSecond(uint64_t duration_ms_to_gauge_tsc_frequency)
+DN_API uint64_t DN_OS_EstimateTscPerSecond(uint64_t duration_ms_to_gauge_tsc_frequency)
 {
   uint64_t os_frequency      = DN_OS_PerfCounterFrequency();
   uint64_t os_target_elapsed = duration_ms_to_gauge_tsc_frequency * os_frequency / 1000ULL;
-  uint64_t tsc_begin         = DN_CPUGetTSC();
+  uint64_t tsc_begin         = DN_CPUGetTsc();
   uint64_t result            = 0;
   if (tsc_begin) {
     uint64_t os_elapsed = 0;
     for (uint64_t os_begin = DN_OS_PerfCounterNow(); os_elapsed < os_target_elapsed;)
       os_elapsed = DN_OS_PerfCounterNow() - os_begin;
-    uint64_t tsc_end     = DN_CPUGetTSC();
+    uint64_t tsc_end     = DN_CPUGetTsc();
     uint64_t tsc_elapsed = tsc_end - tsc_begin;
     result               = tsc_elapsed / os_elapsed * os_frequency;
   }
@@ -11960,14 +11959,14 @@ DN_API bool DN_OS_FileRotate(DN_Str8 base_file_path, DN_USize rotate_count, DN_S
       if (DN_BitIsNotSet(flags, DN_OSFileRotateFlags_KeepBaseFile))
         DN_OS_PathDelete(base_file_path);
     } else {
-      DN_TCScratch scratch = DN_TCScratchBeginArena(nullptr, 0);
+      DN_TcScratch scratch = DN_TcScratchBeginArena(nullptr, 0);
       for (DN_USize offset = 0; offset < (rotate_count - 1); offset++) {
         DN_USize const file_index      = rotate_count - (offset + 1);
         bool           last_file_index = file_index - 1 == 0;
         DN_AssertF(file_index != 0, "This index should never hits zero, we iterate in reverse and stop 1 before the last one");
 
-        DN_Str8       file_path           = DN_Str8FromFmtArena(&scratch.arena, "%.*s%.*s%zu", DN_Str8PrintFmt(base_file_path), DN_Str8PrintFmt(suffix), file_index);
-        DN_Str8       prev_file_path      = last_file_index ? base_file_path : DN_Str8FromFmtArena(&scratch.arena, "%.*s%.*s%zu", DN_Str8PrintFmt(base_file_path), DN_Str8PrintFmt(suffix), file_index - 1);
+        DN_Str8       file_path           = DN_Str8FmtArena(&scratch.arena, "%.*s%.*s%zu", DN_Str8PrintFmt(base_file_path), DN_Str8PrintFmt(suffix), file_index);
+        DN_Str8       prev_file_path      = last_file_index ? base_file_path : DN_Str8FmtArena(&scratch.arena, "%.*s%.*s%zu", DN_Str8PrintFmt(base_file_path), DN_Str8PrintFmt(suffix), file_index - 1);
         DN_OSPathInfo file_path_info      = DN_OS_PathInfo(file_path);
         DN_OSPathInfo prev_file_path_info = DN_OS_PathInfo(prev_file_path);
 
@@ -11983,7 +11982,7 @@ DN_API bool DN_OS_FileRotate(DN_Str8 base_file_path, DN_USize rotate_count, DN_S
             result &= DN_OS_FileMove(prev_file_path, file_path, /*overwrite=*/true, nullptr);
         }
       }
-      DN_TCScratchEnd(&scratch);
+      DN_TcScratchEnd(&scratch);
     }
   }
   return result;
@@ -12112,10 +12111,10 @@ DN_API bool DN_OS_FileWriteAll(DN_Str8 path, DN_Str8 buffer, DN_ErrSink *error)
 
 DN_API bool DN_OS_FileWriteAllFV(DN_Str8 file_path, DN_ErrSink *error, DN_FMT_ATTRIB char const *fmt, va_list args)
 {
-  DN_TCScratch scratch = DN_TCScratchBeginArena(nullptr, 0);
-  DN_Str8      buffer  = DN_Str8FromFmtVArena(&scratch.arena, fmt, args);
+  DN_TcScratch scratch = DN_TcScratchBeginArena(nullptr, 0);
+  DN_Str8      buffer  = DN_Str8FmtVArena(&scratch.arena, fmt, args);
   bool         result  = DN_OS_FileWriteAll(file_path, buffer, error);
-  DN_TCScratchEnd(&scratch);
+  DN_TcScratchEnd(&scratch);
   return result;
 }
 
@@ -12130,30 +12129,30 @@ DN_API bool DN_OS_FileWriteAllF(DN_Str8 file_path, DN_ErrSink *error, DN_FMT_ATT
 
 DN_API bool DN_OS_FileWriteAllSafe(DN_Str8 path, DN_Str8 buffer, DN_ErrSink *error)
 {
-  DN_TCScratch scratch  = DN_TCScratchBeginArena(nullptr, 0);
-  DN_Str8      tmp_path = DN_Str8FromFmtArena(&scratch.arena, "%.*s.tmp", DN_Str8PrintFmt(path));
+  DN_TcScratch scratch  = DN_TcScratchBeginArena(nullptr, 0);
+  DN_Str8      tmp_path = DN_Str8FmtArena(&scratch.arena, "%.*s.tmp", DN_Str8PrintFmt(path));
   if (!DN_OS_FileWriteAll(tmp_path, buffer, error)) {
-    DN_TCScratchEnd(&scratch);
+    DN_TcScratchEnd(&scratch);
     return false;
   }
   if (!DN_OS_FileCopy(tmp_path, path, true /*overwrite*/, error)) {
-    DN_TCScratchEnd(&scratch);
+    DN_TcScratchEnd(&scratch);
     return false;
   }
   if (!DN_OS_PathDelete(tmp_path)) {
-    DN_TCScratchEnd(&scratch);
+    DN_TcScratchEnd(&scratch);
     return false;
   }
-  DN_TCScratchEnd(&scratch);
+  DN_TcScratchEnd(&scratch);
   return true;
 }
 
 DN_API bool DN_OS_FileWriteAllSafeFV(DN_Str8 path, DN_ErrSink *error, DN_FMT_ATTRIB char const *fmt, va_list args)
 {
-  DN_TCScratch scratch = DN_TCScratchBeginArena(nullptr, 0);
-  DN_Str8      buffer  = DN_Str8FromFmtVArena(&scratch.arena, fmt, args);
+  DN_TcScratch scratch = DN_TcScratchBeginArena(nullptr, 0);
+  DN_Str8      buffer  = DN_Str8FmtVArena(&scratch.arena, fmt, args);
   bool         result  = DN_OS_FileWriteAllSafe(path, buffer, error);
-  DN_TCScratchEnd(&scratch);
+  DN_TcScratchEnd(&scratch);
   return result;
 }
 
@@ -12238,7 +12237,7 @@ DN_API bool DN_OS_PathAddF(DN_Arena *arena, DN_OSPath *fs_path, DN_FMT_ATTRIB ch
 {
   va_list args;
   va_start(args, fmt);
-  DN_Str8 path = DN_Str8FromFmtVArena(arena, fmt, args);
+  DN_Str8 path = DN_Str8FmtVArena(arena, fmt, args);
   va_end(args);
   bool result = DN_OS_PathAddRef(arena, fs_path, path);
   return result;
@@ -12308,38 +12307,38 @@ DN_API DN_Str8 DN_OS_PathToArena(DN_Arena *arena, DN_Str8 path, DN_Str8 path_sep
 
 DN_API DN_Str8 DN_OS_PathToPool(DN_Pool *pool, DN_Str8 path, DN_Str8 path_separator)
 {
-  DN_TCScratch scratch   = DN_TCScratchBeginArena(&pool->arena, 1);
+  DN_TcScratch scratch   = DN_TcScratchBeginArena(&pool->arena, 1);
   DN_OSPath fs_path      = {};
   DN_OS_PathAddRef(&scratch.arena, &fs_path, path);
 
   DN_Allocator allocator = DN_AllocatorFromPool(pool);
   DN_Str8 result         = DN_OS_PathBuildWithSeparatorAllocator(allocator, &fs_path, path_separator);
-  DN_TCScratchEnd(&scratch);
+  DN_TcScratchEnd(&scratch);
   return result;
 }
 
 DN_API DN_Str8 DN_OS_PathToFmtArena(DN_Arena *arena, DN_Str8 path_separator, DN_FMT_ATTRIB char const *fmt, ...)
 {
-  DN_TCScratch scratch = DN_TCScratchBeginArena(&arena, 1);
+  DN_TcScratch scratch = DN_TcScratchBeginArena(&arena, 1);
   va_list    args;
   va_start(args, fmt);
-  DN_Str8 path = DN_Str8FromFmtVArena(&scratch.arena, fmt, args);
+  DN_Str8 path = DN_Str8FmtVArena(&scratch.arena, fmt, args);
   va_end(args);
   DN_Str8 result = DN_OS_PathToArena(arena, path, path_separator);
-  DN_TCScratchEnd(&scratch);
+  DN_TcScratchEnd(&scratch);
   return result;
 }
 
 DN_API DN_Str8 DN_OS_PathToFmtPool(DN_Pool *pool, DN_Str8 path_separator, DN_FMT_ATTRIB char const *fmt, ...)
 {
-  DN_TCScratch scratch = DN_TCScratchBeginArena(&pool->arena, 1);
+  DN_TcScratch scratch = DN_TcScratchBeginArena(&pool->arena, 1);
   va_list    args;
   va_start(args, fmt);
-  DN_Str8 path = DN_Str8FromFmtVArena(&scratch.arena, fmt, args);
+  DN_Str8 path = DN_Str8FmtVArena(&scratch.arena, fmt, args);
   va_end(args);
 
   DN_Str8 result = DN_OS_PathToPool(pool, path, path_separator);
-  DN_TCScratchEnd(&scratch);
+  DN_TcScratchEnd(&scratch);
   return result;
 }
 
@@ -12357,38 +12356,45 @@ DN_API DN_Str8 DN_OS_PathPool(DN_Pool *pool, DN_Str8 path)
 
 DN_API DN_Str8 DN_OS_PathFmtArena(DN_Arena *arena, DN_FMT_ATTRIB char const *fmt, ...)
 {
-  DN_TCScratch scratch = DN_TCScratchBeginArena(&arena, 1);
+  DN_TcScratch scratch = DN_TcScratchBeginArena(&arena, 1);
   va_list    args;
   va_start(args, fmt);
-  DN_Str8 path = DN_Str8FromFmtVArena(&scratch.arena, fmt, args);
+  DN_Str8 path = DN_Str8FmtVArena(&scratch.arena, fmt, args);
   va_end(args);
   DN_Str8 result = DN_OS_PathArena(arena, path);
-  DN_TCScratchEnd(&scratch);
+  DN_TcScratchEnd(&scratch);
   return result;
 }
 
 DN_API DN_Str8 DN_OS_PathFmtPool(DN_Pool *pool, DN_FMT_ATTRIB char const *fmt, ...)
 {
-  DN_TCScratch scratch = DN_TCScratchBeginArena(&pool->arena, 1);
+  DN_TcScratch scratch = DN_TcScratchBeginArena(&pool->arena, 1);
   va_list    args;
   va_start(args, fmt);
-  DN_Str8 path = DN_Str8FromFmtVArena(&scratch.arena, fmt, args);
+  DN_Str8 path = DN_Str8FmtVArena(&scratch.arena, fmt, args);
   va_end(args);
   DN_Str8 result = DN_OS_PathPool(pool, path);
-  DN_TCScratchEnd(&scratch);
+  DN_TcScratchEnd(&scratch);
   return result;
 }
 
-DN_API DN_OSExecResult DN_OS_Exec(DN_Str8Slice cmd_line, DN_OSExecArgs *args, DN_Arena *arena, DN_ErrSink *error)
+DN_API DN_OSExecArgs DN_OS_ExecArgsDefault()
+{
+  DN_OSExecArgs result  = {};
+  result.flags         |= DN_OSExecFlags_SaveOutput;
+  return result;
+}
+
+DN_API DN_OSExecResult DN_OS_Exec(DN_Str8Slice cmd_line, DN_OSExecArgs args, DN_Arena *arena, DN_ErrSink *error)
 {
   DN_OSExecAsyncHandle async_handle = DN_OS_ExecAsync(cmd_line, args, error);
   DN_OSExecResult      result       = DN_OS_ExecWait(async_handle, arena, error);
   return result;
 }
 
-DN_API DN_OSExecResult DN_OS_ExecOrAbort(DN_Str8Slice cmd_line, DN_OSExecArgs *args, DN_Arena *arena)
+DN_API DN_OSExecResult DN_OS_ExecOrAbort(DN_Str8Slice cmd_line, DN_OSExecArgs args, DN_Arena *arena)
 {
-  DN_ErrSink     *error  = DN_TCErrSinkBegin(DN_ErrSinkMode_Nil);
+  DN_ErrSink     *error  = DN_TcErrSinkBegin(DN_ErrSinkMode_Nil);
   DN_OSExecResult result = DN_OS_Exec(cmd_line, args, arena, error);
   if (result.os_error_code)
     DN_ErrSinkEndExitIfErrorF(error, result.os_error_code, "OS failed to execute the requested command returning the error code %u", result.os_error_code);
@@ -12412,7 +12418,7 @@ static void DN_OS_ThreadExecute_(void *user_context)
   DN_OS_SemaphoreWait(&thread->thread_exec_wait_for_thread_id_sem, DN_OS_SEMAPHORE_INFINITE_TIMEOUT);
 
   // NOTE: Setup thread context (TLS) _after_ thread ID is setup.
-  DN_TCInitFromHeap(&thread->context, thread->thread_id, thread->tc_init_args, DN_OS_HeapInitDefault());
+  DN_TcInitFromHeap(&thread->context, thread->thread_id, thread->tc_init_args, DN_OS_HeapInitDefault());
 
   // NOTE: Once all initialisation is done, if the thread is to be detached, make a copy of the
   // thread pointer because the caller is not guaranteeing to keep the thread pointer alive (they
@@ -12425,9 +12431,9 @@ static void DN_OS_ThreadExecute_(void *user_context)
 
   // NOTE: Equip the pointers into TLS only _after_ the thread context is copied (if it was
   // detached) to avoid potential dangling ref in the TLS.
-  DN_TCEquip(&thread->context);
+  DN_TcEquip(&thread->context);
   if (thread->is_lane_set) {
-    DN_OS_TCThreadLaneEquip(thread->lane);
+    DN_OS_TcThreadLaneEquip(thread->lane);
     DN_OS_ThreadSetNameFmt("L%02zu/%02zu T%zu", thread->lane.index, thread->lane.count, thread->thread_id);
   } else {
     DN_OS_ThreadSetNameFmt("T%zu", thread->lane.index, thread->lane.count, thread->thread_id);
@@ -12449,7 +12455,7 @@ static void DN_OS_ThreadExecute_(void *user_context)
     // up ourselves.
     DN_OS_SemaphoreDeinit(&thread->join_done_sem);
     #endif
-    DN_TCDeinit(&thread->context, DN_TCDeinitArenas_Yes);
+    DN_TcDeinit(&thread->context, DN_TcDeinitArenas_Yes);
   } else {
     #if !defined(DN_PLATFORM_WIN32)
     DN_OS_SemaphoreIncrement(&thread->join_done_sem, 1); // NOTE: Signal for DN_OS_ThreadJoin waits on this.
@@ -12503,7 +12509,7 @@ static void DN_OS_ThreadPostInit_(DN_OSThread *thread, bool result)
 DN_API DN_OSThreadInitArgs DN_OS_ThreadInitArgsDefault()
 {
   DN_OSThreadInitArgs result = {};
-  result.tc_args             = DN_TCInitArgsDefault();
+  result.tc_args             = DN_TcInitArgsDefault();
   return result;
 }
 
@@ -12515,7 +12521,7 @@ DN_API bool DN_OS_ThreadInit(DN_OSThread *thread, DN_OSThreadFunc *func, DN_OSTh
 
 DN_API void DN_OS_ThreadSetNameFmt(char const *fmt, ...)
 {
-  DN_TCCore *tls = DN_TCGet();
+  DN_TcCore *tls = DN_TcGet();
   va_list args;
   va_start(args, fmt);
   tls->name = DN_Str8x64FromFmtV(fmt, args);
@@ -12615,29 +12621,29 @@ DN_API void DN_OS_ThreadLanewayDispatch(DN_OSThreadLaneway *laneway, DN_OSThread
   }
 }
 
-DN_API void DN_OS_ThreadLanewayJoin(DN_OSThreadLaneway *laneway, DN_U32 timeout_ms, DN_TCDeinitArenas deinit_arenas)
+DN_API void DN_OS_ThreadLanewayJoin(DN_OSThreadLaneway *laneway, DN_U32 timeout_ms, DN_TcDeinitArenas deinit_arenas)
 {
   for (DN_ForItSize(it, DN_OSThread, laneway->threads, laneway->threads_count))
     DN_OS_ThreadJoin(it.data, timeout_ms, deinit_arenas);
   DN_OS_BarrierDeinit(&laneway->barrier);
 }
 
-DN_API DN_OSThreadLane *DN_OS_TCThreadLane()
+DN_API DN_OSThreadLane *DN_OS_TcThreadLane()
 {
-  DN_TCCore       *tc     = DN_TCGet();
+  DN_TcCore       *tc     = DN_TcGet();
   DN_OSThreadLane *result = tc ? DN_Cast(DN_OSThreadLane *) tc->lane_opaque : nullptr;
   return result;
 }
 
-DN_API void DN_OS_TCThreadLaneSync(void **ptr_to_share)
+DN_API void DN_OS_TcThreadLaneSync(void **ptr_to_share)
 {
-  DN_OSThreadLane *lane = DN_OS_TCThreadLane();
+  DN_OSThreadLane *lane = DN_OS_TcThreadLane();
   DN_OS_ThreadLaneSync(lane, ptr_to_share);
 }
 
-DN_API DN_OSThreadLane DN_OS_TCThreadLaneEquip(DN_OSThreadLane lane)
+DN_API DN_OSThreadLane DN_OS_TcThreadLaneEquip(DN_OSThreadLane lane)
 {
-  DN_TCCore       *tc   = DN_TCGet();
+  DN_TcCore       *tc   = DN_TcGet();
   DN_OSThreadLane *curr = DN_Cast(DN_OSThreadLane *) tc->lane_opaque;
   DN_StaticAssert(sizeof(tc->lane_opaque) >= sizeof(DN_OSThreadLane));
   DN_OSThreadLane result = *curr;
@@ -12702,7 +12708,7 @@ DN_API void DN_OS_AsyncDeinit(DN_OSAsyncCore *async)
   DN_AtomicSetValue32(&async->join_threads, true);
   DN_OS_SemaphoreIncrement(&async->worker_sem, async->thread_count);
   for (DN_ForItSize(it, DN_OSThread, async->threads, async->thread_count))
-    DN_OS_ThreadJoin(it.data, UINT32_MAX, DN_TCDeinitArenas_Yes);
+    DN_OS_ThreadJoin(it.data, UINT32_MAX, DN_TcDeinitArenas_Yes);
 }
 
 static bool DN_OS_AsyncQueueTask_(DN_OSAsyncCore *async, DN_OSAsyncTask const *task, DN_U64 wait_time_ms) {
@@ -12822,10 +12828,10 @@ DN_API void DN_OS_Print(DN_OSPrintDest dest, DN_Str8 string)
   unsigned long bytes_written = 0;
   (void)bytes_written;
   if (print_to_console) {
-    DN_TCScratch scratch = DN_TCScratchBeginArena(nullptr, 0);
+    DN_TcScratch scratch = DN_TcScratchBeginArena(nullptr, 0);
     DN_Str16 string16 = DN_OS_W32Str8ToStr16(&scratch.arena, string);
     WriteConsoleW(print_handle, string16.data, DN_Cast(unsigned long) string16.count, &bytes_written, nullptr);
-    DN_TCScratchEnd(&scratch);
+    DN_TcScratchEnd(&scratch);
   } else {
     WriteFile(print_handle, string.data, DN_Cast(unsigned long) string.count, &bytes_written, nullptr);
   }
@@ -12854,14 +12860,14 @@ DN_API void DN_OS_PrintStyle(DN_OSPrintDest dest, DN_LogStyle style, DN_Str8 str
 {
   if (string.data && string.count) {
     if (style.colour) {
-      DN_Str8x32 colour = DN_Str8x32FromANSIColourCodeU8RGB(DN_ANSIColourMode_Fg, style.r, style.g, style.b);
+      DN_Str8x32 colour = DN_Str8x32FromAnsiColourCodeU8Rgb(DN_AnsiColourMode_Fg, style.r, style.g, style.b);
       DN_OS_Print(dest, DN_Str8FromStruct(&colour));
     }
     if (style.bold == DN_LogBold_Yes)
-      DN_OS_Print(dest, DN_Str8Lit(DN_ANSICodeBoldLit));
+      DN_OS_Print(dest, DN_Str8Lit(DN_AnsiCodeBoldLit));
     DN_OS_Print(dest, string);
     if (style.colour || style.bold == DN_LogBold_Yes)
-      DN_OS_Print(dest, DN_Str8Lit(DN_ANSICodeResetLit));
+      DN_OS_Print(dest, DN_Str8Lit(DN_AnsiCodeResetLit));
   }
 }
 
@@ -12887,14 +12893,14 @@ DN_API void DN_OS_PrintFVStyle(DN_OSPrintDest dest, DN_LogStyle style, DN_FMT_AT
 {
   if (fmt) {
     if (style.colour) {
-      DN_Str8x32 colour = DN_Str8x32FromANSIColourCodeU8RGB(DN_ANSIColourMode_Fg, style.r, style.g, style.b);
+      DN_Str8x32 colour = DN_Str8x32FromAnsiColourCodeU8Rgb(DN_AnsiColourMode_Fg, style.r, style.g, style.b);
       DN_OS_Print(dest, DN_Str8FromStruct(&colour));
     }
     if (style.bold == DN_LogBold_Yes)
-      DN_OS_Print(dest, DN_Str8Lit(DN_ANSICodeBoldLit));
+      DN_OS_Print(dest, DN_Str8Lit(DN_AnsiCodeBoldLit));
     DN_OS_PrintFV(dest, fmt, args);
     if (style.colour || style.bold == DN_LogBold_Yes)
-      DN_OS_Print(dest, DN_Str8Lit(DN_ANSICodeResetLit));
+      DN_OS_Print(dest, DN_Str8Lit(DN_AnsiCodeResetLit));
   }
 }
 
@@ -12956,10 +12962,10 @@ DN_API DN_StackTrace DN_StackTraceFromAllocator(DN_Allocator allocator, DN_U16 l
     w32->sym_initialised = true;
     SymSetOptions(SYMOPT_LOAD_LINES);
     if (!SymInitialize(result.process, nullptr /*UserSearchPath*/, true /*fInvadeProcess*/)) {
-      DN_TCScratch  scratch = DN_TCScratchBeginAllocator(&allocator, 1);
+      DN_TcScratch  scratch = DN_TcScratchBeginAllocator(&allocator, 1);
       DN_OSW32Error error   = DN_OS_W32LastError(&scratch.arena);
       DN_LogErrorF("SymInitialize failed, stack trace can not be generated (%lu): %.*s\n", error.code, DN_Str8PrintFmt(error.msg));
-      DN_TCScratchEnd(&scratch);
+      DN_TcScratchEnd(&scratch);
     }
   }
 
@@ -13046,11 +13052,11 @@ DN_API DN_Str8 DN_Str8FromStackTraceAllocator(DN_Allocator allocator, DN_StackTr
   if (!trace)
     return result;
 
-  DN_TCScratch   scratch = DN_TCScratchBeginAllocator(&allocator, 1);
+  DN_TcScratch   scratch = DN_TcScratchBeginAllocator(&allocator, 1);
   DN_Str8Builder builder = DN_Str8BuilderFromArena(&scratch.arena);
   DN_StackTraceAddToStr8Builder_(trace, &builder, skip);
   result = DN_Str8FromStr8BuilderAllocator(&builder, allocator);
-  DN_TCScratchEnd(&scratch);
+  DN_TcScratchEnd(&scratch);
   return result;
 }
 
@@ -13060,20 +13066,20 @@ DN_API DN_Str8 DN_Str8FromStackTraceArena(DN_Arena *arena, DN_StackTrace const *
   if (!trace || !arena)
     return result;
 
-  DN_TCScratch   scratch = DN_TCScratchBeginArena(&arena, 1);
+  DN_TcScratch   scratch = DN_TcScratchBeginArena(&arena, 1);
   DN_Str8Builder builder = DN_Str8BuilderFromArena(&scratch.arena);
   DN_StackTraceAddToStr8Builder_(trace, &builder, skip);
   result = DN_Str8FromStr8BuilderArena(&builder, arena);
-  DN_TCScratchEnd(&scratch);
+  DN_TcScratchEnd(&scratch);
   return result;
 }
 
 DN_API DN_Str8 DN_Str8FromStackTraceNowAllocator(DN_Allocator allocator, DN_U16 limit, DN_U16 skip)
 {
-  DN_TCScratch  scratch = DN_TCScratchBeginArena(DN_Cast(DN_Arena **) & allocator.context, 1);
+  DN_TcScratch  scratch = DN_TcScratchBeginArena(DN_Cast(DN_Arena **) & allocator.context, 1);
   DN_StackTrace walk    = DN_StackTraceFromArena(&scratch.arena, limit);
   DN_Str8       result  = DN_Str8FromStackTraceAllocator(allocator, &walk, skip);
-  DN_TCScratchEnd(&scratch);
+  DN_TcScratchEnd(&scratch);
   return result;
 }
 
@@ -13100,7 +13106,7 @@ DN_API DN_StackTraceFrameSlice DN_StackTraceGetFrames(DN_Arena *arena, DN_U16 li
   if (!arena)
     return result;
 
-  DN_TCScratch            scratch = DN_TCScratchBeginArena(&arena, 1);
+  DN_TcScratch            scratch = DN_TcScratchBeginArena(&arena, 1);
   DN_StackTrace walk    = DN_StackTraceFromArena(&scratch.arena, limit);
   if (walk.size) {
     if (DN_ISliceAllocArena(&result, walk.size, DN_ZMem_No, arena)) {
@@ -13109,7 +13115,7 @@ DN_API DN_StackTraceFrameSlice DN_StackTraceGetFrames(DN_Arena *arena, DN_U16 li
         result.data[slice_index++] = DN_StackTraceRawFrameToFrame(arena, it.raw_frame);
     }
   }
-  DN_TCScratchEnd(&scratch);
+  DN_TcScratchEnd(&scratch);
   return result;
 }
 
@@ -13162,13 +13168,13 @@ DN_API DN_StackTraceFrame DN_StackTraceRawFrameToFrame(DN_Arena *arena, DN_Stack
 
 DN_API void DN_StackTracePrint(DN_U16 limit)
 {
-  DN_TCScratch            scratch     = DN_TCScratchBeginArena(nullptr, 0);
+  DN_TcScratch            scratch     = DN_TcScratchBeginArena(nullptr, 0);
   DN_StackTraceFrameSlice stack_trace = DN_StackTraceGetFrames(&scratch.arena, limit);
   for (DN_ForItSize(it, DN_StackTraceFrame, stack_trace.data, stack_trace.count)) {
     DN_StackTraceFrame frame = *it.data;
     DN_OS_PrintErrLnF("%.*s(%I64u): %.*s", DN_Str8PrintFmt(frame.file_name), frame.line_number, DN_Str8PrintFmt(frame.function_name));
   }
-  DN_TCScratchEnd(&scratch);
+  DN_TcScratchEnd(&scratch);
 }
 
 DN_API void DN_StackTraceReloadSymbols()
@@ -13249,7 +13255,7 @@ bool DN_NET_ResponseIsReady(DN_NETResponse const* resp)
 
 DN_Str8 DN_NET_Str8DiagnosticFromResponse(DN_NETResponse const* resp, DN_Arena *arena)
 {
-  DN_TCScratch   scratch     = DN_TCScratchBeginArena(&arena, 1);
+  DN_TcScratch   scratch     = DN_TcScratchBeginArena(&arena, 1);
   DN_Str8Builder builder     = DN_Str8BuilderFromArena(&scratch.arena);
   DN_Str8BuilderAppendF(&builder, "Request (%s", resp->type == DN_NETRequestType_HTTP ? "HTTP" : "WS");
   if (resp->type == DN_NETRequestType_HTTP) {
@@ -13265,7 +13271,7 @@ DN_Str8 DN_NET_Str8DiagnosticFromResponse(DN_NETResponse const* resp, DN_Arena *
       DN_Str8BuilderAppendF(&builder, "%s%.*s", resp->body.count ? ". " : "", DN_Str8PrintFmt(resp->error_str8));
   }
   DN_Str8 result = DN_Str8FromStr8BuilderArena(&builder, arena);
-  DN_TCScratchEnd(&scratch);
+  DN_TcScratchEnd(&scratch);
   return result;
 }
 
@@ -13439,7 +13445,7 @@ static int32_t DN_NET_CurlThreadEntryPoint_(DN_OSThread *thread)
   DN_OS_ThreadSetNameFmt("%.*s", DN_Str8PrintFmt(curl->thread.name));
 
   while (!curl->kill_thread) {
-    DN_TCScratch tmem = DN_TCScratchBeginArena(nullptr, 0);
+    DN_TcScratch tmem = DN_TcScratchBeginArena(nullptr, 0);
 
     // NOTE: Handle events sitting in the ring queue
     for (bool dequeue_ring = true; dequeue_ring;) {
@@ -13596,13 +13602,13 @@ static int32_t DN_NET_CurlThreadEntryPoint_(DN_OSThread *thread)
               req->response.state = DN_NETResponseState_WSOpen;
             }
           } else {
-            req->response.error_str8 = DN_Str8FromFmtArena(&req->start_response_arena, "Failed to get HTTP response status (CURL %d): %s", msg->data.result, curl_easy_strerror(get_result));
+            req->response.error_str8 = DN_Str8FmtArena(&req->start_response_arena, "Failed to get HTTP response status (CURL %d): %s", msg->data.result, curl_easy_strerror(get_result));
             req->response.state      = DN_NETResponseState_Error;
           }
         } else {
           DN_USize curl_extended_error_size = DN_CStr8Count(curl_req->error);
           req->response.state               = DN_NETResponseState_Error;
-          req->response.error_str8          = DN_Str8FromFmtArena(&req->start_response_arena,
+          req->response.error_str8          = DN_Str8FmtArena(&req->start_response_arena,
                                                          "HTTP request '%.*s' failed (CURL %d): %s%s%s%s",
                                                          DN_Str8PrintFmt(req->url),
                                                          msg->data.result,
@@ -13725,7 +13731,7 @@ static int32_t DN_NET_CurlThreadEntryPoint_(DN_OSThread *thread)
         } else if (receive_result != CURLE_OK) {
           DN_USize curl_extended_error_size = DN_CStr8Count(curl_req->error);
           req->response.state           = DN_NETResponseState_Error;
-          req->response.error_str8      = DN_Str8FromFmtArena(&req->start_response_arena,
+          req->response.error_str8      = DN_Str8FmtArena(&req->start_response_arena,
                                                                   "Websocket receive '%.*s' failed (CURL %d): %s%s%s%s",
                                                                   DN_Str8PrintFmt(req->url),
                                                                   receive_result,
@@ -13745,7 +13751,7 @@ static int32_t DN_NET_CurlThreadEntryPoint_(DN_OSThread *thread)
 
     DN_I32 sleep_time_ms = ws_count > 0 ? 16 : INT32_MAX;
     curl_multi_poll(curl->thread_curlm, nullptr, 0, sleep_time_ms, nullptr);
-    DN_TCScratchEnd(&tmem);
+    DN_TcScratchEnd(&tmem);
   }
 
   return 0;
@@ -13789,7 +13795,7 @@ void DN_NET_CurlDeinit(DN_NETCore *net)
   DN_NETCurlCore *curl = DN_Cast(DN_NETCurlCore *) net->context;
   curl->kill_thread    = true;
   curl_multi_wakeup(curl->thread_curlm);
-  DN_OS_ThreadJoin(&curl->thread, UINT32_MAX, DN_TCDeinitArenas_Yes);
+  DN_OS_ThreadJoin(&curl->thread, UINT32_MAX, DN_TcDeinitArenas_Yes);
 }
 
 static DN_NETRequestHandle DN_NET_CurlDoRequest_(DN_NETCore *net, DN_Str8 url, DN_Str8 method, DN_NETDoHTTPArgs const *args, DN_NETRequestType type)
@@ -14204,7 +14210,7 @@ static bool DN_NET_EmcWSOnClose(int eventType, EmscriptenWebSocketCloseEvent con
   DN_NETCore       *net       = DN_Cast(DN_NETCore *) req->context[0];
   DN_NETEmcWSEvent *net_event = DN_NET_EmcAllocWSEvent_(req);
   net_event->state            = DN_NETResponseState_WSClose;
-  net_event->payload          = DN_Str8FromFmtArena(&req->start_response_arena,
+  net_event->payload          = DN_Str8FmtArena(&req->start_response_arena,
                                                     "Websocket closed '%.*s': (%u) %s (was %s close)",
                                                     DN_Str8PrintFmt(req->url),
                                                     event->code,

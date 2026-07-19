@@ -228,7 +228,7 @@ DN_API bool DN_OS_SetEnvVar(DN_Str8 name, DN_Str8 value)
 
 DN_API DN_OSDiskSpace DN_OS_DiskSpace(DN_Str8 path)
 {
-  DN_TCScratch   scratch           = DN_TCScratchBeginArena(nullptr, 0);
+  DN_TcScratch   scratch           = DN_TcScratchBeginArena(nullptr, 0);
   DN_OSDiskSpace result            = {};
   DN_Str8        path_z_terminated = DN_Str8FromStr8Arena(path, &scratch.arena);
   struct statvfs info              = {};
@@ -237,11 +237,11 @@ DN_API DN_OSDiskSpace DN_OS_DiskSpace(DN_Str8 path)
     result.avail   = info.f_bavail * info.f_frsize;
     result.size    = info.f_blocks * info.f_frsize;
   }
-  DN_TCScratchEnd(&scratch);
+  DN_TcScratchEnd(&scratch);
   return result;
 }
 
-DN_API DN_Str8 DN_OS_EXEPath(DN_Arena *arena)
+DN_API DN_Str8 DN_OS_ExePath(DN_Arena *arena)
 {
   DN_Str8 result = {};
   if (!arena)
@@ -387,7 +387,7 @@ DN_API bool DN_OS_FileCopy(DN_Str8 src, DN_Str8 dest, bool overwrite, DN_ErrSink
   result                = (bytes_written == stat_existing.st_size);
   if (!result) {
     int        error_code = errno;
-    DN_TCScratch scratch               = DN_TCScratchBeginArena(nullptr, 0);
+    DN_TcScratch scratch               = DN_TcScratchBeginArena(nullptr, 0);
     DN_Str8      file_size_str8     = DN_Str8FromByteCount(scratch.arena, stat_existing.st_size, DN_ByteCountType_Auto);
     DN_Str8      bytes_written_str8 = DN_Str8FromByteCount(scratch.arena, bytes_written, DN_ByteCountType_Auto);
     DN_rrSinkAppendF(error,
@@ -400,7 +400,7 @@ DN_API bool DN_OS_FileCopy(DN_Str8 src, DN_Str8 dest, bool overwrite, DN_ErrSink
                      DN_Str8PrintFmt(file_size_str8),
                      error_code,
                      strerror(error_code));
-    DN_TCScratchEnd(&scratch);
+    DN_TcScratchEnd(&scratch);
   }
 
   #endif
@@ -513,10 +513,10 @@ DN_API DN_OSFileRead DN_OS_FileRead(DN_OSFile *file, void *buffer, DN_USize size
 
   result.bytes_read = fread(buffer, 1, size, DN_Cast(FILE *) file->handle);
   if (feof(DN_Cast(FILE*)file->handle)) {
-    DN_TCScratch scratch          = DN_TCScratchBeginArena(nullptr, 0);
+    DN_TcScratch scratch          = DN_TcScratchBeginArena(nullptr, 0);
     DN_Str8x32   buffer_size_str8 = DN_Str8x32FromByteCountU64Auto(size);
     DN_ErrSinkAppendF(err, 1, "Failed to read %S from file", buffer_size_str8);
-    DN_TCScratchEnd(&scratch);
+    DN_TcScratchEnd(&scratch);
     return result;
   }
 
@@ -532,10 +532,10 @@ DN_API bool DN_OS_FileWritePtr(DN_OSFile *file, void const *buffer, DN_USize siz
       fwrite(buffer, DN_Cast(DN_USize) size, 1 /*count*/, DN_Cast(FILE *) file->handle) ==
       1 /*count*/;
   if (!result) {
-    DN_TCScratch scratch          = DN_TCScratchBeginArena(nullptr, 0);
+    DN_TcScratch scratch          = DN_TcScratchBeginArena(nullptr, 0);
     DN_Str8x32   buffer_size_str8 = DN_Str8x32FromByteCountU64Auto(size);
     DN_ErrSinkAppendF(err, 1, "Failed to write buffer (%s) to file handle", DN_Str8PrintFmt(buffer_size_str8));
-    DN_TCScratchEnd(&scratch);
+    DN_TcScratchEnd(&scratch);
   }
   return result;
 }
@@ -623,7 +623,7 @@ DN_API bool DN_OS_PathIsDir(DN_Str8 path)
 
 DN_API bool DN_OS_PathMakeDir(DN_Str8 path)
 {
-  DN_TCScratch scratch = DN_TCScratchBeginArena(nullptr, 0);
+  DN_TcScratch scratch = DN_TcScratchBeginArena(nullptr, 0);
   bool         result  = true;
 
   // TODO(doyle): Implement this without using the path indexes, it's not
@@ -650,7 +650,7 @@ DN_API bool DN_OS_PathMakeDir(DN_Str8 path)
         // NOTE: There's something that exists in at this path, but
         // it's not a directory. This request to make a directory is
         // invalid.
-        DN_TCScratchEnd(&scratch);
+        DN_TcScratchEnd(&scratch);
         return false;
       } else if (DN_OS_PathIsDir(copy)) {
         // NOTE: We found a directory, we can stop here and start
@@ -675,7 +675,7 @@ DN_API bool DN_OS_PathMakeDir(DN_Str8 path)
     if (index != 0)
       copy.data[path_index] = temp;
   }
-  DN_TCScratchEnd(&scratch);
+  DN_TcScratchEnd(&scratch);
   return result;
 }
 
@@ -789,7 +789,7 @@ DN_API DN_OSExecResult DN_OS_ExecWait(DN_OSExecAsyncHandle handle,
 
   // NOTE: Read the data from the read end of the pipe
   if (result.os_error_code == 0) {
-    DN_TCScratch scratch = DN_TCScratchBeginArena(&arena, 1);
+    DN_TcScratch scratch = DN_TcScratchBeginArena(&arena, 1);
     if (arena && handle.stdout_read) {
       char           buffer[4096];
       DN_Str8Builder builder = DN_Str8BuilderFromArena(&scratch.arena);
@@ -817,7 +817,7 @@ DN_API DN_OSExecResult DN_OS_ExecWait(DN_OSExecAsyncHandle handle,
 
       result.stderr_text = DN_Str8FromStr8BuilderArena(&builder, arena);
     }
-    DN_TCScratchEnd(&scratch);
+    DN_TcScratchEnd(&scratch);
   }
 
   close(stdout_pipe[DN_OSPipeType__Read]);
@@ -826,25 +826,25 @@ DN_API DN_OSExecResult DN_OS_ExecWait(DN_OSExecAsyncHandle handle,
 }
 
 DN_API DN_OSExecAsyncHandle DN_OS_ExecAsync(DN_Str8Slice   cmd_line,
-                                            DN_OSExecArgs *args,
+                                            DN_OSExecArgs  args,
                                             DN_ErrSink    *error)
 {
 #if defined(DN_PLATFORM_EMSCRIPTEN)
   DN_AssertInvalidCodePathF("Unsupported operation");
 #endif
-  DN_VerifyWarningF(args->environment.count == 0, "Environment variables are unimplemented in POSIX");
+  DN_VerifyWarningF(args.environment.count == 0, "Environment variables are unimplemented in POSIX");
   DN_OSExecAsyncHandle result = {};
   if (cmd_line.count == 0)
     return result;
 
-  DN_TCScratch scratch = DN_TCScratchBeginArena(nullptr, 0);
-  DN_DEFER { DN_TCScratchEnd(&scratch); };
+  DN_TcScratch scratch = DN_TcScratchBeginArena(nullptr, 0);
+  DN_DEFER { DN_TcScratchEnd(&scratch); };
   DN_Str8    cmd_rendered                      = DN_Str8SliceRender(cmd_line, DN_Str8Lit(" "), &scratch.arena);
   int        stdout_pipe[DN_OSPipeType__Count] = {};
   int        stderr_pipe[DN_OSPipeType__Count] = {};
 
   // NOTE: Open stdout pipe
-  if (DN_BitIsSet(args->flags, DN_OSExecFlags_SaveStdout)) {
+  if (DN_BitIsSet(args.flags, DN_OSExecFlags_SaveStdout)) {
     if (pipe(stdout_pipe) == -1) {
       result.os_error_code = errno;
       DN_ErrSinkAppendF(
@@ -868,8 +868,8 @@ DN_API DN_OSExecAsyncHandle DN_OS_ExecAsync(DN_Str8Slice   cmd_line,
   };
 
   // NOTE: Open stderr pipe //////////////////////////////////////////////////////////////////////
-  if (DN_BitIsSet(args->flags, DN_OSExecFlags_SaveStderr)) {
-    if (DN_BitIsSet(args->flags, DN_OSExecFlags_MergeStderrToStdout)) {
+  if (DN_BitIsSet(args.flags, DN_OSExecFlags_SaveStderr)) {
+    if (DN_BitIsSet(args.flags, DN_OSExecFlags_MergeStderrToStdout)) {
       stderr_pipe[DN_OSPipeType__Read]  = stdout_pipe[DN_OSPipeType__Read];
       stderr_pipe[DN_OSPipeType__Write] = stdout_pipe[DN_OSPipeType__Write];
     } else if (pipe(stderr_pipe) == -1) {
@@ -907,7 +907,7 @@ DN_API DN_OSExecAsyncHandle DN_OS_ExecAsync(DN_Str8Slice   cmd_line,
   }
 
   if (child_pid == 0) { // Child process
-    if (DN_BitIsSet(args->flags, DN_OSExecFlags_SaveStdout) &&
+    if (DN_BitIsSet(args.flags, DN_OSExecFlags_SaveStdout) &&
         (dup2(stdout_pipe[DN_OSPipeType__Write], STDOUT_FILENO) == -1)) {
       result.os_error_code = errno;
       DN_ErrSinkAppendF(
@@ -919,7 +919,7 @@ DN_API DN_OSExecAsyncHandle DN_OS_ExecAsync(DN_Str8Slice   cmd_line,
       return result;
     }
 
-    if (DN_BitIsSet(args->flags, DN_OSExecFlags_SaveStderr) &&
+    if (DN_BitIsSet(args.flags, DN_OSExecFlags_SaveStderr) &&
         (dup2(stderr_pipe[DN_OSPipeType__Write], STDERR_FILENO) == -1)) {
       result.os_error_code = errno;
       DN_ErrSinkAppendF(
@@ -962,9 +962,9 @@ DN_API DN_OSExecAsyncHandle DN_OS_ExecAsync(DN_Str8Slice   cmd_line,
       free(prev_working_dir);
     };
 
-    if (args->working_dir.count) {
+    if (args.working_dir.count) {
       prev_working_dir    = get_current_dir_name();
-      DN_Str8 working_dir = DN_Str8FromStr8Arena(args->working_dir, &scratch.arena);
+      DN_Str8 working_dir = DN_Str8FromStr8Arena(args.working_dir, &scratch.arena);
       if (chdir(working_dir.data) == -1) {
         result.os_error_code = errno;
         DN_ErrSinkAppendF(
@@ -999,7 +999,7 @@ DN_API DN_OSExecAsyncHandle DN_OS_ExecAsync(DN_Str8Slice   cmd_line,
             &stdout_pipe[DN_OSPipeType__Write],
             sizeof(stdout_pipe[DN_OSPipeType__Write]));
 
-  if (DN_BitIsSet(args->flags, DN_OSExecFlags_SaveStderr) && DN_BitIsNotSet(args->flags, DN_OSExecFlags_MergeStderrToStdout)) {
+  if (DN_BitIsSet(args.flags, DN_OSExecFlags_SaveStderr) && DN_BitIsNotSet(args.flags, DN_OSExecFlags_MergeStderrToStdout)) {
     DN_Memcpy(&result.stderr_read,
               &stderr_pipe[DN_OSPipeType__Read],
               sizeof(stderr_pipe[DN_OSPipeType__Read]));
@@ -1007,7 +1007,7 @@ DN_API DN_OSExecAsyncHandle DN_OS_ExecAsync(DN_Str8Slice   cmd_line,
               &stderr_pipe[DN_OSPipeType__Write],
               sizeof(stderr_pipe[DN_OSPipeType__Write]));
   }
-  result.exec_flags = args->flags;
+  result.exec_flags = args.flags;
   DN_Memcpy(&result.process, &child_pid, sizeof(child_pid));
   return result;
 }
@@ -1017,7 +1017,7 @@ DN_API DN_OSExecResult DN_OS_ExecPump(DN_OSExecAsyncHandle handle,
                                       size_t              *stdout_size,
                                       char                *stderr_buffer,
                                       size_t              *stderr_size,
-                                      DN_U32             timeout_ms,
+                                      DN_U32               timeout_ms,
                                       DN_ErrSink          *err)
 {
   DN_AssertInvalidCodePath;
@@ -1322,7 +1322,7 @@ DN_API bool DN_OS_ThreadInitLane(DN_OSThread *thread, DN_OSThreadFunc *func, DN_
   return result;
 }
 
-DN_API bool DN_OS_ThreadJoin(DN_OSThread *thread, DN_U32 timeout_ms, DN_TCDeinitArenas deinit_arenas)
+DN_API bool DN_OS_ThreadJoin(DN_OSThread *thread, DN_U32 timeout_ms, DN_TcDeinitArenas deinit_arenas)
 {
   bool result = true;
   if (thread && thread->handle) {
@@ -1337,7 +1337,7 @@ DN_API bool DN_OS_ThreadJoin(DN_OSThread *thread, DN_U32 timeout_ms, DN_TCDeinit
       pthread_join(thread_id, &return_val);
       thread->handle    = {};
       thread->thread_id = {};
-      DN_TCDeinit(&thread->context, deinit_arenas);
+      DN_TcDeinit(&thread->context, deinit_arenas);
       DN_OS_SemaphoreDeinit(&thread->join_done_sem);
     } else {
       result = false;
@@ -1371,11 +1371,11 @@ DN_API void DN_OS_PosixThreadSetName(DN_Str8 name)
 #if defined(DN_PLATFORM_EMSCRIPTEN)
   (void)name;
 #else
-  DN_TCScratch scratch = DN_TCScratchBeginArena(nullptr, 0);
+  DN_TcScratch scratch = DN_TcScratchBeginArena(nullptr, 0);
   DN_Str8      copy    = DN_Str8FromStr8Arena(name, &scratch.arena);
   pthread_t    thread  = pthread_self();
   pthread_setname_np(thread, (char *)copy.data);
-  DN_TCScratchEnd(&scratch);
+  DN_TcScratchEnd(&scratch);
 #endif
 }
 
@@ -1395,7 +1395,7 @@ DN_API DN_OSPosixProcSelfStatus DN_OS_PosixProcSelfStatus()
   DN_OSFile    file = DN_OS_FileOpen(DN_Str8Lit("/proc/self/status"), DN_OSFileOpen_OpenIfExist, DN_OSFileAccess_Read, nullptr);
 
   if (!file.error) {
-    DN_TCScratch   scratch = DN_TCScratchBeginArena(nullptr, 0);
+    DN_TcScratch   scratch = DN_TcScratchBeginArena(nullptr, 0);
     char           buf[256];
     DN_Str8Builder builder = DN_Str8BuilderFromArena(&scratch.arena);
     for (;;) {
@@ -1439,7 +1439,7 @@ DN_API DN_OSPosixProcSelfStatus DN_OS_PosixProcSelfStatus()
         DN_Assert(to_u64.success);
       }
     }
-    DN_TCScratchEnd(&scratch);
+    DN_TcScratchEnd(&scratch);
   }
   DN_OS_FileClose(&file);
   return result;
