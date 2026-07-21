@@ -3348,12 +3348,12 @@ DN_API DN_F32                   DN_Pcg32NextF32                                 
 DN_API DN_F64                   DN_Pcg32NextF64                                        (DN_Pcg32 *rng);
 DN_API void                     DN_Pcg32Advance                                        (DN_Pcg32 *rng, DN_U64 delta);
 
-#if !defined(DN_Fnv1a32_SEED)
-  #define DN_Fnv1a32_SEED 2166136261U
+#if !defined(DN_FNV1A32_SEED)
+  #define DN_FNV1A32_SEED 2166136261U
 #endif
 
-#if !defined(DN_Fnv1a64_SEED)
-  #define DN_Fnv1a64_SEED 14695981039346656037ULL
+#if !defined(DN_FNV1A64_SEED)
+  #define DN_FNV1A64_SEED 14695981039346656037ULL
 #endif
 
 DN_API DN_U32                   DN_Fnv1aHashU32FromBytes                               (void const *bytes, DN_USize count, DN_U32 seed);
