@@ -300,6 +300,7 @@
 // NOTE: Platform identification
 #if !defined(DN_PLATFORM_EMSCRIPTEN) && \
     !defined(DN_PLATFORM_POSIX) &&      \
+    !defined(DN_PLATFORM_ARM64) &&      \
     !defined(DN_PLATFORM_WIN32)
   #if defined(__aarch64__) || defined(_M_ARM64)
     #define DN_PLATFORM_ARM64
@@ -3319,7 +3320,14 @@ DN_API void                     DN_ProfilerFmtToStdout                          
 DN_API DN_F64                   DN_ProfilerSecFromTsc                                  (DN_Profiler *profiler, DN_U64 duration_tsc);
 DN_API DN_F64                   DN_ProfilerMsFromTsc                                   (DN_Profiler *profiler, DN_U64 duration_tsc);
 
-DN_API void                     DN_QSort                                               (void *array, DN_USize array_size, DN_USize elem_size, void *user_context, DN_QSortCompareFunc *compare);
+DN_API void                     DN_QSort_                                              (void *array, DN_USize array_size, DN_USize elem_size, void *user_context, DN_QSortCompareFunc *compare);
+#if defined(__cplusplus)
+template <typename T> void      DN_QSortT                                              (T *array, DN_USize array_size, void *user_context, DN_QSortCompareFunc *compare);
+#define                         DN_QSort(array, array_size, user_context, compare)     DN_QSortT(array, array_size, user_context, compare)
+#else
+#define                         DN_QSort(array, array_size, user_context, compare)     DN_QSort_(array, array_size, sizeof(*array), user_context, compare)
+#endif
+
 DN_API bool                     DN_QSortCompareStr8NaturalAsc                          (void const* lhs, void const *rhs, void *user_context);
 DN_API bool                     DN_QSortCompareStr8NaturalDesc                         (void const* lhs, void const *rhs, void *user_context);
 DN_API bool                     DN_QSortCompareStr8LexicographicAsc                    (void const* lhs, void const *rhs, void *user_context);
@@ -3580,7 +3588,7 @@ DN_API DN_F32                  DN_V2F32Area                                     
 
 // NOTE: Grayscale co-efficients from:
 //   https://github.com/EpicGames/UnrealEngine/blob/260bb2e1c5610b31c63a36206eedd289409c5f11/Engine/Source/Runtime/Core/Private/Math/Color.cpp#L304
-DN_V3F32 static const          DN_V3F32_Rgb_LUMINANCE = DN_V3F32From3N(0.3f, 0.59f, 0.11f);
+DN_V3F32 static const          DN_V3F32_RGB_LUMINANCE = DN_V3F32From3N(0.3f, 0.59f, 0.11f);
 
 DN_API bool                    operator==                                              (DN_V3F32  lhs, DN_V3F32  rhs);
 DN_API bool                    operator!=                                              (DN_V3F32  lhs, DN_V3F32  rhs);

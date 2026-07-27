@@ -1414,25 +1414,25 @@ DN_API DN_OSPosixProcSelfStatus DN_OS_PosixProcSelfStatus()
 
     for (DN_ForItSize(line_it, DN_Str8, lines.data, lines.count)) {
       DN_Str8 line = DN_Str8TrimWhitespaceAround(*line_it.data);
-      if (DN_Str8StartsWith(line, NAME, DN_Str8EqCase_Insensitive)) {
+      if (DN_Str8StartsWithInsensitive(line, NAME)) {
         DN_Str8 str8     = DN_Str8TrimWhitespaceAround(DN_Str8Subset(line, NAME.count, line.count));
         result.name_size = DN_Min(str8.count, sizeof(result.name));
         DN_Memcpy(result.name, str8.data, result.name_size);
-      } else if (DN_Str8StartsWith(line, PID, DN_Str8EqCase_Insensitive)) {
+      } else if (DN_Str8StartsWithInsensitive(line, PID)) {
         DN_Str8          str8   = DN_Str8TrimWhitespaceAround(DN_Str8Subset(line, PID.count, line.count));
         DN_U64FromResult to_u64 = DN_U64FromStr8(str8);
         result.pid              = to_u64.value;
         DN_Assert(to_u64.success);
-      } else if (DN_Str8StartsWith(line, VM_SIZE, DN_Str8EqCase_Insensitive)) {
+      } else if (DN_Str8StartsWithInsensitive(line, VM_SIZE)) {
         DN_Str8 size_with_kb = DN_Str8TrimWhitespaceAround(DN_Str8Subset(line, VM_SIZE.count, line.count));
-        DN_Assert(DN_Str8EndsWith(size_with_kb, DN_Str8Lit("kB")));
+        DN_Assert(DN_Str8EndsWithSensitive(size_with_kb, DN_Str8Lit("kB")));
         DN_Str8          vm_size = DN_Str8BSplit(size_with_kb, DN_Str8Lit(" ")).lhs;
         DN_U64FromResult to_u64  = DN_U64FromStr8(vm_size);
         result.vm_size           = DN_Kilobytes(to_u64.value);
         DN_Assert(to_u64.success);
-      } else if (DN_Str8StartsWith(line, VM_PEAK, DN_Str8EqCase_Insensitive)) {
+      } else if (DN_Str8StartsWithInsensitive(line, VM_PEAK)) {
         DN_Str8 size_with_kb = DN_Str8TrimWhitespaceAround(DN_Str8Subset(line, VM_PEAK.count, line.count));
-        DN_Assert(DN_Str8EndsWith(size_with_kb, DN_Str8Lit("kB")));
+        DN_Assert(DN_Str8EndsWithSensitive(size_with_kb, DN_Str8Lit("kB")));
         DN_Str8          vm_size = DN_Str8BSplit(size_with_kb, DN_Str8Lit(" ")).lhs;
         DN_U64FromResult to_u64  = DN_U64FromStr8(vm_size);
         result.vm_peak           = DN_Kilobytes(to_u64.value);
