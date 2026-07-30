@@ -1,5 +1,11 @@
 #if DN_WITH_NET_CURL
   #define DN_NO_WINDOWS_H_REPLACEMENT_HEADER
+  #define CURL_STATICLIB
+  #include <curl/curl.h>
+#endif
+
+#if defined(__EMSCRIPTEN__)
+  #define DN_WITH_NET_EMSCRIPTEN 1
 #endif
 
 #define DN_PARANOIA_LEVEL 1
@@ -7,15 +13,6 @@
 #define DN_WITH_NET       1
 #define DN_WITH_TESTS     1
 #include "dn.h"
-
-#if DN_WITH_NET_CURL
-  #define CURL_STATICLIB
-  #include <curl/curl.h>
-#endif
-
-#if defined(DN_PLATFORM_EMSCRIPTEN)
-  #define DN_WITH_NET_EMSCRIPTEN 1
-#endif
 #include "dn.cpp"
 
 #define DN_SHA3_WITH_TESTS

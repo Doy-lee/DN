@@ -14292,17 +14292,17 @@ DN_NETRequestHandle DN_NET_EmcDoHTTP(DN_NETCore *net, DN_Str8 url, DN_Str8 metho
   // NOTE: Setup the HTTP request via Emscripten
   emscripten_fetch_attr_t fetch_attribs = {};
   {
-    DN_Assert(req->args.payload.data[req->args.payload.size] == 0);
-    DN_Assert(req->url.data[req->url.size] == 0);
+    DN_Assert(req->args.payload.data[req->args.payload.count] == 0);
+    DN_Assert(req->url.data[req->url.count] == 0);
 
     // NOTE: Setup request for emscripten
     emscripten_fetch_attr_init(&fetch_attribs);
 
     fetch_attribs.requestData     = req->args.payload.data;
-    fetch_attribs.requestDataSize = req->args.payload.size;
-    DN_Assert(req->method.size < DN_ArrayCountU(fetch_attribs.requestMethod));
-    DN_Memcpy(fetch_attribs.requestMethod, req->method.data, req->method.size);
-    fetch_attribs.requestMethod[req->method.size] = 0;
+    fetch_attribs.requestDataSize = req->args.payload.count;
+    DN_Assert(req->method.count < DN_ArrayCountU(fetch_attribs.requestMethod));
+    DN_Memcpy(fetch_attribs.requestMethod, req->method.data, req->method.count);
+    fetch_attribs.requestMethod[req->method.count] = 0;
 
     // NOTE: Assign HTTP headers
     if (req->args.headers_size) {
@@ -14316,9 +14316,9 @@ DN_NETRequestHandle DN_NET_EmcDoHTTP(DN_NETCore *net, DN_Str8 url, DN_Str8 metho
 
     // NOTE: Handle basic auth
     if (req->args.flags & DN_NETDoHTTPFlags_BasicAuth) {
-      if (req->args.username.size && req->args.password.size) {
-        DN_Assert(req->args.username.data[req->args.username.size] == 0);
-        DN_Assert(req->args.password.data[req->args.password.size] == 0);
+      if (req->args.username.count && req->args.password.count) {
+        DN_Assert(req->args.username.data[req->args.username.count] == 0);
+        DN_Assert(req->args.password.data[req->args.password.count] == 0);
         fetch_attribs.withCredentials = true;
         fetch_attribs.userName        = req->args.username.data;
         fetch_attribs.password        = req->args.password.data;
@@ -14388,7 +14388,7 @@ void DN_NET_EmcDoWSSend(DN_NETRequestHandle handle, DN_Str8 data, DN_NETWSSend s
       } break;
 
       case DN_NETWSSend_Binary: {
-        result = emscripten_websocket_send_binary(emc_request->socket, data.data, data.size);
+        result = emscripten_websocket_send_binary(emc_request->socket, data.data, data.count);
       } break;
 
       case DN_NETWSSend_Close: {
