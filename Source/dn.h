@@ -1503,6 +1503,25 @@ enum DN_Str8BuilderAdd
   DN_Str8BuilderAdd_Prepend,
 };
 
+#if !defined(DN_OsPathSeperator)
+  #if defined(DN_PLATFORM_WIN32)
+    #define DN_OsPathSeperator "\\"
+  #else
+    #define DN_OsPathSeperator "/"
+  #endif
+  #define DN_OsPathSeperatorStr8 DN_Str8Lit(DN_OsPathSeperator)
+#endif
+
+typedef struct DN_Path DN_Path;
+struct DN_Path
+{
+  bool         has_prefix_path_seperator;
+  DN_Str8Link *head;
+  DN_Str8Link *tail;
+  DN_USize     string_size;
+  DN_U16       links_size;
+};
+
 typedef DN_U32 DN_AgeUnit;
 enum DN_AgeUnit_
 {
@@ -2298,7 +2317,6 @@ enum DN_OSFileRotateFlags_
   DN_OSFileRotateFlags_KeepBaseFile = 1 << 0,
 };
 
-
 enum DN_OSPathInfoType
 {
   DN_OSPathInfoType_Unknown,
@@ -2355,34 +2373,6 @@ enum DN_OSFileAccess_
   DN_OSFileAccess_AppendOnly = 1 << 3, // This flag cannot be combined with any other access mode
   DN_OSFileAccess_ReadWrite  = DN_OSFileAccess_Read | DN_OSFileAccess_Write,
   DN_OSFileAccess_All        = DN_OSFileAccess_ReadWrite | DN_OSFileAccess_Execute | DN_OSFileAccess_AppendOnly,
-};
-
-// NOTE: DN_OSPath
-#if !defined(DN_OSPathSeparator)
-  #if defined(DN_PLATFORM_WIN32)
-    #define DN_OSPathSeparator "\\"
-  #else
-    #define DN_OSPathSeparator "/"
-  #endif
-  #define DN_OSPathSeparatorStr8 DN_Str8Lit(DN_OSPathSeparator)
-#endif
-
-typedef struct DN_OSPathLink DN_OSPathLink;
-struct DN_OSPathLink
-{
-  DN_Str8        string;
-  DN_OSPathLink *next;
-  DN_OSPathLink *prev;
-};
-
-typedef struct DN_OSPath DN_OSPath;
-struct DN_OSPath
-{
-  bool           has_prefix_path_separator;
-  DN_OSPathLink *head;
-  DN_OSPathLink *tail;
-  DN_USize       string_size;
-  DN_U16         links_size;
 };
 
 typedef DN_U32 DN_OSExecFlags;
@@ -3099,7 +3089,7 @@ DN_API void                     DN_Str8x512AppendFmtV                           
 DN_API void                     DN_Str8x1024AppendFmt                                  (DN_Str8x1024 *str, DN_FMT_ATTRIB char const *fmt, ...);
 DN_API void                     DN_Str8x1024AppendFmtV                                 (DN_Str8x1024 *str, DN_FMT_ATTRIB char const *fmt, va_list args);
 
-DN_API DN_Str8x32               DN_Str8x32FromU64                                      (DN_U64 val, char separator);
+DN_API DN_Str8x32               DN_Str8x32FromU64                                      (DN_U64 val, char seperator);
 DN_API bool                     DN_Str8Is                                              (DN_Str8 string, DN_Str8IsFlags flags);
 DN_API char *                   DN_Str8End                                             (DN_Str8 string);
 DN_API DN_Str8                  DN_Str8Subset                                          (DN_Str8 string, DN_USize offset, DN_USize count);
@@ -3175,13 +3165,13 @@ DN_API DN_USize                 DN_Str8SplitAVX512F                             
 DN_API DN_Str8Slice             DN_Str8SplitAllocAVX512F                               (DN_Arena *arena, DN_Str8 string, DN_Str8 delimiter, DN_Str8SplitFlags flags);
 #endif
 
-DN_API DN_Str8                  DN_Str8SliceRender                                     (DN_Str8Slice array, DN_Str8 separator, DN_Arena *arena);
+DN_API DN_Str8                  DN_Str8SliceRender                                     (DN_Str8Slice array, DN_Str8 seperator, DN_Arena *arena);
 DN_API DN_Str8                  DN_Str8RenderSpaceSep                                  (DN_Str8Slice array, DN_Arena *arena);
 DN_API int                      DN_Str8CompareNatural                                  (DN_Str8 lhs, DN_Str8 rhs, DN_Str8EqCase eq_case);
 DN_API int                      DN_Str8CompareLexicographic                            (DN_Str8 lhs, DN_Str8 rhs, DN_Str8EqCase eq_case);
 
 DN_API bool                     DN_Str16Eq                                             (DN_Str16 lhs, DN_Str16 rhs);
-DN_API DN_Str16                 DN_Str16SliceRender                                    (DN_Str16Slice array, DN_Str16 separator, DN_Arena *arena);
+DN_API DN_Str16                 DN_Str16SliceRender                                    (DN_Str16Slice array, DN_Str16 seperator, DN_Arena *arena);
 DN_API DN_Str16                 DN_Str16RenderSpaceSep                                 (DN_Str16Slice array, DN_Arena *arena);
 
 DN_API DN_Str8Builder           DN_Str8BuilderFromArena                                (DN_Arena *arena);
@@ -3216,6 +3206,18 @@ DN_API DN_Str8                  DN_Str8FromStr8BuilderAllocator                 
 DN_API DN_Str8                  DN_Str8FromStr8BuilderArena                            (DN_Str8Builder const *builder, DN_Arena *arena);
 DN_API DN_Str8                  DN_Str8FromStr8BuilderDelimitAllocator                 (DN_Str8Builder const *builder, DN_Str8 delimiter, DN_Allocator allocator);
 DN_API DN_Str8                  DN_Str8FromStr8BuilderDelimitArena                     (DN_Str8Builder const *builder, DN_Str8 delimiter, DN_Arena *arena);
+
+DN_API bool                     DN_PathAddRef                                          (DN_Path *path, DN_Str8 add, DN_Arena *arena);
+DN_API bool                     DN_PathAdd                                             (DN_Path *path, DN_Str8 add, DN_Arena *arena);
+DN_API bool                     DN_PathAddF                                            (DN_Path *path, DN_FMT_ATTRIB char const *fmt, ...);
+DN_API bool                     DN_PathPop                                             (DN_Path *path);
+DN_API DN_Str8                  DN_Str8FromPath                                        (DN_Path const *path, DN_Str8 path_seperator, DN_Allocator allocator);
+DN_API DN_Str8                  DN_Str8FmtPathVArena                                   (DN_Str8 path_seperator, DN_Arena *arena, char const *fmt, va_list args);
+DN_API DN_Str8                  DN_Str8FmtPathArena                                    (DN_Str8 path_seperator, DN_Arena *arena, DN_FMT_ATTRIB char const *fmt, ...);
+DN_API DN_Str8                  DN_Str8FmtPathVPool                                    (DN_Str8 path_seperator, DN_Pool  *pool,  char const *fmt, va_list args);
+DN_API DN_Str8                  DN_Str8FmtPathPool                                     (DN_Str8 path_seperator, DN_Pool  *pool,  DN_FMT_ATTRIB char const *fmt, ...);
+DN_API DN_Str8                  DN_Str8FmtOsPathArena                                  (DN_Arena *arena, DN_FMT_ATTRIB char const *fmt, ...);
+DN_API DN_Str8                  DN_Str8FmtOsPathPool                                   (DN_Pool  *pool,  DN_FMT_ATTRIB char const *fmt, ...);
 
 DN_API int                      DN_UTF8Encode                                          (DN_U8 utf8[4], DN_U32 codepoint);
 DN_API int                      DN_UTF16Encode                                         (DN_U16 utf16[2], DN_U32 codepoint);
@@ -4611,8 +4613,8 @@ DN_API void *                    DN_OS_MemAlloc                               (D
 DN_API void                      DN_OS_MemDealloc                             (void *ptr);
 
 DN_API DN_Date                   DN_OS_DateLocalTimeNow                       ();
-DN_API DN_Str8x32                DN_OS_DateLocalTimeStr8Now                   (char date_separator = '-', char hms_separator = ':');
-DN_API DN_Str8x32                DN_OS_DateLocalTimeStr8                      (DN_Date time, char date_separator = '-', char hms_separator = ':');
+DN_API DN_Str8x32                DN_OS_DateLocalTimeStr8Now                   (char date_seperator = '-', char hms_seperator = ':');
+DN_API DN_Str8x32                DN_OS_DateLocalTimeStr8                      (DN_Date time, char date_seperator = '-', char hms_seperator = ':');
 DN_API DN_U64                    DN_OS_DateUnixTimeNs                         ();
 #define                          DN_OS_DateUnixTimeUs()                       (DN_OS_DateUnixTimeNs() / 1000)
 #define                          DN_OS_DateUnixTimeMs()                       (DN_OS_DateUnixTimeNs() / (1000 * 1000))
@@ -4710,24 +4712,6 @@ DN_API bool                      DN_OS_PathIsFile                             (D
 DN_API bool                      DN_OS_PathIsDir                              (DN_Str8 path);
 DN_API bool                      DN_OS_PathMakeDir                            (DN_Str8 path);
 DN_API bool                      DN_OS_PathIterateDir                         (DN_Str8 path, DN_OSDirIterator *it);
-
-DN_API bool                      DN_OS_PathAddRef                             (DN_Arena *arena, DN_OSPath *fs_path, DN_Str8 path);
-DN_API bool                      DN_OS_PathAdd                                (DN_Arena *arena, DN_OSPath *fs_path, DN_Str8 path);
-DN_API bool                      DN_OS_PathAddF                               (DN_Arena *arena, DN_OSPath *fs_path, DN_FMT_ATTRIB char const *fmt, ...);
-DN_API bool                      DN_OS_PathPop                                (DN_OSPath *fs_path);
-DN_API DN_Str8                   DN_OS_PathBuildWithSeparatorAllocator        (DN_Allocator allocator, DN_OSPath const *fs_path, DN_Str8 path_separator);
-DN_API DN_Str8                   DN_OS_PathToArena                            (DN_Arena *arena, DN_Str8 path, DN_Str8 path_separtor);
-DN_API DN_Str8                   DN_OS_PathToPool                             (DN_Pool  *pool,  DN_Str8 path, DN_Str8 path_separtor);
-DN_API DN_Str8                   DN_OS_PathToFmtArena                         (DN_Arena *arena, DN_Str8 path_separator, DN_FMT_ATTRIB char const *fmt, ...);
-DN_API DN_Str8                   DN_OS_PathToFmtPool                          (DN_Pool  *pool,  DN_Str8 path_separator, DN_FMT_ATTRIB char const *fmt, ...);
-DN_API DN_Str8                   DN_OS_PathArena                              (DN_Arena *arena, DN_Str8 path);
-DN_API DN_Str8                   DN_OS_PathPool                               (DN_Pool  *pool,  DN_Str8 path);
-DN_API DN_Str8                   DN_OS_PathFmtArena                           (DN_Arena *arena, DN_FMT_ATTRIB char const *fmt, ...);
-DN_API DN_Str8                   DN_OS_PathFmtPool                            (DN_Pool  *pool,  DN_FMT_ATTRIB char const *fmt, ...);
-
-#define                          DN_OS_PathBuildFwdSlash(allocator, fs_path)  DN_OS_PathBuildWithSeparatorAllocator(allocator, fs_path, DN_Str8Lit("/"))
-#define                          DN_OS_PathBuildBackSlash(allocator, fs_path) DN_OS_PathBuildWithSeparatorAllocator(allocator, fs_path, DN_Str8Lit("\\"))
-#define                          DN_OS_PathBuild(allocator, fs_path)          DN_OS_PathBuildWithSeparatorAllocator(allocator, fs_path, DN_OSPathSeparatorStr8)
 
 DN_API void                      DN_OS_Exit                                   (int32_t exit_code);
 DN_API DN_OSExecArgs             DN_OS_ExecArgsDefault                        ();

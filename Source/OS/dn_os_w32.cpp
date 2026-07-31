@@ -1,5 +1,3 @@
-#define DN_OS_W32_CPP
-
 #if defined(_CLANGD)
   #define DN_WITH_OS 1
   #include "../dn.h"
@@ -649,9 +647,9 @@ DN_API bool DN_OS_PathIterateDir(DN_Str8 path, DN_OSDirIterator *it)
       // add those characters in this branch, so overwrite the null
       // character, add the glob and re-null terminate the buffer.
       if (needs_asterisks)
-        adjusted_path = DN_OS_PathFmtArena(&scratch.arena, "%.*s*", DN_Str8PrintFmt(path));
+        adjusted_path = DN_Str8FmtOsPathArena(&scratch.arena, "%.*s*", DN_Str8PrintFmt(path));
       else
-        adjusted_path = DN_OS_PathFmtArena(&scratch.arena, "%.*s/*", DN_Str8PrintFmt(path));
+        adjusted_path = DN_Str8FmtOsPathArena(&scratch.arena, "%.*s/*", DN_Str8PrintFmt(path));
     }
 
     path16 = DN_OS_W32Str8ToStr16(&scratch.arena, adjusted_path);

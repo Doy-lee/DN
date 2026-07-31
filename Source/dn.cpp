@@ -3257,22 +3257,22 @@ DN_API void DN_Str8x1024AppendFmtV(DN_Str8x1024 *str, DN_FMT_ATTRIB char const *
   DN_FmtVAppend(str->data, &str->count, sizeof(str->data), fmt, args);
 }
 
-DN_API DN_Str8x32 DN_Str8x32FromU64(DN_U64 val, char separator)
+DN_API DN_Str8x32 DN_Str8x32FromU64(DN_U64 val, char seperator)
 {
   DN_Str8x32 result     = {};
   DN_Str8x32 temp       = DN_Str8x32FromFmt("%" PRIu64, val);
   DN_USize   temp_index = 0;
 
-  // NOTE: Write the digits the first, up to [0, 2] digits that do not need a thousandth separator
-  DN_USize   range_without_separator = temp.count % 3;
-  for (; temp_index < range_without_separator; temp_index++)
+  // NOTE: Write the digits the first, up to [0, 2] digits that do not need a thousandth seperator
+  DN_USize   range_without_seperator = temp.count % 3;
+  for (; temp_index < range_without_seperator; temp_index++)
     result.data[result.count++] = temp.data[temp_index];
 
   // NOTE: Write the subsequent digits and every 3rd digit, add the seperator
   DN_USize   digit_counter = 0;
   for (; temp_index < temp.count; temp_index++, digit_counter++) {
-    if (separator && temp_index && (digit_counter % 3 == 0))
-      result.data[result.count++] = separator;
+    if (seperator && temp_index && (digit_counter % 3 == 0))
+      result.data[result.count++] = seperator;
     result.data[result.count++] = temp.data[temp_index];
   }
   return result;
@@ -3756,8 +3756,8 @@ DN_API DN_Str8 DN_Str8TrimByteOrderMark(DN_Str8 string)
 
 DN_API DN_Str8 DN_Str8FileNameFromPath(DN_Str8 path)
 {
-  DN_Str8             separators[] = {DN_Str8Lit("/"), DN_Str8Lit("\\")};
-  DN_Str8BSplitResult split        = DN_Str8BSplitLastArray(path, separators, DN_ArrayCountU(separators));
+  DN_Str8             seperators[] = {DN_Str8Lit("/"), DN_Str8Lit("\\")};
+  DN_Str8BSplitResult split        = DN_Str8BSplitLastArray(path, seperators, DN_ArrayCountU(seperators));
   DN_Str8             result       = split.rhs.count ? split.rhs : split.lhs;
   return result;
 }
@@ -3785,8 +3785,8 @@ DN_API DN_Str8 DN_Str8FileExtension(DN_Str8 path)
 
 DN_API DN_Str8 DN_Str8FileDirectoryFromPath(DN_Str8 path)
 {
-  DN_Str8             separators[] = {DN_Str8Lit("/"), DN_Str8Lit("\\")};
-  DN_Str8BSplitResult split        = DN_Str8BSplitLastArray(path, separators, DN_ArrayCountU(separators));
+  DN_Str8             seperators[] = {DN_Str8Lit("/"), DN_Str8Lit("\\")};
+  DN_Str8BSplitResult split        = DN_Str8BSplitLastArray(path, seperators, DN_ArrayCountU(seperators));
   DN_Str8             result       = split.rhs.count == 0 ? DN_Str8Lit(".") : split.lhs;
   return result;
 }
@@ -4085,7 +4085,7 @@ DN_API DN_Str8 DN_Str8LineBreakAllocator(DN_Str8 src, DN_USize desired_width, DN
         continue;
       }
 
-      // Check if adding this word (plus separator space) would overflow
+      // Check if adding this word (plus seperator space) would overflow
       DN_USize combined_length = curr_line_length + 1 + split.lhs.count;
       if (combined_length > desired_width) {
         // Commit current line, start new line with current word
@@ -4453,7 +4453,7 @@ DN_API DN_Str8Slice DN_Str8SplitAllocAVX512F(DN_Arena *arena, DN_Str8 string, DN
 }
 #endif // DN_STR8_AVX512F
 
-DN_API DN_Str8 DN_Str8SliceRender(DN_Str8Slice slice, DN_Str8 separator, DN_Arena *arena)
+DN_API DN_Str8 DN_Str8SliceRender(DN_Str8Slice slice, DN_Str8 seperator, DN_Arena *arena)
 {
   DN_Str8 result = {};
   if (!arena)
@@ -4462,7 +4462,7 @@ DN_API DN_Str8 DN_Str8SliceRender(DN_Str8Slice slice, DN_Str8 separator, DN_Aren
   DN_USize total_size = 0;
   for (DN_USize index = 0; index < slice.count; index++) {
     if (index)
-      total_size += separator.count;
+      total_size += seperator.count;
     DN_Str8 item = slice.data[index];
     total_size += item.count;
   }
@@ -4472,8 +4472,8 @@ DN_API DN_Str8 DN_Str8SliceRender(DN_Str8Slice slice, DN_Str8 separator, DN_Aren
     DN_USize write_index = 0;
     for (DN_USize index = 0; index < slice.count; index++) {
       if (index) {
-        DN_Memcpy(result.data + write_index, separator.data, separator.count);
-        write_index += separator.count;
+        DN_Memcpy(result.data + write_index, seperator.data, seperator.count);
+        write_index += seperator.count;
       }
       DN_Str8 item = slice.data[index];
       DN_Memcpy(result.data + write_index, item.data, item.count);
@@ -4592,7 +4592,7 @@ DN_API bool DN_Str16Eq(DN_Str16 lhs, DN_Str16 rhs)
 }
 
 
-DN_API DN_Str16 DN_Str16SliceRender(DN_Str16Slice slice, DN_Str16 separator, DN_Arena *arena)
+DN_API DN_Str16 DN_Str16SliceRender(DN_Str16Slice slice, DN_Str16 seperator, DN_Arena *arena)
 {
   DN_Str16 result = {};
   if (!arena)
@@ -4601,7 +4601,7 @@ DN_API DN_Str16 DN_Str16SliceRender(DN_Str16Slice slice, DN_Str16 separator, DN_
   DN_USize total_size = 0;
   for (DN_USize index = 0; index < slice.count; index++) {
     if (index)
-      total_size += separator.count;
+      total_size += seperator.count;
     DN_Str16 item = slice.data[index];
     total_size += item.count;
   }
@@ -4611,8 +4611,8 @@ DN_API DN_Str16 DN_Str16SliceRender(DN_Str16Slice slice, DN_Str16 separator, DN_
     DN_USize write_index = 0;
     for (DN_USize index = 0; index < slice.count; index++) {
       if (index) {
-        DN_Memcpy(result.data + write_index, separator.data, separator.count * sizeof(result.data[0]));
-        write_index += separator.count;
+        DN_Memcpy(result.data + write_index, seperator.data, seperator.count * sizeof(result.data[0]));
+        write_index += seperator.count;
       }
       DN_Str16 item = slice.data[index];
       DN_Memcpy(result.data + write_index, item.data, item.count * sizeof(result.data[0]));
@@ -4913,6 +4913,188 @@ DN_API DN_Str8 DN_Str8FromStr8BuilderDelimitArena(DN_Str8Builder const *builder,
   DN_Str8 result = DN_Str8FromStr8BuilderDelimitAllocator(builder, delimiter, DN_AllocatorFromArena(arena));
   return result;
 }
+
+DN_API bool DN_PathAddRef(DN_Path *path, DN_Str8 add, DN_Arena *arena)
+{
+  if (!arena || !path)
+    return false;
+
+  if (add.count == 0)
+    return true;
+
+  DN_Str8 const delimiter_array[] = {
+      DN_Str8Lit("\\"),
+      DN_Str8Lit("/")};
+
+  if (path->links_size == 0)
+    path->has_prefix_path_seperator = (add.data[0] == '/');
+
+  for (;;) {
+    DN_Str8BSplitResult delimiter = DN_Str8BSplitArray(add, delimiter_array, DN_ArrayCountU(delimiter_array));
+    for (; delimiter.lhs.data; delimiter = DN_Str8BSplitArray(delimiter.rhs, delimiter_array, DN_ArrayCountU(delimiter_array))) {
+      if (delimiter.lhs.count <= 0)
+        continue;
+
+      DN_Str8Link *link = DN_ArenaNew(arena, DN_Str8Link, DN_ZMem_Yes);
+      if (!link)
+        return false;
+
+      link->string = delimiter.lhs;
+      link->prev   = path->tail;
+      if (path->tail)
+        path->tail->next = link;
+      else
+        path->head = link;
+      path->tail = link;
+      path->links_size += 1;
+      path->string_size += delimiter.lhs.count;
+    }
+
+    if (!delimiter.lhs.data)
+      break;
+  }
+
+  return true;
+}
+
+DN_API bool DN_PathAdd(DN_Path *path, DN_Str8 add, DN_Arena *arena)
+{
+  DN_Str8 copy   = DN_Str8FromStr8Arena(add, arena);
+  bool    result = copy.count ? true : DN_PathAddRef(path, copy, arena);
+  return result;
+}
+
+DN_API bool DN_PathAddF(DN_Path *path, DN_Arena *arena, DN_FMT_ATTRIB char const *fmt, ...)
+{
+  va_list args;
+  va_start(args, fmt);
+  DN_Str8 add = DN_Str8FmtVArena(arena, fmt, args);
+  va_end(args);
+  bool result = DN_PathAddRef(path, add, arena);
+  return result;
+}
+
+DN_API bool DN_PathPop(DN_Path *path)
+{
+  if (!path)
+    return false;
+
+  if (path->tail) {
+    DN_Assert(path->head);
+    path->links_size -= 1;
+    path->string_size -= path->tail->string.count;
+    path->tail = path->tail->prev;
+    if (path->tail)
+      path->tail->next = nullptr;
+    else
+      path->head = nullptr;
+  } else {
+    DN_Assert(!path->head);
+  }
+
+  return true;
+}
+
+DN_API DN_Str8 DN_Str8FromPath(DN_Path const *path, DN_Str8 path_seperator, DN_Allocator allocator)
+{
+  DN_Str8 result = {};
+  if (!path || path->links_size <= 0)
+    return result;
+
+  // NOTE: Each link except the last one needs the path seperator appended to it, '/' or '\\'
+  DN_USize string_size = (path->has_prefix_path_seperator ? path_seperator.count : 0) + path->string_size + ((path->links_size - 1) * path_seperator.count);
+  result               = DN_Str8AllocAllocator(string_size, DN_ZMem_No, allocator);
+  if (result.data) {
+    char *dest = result.data;
+    if (path->has_prefix_path_seperator) {
+      DN_Memcpy(dest, path_seperator.data, path_seperator.count);
+      dest += path_seperator.count;
+    }
+
+    for (DN_Str8Link *link = path->head; link; link = link->next) {
+      DN_Str8 string = link->string;
+      DN_Memcpy(dest, string.data, string.count);
+      dest += string.count;
+
+      if (link != path->tail) {
+        DN_Memcpy(dest, path_seperator.data, path_seperator.count);
+        dest += path_seperator.count;
+      }
+    }
+  }
+
+  result.data[string_size] = 0;
+  return result;
+}
+
+DN_API DN_Str8 DN_Str8FmtVPathArena(DN_Str8 path_seperator, DN_Arena *arena, DN_FMT_ATTRIB char const *fmt, va_list args)
+{
+  DN_TcScratch scratch   = DN_TcScratchBeginArena(&arena, 1);
+  DN_Str8 path           = DN_Str8FmtVArena(arena, fmt, args);
+  DN_Path fs_path        = {};
+  DN_PathAddRef(&fs_path, path, &scratch.arena);
+  DN_Allocator allocator = DN_AllocatorFromArena(arena);
+  DN_Str8      result    = DN_Str8FromPath(&fs_path, path_seperator, allocator);
+  DN_TcScratchEnd(&scratch);
+  return result;
+}
+
+DN_API DN_Str8 DN_Str8FmtPathArena(DN_Str8 path_seperator, DN_Arena *arena, DN_FMT_ATTRIB char const *fmt, ...)
+{
+  DN_TcScratch scratch = DN_TcScratchBeginArena(&arena, 1);
+  va_list args;
+  va_start(args, fmt);
+  DN_Str8 path = DN_Str8FmtVArena(arena, fmt, args);
+  va_end(args);
+
+  DN_Path fs_path = {};
+  DN_PathAddRef(&fs_path, path, &scratch.arena);
+
+  DN_Allocator allocator = DN_AllocatorFromArena(arena);
+  DN_Str8      result    = DN_Str8FromPath(&fs_path, path_seperator, allocator);
+  DN_TcScratchEnd(&scratch);
+  return result;
+}
+
+DN_API DN_Str8 DN_Str8FmtVPathPool(DN_Str8 path_seperator, DN_Pool *pool, DN_FMT_ATTRIB char const *fmt, va_list args)
+{
+  DN_TcScratch scratch = DN_TcScratchBeginArena(&pool->arena, 1);
+  DN_Str8 path         = DN_Str8FmtVPool(pool, fmt, args);
+  DN_Path fs_path      = {};
+  DN_PathAddRef(&fs_path, path, &scratch.arena);
+  DN_Allocator allocator = DN_AllocatorFromPool(pool);
+  DN_Str8      result    = DN_Str8FromPath(&fs_path, path_seperator, allocator);
+  DN_TcScratchEnd(&scratch);
+  return result;
+}
+
+DN_API DN_Str8 DN_Str8FmtPathPool(DN_Str8 path_seperator, DN_Pool *pool, DN_FMT_ATTRIB char const *fmt, ...)
+{
+  va_list args;
+  va_start(args, fmt);
+  DN_Str8 result = DN_Str8FmtVPathPool(path_seperator, pool, fmt, args);
+  va_end(args);
+  return result;
+}
+
+DN_API DN_Str8 DN_Str8FmtOsPathPool(DN_Pool *pool, DN_FMT_ATTRIB char const *fmt, ...)
+{
+  va_list args;
+  va_start(args, fmt);
+  DN_Str8 result = DN_Str8FmtVPathPool(DN_OsPathSeperatorStr8, pool, fmt, args);
+  va_end(args);
+  return result;
+}
+
+DN_API DN_Str8 DN_Str8FmtOsPathArena(DN_Arena *arena, DN_FMT_ATTRIB char const *fmt, ...)
+{
+  va_list args;
+  va_start(args, fmt);
+  DN_Str8 result = DN_Str8FmtVPathArena(DN_OsPathSeperatorStr8, arena, fmt, args);
+  va_end(args);
+  return result;
+}
+
 
 // NOTE: DN_UTF
 DN_API int DN_UTF8Encode(DN_U8 utf8[4], DN_U32 codepoint)
@@ -11611,7 +11793,7 @@ static void DN_OS_LoggerSetFilePathNoMutex_(DN_OSLogger *logger, DN_Pool *pool, 
     logger->file_path = {};
   }
   DN_OS_FileClose(&logger->file);
-  logger->file_path = DN_OS_PathFmtPool(pool, "%.*s", DN_Str8PrintFmt(file_path));
+  logger->file_path = DN_Str8FmtOsPathPool(pool, "%.*s", DN_Str8PrintFmt(file_path));
 
   // NOTE: Clear the sticky file error flag if it was set
   logger->flags &= ~DN_OSLoggerFlags_FileError;
@@ -11634,7 +11816,7 @@ static void DN_OS_DoLogFileSetupAndRotation_(DN_OSLogger *logger)
     // NOTE: Set a default file path to log to if it's not been set yet
     if (logger->file_path.count == 0) {
       DN_Str8      exe_dir           = DN_OS_ExeDir(&scratch.arena);
-      DN_Str8      default_file_path = DN_OS_PathFmtArena(&scratch.arena, "%.*s/dn.log", DN_Str8PrintFmt(exe_dir));
+      DN_Str8      default_file_path = DN_Str8FmtOsPathArena(&scratch.arena, "%.*s/dn.log", DN_Str8PrintFmt(exe_dir));
       DN_OS_LoggerSetFilePathNoMutex_(logger, DN_TcMainPool(), default_file_path);
     }
 
@@ -11833,26 +12015,26 @@ DN_API DN_Arena DN_OS_ArenaFromHeapBasic(DN_U64 size, DN_MemFlags flags)
 }
 
 // NOTE: Date
-DN_API DN_Str8x32 DN_OS_DateLocalTimeStr8(DN_Date time, char date_separator, char hms_separator)
+DN_API DN_Str8x32 DN_OS_DateLocalTimeStr8(DN_Date time, char date_seperator, char hms_seperator)
 {
   DN_Str8x32 result = DN_Str8x32FromFmt("%hu%c%02hhu%c%02hhu %02hhu%c%02hhu%c%02hhu",
                                         time.year,
-                                        date_separator,
+                                        date_seperator,
                                         time.month,
-                                        date_separator,
+                                        date_seperator,
                                         time.day,
                                         time.hour,
-                                        hms_separator,
+                                        hms_seperator,
                                         time.minutes,
-                                        hms_separator,
+                                        hms_seperator,
                                         time.seconds);
   return result;
 }
 
-DN_API DN_Str8x32 DN_OS_DateLocalTimeStr8Now(char date_separator, char hms_separator)
+DN_API DN_Str8x32 DN_OS_DateLocalTimeStr8Now(char date_seperator, char hms_seperator)
 {
   DN_Date    time   = DN_OS_DateLocalTimeNow();
-  DN_Str8x32 result = DN_OS_DateLocalTimeStr8(time, date_separator, hms_separator);
+  DN_Str8x32 result = DN_OS_DateLocalTimeStr8(time, date_seperator, hms_seperator);
   return result;
 }
 
@@ -11863,8 +12045,8 @@ DN_API DN_Str8 DN_OS_ExeDir(DN_Arena *arena)
     return result;
   DN_TcScratch        scratch      = DN_TcScratchBeginArena(&arena, 1);
   DN_Str8             exe_path     = DN_OS_ExePath(&scratch.arena);
-  DN_Str8             separators[] = {DN_Str8Lit("/"), DN_Str8Lit("\\")};
-  DN_Str8BSplitResult split        = DN_Str8BSplitLastArray(exe_path, separators, DN_ArrayCountU(separators));
+  DN_Str8             seperators[] = {DN_Str8Lit("/"), DN_Str8Lit("\\")};
+  DN_Str8BSplitResult split        = DN_Str8BSplitLastArray(exe_path, seperators, DN_ArrayCountU(seperators));
   result                           = DN_Str8FromStr8Arena(split.lhs, arena);
   DN_TcScratchEnd(&scratch);
   return result;
@@ -12190,201 +12372,6 @@ DN_API bool DN_OS_PathIsOlderThan(DN_Str8 path, DN_Str8 check_against)
   DN_OSPathInfo file_info          = DN_OS_PathInfo(path);
   DN_OSPathInfo check_against_info = DN_OS_PathInfo(check_against);
   bool          result             = !file_info.exists || file_info.last_write_time_in_s < check_against_info.last_write_time_in_s;
-  return result;
-}
-
-DN_API bool DN_OS_PathAddRef(DN_Arena *arena, DN_OSPath *fs_path, DN_Str8 path)
-{
-  if (!arena || !fs_path || path.count == 0)
-    return false;
-
-  if (path.count <= 0)
-    return true;
-
-  DN_Str8 const delimiter_array[] = {
-      DN_Str8Lit("\\"),
-      DN_Str8Lit("/")};
-
-  if (fs_path->links_size == 0)
-    fs_path->has_prefix_path_separator = (path.data[0] == '/');
-
-  for (;;) {
-    DN_Str8BSplitResult delimiter = DN_Str8BSplitArray(path, delimiter_array, DN_ArrayCountU(delimiter_array));
-    for (; delimiter.lhs.data; delimiter = DN_Str8BSplitArray(delimiter.rhs, delimiter_array, DN_ArrayCountU(delimiter_array))) {
-      if (delimiter.lhs.count <= 0)
-        continue;
-
-      DN_OSPathLink *link = DN_ArenaNew(arena, DN_OSPathLink, DN_ZMem_Yes);
-      if (!link)
-        return false;
-
-      link->string = delimiter.lhs;
-      link->prev   = fs_path->tail;
-      if (fs_path->tail)
-        fs_path->tail->next = link;
-      else
-        fs_path->head = link;
-      fs_path->tail = link;
-      fs_path->links_size += 1;
-      fs_path->string_size += delimiter.lhs.count;
-    }
-
-    if (!delimiter.lhs.data)
-      break;
-  }
-
-  return true;
-}
-
-DN_API bool DN_OS_PathAdd(DN_Arena *arena, DN_OSPath *fs_path, DN_Str8 path)
-{
-  DN_Str8 copy   = DN_Str8FromStr8Arena(path, arena);
-  bool    result = copy.count ? true : DN_OS_PathAddRef(arena, fs_path, copy);
-  return result;
-}
-
-DN_API bool DN_OS_PathAddF(DN_Arena *arena, DN_OSPath *fs_path, DN_FMT_ATTRIB char const *fmt, ...)
-{
-  va_list args;
-  va_start(args, fmt);
-  DN_Str8 path = DN_Str8FmtVArena(arena, fmt, args);
-  va_end(args);
-  bool result = DN_OS_PathAddRef(arena, fs_path, path);
-  return result;
-}
-
-DN_API bool DN_OS_PathPop(DN_OSPath *fs_path)
-{
-  if (!fs_path)
-    return false;
-
-  if (fs_path->tail) {
-    DN_Assert(fs_path->head);
-    fs_path->links_size -= 1;
-    fs_path->string_size -= fs_path->tail->string.count;
-    fs_path->tail = fs_path->tail->prev;
-    if (fs_path->tail)
-      fs_path->tail->next = nullptr;
-    else
-      fs_path->head = nullptr;
-  } else {
-    DN_Assert(!fs_path->head);
-  }
-
-  return true;
-}
-
-DN_API DN_Str8 DN_OS_PathBuildWithSeparatorAllocator(DN_Allocator allocator, DN_OSPath const *fs_path, DN_Str8 path_separator)
-{
-  DN_Str8 result = {};
-  if (!fs_path || fs_path->links_size <= 0)
-    return result;
-
-  // NOTE: Each link except the last one needs the path separator appended to it, '/' or '\\'
-  DN_USize string_size = (fs_path->has_prefix_path_separator ? path_separator.count : 0) + fs_path->string_size + ((fs_path->links_size - 1) * path_separator.count);
-  result               = DN_Str8AllocAllocator(string_size, DN_ZMem_No, allocator);
-  if (result.data) {
-    char *dest = result.data;
-    if (fs_path->has_prefix_path_separator) {
-      DN_Memcpy(dest, path_separator.data, path_separator.count);
-      dest += path_separator.count;
-    }
-
-    for (DN_OSPathLink *link = fs_path->head; link; link = link->next) {
-      DN_Str8 string = link->string;
-      DN_Memcpy(dest, string.data, string.count);
-      dest += string.count;
-
-      if (link != fs_path->tail) {
-        DN_Memcpy(dest, path_separator.data, path_separator.count);
-        dest += path_separator.count;
-      }
-    }
-  }
-
-  result.data[string_size] = 0;
-  return result;
-}
-
-DN_API DN_Str8 DN_OS_PathToArena(DN_Arena *arena, DN_Str8 path, DN_Str8 path_separator)
-{
-  DN_OSPath fs_path = {};
-  DN_OS_PathAddRef(arena, &fs_path, path);
-  DN_Allocator allocator = DN_AllocatorFromArena(arena);
-  DN_Str8 result         = DN_OS_PathBuildWithSeparatorAllocator(allocator, &fs_path, path_separator);
-  return result;
-}
-
-DN_API DN_Str8 DN_OS_PathToPool(DN_Pool *pool, DN_Str8 path, DN_Str8 path_separator)
-{
-  DN_TcScratch scratch   = DN_TcScratchBeginArena(&pool->arena, 1);
-  DN_OSPath fs_path      = {};
-  DN_OS_PathAddRef(&scratch.arena, &fs_path, path);
-
-  DN_Allocator allocator = DN_AllocatorFromPool(pool);
-  DN_Str8 result         = DN_OS_PathBuildWithSeparatorAllocator(allocator, &fs_path, path_separator);
-  DN_TcScratchEnd(&scratch);
-  return result;
-}
-
-DN_API DN_Str8 DN_OS_PathToFmtArena(DN_Arena *arena, DN_Str8 path_separator, DN_FMT_ATTRIB char const *fmt, ...)
-{
-  DN_TcScratch scratch = DN_TcScratchBeginArena(&arena, 1);
-  va_list    args;
-  va_start(args, fmt);
-  DN_Str8 path = DN_Str8FmtVArena(&scratch.arena, fmt, args);
-  va_end(args);
-  DN_Str8 result = DN_OS_PathToArena(arena, path, path_separator);
-  DN_TcScratchEnd(&scratch);
-  return result;
-}
-
-DN_API DN_Str8 DN_OS_PathToFmtPool(DN_Pool *pool, DN_Str8 path_separator, DN_FMT_ATTRIB char const *fmt, ...)
-{
-  DN_TcScratch scratch = DN_TcScratchBeginArena(&pool->arena, 1);
-  va_list    args;
-  va_start(args, fmt);
-  DN_Str8 path = DN_Str8FmtVArena(&scratch.arena, fmt, args);
-  va_end(args);
-
-  DN_Str8 result = DN_OS_PathToPool(pool, path, path_separator);
-  DN_TcScratchEnd(&scratch);
-  return result;
-}
-
-DN_API DN_Str8 DN_OS_PathArena(DN_Arena *arena, DN_Str8 path)
-{
-  DN_Str8 result = DN_OS_PathToArena(arena, path, DN_OSPathSeparatorStr8);
-  return result;
-}
-
-DN_API DN_Str8 DN_OS_PathPool(DN_Pool *pool, DN_Str8 path)
-{
-  DN_Str8 result = DN_OS_PathToPool(pool, path, DN_OSPathSeparatorStr8);
-  return result;
-}
-
-DN_API DN_Str8 DN_OS_PathFmtArena(DN_Arena *arena, DN_FMT_ATTRIB char const *fmt, ...)
-{
-  DN_TcScratch scratch = DN_TcScratchBeginArena(&arena, 1);
-  va_list    args;
-  va_start(args, fmt);
-  DN_Str8 path = DN_Str8FmtVArena(&scratch.arena, fmt, args);
-  va_end(args);
-  DN_Str8 result = DN_OS_PathArena(arena, path);
-  DN_TcScratchEnd(&scratch);
-  return result;
-}
-
-DN_API DN_Str8 DN_OS_PathFmtPool(DN_Pool *pool, DN_FMT_ATTRIB char const *fmt, ...)
-{
-  DN_TcScratch scratch = DN_TcScratchBeginArena(&pool->arena, 1);
-  va_list    args;
-  va_start(args, fmt);
-  DN_Str8 path = DN_Str8FmtVArena(&scratch.arena, fmt, args);
-  va_end(args);
-  DN_Str8 result = DN_OS_PathPool(pool, path);
-  DN_TcScratchEnd(&scratch);
   return result;
 }
 
