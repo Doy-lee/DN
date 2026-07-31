@@ -6790,6 +6790,12 @@ DN_API DN_V2F32 DN_V2F32Lerp(DN_V2F32 a, DN_F32 t, DN_V2F32 b)
   return result;
 }
 
+DN_API DN_V2F32 DN_V2F32Rotate(DN_V2F32 v, DN_F32 cos_a, DN_F32 sin_a)
+{
+  DN_V2F32 result = DN_V2F32From2N(v.x * cos_a - v.y * sin_a, v.x * sin_a + v.y * cos_a);
+  return result;
+}
+
 DN_API bool operator!=(DN_V2F32 lhs, DN_V2F32 rhs)
 {
   bool result = !(lhs == rhs);

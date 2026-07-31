@@ -3507,10 +3507,16 @@ DN_API DN_V2U16&               operator/=                                       
 DN_API DN_V2U16&               operator-=                                              (DN_V2U16& lhs, DN_V2U16 rhs);
 DN_API DN_V2U16&               operator+=                                              (DN_V2U16& lhs, DN_V2U16 rhs);
 
-#define                        DN_V2U32Zero                                            DN_Literal(DN_V2U32){{(DN_U32)(0), (DN_U32)(0)}}
-#define                        DN_V2U32One                                             DN_Literal(DN_V2U32){{(DN_U32)(1), (DN_U32)(1)}}
-#define                        DN_V2U32From1N(x)                                       DN_Literal(DN_V2U32){{(DN_U32)(x), (DN_U32)(x)}}
-#define                        DN_V2U32From2N(x, y)                                    DN_Literal(DN_V2U32){{(DN_U32)(x), (DN_U32)(y)}}
+// NOTE: DN_V2F32
+// API
+//   DN_V2F32Rotate
+//     Rotate a vector using the precomputed cosine and sine value of the angle (e.g.
+//     `cos_a => cos(your_angle * 2.f * DN_PiF32)` and `sin_a => sinf(your_angle * 2.f * DN_PiF32)`)
+#define                        DN_V2U32Zero                                            DN_Literal(DN_V2U32){{(DN_U32)(0),    (DN_U32)(0)}}
+#define                        DN_V2U32One                                             DN_Literal(DN_V2U32){{(DN_U32)(1),    (DN_U32)(1)}}
+#define                        DN_V2U32From1N(x)                                       DN_Literal(DN_V2U32){{(DN_U32)(x),    (DN_U32)(x)}}
+#define                        DN_V2U32From2N(x, y)                                    DN_Literal(DN_V2U32){{(DN_U32)(x),    (DN_U32)(y)}}
+#define                        DN_V2U32FromV2(v2)                                      DN_Literal(DN_V2U32){{(DN_U32)(v2.x), (DN_U32)(v2.y)}}
 
 #define                        DN_V2F32Zero                                            DN_Literal(DN_V2F32){{(DN_F32)(0),    (DN_F32)(0)}}
 #define                        DN_V2F32One                                             DN_Literal(DN_V2F32){{(DN_F32)(1),    (DN_F32)(1)}}
@@ -3519,6 +3525,7 @@ DN_API DN_V2U16&               operator+=                                       
 #define                        DN_V2F32FromV2(xy)                                      DN_Literal(DN_V2F32){{(DN_F32)(xy).x, (DN_F32)(xy).y}}
 
 DN_API DN_V2F32                DN_V2F32Lerp                                            (DN_V2F32 a, DN_F32 t, DN_V2F32 b);
+DN_API DN_V2F32                DN_V2F32Rotate                                          (DN_V2F32 v, DN_F32 cos_a, DN_F32 sin_a);
 
 DN_API bool                    operator!=                                              (DN_V2F32  lhs, DN_V2F32  rhs);
 DN_API bool                    operator==                                              (DN_V2F32  lhs, DN_V2F32  rhs);
