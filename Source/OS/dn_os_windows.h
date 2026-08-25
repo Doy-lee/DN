@@ -674,9 +674,11 @@
 
   #define SW_HIDE           0
   #define SW_NORMAL         1
+  #define SW_SHOWNORMAL     1
   #define SW_MAXIMIZE       3
   #define SW_SHOWNOACTIVATE 4
   #define SW_SHOW           5
+  #define SW_RESTORE        9
   #define SW_FORCEMINIMIZE  11
 
   extern "C"
@@ -686,7 +688,12 @@
   __declspec(dllimport) UINT __stdcall GetWindowModuleFileNameA(HWND hwnd, LPSTR pszFileName, UINT cchFileNameMax);
   __declspec(dllimport) BOOL __stdcall ShowWindow              (HWND hWnd, int nCmdShow);
   __declspec(dllimport) BOOL __stdcall GetWindowPlacement      (HWND hWnd, WINDOWPLACEMENT *lpwndpl);
-
+  __declspec(dllimport) BOOL __stdcall IsIconic                (HWND hWnd);
+  __declspec(dllimport) BOOL __stdcall BringWindowToTop        (HWND hWnd);
+  __declspec(dllimport) BOOL __stdcall SetForegroundWindow     (HWND hWnd);
+  __declspec(dllimport) HWND __stdcall SetFocus                (HWND hWnd);
+  __declspec(dllimport) HWND __stdcall GetForegroundWindow     ();
+  __declspec(dllimport) BOOL __stdcall SetWindowTextW          (HWND hWnd, LPCWSTR lpString);
   }
 
   // NOTE: um/wininet.h //////////////////////////////////////////////////////////////////////////
@@ -1188,7 +1195,6 @@
   // NOTE: um/shellapi.h /////////////////////////////////////////////////////////////////////////
   extern "C"
   {
-  __declspec(dllimport) HINSTANCE __stdcall ShellExecuteA(HWND hwnd, CHAR const *lpOperation, CHAR const *lpFile, CHAR const *lpParameters, CHAR const *lpDirectory, INT nShowCmd);
   __declspec(dllimport) HINSTANCE __stdcall ShellExecuteW(HWND hwnd, WCHAR const *lpOperation, WCHAR const *lpFile, WCHAR const *lpParameters, WCHAR const *lpDirectory, INT nShowCmd);
   }
 

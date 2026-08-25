@@ -1,6 +1,10 @@
 #if !defined(DN_H)
 #define DN_H
 
+#if defined(_CLANGD)
+  #define DN_WITH_OS 1
+#endif
+
 // NOTE: DN
 
 // Getting Started
@@ -782,6 +786,11 @@ typedef enum DN_ZMem {
   DN_ZMem_Yes, // Memory should be zero-ed out before giving to the callee
 } DN_ZMem;
 
+typedef enum DN_AddType {
+  DN_AddType_Prepend,
+  DN_AddType_Append,
+} DN_AddType;
+
 typedef struct DN_Str8 DN_Str8;
 struct DN_Str8
 {
@@ -1363,22 +1372,30 @@ struct DN_Pool
   DN_U8        align;
 };
 
-typedef struct DN_UTF8DecodeResult DN_UTF8DecodeResult;
-struct DN_UTF8DecodeResult
+typedef struct DN_Utf32FromResult DN_Utf32FromResult;
+struct DN_Utf32FromResult
 {
-  bool    success;
-  DN_Str8 remaining;
-  DN_U32  codepoint;
+  bool     success;
+  DN_Str8  remaining;
+  DN_U32   codepoint;
+  DN_USize byte_count; // Number of bytes from the stream that was decoded
 };
 
-typedef struct DN_UTF8DecodeIterator DN_UTF8DecodeIterator;
-struct DN_UTF8DecodeIterator
+typedef struct DN_Utf32FromIterator DN_Utf32FromUtf8Iterator;
+struct DN_Utf32FromIterator
 {
   bool     init;
   bool     success;
   DN_Str8  remaining;
+  DN_USize bytes_decoded;
   DN_USize codepoint_index;
   DN_U32   codepoint;
+};
+
+enum DN_Utf32IterateDir
+{
+  DN_Utf32IterateDir_Forwards,
+  DN_Utf32IterateDir_Reverse,
 };
 
 typedef DN_U32 DN_CodepointCountFlags;
@@ -1495,12 +1512,6 @@ struct DN_Str8Builder
   DN_Str8Link* tail;        // Last string in the linked list of strings
   DN_USize     string_size; // The size in bytes necessary to construct the current string
   DN_USize     count;       // The number of links in the linked list of strings
-};
-
-enum DN_Str8BuilderAdd
-{
-  DN_Str8BuilderAdd_Append,
-  DN_Str8BuilderAdd_Prepend,
 };
 
 #if !defined(DN_OsPathSeperator)
@@ -1965,11 +1976,6 @@ typedef enum DN_ArrayErase {
   DN_ArrayErase_Unstable,
   DN_ArrayErase_Stable,
 } DN_ArrayErase;
-
-typedef enum DN_ArrayAdd {
-  DN_ArrayAdd_Append,
-  DN_ArrayAdd_Prepend,
-} DN_ArrayAdd;
 
 typedef struct DN_ArrayEraseResult DN_ArrayEraseResult;
 struct DN_ArrayEraseResult
@@ -2447,6 +2453,31 @@ typedef struct DN_OSConditionVariable DN_OSConditionVariable;
 struct DN_OSConditionVariable
 {
   DN_U64 handle;
+};
+
+struct DN_OSWindow
+{
+  DN_UPtr handle;
+};
+
+enum DN_OSWindowShow
+{
+  DN_OSWindowShow_Nil,
+  DN_OSWindowShow_Restore,
+  DN_OSWindowShow_Minimise,
+  DN_OSWindowShow_Maximise,
+};
+
+enum DN_OSWindowMaximise
+{
+  DN_OSWindowMaximise_No,
+  DN_OSWindowMaximise_Yes,
+};
+
+enum DN_OSWindowMinimise
+{
+  DN_OSWindowMinimise_No,
+  DN_OSWindowMinimise_Yes,
 };
 
 typedef DN_I32(DN_OSThreadFunc)(struct DN_OSThread *);
@@ -3178,28 +3209,28 @@ DN_API DN_Str8Builder           DN_Str8BuilderFromArena                         
 DN_API DN_Str8Builder           DN_Str8BuilderFromStr8PtrRef                           (DN_Arena *arena, DN_Str8 const *strings, DN_USize count);
 DN_API DN_Str8Builder           DN_Str8BuilderFromStr8PtrCopy                          (DN_Arena *arena, DN_Str8 const *strings, DN_USize count);
 DN_API DN_Str8Builder           DN_Str8BuilderFromBuilder                              (DN_Arena *arena, DN_Str8Builder const *builder);
-DN_API bool                     DN_Str8BuilderAddArrayRef                              (DN_Str8Builder *builder, DN_Str8 const *strings, DN_USize count, DN_Str8BuilderAdd add);
-DN_API bool                     DN_Str8BuilderAddArrayCopy                             (DN_Str8Builder *builder, DN_Str8 const *strings, DN_USize count, DN_Str8BuilderAdd add);
-DN_API bool                     DN_Str8BuilderAddFV                                    (DN_Str8Builder *builder, DN_Str8BuilderAdd add, DN_FMT_ATTRIB char const *fmt, va_list args);
-#define                         DN_Str8BuilderAppendArrayRef(builder, strings, size)   DN_Str8BuilderAddArrayRef(builder, strings, size, DN_Str8BuilderAdd_Append)
-#define                         DN_Str8BuilderAppendArrayCopy(builder, strings, size)  DN_Str8BuilderAddArrayCopy(builder, strings, size, DN_Str8BuilderAdd_Append)
-#define                         DN_Str8BuilderAppendSliceRef(builder, slice)           DN_Str8BuilderAddArrayRef(builder, slice.data, slice.count, DN_Str8BuilderAdd_Append)
-#define                         DN_Str8BuilderAppendSliceCopy(builder, slice)          DN_Str8BuilderAddArrayCopy(builder, slice.data, slice.count, DN_Str8BuilderAdd_Append)
+DN_API bool                     DN_Str8BuilderAddArrayRef                              (DN_Str8Builder *builder, DN_Str8 const *strings, DN_USize count, DN_AddType add);
+DN_API bool                     DN_Str8BuilderAddArrayCopy                             (DN_Str8Builder *builder, DN_Str8 const *strings, DN_USize count, DN_AddType add);
+DN_API bool                     DN_Str8BuilderAddFV                                    (DN_Str8Builder *builder, DN_AddType add, DN_FMT_ATTRIB char const *fmt, va_list args);
+#define                         DN_Str8BuilderAppendArrayRef(builder, strings, size)   DN_Str8BuilderAddArrayRef(builder, strings, size, DN_AddType_Append)
+#define                         DN_Str8BuilderAppendArrayCopy(builder, strings, size)  DN_Str8BuilderAddArrayCopy(builder, strings, size, DN_AddType_Append)
+#define                         DN_Str8BuilderAppendSliceRef(builder, slice)           DN_Str8BuilderAddArrayRef(builder, slice.data, slice.count, DN_AddType_Append)
+#define                         DN_Str8BuilderAppendSliceCopy(builder, slice)          DN_Str8BuilderAddArrayCopy(builder, slice.data, slice.count, DN_AddType_Append)
 DN_API bool                     DN_Str8BuilderAppendRef                                (DN_Str8Builder *builder, DN_Str8 string);
 DN_API bool                     DN_Str8BuilderAppendCopy                               (DN_Str8Builder *builder, DN_Str8 string);
-#define                         DN_Str8BuilderAppendFV(builder, fmt, args)             DN_Str8BuilderAddFV(builder, DN_Str8BuilderAdd_Append, fmt, args)
+#define                         DN_Str8BuilderAppendFV(builder, fmt, args)             DN_Str8BuilderAddFV(builder, DN_AddType_Append, fmt, args)
 DN_API bool                     DN_Str8BuilderAppendF                                  (DN_Str8Builder *builder, DN_FMT_ATTRIB char const *fmt, ...);
 DN_API bool                     DN_Str8BuilderAppendBytesRef                           (DN_Str8Builder *builder, void const *ptr, DN_USize count);
 DN_API bool                     DN_Str8BuilderAppendBytesCopy                          (DN_Str8Builder *builder, void const *ptr, DN_USize count);
 DN_API bool                     DN_Str8BuilderAppendBuilderRef                         (DN_Str8Builder *dest, DN_Str8Builder const *src);
 DN_API bool                     DN_Str8BuilderAppendBuilderCopy                        (DN_Str8Builder *dest, DN_Str8Builder const *src);
-#define                         DN_Str8BuilderPrependArrayRef(builder, strings, size)  DN_Str8BuilderAddArrayRef(builder, strings, size, DN_Str8BuilderAdd_Prepend)
-#define                         DN_Str8BuilderPrependArrayCopy(builder, strings, size) DN_Str8BuilderAddArrayCopy(builder, strings, size, DN_Str8BuilderAdd_Prepend)
-#define                         DN_Str8BuilderPrependSliceRef(builder, slice)          DN_Str8BuilderAddArrayRef(builder, slice.data, slice.count, DN_Str8BuilderAdd_Prepend)
-#define                         DN_Str8BuilderPrependSliceCopy(builder, slice)         DN_Str8BuilderAddArrayCopy(builder, slice.data, slice.count, DN_Str8BuilderAdd_Prepend)
+#define                         DN_Str8BuilderPrependArrayRef(builder, strings, size)  DN_Str8BuilderAddArrayRef(builder, strings, size, DN_AddType_Prepend)
+#define                         DN_Str8BuilderPrependArrayCopy(builder, strings, size) DN_Str8BuilderAddArrayCopy(builder, strings, size, DN_AddType_Prepend)
+#define                         DN_Str8BuilderPrependSliceRef(builder, slice)          DN_Str8BuilderAddArrayRef(builder, slice.data, slice.count, DN_AddType_Prepend)
+#define                         DN_Str8BuilderPrependSliceCopy(builder, slice)         DN_Str8BuilderAddArrayCopy(builder, slice.data, slice.count, DN_AddType_Prepend)
 DN_API bool                     DN_Str8BuilderPrependRef                               (DN_Str8Builder *builder, DN_Str8 string);
 DN_API bool                     DN_Str8BuilderPrependCopy                              (DN_Str8Builder *builder, DN_Str8 string);
-#define                         DN_Str8BuilderPrependFV(builder, fmt, args)            DN_Str8BuilderAddFV(builder, DN_Str8BuilderAdd_Prepend, fmt, args)
+#define                         DN_Str8BuilderPrependFV(builder, fmt, args)            DN_Str8BuilderAddFV(builder, DN_AddType_Prepend, fmt, args)
 DN_API bool                     DN_Str8BuilderPrependF                                 (DN_Str8Builder *builder, DN_FMT_ATTRIB char const *fmt, ...);
 DN_API bool                     DN_Str8BuilderErase                                    (DN_Str8Builder *builder, DN_Str8 string);
 DN_API DN_Str8                  DN_Str8FromStr8BuilderAllocator                        (DN_Str8Builder const *builder, DN_Allocator allocator);
@@ -3219,11 +3250,19 @@ DN_API DN_Str8                  DN_Str8FmtPathPool                              
 DN_API DN_Str8                  DN_Str8FmtOsPathArena                                  (DN_Arena *arena, DN_FMT_ATTRIB char const *fmt, ...);
 DN_API DN_Str8                  DN_Str8FmtOsPathPool                                   (DN_Pool  *pool,  DN_FMT_ATTRIB char const *fmt, ...);
 
-DN_API int                      DN_UTF8Encode                                          (DN_U8 utf8[4], DN_U32 codepoint);
-DN_API int                      DN_UTF16Encode                                         (DN_U16 utf16[2], DN_U32 codepoint);
-DN_API DN_UTF8DecodeResult      DN_UTF8Decode                                          (DN_Str8 stream);
-DN_API bool                     DN_UTF8DecodeIterate                                   (DN_UTF8DecodeIterator *it, DN_Str8 utf8);
-DN_API DN_USize                 DN_USizeCodepointCountFromUTF8                         (DN_Str8 str, DN_CodepointCountFlags flags);
+DN_API DN_USize                 DN_Utf8FromUtf32                                       (DN_U8 utf8[4], DN_U32 codepoint);
+DN_API bool                     DN_Utf32IsAlphabet                                     (DN_U32 codepoint);
+DN_API bool                     DN_Utf32IsDigit                                        (DN_U32 codepoint);
+DN_API bool                     DN_Utf32IsAlphaNum                                     (DN_U32 codepoint);
+DN_API bool                     DN_Utf32IsWhitespace                                   (DN_U32 codepoint);
+DN_API bool                     DN_Utf32IsHex                                          (DN_U32 codepoint);
+DN_API bool                     DN_Utf32IsWordCharacter                                (DN_U32 codepoint);
+DN_API DN_U32                   DN_Utf32ToLower                                        (DN_U32 codepoint);
+DN_API DN_U32                   DN_Utf32ToUpper                                        (DN_U32 codepoint);
+DN_API DN_USize                 DN_Utf32FromUtf16                                      (DN_U16 utf16[2], DN_U32 codepoint);
+DN_API DN_Utf32FromResult       DN_Utf32FromUtf8Stream                                 (DN_Str8 stream);
+DN_API bool                     DN_Utf32FromUtf8Iterate                                (DN_Utf32FromUtf8Iterator *it, DN_Utf32IterateDir dir, DN_Str8 utf8);
+DN_API DN_USize                 DN_Utf32CodepointCountFromUtf8                         (DN_Str8 str, DN_CodepointCountFlags flags);
 
 DN_API DN_U8                    DN_U8FromHexNibble                                     (char hex);
 DN_API DN_NibbleFromU8Result    DN_NibbleFromU8                                        (DN_U8 u8);
@@ -4004,15 +4043,15 @@ DN_API DN_RaycastV2            DN_RaycastLineIntersectV2                        
   #define DN_PArrayAdd(ptr, ptr_size, max, item, add)                              DN_TArrayAddArray(ptr, ptr_size, max, &item, 1, add)
   #define DN_PArrayAddArena(ptr, ptr_size, ptr_max, arena, item, add)              DN_TArrayAddArrayArena(&(ptr), ptr_size, ptr_max, arena, &item, 1, add)
   #define DN_PArrayAddPool(ptr, ptr_size, ptr_max, pool, item, add)                DN_TArrayAddArrayPool(&(ptr), ptr_size, ptr_max, pool, &item, 1, add)
-  #define DN_PArrayAppendArray(ptr, ptr_size, max, items, count)                   DN_TArrayAddArray(ptr, ptr_size, max, items, count, DN_ArrayAdd_Append)
-  #define DN_PArrayAppend(ptr, ptr_size, max, item)                                DN_TArrayAddArray(ptr, ptr_size, max, &item, 1, DN_ArrayAdd_Append)
-  #define DN_PArrayAppendArena(ptr, ptr_size, ptr_max, arena, item)                DN_TArrayAddArrayArena(&(ptr), ptr_size, ptr_max, arena, &item, 1, DN_ArrayAdd_Append)
-  #define DN_PArrayAppendPool(ptr, ptr_size, ptr_max, pool, item)                  DN_TArrayAddArrayPool(&(ptr), ptr_size, ptr_max, pool, &item, 1, DN_ArrayAdd_Append)
-  #define DN_PArrayAppendAssert(ptr, ptr_size, max, item)                          DN_TArrayAddArrayAssert(ptr, ptr_size, max, &item, 1, DN_ArrayAdd_Append, DN_CallSiteNow)
-  #define DN_PArrayPrependArray(ptr, ptr_size, max, items, count)                  DN_TArrayAddArray(ptr, ptr_size, max, items, count, DN_ArrayAdd_Prepend)
-  #define DN_PArrayPrepend(ptr, ptr_size, max, item)                               DN_TArrayAddArray(ptr, ptr_size, max, &item, 1, DN_ArrayAdd_Prepend)
-  #define DN_PArrayPrependArena(ptr, ptr_size, ptr_max, arena, item)               DN_TArrayAddArrayArena(&(ptr), ptr_size, ptr_max, arena, &item, 1, DN_ArrayAdd_Prepend)
-  #define DN_PArrayPrependPool(ptr, ptr_size, ptr_max, pool, item)                 DN_TArrayAddArrayPool(&(ptr), ptr_size, ptr_max, pool, &item, 1, DN_ArrayAdd_Prepend)
+  #define DN_PArrayAppendArray(ptr, ptr_size, max, items, count)                   DN_TArrayAddArray(ptr, ptr_size, max, items, count, DN_AddType_Append)
+  #define DN_PArrayAppend(ptr, ptr_size, max, item)                                DN_TArrayAddArray(ptr, ptr_size, max, &item, 1, DN_AddType_Append)
+  #define DN_PArrayAppendArena(ptr, ptr_size, ptr_max, arena, item)                DN_TArrayAddArrayArena(&(ptr), ptr_size, ptr_max, arena, &item, 1, DN_AddType_Append)
+  #define DN_PArrayAppendPool(ptr, ptr_size, ptr_max, pool, item)                  DN_TArrayAddArrayPool(&(ptr), ptr_size, ptr_max, pool, &item, 1, DN_AddType_Append)
+  #define DN_PArrayAppendAssert(ptr, ptr_size, max, item)                          DN_TArrayAddArrayAssert(ptr, ptr_size, max, &item, 1, DN_AddType_Append, DN_CallSiteNow)
+  #define DN_PArrayPrependArray(ptr, ptr_size, max, items, count)                  DN_TArrayAddArray(ptr, ptr_size, max, items, count, DN_AddType_Prepend)
+  #define DN_PArrayPrepend(ptr, ptr_size, max, item)                               DN_TArrayAddArray(ptr, ptr_size, max, &item, 1, DN_AddType_Prepend)
+  #define DN_PArrayPrependArena(ptr, ptr_size, ptr_max, arena, item)               DN_TArrayAddArrayArena(&(ptr), ptr_size, ptr_max, arena, &item, 1, DN_AddType_Prepend)
+  #define DN_PArrayPrependPool(ptr, ptr_size, ptr_max, pool, item)                 DN_TArrayAddArrayPool(&(ptr), ptr_size, ptr_max, pool, &item, 1, DN_AddType_Prepend)
 
   #define DN_PArrayEraseRange(ptr, ptr_size, begin_index, count, erase)            DN_TArrayEraseRange(ptr, ptr_size, begin_index, count, erase)
   #define DN_PArrayErase(ptr, ptr_size, index, erase)                              DN_TArrayEraseRange(ptr, ptr_size, index, 1, erase)
@@ -4066,15 +4105,15 @@ DN_API DN_RaycastV2            DN_RaycastLineIntersectV2                        
   #define DN_PArrayAdd(ptr, ptr_size, max, item, add)                          (DN_CppDeclType(&(ptr)[0]))DN_ArrayAddArray(ptr, ptr_size, max, sizeof((ptr)[0]), &item, 1, add)
   #define DN_PArrayAddArena(ptr, ptr_size, max, arena, item, add)              (DN_CppDeclType(&(ptr)[0]))DN_ArrayAddArrayArena((void **)&(ptr), ptr_size, max, sizeof((ptr)[0]), arena, &item, 1, add)
   #define DN_PArrayAddPool(ptr, ptr_size, max, pool, item, add)                (DN_CppDeclType(&(ptr)[0]))DN_ArrayAddArrayPool((void **)&(ptr), ptr_size, max, sizeof((ptr)[0]), pool, &item, 1, add)
-  #define DN_PArrayAppendArray(ptr, ptr_size, max, items, count)               (DN_CppDeclType(&(ptr)[0]))DN_ArrayAddArray(ptr, ptr_size, max, sizeof((ptr)[0]), items, count, DN_ArrayAdd_Append)
-  #define DN_PArrayAppend(ptr, ptr_size, max, item)                            (DN_CppDeclType(&(ptr)[0]))DN_ArrayAddArray(ptr, ptr_size, max, sizeof((ptr)[0]), &item, 1, DN_ArrayAdd_Append)
-  #define DN_PArrayAppendArena(ptr, ptr_size, max, arena, item)                (DN_CppDeclType(&(ptr)[0]))DN_ArrayAddArrayArena((void **)&(ptr), ptr_size, max, sizeof((ptr)[0]), arena, &item, 1, DN_ArrayAdd_Append)
-  #define DN_PArrayAppendPool(ptr, ptr_size, max, pool, item)                  (DN_CppDeclType(&(ptr)[0]))DN_ArrayAddArrayPool((void **)&(ptr), ptr_size, max, sizeof((ptr)[0]), pool, &item, 1, DN_ArrayAdd_Append)
-  #define DN_PArrayAppendAssert(ptr, ptr_size, max, item)                      (DN_CppDeclType(&(ptr)[0]))DN_ArrayAddArrayAssert(ptr, ptr_size, max, sizeof((ptr)[0]), &item, 1, DN_ArrayAdd_Append, DN_CallSiteNow)
-  #define DN_PArrayPrependArray(ptr, ptr_size, max, items, count)              (DN_CppDeclType(&(ptr)[0]))DN_ArrayAddArray(ptr, ptr_size, max, sizeof((ptr)[0]), items, count, DN_ArrayAdd_Prepend)
-  #define DN_PArrayPrepend(ptr, ptr_size, max, item)                           (DN_CppDeclType(&(ptr)[0]))DN_ArrayAddArray(ptr, ptr_size, max, sizeof((ptr)[0]), &item, 1, DN_ArrayAdd_Prepend)
-  #define DN_PArrayPrependArena(ptr, ptr_size, max, arena, item)               (DN_CppDeclType(&(ptr)[0]))DN_ArrayAddArrayArena((void **)&(ptr), ptr_size, max, sizeof((ptr)[0]), arena, &item, 1, DN_ArrayAdd_Prepend)
-  #define DN_PArrayPrependPool(ptr, ptr_size, max, pool, item)                 (DN_CppDeclType(&(ptr)[0]))DN_ArrayAddArrayPool((void **)&(ptr), ptr_size, max, sizeof((ptr)[0]), pool, &item, 1, DN_ArrayAdd_Prepend)
+  #define DN_PArrayAppendArray(ptr, ptr_size, max, items, count)               (DN_CppDeclType(&(ptr)[0]))DN_ArrayAddArray(ptr, ptr_size, max, sizeof((ptr)[0]), items, count, DN_AddType_Append)
+  #define DN_PArrayAppend(ptr, ptr_size, max, item)                            (DN_CppDeclType(&(ptr)[0]))DN_ArrayAddArray(ptr, ptr_size, max, sizeof((ptr)[0]), &item, 1, DN_AddType_Append)
+  #define DN_PArrayAppendArena(ptr, ptr_size, max, arena, item)                (DN_CppDeclType(&(ptr)[0]))DN_ArrayAddArrayArena((void **)&(ptr), ptr_size, max, sizeof((ptr)[0]), arena, &item, 1, DN_AddType_Append)
+  #define DN_PArrayAppendPool(ptr, ptr_size, max, pool, item)                  (DN_CppDeclType(&(ptr)[0]))DN_ArrayAddArrayPool((void **)&(ptr), ptr_size, max, sizeof((ptr)[0]), pool, &item, 1, DN_AddType_Append)
+  #define DN_PArrayAppendAssert(ptr, ptr_size, max, item)                      (DN_CppDeclType(&(ptr)[0]))DN_ArrayAddArrayAssert(ptr, ptr_size, max, sizeof((ptr)[0]), &item, 1, DN_AddType_Append, DN_CallSiteNow)
+  #define DN_PArrayPrependArray(ptr, ptr_size, max, items, count)              (DN_CppDeclType(&(ptr)[0]))DN_ArrayAddArray(ptr, ptr_size, max, sizeof((ptr)[0]), items, count, DN_AddType_Prepend)
+  #define DN_PArrayPrepend(ptr, ptr_size, max, item)                           (DN_CppDeclType(&(ptr)[0]))DN_ArrayAddArray(ptr, ptr_size, max, sizeof((ptr)[0]), &item, 1, DN_AddType_Prepend)
+  #define DN_PArrayPrependArena(ptr, ptr_size, max, arena, item)               (DN_CppDeclType(&(ptr)[0]))DN_ArrayAddArrayArena((void **)&(ptr), ptr_size, max, sizeof((ptr)[0]), arena, &item, 1, DN_AddType_Prepend)
+  #define DN_PArrayPrependPool(ptr, ptr_size, max, pool, item)                 (DN_CppDeclType(&(ptr)[0]))DN_ArrayAddArrayPool((void **)&(ptr), ptr_size, max, sizeof((ptr)[0]), pool, &item, 1, DN_AddType_Prepend)
 
   #define DN_PArrayEraseRange(ptr, ptr_size, begin_index, count, erase)        DN_ArrayEraseRange(ptr, ptr_size, sizeof((ptr)[0]), begin_index, count, erase)
   #define DN_PArrayErase(ptr, ptr_size, index, erase)                          DN_ArrayEraseRange(ptr, ptr_size, sizeof((ptr)[0]), index, 1, erase)
@@ -4199,10 +4238,10 @@ DN_API void*                              DN_ArrayMakeArray              (void *
 DN_API void*                              DN_ArrayMakeArrayAssert        (void *data, DN_USize *count, DN_USize max, DN_USize elem_size, DN_USize make_count, DN_ZMem z_mem, DN_CallSite call_site);
 DN_API void*                              DN_ArrayMakeArrayArena         (void **data, DN_USize *count, DN_USize *max, DN_USize elem_size, DN_Arena *arena, DN_USize make_count, DN_ZMem z_mem);
 DN_API void*                              DN_ArrayMakeArrayPool          (void **data, DN_USize *count, DN_USize *max, DN_USize elem_size, DN_Pool *pool, DN_USize make_count, DN_ZMem z_mem);
-DN_API void*                              DN_ArrayAddArray               (void *data, DN_USize *count, DN_USize max, DN_USize elem_size, void const *elems, DN_USize elems_count, DN_ArrayAdd add);
-DN_API void*                              DN_ArrayAddArrayAssert         (void *data, DN_USize *count, DN_USize max, DN_USize elem_size, void const *elems, DN_USize elems_count, DN_ArrayAdd add, DN_CallSite call_site);
-DN_API void*                              DN_ArrayAddArrayArena          (void **data, DN_USize *count, DN_USize *max, DN_USize elem_size, void const *elems, DN_USize elems_count, DN_Arena *arena, DN_ArrayAdd add);
-DN_API void*                              DN_ArrayAddArrayPool           (void **data, DN_USize *count, DN_USize *max, DN_USize elem_size, void const *elems, DN_USize elems_count, DN_Pool *pool, DN_ArrayAdd add);
+DN_API void*                              DN_ArrayAddArray               (void *data, DN_USize *count, DN_USize max, DN_USize elem_size, void const *elems, DN_USize elems_count, DN_AddType add);
+DN_API void*                              DN_ArrayAddArrayAssert         (void *data, DN_USize *count, DN_USize max, DN_USize elem_size, void const *elems, DN_USize elems_count, DN_AddType add, DN_CallSite call_site);
+DN_API void*                              DN_ArrayAddArrayArena          (void **data, DN_USize *count, DN_USize *max, DN_USize elem_size, void const *elems, DN_USize elems_count, DN_Arena *arena, DN_AddType add);
+DN_API void*                              DN_ArrayAddArrayPool           (void **data, DN_USize *count, DN_USize *max, DN_USize elem_size, void const *elems, DN_USize elems_count, DN_Pool *pool, DN_AddType add);
 DN_API bool                               DN_ArrayResizePool             (void **data, DN_USize *count, DN_USize *max, DN_USize elem_size, DN_Pool *pool, DN_USize new_max);
 DN_API bool                               DN_ArrayResizeArena            (void **data, DN_USize *count, DN_USize *max, DN_USize elem_size, DN_Arena *arena, DN_USize new_max);
 DN_API bool                               DN_ArrayReservePool            (void **data, DN_USize *max, DN_USize elem_size, DN_Pool *pool, DN_USize new_max);
@@ -4225,24 +4264,24 @@ template <typename T> T*                  DN_TArrayMakeArray             (T *dat
 template <typename T> T*                  DN_TArrayMakeArrayAssert       (T *data, DN_USize *count, DN_USize max, DN_USize make_count, DN_ZMem z_mem, DN_CallSite call_site);
 template <typename T> T*                  DN_TArrayMakeArrayAssertZ      (T *data, DN_USize *count, DN_USize max, DN_USize make_count, DN_CallSite call_site);
 template <typename T> T*                  DN_TArrayMakeArrayAssertNoZ    (T *data, DN_USize *count, DN_USize max, DN_USize make_count, DN_CallSite call_site);
-template <typename T> T*                  DN_TArrayAddArray              (T *data, DN_USize *count, DN_USize max, T const *elems, DN_USize elems_count, DN_ArrayAdd add);
-template <typename T> T*                  DN_TArrayAddArrayAssert        (T *data, DN_USize *count, DN_USize max, T const *elems, DN_USize elems_count, DN_ArrayAdd add, DN_CallSite call_site);
+template <typename T> T*                  DN_TArrayAddArray              (T *data, DN_USize *count, DN_USize max, T const *elems, DN_USize elems_count, DN_AddType add);
+template <typename T> T*                  DN_TArrayAddArrayAssert        (T *data, DN_USize *count, DN_USize max, T const *elems, DN_USize elems_count, DN_AddType add, DN_CallSite call_site);
 template <typename T> T*                  DN_TArrayMakeArrayArena        (T **data, DN_USize *count, DN_USize *max, DN_Arena *arena, DN_USize make_count, DN_ZMem z_mem);
 template <typename T> T*                  DN_TArrayMakeArrayArenaZ       (T **data, DN_USize *count, DN_USize *max, DN_Arena *arena, DN_USize make_count);
 template <typename T> T*                  DN_TArrayMakeArrayArenaNoZ     (T **data, DN_USize *count, DN_USize *max, DN_Arena *arena, DN_USize make_count);
 template <typename T> T*                  DN_TArrayMakeArrayPool         (T **data, DN_USize *count, DN_USize *max, DN_Pool *pool, DN_USize make_count, DN_ZMem z_mem);
 template <typename T> T*                  DN_TArrayMakeArrayPoolZ        (T **data, DN_USize *count, DN_USize *max, DN_Pool *pool, DN_USize make_count);
 template <typename T> T*                  DN_TArrayMakeArrayPoolNoZ      (T **data, DN_USize *count, DN_USize *max, DN_Pool *pool, DN_USize make_count);
-template <typename T> T*                  DN_TArrayAddArrayArena         (T **data, DN_USize *count, DN_USize *max, DN_Arena *arena, T const *elems, DN_USize elems_count, DN_ArrayAdd add);
-template <typename T> T*                  DN_TArrayAddArrayPool          (T **data, DN_USize *count, DN_USize *max, DN_Pool *pool, T const *elems, DN_USize elems_count, DN_ArrayAdd add);
+template <typename T> T*                  DN_TArrayAddArrayArena         (T **data, DN_USize *count, DN_USize *max, DN_Arena *arena, T const *elems, DN_USize elems_count, DN_AddType add);
+template <typename T> T*                  DN_TArrayAddArrayPool          (T **data, DN_USize *count, DN_USize *max, DN_Pool *pool, T const *elems, DN_USize elems_count, DN_AddType add);
 template <typename T> T*                  DN_TArrayMakeArena             (T **data, DN_USize *count, DN_USize *max, DN_Arena *arena, DN_ZMem z_mem);
 template <typename T> T*                  DN_TArrayMakeArenaZ            (T **data, DN_USize *count, DN_USize *max, DN_Arena *arena);
 template <typename T> T*                  DN_TArrayMakeArenaNoZ          (T **data, DN_USize *count, DN_USize *max, DN_Arena *arena);
 template <typename T> T*                  DN_TArrayMakePool              (T **data, DN_USize *count, DN_USize *max, DN_Pool *pool, DN_ZMem z_mem);
 template <typename T> T*                  DN_TArrayMakePoolZ             (T **data, DN_USize *count, DN_USize *max, DN_Pool *pool);
 template <typename T> T*                  DN_TArrayMakePoolNoZ           (T **data, DN_USize *count, DN_USize *max, DN_Pool *pool);
-template <typename T> T*                  DN_TArrayAddArena              (T **data, DN_USize *count, DN_USize *max, DN_Arena *arena, T const *elems, DN_USize elems_count, DN_ArrayAdd add);
-template <typename T> T*                  DN_TArrayAddPool               (T **data, DN_USize *count, DN_USize *max, DN_Pool *pool, T const *elems, DN_USize elems_count, DN_ArrayAdd add);
+template <typename T> T*                  DN_TArrayAddArena              (T **data, DN_USize *count, DN_USize *max, DN_Arena *arena, T const *elems, DN_USize elems_count, DN_AddType add);
+template <typename T> T*                  DN_TArrayAddPool               (T **data, DN_USize *count, DN_USize *max, DN_Pool *pool, T const *elems, DN_USize elems_count, DN_AddType add);
 template <typename T> bool                DN_TArrayResizePool            (T **data, DN_USize *count, DN_USize *max, DN_Pool *pool, DN_USize new_max);
 template <typename T> bool                DN_TArrayResizeArena           (T **data, DN_USize *count, DN_USize *max, DN_Arena *arena, DN_USize new_max);
 template <typename T> bool                DN_TArrayReservePool           (T **data, DN_USize *max, DN_Pool *pool, DN_USize new_max);
@@ -4627,6 +4666,7 @@ DN_API bool                      DN_OS_SetEnvVar                              (D
 DN_API DN_OSDiskSpace            DN_OS_DiskSpace                              (DN_Str8 path);
 DN_API DN_Str8                   DN_OS_ExePath                                (DN_Arena *arena);
 DN_API DN_Str8                   DN_OS_ExeDir                                 (DN_Arena *arena);
+DN_API void                      DN_OS_OpenUrl                                (DN_Str8 url);
 DN_API void                      DN_OS_SleepMs                                (DN_UInt milliseconds);
 
 DN_API DN_U64                    DN_OS_PerfCounterNow                         ();
@@ -4742,6 +4782,17 @@ DN_API bool                      DN_OS_ConditionVariableWait                  (D
 DN_API bool                      DN_OS_ConditionVariableWaitUntil             (DN_OSConditionVariable *cv, DN_OSMutex *mutex, DN_U64 end_ts_ms);
 DN_API void                      DN_OS_ConditionVariableSignal                (DN_OSConditionVariable *cv);
 DN_API void                      DN_OS_ConditionVariableBroadcast             (DN_OSConditionVariable *cv);
+
+// NOTE: Windowing
+DN_API DN_OSWindowMinimise       DN_OS_WindowIsMinimised                      (DN_OSWindow *window);
+DN_API DN_OSWindowMaximise       DN_OS_WindowIsMaximised                      (DN_OSWindow *window);
+DN_API void                      DN_OS_WindowSetTitle                         (DN_OSWindow *window, DN_Str8 title);
+DN_API void                      DN_OS_WindowShow                             (DN_OSWindow *window, DN_OSWindowShow min);
+DN_API void                      DN_OS_WindowMaximise                         (DN_OSWindow *window, DN_OSWindowMaximise maximise);
+DN_API void                      DN_OS_WindowMinimise                         (DN_OSWindow *window, DN_OSWindowMinimise minimise);
+DN_API void                      DN_OS_WindowBringToFront                     (DN_OSWindow *window);
+DN_API void                      DN_OS_WindowFocus                            (DN_OSWindow *window);
+DN_API bool                      DN_OS_WindowIsFocused                        (DN_OSWindow *window);
 
 // NOTE: Thread
 // Overview
@@ -5003,14 +5054,14 @@ T *DN_TArrayMakeArrayAssertNoZ(T *data, DN_USize *count, DN_USize max, DN_USize 
 }
 
 template <typename T>
-T *DN_TArrayAddArray(T *data, DN_USize *count, DN_USize max, T const *elems, DN_USize elems_count, DN_ArrayAdd add)
+T *DN_TArrayAddArray(T *data, DN_USize *count, DN_USize max, T const *elems, DN_USize elems_count, DN_AddType add)
 {
   T* result = DN_Cast(T *)DN_ArrayAddArray(data, count, max, sizeof(*elems), elems, elems_count, add);
   return result;
 }
 
 template <typename T>
-T *DN_TArrayAddArrayAssert(T *data, DN_USize *count, DN_USize max, T const *elems, DN_USize elems_count, DN_ArrayAdd add, DN_CallSite call_site)
+T *DN_TArrayAddArrayAssert(T *data, DN_USize *count, DN_USize max, T const *elems, DN_USize elems_count, DN_AddType add, DN_CallSite call_site)
 {
   T* result = DN_Cast(T *)DN_ArrayAddArrayAssert(data, count, max, sizeof(*elems), elems, elems_count, add, call_site);
   return result;
@@ -5059,14 +5110,14 @@ T *DN_TArrayMakeArrayPoolNoZ(T **data, DN_USize *count, DN_USize *max, DN_Pool *
 }
 
 template <typename T>
-T *DN_TArrayAddArrayArena(T **data, DN_USize *count, DN_USize *max, DN_Arena *arena, T const *elems, DN_USize elems_count, DN_ArrayAdd add)
+T *DN_TArrayAddArrayArena(T **data, DN_USize *count, DN_USize *max, DN_Arena *arena, T const *elems, DN_USize elems_count, DN_AddType add)
 {
   T *result = DN_Cast(T *)DN_ArrayAddArrayArena(DN_Cast(void **)data, count, max, sizeof(**data), arena, elems, elems_count, add);
   return result;
 }
 
 template <typename T>
-T *DN_TArrayAddArrayPool(T **data, DN_USize *count, DN_USize *max, DN_Pool *pool, T const *elems, DN_USize elems_count, DN_ArrayAdd add)
+T *DN_TArrayAddArrayPool(T **data, DN_USize *count, DN_USize *max, DN_Pool *pool, T const *elems, DN_USize elems_count, DN_AddType add)
 {
   T *result = DN_Cast(T *)DN_ArrayAddArrayPool(DN_Cast(void **)data, count, max, sizeof(**data), pool, elems, elems_count, add);
   return result;
@@ -5115,14 +5166,14 @@ T *DN_TArrayMakePoolNoZ(T **data, DN_USize *count, DN_USize *max, DN_Pool *pool)
 }
 
 template <typename T>
-T *DN_TArrayAddArena(T **data, DN_USize *count, DN_USize *max, DN_Arena *arena, T const *elems, DN_USize elems_count, DN_ArrayAdd add)
+T *DN_TArrayAddArena(T **data, DN_USize *count, DN_USize *max, DN_Arena *arena, T const *elems, DN_USize elems_count, DN_AddType add)
 {
   T *result = DN_TArrayAddArrayArena(data, count, max, arena, elems, elems_count, add);
   return result;
 }
 
 template <typename T>
-T *DN_TArrayAddPool(T **data, DN_USize *count, DN_USize *max, DN_Pool *pool, T const *elems, DN_USize elems_count, DN_ArrayAdd add)
+T *DN_TArrayAddPool(T **data, DN_USize *count, DN_USize *max, DN_Pool *pool, T const *elems, DN_USize elems_count, DN_AddType add)
 {
   T *result = DN_TArrayAddArrayPool(data, count, max, pool, elems, elems_count, add);
   return result;

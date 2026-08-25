@@ -5,6 +5,7 @@
   #define DN_WITH_NET_CURL 1
   #define DN_ARENA_TEMP_MEM_UAF_GUARD 1
   #include "dn.h"
+  #include <windows.h>
 #endif
 
 #if DN_STR8_AVX512F
@@ -4003,13 +4004,65 @@ DN_API DN_Str8 DN_Str8PadNewLinesArena(DN_Str8 string, DN_Str8 pad_string, DN_Ar
   return result;
 }
 
-DN_API DN_USize DN_USizeCodepointCountFromUTF8(DN_Str8 str, DN_CodepointCountFlags flags)
+DN_API bool DN_Utf32IsAlphabet(DN_U32 codepoint)
+{
+  bool result = (codepoint >= 'A' && codepoint <= 'Z') || (codepoint >= 'a' && codepoint <= 'z');
+  return result;
+}
+
+DN_API bool DN_Utf32IsDigit(DN_U32 codepoint)
+{
+  bool result = (codepoint >= '0' && codepoint <= '9');
+  return result;
+}
+
+DN_API bool DN_Utf32IsAlphaNum(DN_U32 codepoint)
+{
+  bool result = DN_Utf32IsAlphabet(codepoint) || DN_Utf32IsDigit(codepoint);
+  return result;
+}
+
+DN_API bool DN_Utf32IsWhitespace(DN_U32 codepoint)
+{
+  bool result = (codepoint == ' ' || codepoint == '\t' || codepoint == '\n' || codepoint == '\r');
+  return result;
+}
+
+DN_API bool DN_Utf32IsHex(DN_U32 codepoint)
+{
+  bool result = ((codepoint >= 'a' && codepoint <= 'f') || (codepoint >= 'A' && codepoint <= 'F') || (codepoint >= '0' && codepoint <= '9'));
+  return result;
+}
+
+DN_API bool DN_Utf32IsWordCharacter(DN_U32 codepoint)
+{
+  bool result = DN_Utf32IsAlphaNum(codepoint) || codepoint == '_';
+  return result;
+}
+
+DN_API DN_U32 DN_Utf32ToLower(DN_U32 codepoint)
+{
+  DN_U32 result = codepoint;
+  if (result >= 'A' && result <= 'Z')
+    result += 'a' - 'A';
+  return result;
+}
+
+DN_API DN_U32 DN_Utf32ToUpper(DN_U32 codepoint)
+{
+  DN_U32 result = codepoint;
+  if (result >= 'a' && result <= 'z')
+    result -= 'a' - 'A';
+  return result;
+}
+
+DN_API DN_USize DN_Utf32CodepointCountFromUtf8(DN_Str8 str, DN_CodepointCountFlags flags)
 {
   DN_USize result = 0;
 
   if (DN_BitIsNotSet(flags, DN_CodepointCountFlags_SkipAnsiCode)) {
-    DN_UTF8DecodeIterator it = {};
-    while (DN_UTF8DecodeIterate(&it, str))
+    DN_Utf32FromUtf8Iterator it = {};
+    while (DN_Utf32FromUtf8Iterate(&it, DN_Utf32IterateDir_Forwards, str))
       ;
     result = it.codepoint_index;
   } else {
@@ -4033,7 +4086,7 @@ DN_API DN_USize DN_USizeCodepointCountFromUTF8(DN_Str8 str, DN_CodepointCountFla
         continue;
       }
 
-      DN_UTF8DecodeResult decode = DN_UTF8Decode(DN_Str8FromPtr(p, end - p));
+      DN_Utf32FromResult decode = DN_Utf32FromUtf8Stream(DN_Str8FromPtr(p, end - p));
       if (!decode.success)
         break;
       p = decode.remaining.data;
@@ -4130,7 +4183,7 @@ DN_API DN_Str8 DN_Str8Table(DN_Str8 const *rows, DN_USize num_rows, DN_USize num
   for (DN_USize i = 0; i < num_cols; i++) {
     for (DN_USize j = 0; j < num_rows; j++) {
       DN_USize index = j * num_cols + i;
-      col_widths[i]  = DN_Max(col_widths[i], (DN_U16)DN_USizeCodepointCountFromUTF8(rows[index], DN_CodepointCountFlags_SkipAnsiCode));
+      col_widths[i]  = DN_Max(col_widths[i], (DN_U16)DN_Utf32CodepointCountFromUtf8(rows[index], DN_CodepointCountFlags_SkipAnsiCode));
     }
   }
 
@@ -4149,7 +4202,7 @@ DN_API DN_Str8 DN_Str8Table(DN_Str8 const *rows, DN_USize num_rows, DN_USize num
       DN_USize index = (i * num_cols) + j;
       DN_Str8  item  = rows[index];
       DN_Str8BuilderAppendF(&builder, " %.*s", DN_Str8PrintFmt(item));
-      DN_USize item_width = DN_USizeCodepointCountFromUTF8(item, DN_CodepointCountFlags_SkipAnsiCode);
+      DN_USize item_width = DN_Utf32CodepointCountFromUtf8(item, DN_CodepointCountFlags_SkipAnsiCode);
       for (DN_USize k = 0; k < col_widths[j] - item_width; k++)
         DN_Str8BuilderAppendF(&builder, " ");
       DN_Str8BuilderAppendF(&builder, " |");
@@ -4658,7 +4711,7 @@ DN_API DN_Str8Builder DN_Str8BuilderFromBuilder(DN_Arena *arena, DN_Str8Builder 
   return result;
 }
 
-DN_API bool DN_Str8BuilderAddArrayRef(DN_Str8Builder *builder, DN_Str8 const *strings, DN_USize count, DN_Str8BuilderAdd add)
+DN_API bool DN_Str8BuilderAddArrayRef(DN_Str8Builder *builder, DN_Str8 const *strings, DN_USize count, DN_AddType add)
 {
   if (!builder)
     return false;
@@ -4671,7 +4724,7 @@ DN_API bool DN_Str8BuilderAddArrayRef(DN_Str8Builder *builder, DN_Str8 const *st
   if (!links)
     return false;
 
-  if (add == DN_Str8BuilderAdd_Append) {
+  if (add == DN_AddType_Append) {
     for (DN_ForIndexU(index, count)) {
       DN_Str8      string = strings[index];
       DN_Str8Link *link   = links + index;
@@ -4686,7 +4739,7 @@ DN_API bool DN_Str8BuilderAddArrayRef(DN_Str8Builder *builder, DN_Str8 const *st
       builder->string_size += string.count;
     }
   } else {
-    DN_Assert(add == DN_Str8BuilderAdd_Prepend);
+    DN_Assert(add == DN_AddType_Prepend);
     DN_MSVC_WARNING_PUSH
     DN_MSVC_WARNING_DISABLE(6293) // NOTE: Ill-defined loop
     for (DN_USize index = count - 1; index < count; index--) {
@@ -4705,7 +4758,7 @@ DN_API bool DN_Str8BuilderAddArrayRef(DN_Str8Builder *builder, DN_Str8 const *st
   return true;
 }
 
-DN_API bool DN_Str8BuilderAddArrayCopy(DN_Str8Builder *builder, DN_Str8 const *strings, DN_USize count, DN_Str8BuilderAdd add)
+DN_API bool DN_Str8BuilderAddArrayCopy(DN_Str8Builder *builder, DN_Str8 const *strings, DN_USize count, DN_AddType add)
 {
   if (!builder)
     return false;
@@ -4731,7 +4784,7 @@ DN_API bool DN_Str8BuilderAddArrayCopy(DN_Str8Builder *builder, DN_Str8 const *s
   return result;
 }
 
-DN_API bool DN_Str8BuilderAddFV(DN_Str8Builder *builder, DN_Str8BuilderAdd add, DN_FMT_ATTRIB char const *fmt, va_list args)
+DN_API bool DN_Str8BuilderAddFV(DN_Str8Builder *builder, DN_AddType add, DN_FMT_ATTRIB char const *fmt, va_list args)
 {
   DN_Str8 string  = DN_Str8FmtVArena(builder->arena, fmt, args);
   DN_U64  arena_p = DN_MemListPos(builder->arena->mem);
@@ -4743,13 +4796,13 @@ DN_API bool DN_Str8BuilderAddFV(DN_Str8Builder *builder, DN_Str8BuilderAdd add, 
 
 DN_API bool DN_Str8BuilderAppendRef(DN_Str8Builder *builder, DN_Str8 string)
 {
-  bool result = DN_Str8BuilderAddArrayRef(builder, &string, 1, DN_Str8BuilderAdd_Append);
+  bool result = DN_Str8BuilderAddArrayRef(builder, &string, 1, DN_AddType_Append);
   return result;
 }
 
 DN_API bool DN_Str8BuilderAppendCopy(DN_Str8Builder *builder, DN_Str8 string)
 {
-  bool result = DN_Str8BuilderAddArrayCopy(builder, &string, 1, DN_Str8BuilderAdd_Append);
+  bool result = DN_Str8BuilderAddArrayCopy(builder, &string, 1, DN_AddType_Append);
   return result;
 }
 
@@ -4838,13 +4891,13 @@ DN_API bool DN_Str8BuilderAppendBuilderCopy(DN_Str8Builder *dest, DN_Str8Builder
 
 DN_API bool DN_Str8BuilderPrependRef(DN_Str8Builder *builder, DN_Str8 string)
 {
-  bool result = DN_Str8BuilderAddArrayRef(builder, &string, 1, DN_Str8BuilderAdd_Prepend);
+  bool result = DN_Str8BuilderAddArrayRef(builder, &string, 1, DN_AddType_Prepend);
   return result;
 }
 
 DN_API bool DN_Str8BuilderPrependCopy(DN_Str8Builder *builder, DN_Str8 string)
 {
-  bool result = DN_Str8BuilderAddArrayCopy(builder, &string, 1, DN_Str8BuilderAdd_Prepend);
+  bool result = DN_Str8BuilderAddArrayCopy(builder, &string, 1, DN_AddType_Prepend);
   return result;
 }
 
@@ -5095,9 +5148,7 @@ DN_API DN_Str8 DN_Str8FmtOsPathArena(DN_Arena *arena, DN_FMT_ATTRIB char const *
   return result;
 }
 
-
-// NOTE: DN_UTF
-DN_API int DN_UTF8Encode(DN_U8 utf8[4], DN_U32 codepoint)
+DN_API DN_USize DN_Utf8FromUtf32(DN_U8 utf8[4], DN_U32 codepoint)
 {
   // NOTE: Table from https://www.reedbeta.com/blog/programmers-intro-to-unicode/
   // ----------------------------------------+----------------------------+--------------------+
@@ -5138,96 +5189,7 @@ DN_API int DN_UTF8Encode(DN_U8 utf8[4], DN_U32 codepoint)
   return 0;
 }
 
-DN_API DN_UTF8DecodeResult DN_UTF8Decode(DN_Str8 stream)
-{
-  DN_UTF8DecodeResult result = {};
-  result.remaining           = stream;
-  if (stream.count <= 0)
-    return result;
-
-  DN_U8 b0 = DN_Cast(DN_U8)stream.data[0];
-  DN_U8 b1 = DN_Cast(DN_U8)(stream.count >= 2 ? stream.data[1] : 0);
-  DN_U8 b2 = DN_Cast(DN_U8)(stream.count >= 3 ? stream.data[2] : 0);
-  DN_U8 b3 = DN_Cast(DN_U8)(stream.count >= 4 ? stream.data[3] : 0);
-
-  if ((b0 & 0b1000'0000) == 0) {
-    result.codepoint = b0;
-    result.success   = true;
-    result.remaining = DN_Str8FromPtr(stream.data + 1, stream.count - 1);
-    return result;
-  }
-
-  if ((b0 & 0b1110'0000) == 0b1100'0000) {
-    if (stream.count < 2)
-      return result;
-    if ((b1 & 0b1100'0000) != 0b1000'0000)
-      return result;
-    DN_U32 cp = ((b0 & 0b0001'1111) << 6) | ((b1 & 0b0011'1111) << 0);
-    if (cp < 0x80)
-      return result;
-    result.codepoint  = cp;
-    result.success   = true;
-    result.remaining = DN_Str8FromPtr(stream.data + 2, stream.count - 2);
-    return result;
-  }
-
-  if ((b0 & 0b1111'0000) == 0b1110'0000) {
-    if (stream.count < 3)
-      return result;
-    if ((b1 & 0b1100'0000) != 0b1000'0000)
-      return result;
-    if ((b2 & 0b1100'0000) != 0b1000'0000)
-      return result;
-    DN_U32 cp = ((b0 & 0b0000'1111) << 12) | ((b1 & 0b0011'1111) << 6) | ((b2 & 0b0011'1111) << 0);
-    if (cp < 0x800)
-      return result;
-    result.codepoint  = cp;
-    result.success   = true;
-    result.remaining = DN_Str8FromPtr(stream.data + 3, stream.count - 3);
-    return result;
-  }
-
-  if ((b0 & 0b1111'1000) == 0b1111'0000) {
-    if (stream.count < 4)
-      return result;
-    if ((b1 & 0b1100'0000) != 0b1000'0000)
-      return result;
-    if ((b2 & 0b1100'0000) != 0b1000'0000)
-      return result;
-    if ((b3 & 0b1100'0000) != 0b1000'0000)
-      return result;
-    DN_U32 cp = ((b0 & 0b0000'0111) << 18)  |
-                 ((b1 & 0b0011'1111) << 12) |
-                 ((b2 & 0b0011'1111) << 6)  |
-                 ((b3 & 0b0011'1111) << 0);
-    if (cp < 0x10000 || cp > 0x10FFFF)
-      return result;
-    result.codepoint = cp;
-    result.success   = true;
-    result.remaining = DN_Str8FromPtr(stream.data + 4, stream.count - 4);
-    return result;
-  }
-
-  return result;
-}
-
-DN_API bool DN_UTF8DecodeIterate(DN_UTF8DecodeIterator *it, DN_Str8 utf8)
-{
-  if (it->init) {
-    it->codepoint_index++;
-  } else {
-    it->remaining = utf8;
-    it->init      = true;
-  }
-  DN_UTF8DecodeResult decode = DN_UTF8Decode(it->remaining);
-  it->success                = decode.success;
-  it->remaining              = decode.remaining;
-  it->codepoint              = decode.codepoint;
-  bool result                = it->success;
-  return result;
-}
-
-DN_API int DN_UTF16Encode(DN_U16 utf16[2], DN_U32 codepoint)
+DN_API DN_USize DN_Utf32FromUtf16(DN_U16 utf16[2], DN_U32 codepoint)
 {
   // NOTE: Table from https://www.reedbeta.com/blog/programmers-intro-to-unicode/
   // ----------------------------------------+------------------------------------+------------------+
@@ -5252,6 +5214,128 @@ DN_API int DN_UTF16Encode(DN_U16 utf16[2], DN_U32 codepoint)
   return 0;
 }
 
+DN_API DN_Utf32FromResult DN_Utf32FromUtf8Stream(DN_Str8 stream)
+{
+  DN_Utf32FromResult result = {};
+  result.remaining          = stream;
+  if (stream.count <= 0)
+    return result;
+
+  // NOTE: Decompose stream into 4 potential utf8 bytes
+  DN_U8 b0 = DN_Cast(DN_U8)stream.data[0];
+  DN_U8 b1 = DN_Cast(DN_U8)(stream.count >= 2 ? stream.data[1] : 0);
+  DN_U8 b2 = DN_Cast(DN_U8)(stream.count >= 3 ? stream.data[2] : 0);
+  DN_U8 b3 = DN_Cast(DN_U8)(stream.count >= 4 ? stream.data[3] : 0);
+
+  // NOTE: Decode
+  if ((b0 & 0b1000'0000) == 0) {
+    result.codepoint  = b0;
+    result.success    = true;
+    result.remaining  = DN_Str8FromPtr(stream.data + 1, stream.count - 1);
+    result.byte_count = 1;
+    return result;
+  }
+
+  if ((b0 & 0b1110'0000) == 0b1100'0000) {
+    if (stream.count < 2)
+      return result;
+    if ((b1 & 0b1100'0000) != 0b1000'0000)
+      return result;
+    DN_U32 cp = ((b0 & 0b0001'1111) << 6) | ((b1 & 0b0011'1111) << 0);
+    if (cp < 0x80)
+      return result;
+    result.codepoint  = cp;
+    result.success    = true;
+    result.remaining  = DN_Str8FromPtr(stream.data + 2, stream.count - 2);
+    result.byte_count = 2;
+    return result;
+  }
+
+  if ((b0 & 0b1111'0000) == 0b1110'0000) {
+    if (stream.count < 3)
+      return result;
+    if ((b1 & 0b1100'0000) != 0b1000'0000)
+      return result;
+    if ((b2 & 0b1100'0000) != 0b1000'0000)
+      return result;
+    DN_U32 cp = ((b0 & 0b0000'1111) << 12) | ((b1 & 0b0011'1111) << 6) | ((b2 & 0b0011'1111) << 0);
+    if (cp < 0x800)
+      return result;
+    result.codepoint  = cp;
+    result.success    = true;
+    result.remaining  = DN_Str8FromPtr(stream.data + 3, stream.count - 3);
+    result.byte_count = 3;
+    return result;
+  }
+
+  if ((b0 & 0b1111'1000) == 0b1111'0000) {
+    if (stream.count < 4)
+      return result;
+    if ((b1 & 0b1100'0000) != 0b1000'0000)
+      return result;
+    if ((b2 & 0b1100'0000) != 0b1000'0000)
+      return result;
+    if ((b3 & 0b1100'0000) != 0b1000'0000)
+      return result;
+    DN_U32 cp = ((b0 & 0b0000'0111) << 18)  | ((b1 & 0b0011'1111) << 12) | ((b2 & 0b0011'1111) << 6)  | ((b3 & 0b0011'1111) << 0);
+    if (cp < 0x10000 || cp > 0x10FFFF)
+      return result;
+    result.codepoint  = cp;
+    result.success    = true;
+    result.remaining  = DN_Str8FromPtr(stream.data + 4, stream.count - 4);
+    result.byte_count = 4;
+    return result;
+  }
+
+  return result;
+}
+
+DN_API bool DN_Utf32FromUtf8Iterate(DN_Utf32FromUtf8Iterator *it, DN_Utf32IterateDir dir, DN_Str8 utf8)
+{
+  // NOTE: Iterate forwards
+  if (dir == DN_Utf32IterateDir_Forwards) {
+    if (it->init) {
+      it->codepoint_index++;
+    } else {
+      it->remaining = utf8;
+      it->init      = true;
+    }
+    DN_Utf32FromResult decode = DN_Utf32FromUtf8Stream(it->remaining);
+    it->success               = decode.success;
+    it->remaining             = decode.remaining;
+    it->codepoint             = decode.codepoint;
+    it->bytes_decoded        += decode.byte_count;
+  }
+
+  // NOTE: Or otherwise iterate backwards
+  if (dir == DN_Utf32IterateDir_Reverse) {
+    bool first_time = it->init == false;
+    if (first_time) {
+      it->remaining = utf8;
+      it->init      = true;
+    }
+
+    it->success = false;
+    for (DN_USize codepoint_size = 1; codepoint_size <= 4; codepoint_size++) {
+      DN_Str8            utf8_stream = DN_Str8Subset(it->remaining, it->remaining.count - codepoint_size, codepoint_size);
+      DN_Utf32FromResult utf32_from  = DN_Utf32FromUtf8Stream(utf8_stream);
+      if (utf32_from.success) {
+        DN_Assert(utf32_from.byte_count <= it->remaining.count);
+        it->success        = true;
+        it->remaining      = DN_Str8FromPtr(it->remaining.data, it->remaining.count - utf32_from.byte_count);
+        it->bytes_decoded += utf32_from.byte_count;
+        it->codepoint      = utf32_from.codepoint;
+        break;
+      }
+    }
+
+    if (!first_time && it->success)
+      it->codepoint_index++;
+  }
+
+  bool result = it->success;
+  return result;
+}
 
 DN_API DN_U8 DN_U8FromHexNibble(char hex)
 {
@@ -8593,13 +8677,14 @@ DN_API void *DN_ArrayMakeArrayPool(void **data, DN_USize *count, DN_USize *max, 
   return result;
 }
 
-DN_API void *DN_ArrayAddArray(void *data, DN_USize *count, DN_USize max, DN_USize elem_size, void const *elems, DN_USize elems_count, DN_ArrayAdd add)
+DN_API void *DN_ArrayAddArray(void *data, DN_USize *count, DN_USize max, DN_USize elem_size, void const *elems, DN_USize elems_count, DN_AddType add)
 {
   void *result = DN_ArrayMakeArray(data, count, max, elem_size, elems_count, DN_ZMem_No);
   if (result) {
-    if (add == DN_ArrayAdd_Append) {
+    if (add == DN_AddType_Append) {
       DN_Memcpy(result, elems, elems_count * elem_size);
     } else {
+      DN_Assert(add == DN_AddType_Prepend);
       char *move_dest = DN_Cast(char *)data + (elems_count * elem_size); // Shift elements forward
       char *move_src  = DN_Cast(char *)data;
       DN_Memmove(move_dest, move_src, elem_size * count[0]);
@@ -8609,7 +8694,7 @@ DN_API void *DN_ArrayAddArray(void *data, DN_USize *count, DN_USize max, DN_USiz
   return result;
 }
 
-DN_API void *DN_ArrayAddArrayArena(void **data, DN_USize *count, DN_USize *max, DN_USize elem_size, DN_Arena *arena, void const *elems, DN_USize elems_count, DN_ArrayAdd add)
+DN_API void *DN_ArrayAddArrayArena(void **data, DN_USize *count, DN_USize *max, DN_USize elem_size, DN_Arena *arena, void const *elems, DN_USize elems_count, DN_AddType add)
 {
   void *result = nullptr;
   if (DN_ArrayPrepareArena(data, *count, max, elem_size, arena, elems_count))
@@ -8617,7 +8702,7 @@ DN_API void *DN_ArrayAddArrayArena(void **data, DN_USize *count, DN_USize *max, 
   return result;
 }
 
-DN_API void *DN_ArrayAddArrayPool(void **data, DN_USize *count, DN_USize *max, DN_USize elem_size, DN_Pool *pool, void const *elems, DN_USize elems_count, DN_ArrayAdd add)
+DN_API void *DN_ArrayAddArrayPool(void **data, DN_USize *count, DN_USize *max, DN_USize elem_size, DN_Pool *pool, void const *elems, DN_USize elems_count, DN_AddType add)
 {
   void *result = nullptr;
   if (DN_ArrayPreparePool(data, *count, max, elem_size, pool, elems_count))
@@ -8625,7 +8710,7 @@ DN_API void *DN_ArrayAddArrayPool(void **data, DN_USize *count, DN_USize *max, D
   return result;
 }
 
-DN_API void *DN_ArrayAddArrayAssert(void *data, DN_USize *count, DN_USize max, DN_USize elem_size, void const *elems, DN_USize elems_count, DN_ArrayAdd add, DN_CallSite call_site)
+DN_API void *DN_ArrayAddArrayAssert(void *data, DN_USize *count, DN_USize max, DN_USize elem_size, void const *elems, DN_USize elems_count, DN_AddType add, DN_CallSite call_site)
 {
   void *result = DN_ArrayAddArray(data, count, max, elem_size, elems, elems_count, add);
   DN_AssertCallSiteF(result, call_site, "Array out of space, failed to add %zu items: array=%p size=%zu max=%zu", elems_count, data, *count, max);
@@ -12052,6 +12137,14 @@ DN_API DN_Str8 DN_OS_ExeDir(DN_Arena *arena)
   return result;
 }
 
+DN_API void DN_OS_OpenUrl(DN_Str8 url)
+{
+  DN_TcScratch scratch = DN_TcScratchBeginArena(nullptr, 0);
+  DN_Str16 url16       = DN_OS_W32Str8ToStr16(&scratch.arena, url);
+  ShellExecuteW(0, L"open", (WCHAR *)url16.data, 0, 0, SW_SHOWNORMAL);
+  DN_TcScratchEnd(&scratch);
+}
+
 // NOTE: Counters
 DN_API DN_F64 DN_OS_PerfCounterS(uint64_t begin, uint64_t end)
 {
@@ -12400,6 +12493,32 @@ DN_API DN_OSExecResult DN_OS_ExecOrAbort(DN_Str8Slice cmd_line, DN_OSExecArgs ar
     DN_ErrSinkEndExitIfErrorF(error, result.exit_code, "OS executed command and returned non-zero exit code %u", result.exit_code);
   DN_ErrSinkEndIgnore(error);
   return result;
+}
+
+DN_API void DN_OS_WindowMaximise(DN_OSWindow *window, DN_OSWindowMaximise maximise)
+{
+  DN_OSWindowMaximise is_maximised = DN_OS_WindowIsMaximised(window);
+  if (is_maximised != maximise) {
+    DN_OSWindowShow show = DN_OSWindowShow_Nil;
+    switch (maximise) {
+      case DN_OSWindowMaximise_No:  show = DN_OSWindowShow_Restore; break;
+      case DN_OSWindowMaximise_Yes: show = DN_OSWindowShow_Maximise; break;
+    }
+    DN_OS_WindowShow(window, show);
+  }
+}
+
+DN_API void DN_OS_WindowMinimise(DN_OSWindow *window, DN_OSWindowMinimise minimise)
+{
+  DN_OSWindowMinimise is_minimised = DN_OS_WindowIsMinimised(window);
+  if (is_minimised != minimise) {
+    DN_OSWindowShow show = DN_OSWindowShow_Nil;
+    switch (minimise) {
+      case DN_OSWindowMinimise_No:  show = DN_OSWindowShow_Restore; break;
+      case DN_OSWindowMinimise_Yes: show = DN_OSWindowShow_Minimise; break;
+    }
+    DN_OS_WindowShow(window, show);
+  }
 }
 
 static void DN_OS_ThreadExecute_(void *user_context)

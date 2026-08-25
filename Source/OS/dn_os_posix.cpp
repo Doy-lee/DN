@@ -1274,6 +1274,53 @@ DN_API void DN_OS_ConditionVariableBroadcast(DN_OSConditionVariable *cv)
   }
 }
 
+DN_API DN_OSWindowMinimise DN_OS_WindowIsMinimised(DN_OSWindow *window)
+{
+  (void)window;
+  DN_AssertInvalidCodePath;
+  return DN_OSWindowMinimise_No;
+}
+
+DN_API DN_OSWindowMaximise DN_OS_WindowIsMaximised(DN_OSWindow *window)
+{
+  (void)window;
+  DN_AssertInvalidCodePath;
+  return DN_OSWindowMaximise_No;
+}
+
+DN_API void DN_OS_WindowSetTitle(DN_OSWindow *window, DN_Str8 title)
+{
+  (void)window;
+  (void)title;
+  DN_AssertInvalidCodePath;
+}
+
+DN_API void DN_OS_WindowShow(DN_OSWindow *window, DN_OSWindowShow show)
+{
+  (void)window;
+  (void)show;
+  DN_AssertInvalidCodePath;
+}
+
+DN_API void DN_OS_WindowBringToFront(DN_OSWindow *window)
+{
+  (void)window;
+  DN_AssertInvalidCodePath;
+}
+
+DN_API void DN_OS_WindowFocus(DN_OSWindow *window)
+{
+  (void)window;
+  DN_AssertInvalidCodePath;
+}
+
+DN_API bool DN_OS_WindowIsFocused(DN_OSWindow *window)
+{
+  (void)window;
+  DN_AssertInvalidCodePath;
+  return false;
+}
+
 // NOTE: DN_OSThread
 static void *DN_OS_ThreadFunc_(void *user_context)
 {

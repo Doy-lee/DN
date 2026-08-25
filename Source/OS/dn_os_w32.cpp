@@ -2,6 +2,7 @@
   #define DN_WITH_OS 1
   #include "../dn.h"
   #include "dn_os_w32.h"
+  #include <windows.h>
 #endif
 
 // NOTE: DN_Mem
@@ -1285,6 +1286,70 @@ DN_API void DN_OS_ConditionVariableBroadcast(DN_OSConditionVariable *cv)
     DN_OSW32SyncPrimitive *primitive = DN_OS_U64ToW32SyncPrimitive_(cv->handle);
     WakeAllConditionVariable(&primitive->cv);
   }
+}
+
+DN_API DN_OSWindowMinimise DN_OS_WindowIsMinimised(DN_OSWindow *window)
+{
+  HWND                hwnd   = window ? DN_Cast(HWND) window->handle : nullptr;
+  DN_OSWindowMinimise result = DN_OSWindowMinimise_No;
+  if (hwnd && IsIconic(hwnd) != 0)
+    result = DN_OSWindowMinimise_Yes;
+  return result;
+}
+
+DN_API DN_OSWindowMaximise DN_OS_WindowIsMaximised(DN_OSWindow *window)
+{
+  HWND                hwnd   = window ? DN_Cast(HWND) window->handle : nullptr;
+  DN_OSWindowMaximise result = DN_OSWindowMaximise_No;
+  if (hwnd && IsZoomed(hwnd) != 0)
+    result = DN_OSWindowMaximise_Yes;
+  return result;
+}
+
+DN_API void DN_OS_WindowSetTitle(DN_OSWindow *window, DN_Str8 title)
+{
+  HWND hwnd = window ? DN_Cast(HWND) window->handle : nullptr;
+  if (hwnd) {
+    DN_TcScratch scratch = DN_TcScratchBeginArena(nullptr, 0);
+    DN_Str16     title16 = DN_OS_W32Str8ToStr16(&scratch.arena, title);
+    SetWindowTextW(hwnd, (WCHAR *)title16.data);
+    DN_TcScratchEnd(&scratch);
+  }
+}
+
+DN_API void DN_OS_WindowShow(DN_OSWindow *window, DN_OSWindowShow show)
+{
+  switch (show) {
+    case DN_OSWindowShow_Nil:      break;
+    case DN_OSWindowShow_Restore:  ShowWindow(DN_Cast(HWND)window->handle, SW_RESTORE); break;
+    case DN_OSWindowShow_Minimise: ShowWindow(DN_Cast(HWND)window->handle, SW_MINIMIZE); break;
+    case DN_OSWindowShow_Maximise: ShowWindow(DN_Cast(HWND)window->handle, SW_MAXIMIZE); break;
+  }
+}
+
+DN_API void DN_OS_WindowBringToFront(DN_OSWindow *window)
+{
+  HWND hwnd = window ? DN_Cast(HWND)window->handle : nullptr;
+  if (hwnd)
+    BringWindowToTop(hwnd);
+}
+
+DN_API void DN_OS_WindowFocus(DN_OSWindow *window)
+{
+  HWND hwnd = window ? DN_Cast(HWND)window->handle : nullptr;
+  if (hwnd) {
+    SetForegroundWindow(hwnd);
+    SetFocus(hwnd);
+  }
+}
+
+DN_API bool DN_OS_WindowIsFocused(DN_OSWindow *window)
+{
+  bool result = false;
+  HWND hwnd   = window ? DN_Cast(HWND) window->handle : nullptr;
+  if (hwnd)
+    result = hwnd == GetForegroundWindow();
+  return result;
 }
 
 static DWORD __stdcall DN_OS_ThreadFunc_(void *user_context)
